@@ -2,6 +2,8 @@
 
 namespace Smaily_WC;
 
+use Smaily_Logger;
+
 /**
  * Newsletter subscriber sync with Smaily contacts
  * Send subscriber to Smaily mailing list when user updates profile
@@ -9,9 +11,21 @@ namespace Smaily_WC;
 class Subscriber_Synchronization {
 
 	/**
+	 * Service name.
+	 * @var string
+	 */
+	const SERVICE = 'woocommerce_subscriber_synchronization';
+
+	/**
 	 * @var \Smaily_Options Instance of Smaily_Options.
 	 */
 	private $options;
+
+	/**
+	 * Logger.
+	 * @var Smaily_Logger
+	 */
+	private $logger;
 
 	/**
 	 * Constructor.
@@ -20,6 +34,7 @@ class Subscriber_Synchronization {
 	 */
 	public function __construct( \Smaily_Options $options ) {
 		$this->options = $options->get_settings();
+		$this->logger  = new Smaily_Logger( self::SERVICE );
 	}
 
 	/**
@@ -141,9 +156,22 @@ class Subscriber_Synchronization {
 			$data['email'] = sanitize_text_field( wp_unslash( $_POST['billing_email'] ) );
 		}
 
-		// Make API call  to Smaily for subscriber update.
-		if ( isset( $data['email'] ) ) {
-			\Smaily_Request::post( 'contact', array( 'body' => $data ) );
+		if ( ! isset( $data['email'] ) ) {
+			return;
+		}
+
+		$response = \Smaily_Request::post( 'contact', array( 'body' => $data ) );
+
+		if ( empty( $response ) ) {
+			return $this->logger->error( sprintf( 'Failed to subscribe customer during checkout. The order with id "%d" failed with unknown error.', $order_id ) );
+		}
+
+		if ( isset( $response['error'] ) ) {
+			return $this->logger->error( sprintf( 'Failed to subscribe customer during checkout. The order with id "%d" failed with an error: %s', $order_id, $response['error'] ) );
+		}
+
+		if ( isset( $response['body']['code'] ) && $response['body']['code'] !== 101 ) {
+			return $this->logger->error( sprintf( 'Failed to subscribe customer during checkout: %s', wp_json_encode( $response ) ) );
 		}
 	}
 
@@ -161,15 +189,15 @@ class Subscriber_Synchronization {
 		$response = \Smaily_Request::post( 'contact', array( 'body' => $data ) );
 
 		if ( empty( $response ) ) {
-			\Smaily_Logger::error( sprintf( 'Updating subscriber with id "%d" failed with unknown error', $user_id ) );
+			return $this->logger->error( sprintf( 'Updating subscriber with id "%d" failed with unknown error', $user_id ) );
 		}
 
 		if ( isset( $response['error'] ) ) {
-			\Smaily_Logger::error( sprintf( 'Updating subscriber with id "%d" failed with an error: %s', $user_id, $response['error'] ) );
+			return $this->logger->error( sprintf( 'Updating subscriber with id "%d" failed with an error: %s', $user_id, $response['error'] ) );
 		}
 
 		if ( isset( $response['body']['code'] ) && $response['body']['code'] !== 101 ) {
-			\Smaily_Logger::error( sprintf( 'Updating subscriber failed: %s', wp_json_encode( $response ) ) );
+			return $this->logger->error( sprintf( 'Updating subscriber failed: %s', wp_json_encode( $response ) ) );
 		}
 	}
 }

@@ -1,88 +1,77 @@
 <?php
-/**
- * We use file operations outside WP to make directories in recursive mode and appending logs to file end instead of always writing new files.
- *
- * phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_mkdir, WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
- */
 
 /**
- * Logger class for smaily plugin logging
+ * Logger class for Smaily plugin logging.
  */
 class Smaily_Logger {
 
+	const LEVEL_INFO    = 'info';
+	const LEVEL_WARNING = 'warning';
+	const LEVEL_ERROR   = 'error';
 
 	/**
-	 * Folder path where logs are stored.
+	 * The service using the logger.
 	 *
+	 * @var string
 	 */
-	const LOG_DIR = SMAILY_PLUGIN_PATH . 'logs';
+	protected $service;
 
 	/**
-	 * File path where logs are stored.
-	 *
+	 * Constructor for instance-based logging.
+	 * @param string $service
 	 */
-	const LOG_FILE = self::LOG_DIR . '/debug.log';
-
-	/**
-	 * .htaccess file path to mitigate folder traversal.
-	 *
-	 */
-	const HTACCESS_FILE = self::LOG_DIR . '/.htaccess';
-
-	/**
-	 * Log a message to the WordPress debug log.
-	 *
-	 * @param string $message The message to log.
-	 * @param string $level The log level (e.g., 'info', 'warning', 'error').
-	 */
-	public static function log( $message, $level = 'info' ) {
-		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
-			return;
-		}
-
-		if ( ! defined( 'WP_DEBUG_LOG' ) || ! WP_DEBUG_LOG ) {
-			return;
-		}
-
-		$log_message = sprintf( '[%s] %s: %s', current_time( 'mysql' ), strtoupper( $level ), $message );
-
-		// Check if the logs directory exists, if not create it.
-		if ( ! is_dir( self::LOG_DIR ) ) {
-			mkdir( self::LOG_DIR, 0755, true );
-
-			// Create .htaccess file to prevent direct access.
-			$htaccess_content = 'Deny from all';
-			file_put_contents( self::HTACCESS_FILE, $htaccess_content );
-		}
-
-		// Write the log message to the log file.
-		file_put_contents( self::LOG_FILE, $log_message . PHP_EOL, FILE_APPEND );
+	public function __construct( $service ) {
+		$this->service = $service;
 	}
 
 	/**
-	 * Log an informational message.
+	 * Log an info message.
 	 *
-	 * @param string $message The message to log.
+	 * @param string|array|object $message
+	 * @return void
 	 */
-	public static function info( $message ) {
-		self::log( $message, 'info' );
+	public function info( $message ) {
+		$this->log( $message, self::LEVEL_INFO );
 	}
 
 	/**
 	 * Log a warning message.
 	 *
-	 * @param string $message The message to log.
+	 * @param string|array|object $message
+	 * @return void
 	 */
-	public static function warning( $message ) {
-		self::log( $message, 'warning' );
+	public function warning( $message ) {
+		$this->log( $message, self::LEVEL_WARNING );
 	}
 
 	/**
 	 * Log an error message.
 	 *
-	 * @param string $message The message to log.
+	 * @param string|array|object $message
+	 * @return void
 	 */
-	public static function error( $message ) {
-		self::log( $message, 'error' );
+	public function error( $message ) {
+		$this->log( $message, self::LEVEL_ERROR );
+	}
+
+	/**
+	 * Log a message.
+	 *
+	 * @param string|array|object $message The message to log.
+	 * @param string $level The log level (e.g., 'info', 'warning', 'error').
+	 */
+	private function log( $message, $level ) {
+		if ( empty( $message ) || empty( $level ) ) {
+			return;
+		}
+
+		if ( is_array( $message ) || is_object( $message ) ) {
+			$message = wp_json_encode( $message );
+		}
+
+		$message = sprintf( 'PHP %s: Smaily-%s: %s', strtoupper( $level ), $this->service, $message );
+
+		// phpcs:disable WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log( $message );
 	}
 }

@@ -11,6 +11,21 @@
 
 class Smaily_Lifecycle {
 
+	/**
+	 * Service name.
+	 * @var string
+	 */
+	const SERVICE = 'lifecycle';
+
+	/**
+	 * Logger.
+	 * @var Smaily_Logger
+	 */
+	private $logger;
+
+	public function __construct() {
+		$this->logger = new Smaily_Logger( self::SERVICE );
+	}
 
 	/**
 	 * Callback for plugin activation hook.
@@ -26,6 +41,7 @@ class Smaily_Lifecycle {
 		}
 
 		$this->run_migrations();
+		$this->logger->info( 'Plugin activated' );
 	}
 
 	/**
@@ -38,7 +54,6 @@ class Smaily_Lifecycle {
 	 * Additionally, it flushes the rewrite rules.
 	 */
 	private function set_scheduled_actions() {
-
 		// Check if the daily sync action is already scheduled.
 		if ( ! wp_next_scheduled( 'smaily_cron_sync_contacts' ) ) {
 			// Add Cron job to sync customers.
@@ -110,6 +125,7 @@ class Smaily_Lifecycle {
 		wp_clear_scheduled_hook( 'smaily_cron_sync_contacts' );
 		wp_clear_scheduled_hook( 'smaily_cron_abandoned_carts_email' );
 		wp_clear_scheduled_hook( 'smaily_cron_abandoned_carts_status' );
+		$this->logger->info( 'Plugin deactivated' );
 	}
 
 	/**
