@@ -1,0 +1,50 @@
+.wp-block-smaily-newsletter-block-wrapper {
+	border-radius: 7px;
+	padding: 16px 24px;
+
+	.smaily-newsletter-block-notice-container {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-bottom: 16px;
+		color: var(--wp--preset--color--contrast, #000);
+	}
+
+	.smaily-newsletter-block-form-control {
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+		margin-bottom: 8px;
+
+		label {
+			display: block;
+			font-size: 11px;
+			font-weight: 500;
+			line-height: 1.4;
+			text-transform: uppercase;
+			margin-bottom: 8px;
+			padding: 0;
+		}
+
+		input {
+			padding: 6px 8px;
+			margin: 0;
+			border: 1px solid #949494;
+			border-radius: 2px;
+			transition: box-shadow 0.1s linear;
+			outline: 2px solid #0000;
+		}
+	}
+
+	.smaily-newsletter-block-button-submit {
+		background-color: var(--smaily-subscribe-button-bg-color);
+		color: var(--smaily-subscribe-button-text-color);
+		justify-content: center;
+		width: var(--smaily-subscribe-button-width);
+	}
+
+	.smaily-newsletter-block-button-submit:hover:not(:disabled) {
+		background-color: var(--smaily-subscribe-button-bg-color);
+		color: var(--smaily-subscribe-button-text-color);
+	}
+}

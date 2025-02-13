@@ -1,0 +1,93 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "smaily/newsletter-block",
+	"version": "1.0.0",
+	"title": "Smaily Sign-Up Form",
+	"category": "widgets",
+	"description": "Smaily newsletter subscription form.",
+	"example": {},
+	"attributes": {
+		"subdomain": {
+			"type": "string",
+			"default": ""
+		},
+		"showNameField": {
+			"type": "boolean",
+			"default": false
+		},
+		"nameInputLabel": {
+			"type": "string",
+			"default": "Name"
+		},
+		"subscribeButtonLabel": {
+			"type": "string",
+			"default": "Subscribe"
+		},
+		"subscribeButtonBackgroundColor": {
+			"type": "string",
+			"default": "var(--wp-admin-theme-color)"
+		},
+		"subscribeButtonTextColor": {
+			"type": "string",
+			"default": "var(--wp-components-color-accent-inverted,#fff)"
+		},
+		"subscribeButtonWidth": {
+			"type": "string",
+			"default": "auto"
+		},
+		"emailInputLabel": {
+			"type": "string",
+			"default": "Email"
+		},
+		"successMessage": {
+			"type": "string",
+			"default": ""
+		},
+		"errorMessage": {
+			"type": "string",
+			"default": ""
+		},
+		"successURL": {
+			"type": "string",
+			"default": ""
+		},
+		"errorURL": {
+			"type": "string",
+			"default": ""
+		},
+		"autoresponderId": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"align": true,
+		"color": {
+			"background": true,
+			"text": true,
+			"button": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"__experimentalBorder": {
+			"color": true,
+			"radius": true,
+			"style": true,
+			"width": true,
+			"__experimentalDefaultControls": {
+				"color": true,
+				"radius": true,
+				"style": true,
+				"width": true
+			}
+		},
+		"html": false
+	},
+	"textdomain": "smaily",
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"render": "file:./render.php"
+}

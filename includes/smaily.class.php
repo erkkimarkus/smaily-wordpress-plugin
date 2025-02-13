@@ -127,6 +127,7 @@ class Smaily {
 		require_once SMAILY_PLUGIN_PATH . 'includes/smaily-template.class.php';
 		require_once SMAILY_PLUGIN_PATH . 'includes/smaily-widget.class.php';
 		require_once SMAILY_PLUGIN_PATH . 'public/smaily-public.class.php';
+		require_once SMAILY_PLUGIN_PATH . 'includes/smaily-api.class.php';
 
 		$this->options = new Smaily_Options();
 
@@ -172,14 +173,8 @@ class Smaily {
 	 * @access private
 	 */
 	public function init_blocks() {
-		$plugin_block = new Smaily_Block( $this->options, $this->get_plugin_name(), $this->get_version() );
-
-		register_block_type(
-			SMAILY_PLUGIN_PATH . '/blocks',
-			array(
-				'render_callback' => array( $plugin_block, 'render' ),
-			)
-		);
+		wp_enqueue_style( 'wp-components' );
+		register_block_type( SMAILY_PLUGIN_PATH . '/blocks/newsletter-signup/build' );
 	}
 
 	/**
@@ -192,13 +187,14 @@ class Smaily {
 	private function define_admin_hooks() {
 		$plugin_name  = $this->get_plugin_name();
 		$plugin_admin = new Smaily_Admin( $this->options, $plugin_name, $this->get_version() );
+		$plugin_api   = new Smaily_API( $this->options, $plugin_admin );
 		add_action( 'admin_enqueue_scripts', array( $plugin_admin, 'enqueue_styles' ) );
 		add_action( 'admin_enqueue_scripts', array( $plugin_admin, 'enqueue_scripts' ) );
-		add_action( 'admin_enqueue_scripts', array( $plugin_admin, 'smaily_subscription_block_init' ) );
 		add_action( 'wp_ajax_smaily_admin_save', array( $plugin_admin, 'smaily_admin_save' ) );
 		add_action( 'widgets_init', array( $plugin_admin, 'smaily_subscription_widget_init' ) );
 		add_action( 'admin_menu', array( $plugin_admin, 'smaily_admin_render' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( SMAILY_PLUGIN_FILE ), array( $plugin_admin, 'settings_link' ) );
+		add_action( 'rest_api_init', array( $plugin_api, 'register_endpoints' ) );
 
 		if ( Smaily_Helper::is_woocommerce_active() ) {
 
