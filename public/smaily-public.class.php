@@ -67,13 +67,9 @@ class Smaily_Public {
 	 */
 	public function smaily_shortcode_render( $atts ) {
 		// Load configuration data.
-		$api_credentials = $this->options->get_api_credentials();
-		$settings        = $this->options->get_settings();
-		// Data to be assigned to template.
-		$config                = array();
-		$config['domain']      = $api_credentials['subdomain'];
-		$config['form']        = $settings['form'];
-		$config['is_advanced'] = $settings['is_advanced'];
+		$api_credentials  = $this->options->get_api_credentials();
+		$config           = array();
+		$config['domain'] = $api_credentials['subdomain'];
 
 		// Parse attributes out of shortcode tag.
 		$shortcode_atts             = shortcode_atts(
@@ -90,9 +86,7 @@ class Smaily_Public {
 		$config['show_name']        = $shortcode_atts['show_name'];
 		$config['autoresponder_id'] = $shortcode_atts['autoresponder_id'];
 
-		// Create admin template.
-		$file     = $config['is_advanced'] === true ? 'advanced.php' : 'basic.php';
-		$template = new Smaily_Template( 'public/partials/smaily-public-' . $file );
+		$template = new Smaily_Template( 'public/partials/smaily-public-basic.php' );
 		$template->assign( $config );
 		// Display responses on Smaily subscription form.
 		$form_has_response  = false;
