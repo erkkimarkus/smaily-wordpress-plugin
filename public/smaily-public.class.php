@@ -8,8 +8,6 @@
  */
 
 class Smaily_Public {
-
-
 	/**
 	 * The ID of this plugin.
 	 *
@@ -62,66 +60,58 @@ class Smaily_Public {
 	/**
 	 * Render Smaily form using shortcode.
 	 *
-	 * @param  array $atts Shortcode attributes.
-	 * @return string
+	 * @param  array $attrs Shortcode attributes.
 	 */
-	public function smaily_shortcode_render( $atts ) {
-		// Load configuration data.
-		$api_credentials  = $this->options->get_api_credentials();
-		$config           = array();
-		$config['domain'] = $api_credentials['subdomain'];
+	public function smaily_shortcode_render( $attrs ) {
+		// Allow overriding the template.
+		$template_path = locate_template( 'smaily/smaily-public-basic.php' );
+		if ( ! $template_path ) {
+			$template_path = SMAILY_PLUGIN_PATH . 'public/partials/smaily-public-basic.php';
+		}
 
-		// Parse attributes out of shortcode tag.
-		$shortcode_atts             = shortcode_atts(
+		$shortcode_attrs = shortcode_atts(
 			array(
-				'success_url'      => get_site_url(),
-				'failure_url'      => get_site_url(),
+				'success_url'      => Smaily_Helper::get_current_url(),
+				'failure_url'      => Smaily_Helper::get_current_url(),
 				'show_name'        => false,
 				'autoresponder_id' => '',
 			),
-			$atts
+			$attrs
 		);
-		$config['success_url']      = $shortcode_atts['success_url'];
-		$config['failure_url']      = $shortcode_atts['failure_url'];
-		$config['show_name']        = $shortcode_atts['show_name'];
-		$config['autoresponder_id'] = $shortcode_atts['autoresponder_id'];
 
-		$template = new Smaily_Template( 'public/partials/smaily-public-basic.php' );
-		$template->assign( $config );
-		// Display responses on Smaily subscription form.
-		$form_has_response  = false;
-		$form_is_successful = false;
-		$response_message   = null;
+		$autoresponder_id = $shortcode_attrs['autoresponder_id'];
+		$failure_url      = $shortcode_attrs['failure_url'];
+		$has_credentials  = $this->options->has_credentials();
+		$language_code    = Smaily_Helper::get_current_language_code();
+		$show_name        = $shortcode_attrs['show_name'];
+		$subdomain        = $this->options->get_subdomain();
+		$success_url      = $shortcode_attrs['success_url'];
 
-		$credentials_not_valid = empty( $api_credentials['subdomain'] ) || empty( $api_credentials['username'] ) || empty( $api_credentials['password'] );
-		if ( $credentials_not_valid ) {
-			$form_has_response = true;
-			$response_message  = __( 'Smaily credentials not validated. Subscription form will not work!', 'smaily' );
-		} elseif ( isset( $_GET['code'] ) && (int) $_GET['code'] === 101 ) { // phpcs:ignore WordPress.Security.NonceVerification
-			$form_is_successful = true;
-		} elseif ( isset( $_GET['code'] ) || ! empty( $_GET['code'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			$form_has_response = true;
-			switch ( (int) $_GET['code'] ) { // phpcs:ignore WordPress.Security.NonceVerification
-				case 201:
-					$response_message = __( 'Form was not submitted using POST method.', 'smaily' );
-					break;
-				case 204:
-					$response_message = __( 'Input does not contain a recognizable email address.', 'smaily' );
-					break;
-				default:
-					$response_message = __( 'Could not add to subscriber list for an unknown reason. Probably something in Smaily.', 'smaily' );
-					break;
-			}
-		}
-
-		$template->assign(
-			array(
-				'form_has_response'  => $form_has_response,
-				'response_message'   => $response_message,
-				'form_is_successful' => $form_is_successful,
+		$this->render_template(
+			$template_path,
+			compact(
+				'autoresponder_id',
+				'failure_url',
+				'has_credentials',
+				'language_code',
+				'show_name',
+				'subdomain',
+				'success_url'
 			)
 		);
-		// Render template.
-		return $template->render();
+	}
+
+	/**
+	 * Renders templates and scopes the variables.
+	 *
+	 * @param array $parameters Parameters that can be accessed through $parameters array in the template.
+	 * @return void
+	 */
+	public static function render_template( $template_path, $parameters = array() ) {
+		if ( ! file_exists( $template_path ) ) {
+			throw new Exception( 'Template file not found: ' . esc_attr( $template_path ) );
+		}
+
+		include $template_path;
 	}
 }
