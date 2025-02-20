@@ -2,6 +2,8 @@
 
 namespace Smaily_CF7;
 
+use Smaily_Options;
+
 defined( 'ABSPATH' ) || exit;
 
 use WPCF7_Integration;
@@ -63,12 +65,12 @@ class Admin {
 
 		$autoresponder = isset( $_POST['smailyforcf7-autoresponder'] ) ? (int) $_POST['smailyforcf7-autoresponder'] : 0;
 
-		$this->options->update_settings(
+		update_option(
+			Smaily_Options::CONTACT_FORM_7_STATUS_OPTION,
 			array(
 				'is_enabled'       => $status,
 				'autoresponder_id' => $autoresponder,
-			),
-			'cf7_settings'
+			)
 		);
 	}
 
@@ -105,7 +107,7 @@ class Admin {
 		$has_credentials = $this->options->has_credentials();
 
 		// Fetch autoresponder data here for view.
-		$autoresponder_list = $this->get_autoresponders();
+		$autoresponder_list = $this->get_autoresponders(); //TODO: Move this to smaily API.
 
 		$form_tags       = \WPCF7_FormTagsManager::get_instance()->get_scanned_tags();
 		$captcha_enabled = $this->is_captcha_enabled( $form_tags );

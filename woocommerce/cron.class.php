@@ -108,6 +108,7 @@ class Cron {
 			}
 		}
 
+		// TODO: Why?
 		update_user_meta( 1, 'user_newsletter', 1 );
 
 		// Get all users with subscribed status.
@@ -186,17 +187,19 @@ class Cron {
 				continue;
 			}
 
-			// Data to send to smail API.
+			// Data to send to Smaily API.
 			$addresses = array(
+				'email'      => $customer['email'],
+				'store'      => get_site_url(),
 				'first_name' => '',
 				'last_name'  => '',
 			);
 			// Gather customer data.
 			$customer_data = array();
-			$sync_values   = array( 'first_name', 'last_name', 'email' );
+			$sync_values   = array( 'first_name', 'last_name' );
 			foreach ( $sync_values as $sync_value ) {
 				// Check if user has enabled extra field in settings.
-				if ( in_array( $sync_value, $results['woocommerce']['cart_options'], true ) || $sync_value === 'email' ) {
+				if ( in_array( $sync_value, $results['woocommerce']['cart_options'], true ) ) {
 					// Add extra field if it's available in customer data.
 					if ( isset( $customer[ $sync_value ] ) ) {
 						$addresses[ $sync_value ] = $customer[ $sync_value ];
@@ -419,7 +422,7 @@ class Cron {
 			// Abandoned carts table name.
 			$table = $wpdb->prefix . 'smaily_abandoned_carts';
 			// Cart cutoff in seconds.
-			$cutoff = (int) $results['woocommerce']['cart_cutoff'] * 60;
+			$cutoff = (int) $results['woocommerce']['cart_cutoff'] * MINUTE_IN_SECONDS;
 			// Current UTC timestamp - cutoff.
 			$limit = strtotime( gmdate( 'Y-m-d\TH:i:s\Z' ) ) - $cutoff;
 			$time  = gmdate( 'Y-m-d\TH:i:s\Z', $limit );

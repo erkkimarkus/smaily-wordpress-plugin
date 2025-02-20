@@ -3,8 +3,8 @@
 namespace Smaily_WC;
 
 /**
- * Adds and controlls WooCommerce Register and Account Details fields.
- * Adds and controlls WordPress User Profile and Admin Profile fields.
+ * Adds and controls WooCommerce Register and Account Details fields.
+ * Adds and controls WordPress User Profile and Admin Profile fields.
  */
 class Profile_Settings {
 
@@ -30,12 +30,11 @@ class Profile_Settings {
 	 */
 	public function smaily_checkout_newsletter_checkbox() {
 		$settings = $this->options;
-		$checked  = intval( $settings['woocommerce']['checkbox_auto_checked'] );
 		$enabled  = intval( $settings['woocommerce']['checkout_checkbox_enabled'] );
 		if ( $enabled ) {
 			$checkbox  = '<p class="form-row form-row-wide smaily-for-woocommerce-newsletter">';
 			$checkbox .= '<label class="checkbox woocommerce-form__label woocommerce-form__label-for-checkbox">';
-			$checkbox .= '<input type="checkbox" class="input-checkbox woocommerce-form__input woocommerce-form__input-checkbox" name="user_newsletter" id="smaily-checkout-subscribe" value="1"' . checked( $checked, 1, false ) . ' />';
+			$checkbox .= '<input type="checkbox" class="input-checkbox woocommerce-form__input woocommerce-form__input-checkbox" name="user_newsletter" id="smaily-checkout-subscribe" value="1"' . ' />';
 			$checkbox .= '<span>' . __( 'Subscribe to newsletter', 'smaily' ) . '</span>';
 			$checkbox .= '</label>';
 			$checkbox .= '</p>';
@@ -104,7 +103,7 @@ class Profile_Settings {
 	public function smaily_get_account_fields() {
 		// Get fields from sync_additional.
 		$result = $this->options;
-		if ( ! empty( $result['woocommerce']['syncronize_additional'] ) ) {
+		if ( ! empty( $result['woocommerce']['synchronize_additional'] ) ) {
 			// All custom fields available.
 			$fields_available = array(
 				'user_gender' => array(
@@ -158,9 +157,9 @@ class Profile_Settings {
 				),
 			);
 
-			// Add only new fields selected from syncronize_additional.
-			$syncronize_additional = $result['woocommerce']['syncronize_additional'];
-			foreach ( $syncronize_additional as $key ) {
+			// Add only new fields selected from synchronize_additional.
+			$synchronize_additional = $result['woocommerce']['synchronize_additional'];
+			foreach ( $synchronize_additional as $key ) {
 				if ( array_key_exists( $key, $fields_available ) ) {
 					$add_fields[ $key ] = $fields_available[ $key ];
 				}
@@ -304,8 +303,6 @@ class Profile_Settings {
 			}
 
 			$sanitize = isset( $field_args['sanitize'] ) ? $field_args['sanitize'] : 'wc_clean';
-			// Sanitization not picked up by linter.
-			// phpcs:ignore  WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing
 			$value = isset( $_POST[ $key ] ) ? call_user_func( $sanitize, wp_unslash( $_POST[ $key ] ) ) : '';
 
 			$fields[ $key ] = $value;
