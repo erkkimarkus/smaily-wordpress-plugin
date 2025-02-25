@@ -8,57 +8,26 @@
 
 namespace Smaily_WC;
 
+use Smaily_Options;
+
 class Profile_Settings {
-	/**
-	 * @var \Smaily_Options Instance of Smaily_Options.
-	 */
-	private $options;
-
-	/**
-	 * Constructor.
-	 *
-	 * @param \Smaily_Options $options Instance of Smaily_Options.
-	 */
-	public function __construct( \Smaily_Options $options ) {
-		$this->options = $options->get_settings();
-	}
-
 	/**
 	 * Add newsletter subscribe button to admin preferred place in checkout page.
 	 *
 	 * @return void
 	 */
 	public function smaily_checkout_newsletter_checkbox() {
-		$settings = $this->options;
-		$enabled  = intval( $settings['woocommerce']['checkout_checkbox_enabled'] );
-		if ( $enabled ) {
-			$checkbox  = '<p class="form-row form-row-wide smaily-for-woocommerce-newsletter">';
-			$checkbox .= '<label class="checkbox woocommerce-form__label woocommerce-form__label-for-checkbox">';
-			$checkbox .= '<input type="checkbox" class="input-checkbox woocommerce-form__input woocommerce-form__input-checkbox" name="user_newsletter" id="smaily-checkout-subscribe" value="1"' . ' />';
-			$checkbox .= '<span>' . __( 'Subscribe to newsletter', 'smaily' ) . '</span>';
-			$checkbox .= '</label>';
-			$checkbox .= '</p>';
-
-			echo wp_kses(
-				$checkbox,
-				array(
-					'p'     => array(
-						'class' => array(),
-					),
-					'label' => array(
-						'class' => array(),
-					),
-					'input' => array(
-						'type'  => array(),
-						'class' => array(),
-						'name'  => array(),
-						'id'    => array(),
-						'value' => array(),
-					),
-					'span'  => array(),
-				)
-			);
-		}
+		$enabled = get_option( Smaily_Options::CUSTOMER_SYNC_ENABLED_OPTION );
+		?>
+		<?php if ( $enabled ) : ?>
+			<p class="form-row form-row-wide smaily-for-woocommerce-newsletter">
+				<label class="checkbox woocommerce-form__label woocommerce-form__label-for-checkbox">
+					<input type="checkbox" class="input-checkbox woocommerce-form__input woocommerce-form__input-checkbox" name="user_newsletter" id="smaily-checkout-subscribe" value="1" />
+					<span><?php esc_html_e( 'Subscribe to newsletter', 'smaily' ); ?></span>
+				</label>
+			</p>
+		<?php endif; ?>
+		<?php
 	}
 
 	/**
@@ -67,7 +36,6 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_print_user_frontend_fields() {
-		// Get new fileds.
 		$fields            = $this->smaily_get_account_fields();
 		$is_user_logged_in = is_user_logged_in();
 
@@ -101,90 +69,76 @@ class Profile_Settings {
 	 * @return array $smaily_account_fields New fields to add in forms.
 	 */
 	public function smaily_get_account_fields() {
-		// Get fields from sync_additional.
-		$result = $this->options;
-		if ( ! empty( $result['woocommerce']['synchronize_additional'] ) ) {
-			// All custom fields available.
-			$fields_available = array(
-				'user_gender' => array(
-					'type'                 => 'radio',
-					'label'                => __( 'Gender', 'smaily' ),
-					'required'             => false,
-					'class'                => array( 'tog' ),
-					'options'              => array(
-						1 => __( 'Male', 'smaily' ),
-						2 => __( 'Female', 'smaily' ),
-					),
-					'hide_in_account'      => false,
-					'hide_in_admin'        => false,
-					'hide_in_checkout'     => false,
-					'hide_in_registration' => false,
-				),
-				'user_phone'  => array(
-					'type'                 => 'tel',
-					'label'                => __( 'Phone', 'smaily' ),
-					'placeholder'          => __( 'Enter phone number', 'smaily' ),
-					'required'             => false,
-					'class'                => array( 'regular-text' ),
-					'hide_in_account'      => false,
-					'hide_in_admin'        => false,
-					'hide_in_checkout'     => true,
-					'hide_in_registration' => false,
-				),
-				'user_dob'    => array(
-					'type'                 => 'date',
-					'label'                => __( 'Birthday', 'smaily' ),
-					'placeholder'          => __( 'Enter birthday', 'smaily' ),
-					'required'             => false,
-					'class'                => array( 'regular-text' ),
-					'hide_in_account'      => false,
-					'hide_in_admin'        => false,
-					'hide_in_checkout'     => false,
-					'hide_in_registration' => false,
+		$options = get_option(
+			Smaily_Options::CUSTOMER_SYNC_FIELDS_OPTION,
+			Smaily_Options::CUSTOMER_SYNC_DEFAULT_FIELDS
+		);
 
+		$fields_available = array(
+			'user_gender' => array(
+				'type'                 => 'radio',
+				'label'                => __( 'Gender', 'smaily' ),
+				'required'             => false,
+				'class'                => array( 'tog' ),
+				'options'              => array(
+					1 => __( 'Male', 'smaily' ),
+					2 => __( 'Female', 'smaily' ),
 				),
-			);
+				'hide_in_account'      => false,
+				'hide_in_admin'        => false,
+				'hide_in_checkout'     => false,
+				'hide_in_registration' => false,
+			),
+			'user_phone'  => array(
+				'type'                 => 'tel',
+				'label'                => __( 'Phone', 'smaily' ),
+				'placeholder'          => __( 'Enter phone number', 'smaily' ),
+				'required'             => false,
+				'class'                => array( 'regular-text' ),
+				'hide_in_account'      => false,
+				'hide_in_admin'        => false,
+				'hide_in_checkout'     => true,
+				'hide_in_registration' => false,
+			),
+			'user_dob'    => array(
+				'type'                 => 'date',
+				'label'                => __( 'Birthday', 'smaily' ),
+				'placeholder'          => __( 'Enter birthday', 'smaily' ),
+				'required'             => false,
+				'class'                => array( 'regular-text' ),
+				'hide_in_account'      => false,
+				'hide_in_admin'        => false,
+				'hide_in_checkout'     => false,
+				'hide_in_registration' => false,
+			),
+		);
 
-			$add_fields = array(
-				'user_newsletter' => array(
-					'type'                 => 'checkbox',
-					'label'                => __( 'Subscribe to newsletter', 'smaily' ),
-					'required'             => false,
-					'hide_in_account'      => false,
-					'hide_in_admin'        => false,
-					'hide_in_checkout'     => false,
-					'hide_in_registration' => false,
-				),
-			);
+		$add_fields = array(
+			'user_newsletter' => array(
+				'type'                 => 'checkbox',
+				'label'                => __( 'Subscribe to newsletter', 'smaily' ),
+				'required'             => false,
+				'hide_in_account'      => false,
+				'hide_in_admin'        => false,
+				'hide_in_checkout'     => false,
+				'hide_in_registration' => false,
+			),
+		);
 
-			// Add only new fields selected from synchronize_additional.
-			$synchronize_additional = $result['woocommerce']['synchronize_additional'];
-			foreach ( $synchronize_additional as $key ) {
-				if ( array_key_exists( $key, $fields_available ) ) {
-					$add_fields[ $key ] = $fields_available[ $key ];
-				}
+		foreach ( $options as $key => $value ) {
+			if ( $value === false ) {
+				continue;
 			}
-			return apply_filters(
-				'smaily_account_fields',
-				$add_fields
-			);
-		} else {
-			// If no additional fields selected, show only newsletter subscribe option.
-			return apply_filters(
-				'smaily_account_fields',
-				array(
-					'user_newsletter' => array(
-						'type'                 => 'checkbox',
-						'label'                => __( 'Subscribe newsletter', 'smaily' ),
-						'required'             => false,
-						'hide_in_account'      => false,
-						'hide_in_admin'        => false,
-						'hide_in_checkout'     => false,
-						'hide_in_registration' => false,
-					),
-				)
-			);
+
+			if ( array_key_exists( $key, $fields_available ) ) {
+				$add_fields[ $key ] = $fields_available[ $key ];
+			}
 		}
+
+		return apply_filters(
+			'smaily_account_fields',
+			$add_fields
+		);
 	}
 
 	/**
@@ -194,14 +148,11 @@ class Profile_Settings {
 	 * @return array $checkout_fields Updated checkout fields
 	 */
 	public function smaily_checkout_fields( $checkout_fields ) {
-
-		// Get available account fields.
 		$fields = $this->smaily_get_account_fields();
 		// Fields to append to billing information.
 		$billing_details_list = array( 'user_gender', 'user_phone', 'user_dob' );
 
 		foreach ( $fields as $key => $field_args ) {
-
 			if ( ! empty( $field_args['hide_in_checkout'] ) ) {
 				continue;
 			}
@@ -221,7 +172,6 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_print_user_admin_fields() {
-		// Get account fields.
 		$fields = $this->smaily_get_account_fields();
 		?>
 		<h2><?php esc_html_e( 'Additional Information', 'smaily' ); ?></h2>
@@ -258,12 +208,7 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_save_wc_account_fields( $customer_id ) {
-		$nonce_val = isset( $_REQUEST['save-account-details-nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['save-account-details-nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( sanitize_key( $nonce_val ), 'save_account_details' ) ) {
-			return;
-		}
-
-		$sanitized_data = $this->sanitize_request_smaily_account_fields();
+		$sanitized_data = $this->sanitize_request_smaily_account_fields( 'save-account-details-nonce', 'save_account_details' );
 		$this->save_account_fields( $customer_id, $sanitized_data );
 	}
 
@@ -274,12 +219,7 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_save_account_fields( $user_id ) {
-		$nonce_val = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
-		if ( ! wp_verify_nonce( sanitize_key( $nonce_val ), 'update-user_' . $user_id ) ) {
-			return;
-		}
-
-		$sanitized_data = $this->sanitize_request_smaily_account_fields();
+		$sanitized_data = $this->sanitize_request_smaily_account_fields( '_wpnonce', 'update-user_' . $user_id );
 		$this->save_account_fields( $user_id, $sanitized_data );
 	}
 
@@ -294,18 +234,20 @@ class Profile_Settings {
 	 *
 	 * @return array
 	 */
-	private function sanitize_request_smaily_account_fields() {
-		$fields = array();
+	private function sanitize_request_smaily_account_fields( string $nonce_field, $action ) {
+		$nonce_val = isset( $_REQUEST[ $nonce_field ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $nonce_field ] ) ) : '';
+		if ( ! wp_verify_nonce( sanitize_key( $nonce_val ), $action ) ) {
+			return array();
+		}
 
+		$fields = array();
+		$action = isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : '';
 		foreach ( $this->smaily_get_account_fields() as $key => $field_args ) {
-			if ( ! $this->smaily_is_field_visible( $field_args ) ) {
+			if ( ! $this->smaily_is_field_visible( $field_args, $action ) ) {
 				continue;
 			}
 
-			$sanitize = isset( $field_args['sanitize'] ) ? $field_args['sanitize'] : 'wc_clean';
-			$value    = isset( $_POST[ $key ] ) ? call_user_func( $sanitize, wp_unslash( $_POST[ $key ] ) ) : '';
-
-			$fields[ $key ] = $value;
+			$fields[ $key ] = isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '';
 		}
 
 		return $fields;
@@ -375,21 +317,26 @@ class Profile_Settings {
 	 * @param array $field_args Form field.
 	 * @return boolean $visible Visibility.
 	 */
-	public function smaily_is_field_visible( $field_args ) {
-		$visible = true;
-		$action  = filter_input( INPUT_POST, 'action' );
-
-		if ( is_admin() && ! empty( $field_args['hide_in_admin'] ) ) {
-			$visible = false;
-		} elseif ( ( is_account_page() || $action === 'save_account_details' ) && is_user_logged_in() && ! empty( $field_args['hide_in_account'] ) ) {
-			$visible = false;
-		} elseif ( ( is_account_page() || $action === 'save_account_details' ) && ! is_user_logged_in() && ! empty( $field_args['hide_in_registration'] ) ) {
-			$visible = false;
-		} elseif ( is_checkout() && ! empty( $field_args['hide_in_checkout'] ) ) {
-			$visible = false;
+	public function smaily_is_field_visible( $field_args, $action ) {
+		if ( is_admin() && $field_args['hide_in_admin'] === false ) {
+			return true;
 		}
 
-		return $visible;
+		if ( is_account_page() || $action === 'save_account_details' ) {
+			if ( is_user_logged_in() && $field_args['hide_in_account'] === false ) {
+				return true;
+			}
+
+			if ( is_user_logged_in() && $field_args['hide_in_registration'] === false ) {
+				return true;
+			}
+		}
+
+		if ( is_checkout() && $field_args['hide_in_checkout'] === false ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -402,7 +349,7 @@ class Profile_Settings {
 		$userdata = array(
 			'user_pass',
 			'user_login',
-			'user_nicename',
+			'user_nickname',
 			'user_email',
 			'display_name',
 			'nickname',
