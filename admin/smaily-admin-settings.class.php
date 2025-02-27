@@ -189,10 +189,7 @@ class Settings {
 			$checkout_subscription_section,
 			array(
 				'option_name' => Smaily_Options::CHECKOUT_SUBSCRIPTION_POSITION_OPTION,
-				'options'     => array(
-					'before' => __( 'Before', 'smaily' ),
-					'after'  => __( 'After', 'smaily' ),
-				),
+				'options'     => Smaily_Options::get_checkout_subscription_position_options(),
 			)
 		);
 
@@ -204,12 +201,7 @@ class Settings {
 			$checkout_subscription_section,
 			array(
 				'option_name' => Smaily_Options::CHECKOUT_SUBSCRIPTION_LOCATION_OPTION,
-				'options'     => array(
-					'order_notes'                => __( 'Order notes', 'smaily' ),
-					'checkout_billing_form'      => __( 'Billing form', 'smaily' ),
-					'checkout_shipping_form'     => __( 'Shipping form', 'smaily' ),
-					'checkout_registration_form' => __( 'Registration form', 'smaily' ),
-				),
+				'options'     => Smaily_Options::get_checkout_subscription_location_options(),
 			)
 		);
 	}
