@@ -1,9 +1,6 @@
 <?php
-/**
- * Smaily WooCommerce RSS Feed Template
- *
- * @package Smaily
- */
+
+use Smaily_WP_Connect\Integrations\WooCommerce\Rss;
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -18,7 +15,7 @@ $currencysymbol = get_woocommerce_currency_symbol();
 
 // Default to 50 products.
 $limit = $limit === 0 ? 50 : $limit;
-$items = Smaily_WC\Rss::list_rss_feed_items( $category, $limit, $order_by, $order );
+$items = Rss::list_rss_feed_items( $category, $limit, $order_by, $order );
 
 header( 'Content-Type: application/xml' );
 ?>
