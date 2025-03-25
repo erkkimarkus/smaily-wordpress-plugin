@@ -29,7 +29,7 @@ class Lifecycle {
 	public function register_hooks() {
 		register_activation_hook( SMAILY_WP_CONNECT_PLUGIN_FILE, array( $this, 'activate' ) );
 		register_deactivation_hook( SMAILY_WP_CONNECT_PLUGIN_FILE, array( $this, 'deactivate' ) );
-		register_uninstall_hook( SMAILY_WP_CONNECT_PLUGIN_FILE, array( '\Smaily_Lifecycle', 'uninstall' ) );
+		register_uninstall_hook( SMAILY_WP_CONNECT_PLUGIN_FILE, array( __CLASS__, 'uninstall' ) );
 		add_action( 'plugins_loaded', array( $this, 'set_locale' ) );
 		add_action( 'plugins_loaded', array( $this, 'update' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'check_for_update' ), 10, 2 );
@@ -147,7 +147,7 @@ class Lifecycle {
 		// Delete Smaily plugin abandoned cart table.
 		$wpdb->query(
 			$wpdb->prepare(
-				'DROP TABLE IF EXISTS %s',
+				'DROP TABLE IF EXISTS `%1$s`',
 				$wpdb->prefix . Cart::ABANDONED_CART_TABLE_NAME
 			)
 		);
