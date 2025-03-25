@@ -145,7 +145,7 @@ class Admin {
 		$credentials_valid = $this->validate_api_credentials( $new_value['subdomain'], $new_value['username'], $new_value['password'] );
 		if ( $credentials_valid[0] === true ) {
 			add_settings_error(
-				'smaily_messages',
+				'smaily_wp_connect_messages',
 				'credentials_validated',
 				__( 'API credentials validated successfully!', 'smaily-wp-connect' ),
 				'success'
@@ -160,7 +160,7 @@ class Admin {
 			switch ( $credentials_valid[1] ) {
 				case 404:
 					add_settings_error(
-						'smaily_messages',
+						'smaily_wp_connect_messages',
 						'invalid_api_credentials',
 						__( 'Check subdomain. API credentials validation failed.', 'smaily-wp-connect' ),
 						'error'
@@ -168,7 +168,7 @@ class Admin {
 					break;
 				default:
 					add_settings_error(
-						'smaily_messages',
+						'smaily_wp_connect_messages',
 						'invalid_api_credentials',
 						__( 'API credentials validation failed. Please check your details.', 'smaily-wp-connect' ),
 						'error'
