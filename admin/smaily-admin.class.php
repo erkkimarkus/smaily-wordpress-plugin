@@ -76,7 +76,7 @@ class Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_styles' ) );
 		add_action( 'admin_init', array( $this, 'settings_init' ) );
 		add_action( 'admin_menu', array( $this, 'settings_page' ) );
-		add_action( 'pre_update_option_smaily_api_credentials', array( $this, 'validate_api_credentials_after_save' ), 10, 3 );
+		add_action( 'pre_update_option_' . Options::API_CREDENTIALS_OPTION, array( $this, 'validate_api_credentials_after_save' ), 10, 3 );
 		add_action( 'widgets_init', array( $this, 'smaily_subscription_widget_init' ) );
 		add_action( 'wp_ajax_smaily_admin_save', array( $this, 'smaily_admin_save' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( SMAILY_WP_CONNECT_PLUGIN_FILE ), array( $this, 'settings_link' ) );

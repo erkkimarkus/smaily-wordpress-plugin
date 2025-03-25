@@ -275,11 +275,11 @@ class Renderer {
 		$current_autoresponder_id = $abandoned_cart_status['autoresponder_id'];
 		?>
 		<fieldset>
-			<label for="smaily_abandoned_cart_status[enabled]">
+			<label for="<?php echo esc_attr( Options::ABANDONED_CART_STATUS_OPTION ); ?>_enabled">
 				<input
 					type="checkbox"
-					id="smaily_abandoned_cart_status_enabled"
-					name="smaily_abandoned_cart_status[enabled]"
+					id="<?php echo esc_attr( Options::ABANDONED_CART_STATUS_OPTION ); ?>_enabled"
+					name="<?php echo esc_attr( Options::ABANDONED_CART_STATUS_OPTION ); ?>[enabled]"
 					value="1"
 					<?php checked( $enabled, true ); ?>
 				/>
@@ -287,7 +287,7 @@ class Renderer {
 			</label>
 		</fieldset>
 		<fieldset>
-			<select name="smaily_abandoned_cart_status[autoresponder_id]">
+			<select name="<?php echo esc_attr( Options::ABANDONED_CART_STATUS_OPTION ); ?>[autoresponder_id]">
 				<?php if ( ! empty( $autoresponders ) ) : ?>
 					<?php foreach ( $autoresponders as $autoresponder_id => $autoresponder_name ) : ?>
 						<option
