@@ -22,7 +22,6 @@
         "build:checkout-optin": "npm --prefix blocks/checkout-optin/ ci blocks/checkout-optin/ && npm run build --prefix blocks/checkout-optin/",
         "extract-text-domain": "wp i18n make-pot . languages/smaily-wp-connect.pot && msginit -i languages/smaily-wp-connect.pot -o languages/smaily-wp-connect-en.po -l en --no-translator",
         "compile-translations": "rm -f languages/smaily-wp-connect-en.po && wp i18n update-po languages/smaily-wp-connect.pot languages/ && wp i18n make-mo languages/ && wp i18n make-json languages/ --no-purge",
-
         "package": "cat .zipignore | xargs zip -r smaily-wp-connect.zip . -x"
     }
 }
