@@ -20,3 +20,4 @@ phpcs.xml
 readme.md
 *.sh
 .zipignore
+*.zip
