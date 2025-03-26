@@ -72,18 +72,17 @@ jobs:
           /${{ env.WP_PLUGIN_NAME }}/languages/*.pot
           /${{ env.WP_PLUGIN_NAME }}/languages/*.po
           /${{ env.WP_PLUGIN_NAME }}/languages/.gitignore
-          /${{ env.WP_PLUGIN_NAME }}/.env
-          /${{ env.WP_PLUGIN_NAME }}/.env.example
+          /${{ env.WP_PLUGIN_NAME }}/.env*
           /${{ env.WP_PLUGIN_NAME }}/.gitignore
           /${{ env.WP_PLUGIN_NAME }}/compose.yaml
-          /${{ env.WP_PLUGIN_NAME }}/composer.json
-          /${{ env.WP_PLUGIN_NAME }}/composer.lock
+          /${{ env.WP_PLUGIN_NAME }}/composer.*
           /${{ env.WP_PLUGIN_NAME }}/contributing.md
           /${{ env.WP_PLUGIN_NAME }}/Dockerfile
           /${{ env.WP_PLUGIN_NAME }}/phpcs.xml
           /${{ env.WP_PLUGIN_NAME }}/readme.md
-          /${{ env.WP_PLUGIN_NAME }}/release.sh
-          /${{ env.WP_PLUGIN_NAME }}/user.sh
+          /${{ env.WP_PLUGIN_NAME }}/*.sh
+          /${{ env.WP_PLUGIN_NAME }}/.zipignore
+          /${{ env.WP_PLUGIN_NAME }}/*.zip
 
     - name: Get release URL
       id: get_release_url
