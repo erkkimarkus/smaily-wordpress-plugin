@@ -46,7 +46,7 @@ class Lifecycle {
 			$this->set_scheduled_actions();
 
 			// Set to flush rewrite rules during init action if not yet flushed.
-			update_option( 'smaily_flush_rewrite_rules', true );
+			update_option( 'smaily_wp_connect_flush_rewrite_rules', true );
 		}
 
 		$this->run_migrations();
@@ -90,7 +90,7 @@ class Lifecycle {
 		if ( $plugin === 'woocommerce/woocommerce.php' ) {
 			$this->create_woocommerce_tables();
 			$this->set_scheduled_actions();
-			update_option( 'smaily_flush_rewrite_rules', true );
+			update_option( 'smaily_wp_connect_flush_rewrite_rules', true );
 		}
 	}
 
@@ -102,7 +102,7 @@ class Lifecycle {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
-		// Create smaily_abandoned_cart table if it does not exist.
+		// Create abandoned_cart table if it does not exist.
 		$abandoned_table_name = $wpdb->prefix . Cart::ABANDONED_CART_TABLE_NAME;
 		$query                = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $abandoned_table_name ) );
 
@@ -154,7 +154,7 @@ class Lifecycle {
 
 		Options::delete_all_options();
 
-		delete_transient( 'smaily_plugin_updated' );
+		delete_transient( 'smaily_wp_connect_plugin_updated' );
 	}
 
 	/**
@@ -164,11 +164,11 @@ class Lifecycle {
 	 *
 	 */
 	public function update() {
-		if ( get_transient( 'smaily_plugin_updated' ) !== true ) {
+		if ( get_transient( 'smaily_wp_connect_plugin_updated' ) !== true ) {
 			return;
 		}
 		$this->run_migrations();
-		delete_transient( 'smaily_plugin_updated' );
+		delete_transient( 'smaily_wp_connect_plugin_updated' );
 	}
 
 	/**
@@ -193,7 +193,7 @@ class Lifecycle {
 
 		foreach ( $updated_plugins as $plugin_basename ) {
 			if ( $smaily_basename === $plugin_basename ) {
-				return set_transient( 'smaily_plugin_updated', true );
+				return set_transient( 'smaily_wp_connect_plugin_updated', true );
 			}
 		}
 	}

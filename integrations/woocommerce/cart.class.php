@@ -26,7 +26,7 @@ class Cart {
 	}
 
 	/**
-	 * Clears cart from smaily_abandoned_carts table for that user, when customer makes order.
+	 * Clears cart from abandoned carts table for that user, when customer makes order.
 	 */
 	public function smaily_checkout_delete_cart() {
 		if ( is_user_logged_in() ) {
@@ -43,7 +43,7 @@ class Cart {
 	}
 
 	/**
-	 * Updates smaily_abandoned_carts table with user data.
+	 * Updates abandoned carts table with user data.
 	 *
 	 * @return void
 	 */
@@ -55,14 +55,14 @@ class Cart {
 		}
 
 		// Check if the function has already run in this request.
-		if ( get_transient( 'smaily_cart_updated' ) ) {
+		if ( get_transient( 'smaily_wp_connect_cart_updated' ) ) {
 			return;
 		}
 
 		/**
 		 * Set a transient to prevent multiple calls in a small duration.
 		 */
-		set_transient( 'smaily_cart_updated', true, 1 );
+		set_transient( 'smaily_wp_connect_cart_updated', true, 1 );
 
 		global $wpdb;
 		// Customer data.

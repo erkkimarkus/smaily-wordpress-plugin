@@ -16,14 +16,14 @@ class Admin {
 	private $plugin_name;
 
 	/**
-	 * @var Options Instance of Smaily_Options.
+	 * @var Options Instance of Smaily Options.
 	 */
 	private $options;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param Options $options Instance of Smaily_Options.
+	 * @param Options $options Instance of Smaily Options.
 	 */
 	public function __construct( Options $options, $plugin_name ) {
 		$this->options     = $options;

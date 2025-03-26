@@ -221,8 +221,8 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_connection_tab_settings' ),
-					'option_group'       => 'smaily_settings_connection',
-					'page'               => 'smaily_settings_tab_connection',
+					'option_group'       => 'smaily_wp_connect_connection',
+					'page'               => 'smaily_wp_connect_tab_connection',
 				),
 			);
 
@@ -237,8 +237,8 @@ class Admin {
 						''
 					),
 					'register_settings' => array( $this->settings, 'register_tutorial_tab_settings' ),
-					'option_group'      => 'smaily_settings_tutorial',
-					'page'              => 'smaily_settings_tab_tutorial',
+					'option_group'      => 'smaily_wp_connect_tutorial',
+					'page'              => 'smaily_wp_connect_tab_tutorial',
 				);
 			}
 
@@ -254,8 +254,8 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_subscriber_sync_tab_settings' ),
-					'option_group'       => 'smaily_settings_subscriber_sync',
-					'page'               => 'smaily_settings_tab_subscriber_sync',
+					'option_group'       => 'smaily_wp_connect_subscriber_sync',
+					'page'               => 'smaily_wp_connect_tab_subscriber_sync',
 				);
 
 				$tabs['abandoned_cart'] = array(
@@ -269,8 +269,8 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_abandoned_cart_tab_settings' ),
-					'option_group'       => 'smaily_settings_abandoned_cart',
-					'page'               => 'smaily_settings_tab_abandoned_cart',
+					'option_group'       => 'smaily_wp_connect_abandoned_cart',
+					'page'               => 'smaily_wp_connect_tab_abandoned_cart',
 				);
 
 				$tabs['rss'] = array(
@@ -284,8 +284,8 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_rss_tab_settings' ),
-					'option_group'       => 'smaily_settings_rss',
-					'page'               => 'smaily_settings_tab_rss',
+					'option_group'       => 'smaily_wp_connect_rss',
+					'page'               => 'smaily_wp_connect_tab_rss',
 				);
 			}
 
@@ -303,7 +303,7 @@ class Admin {
 		wp_register_style( $this->plugin_name, SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/smaily-admin.css', array(), $this->version, 'all' );
 		wp_register_style( $this->plugin_name . '-widget', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/smaily-widget-admin.css', array(), $this->version, 'all' );
 
-		wp_enqueue_style( 'smaily-wp-connect-fonts', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/fonts.css', array(), null );
+		wp_enqueue_style( $this->plugin_name . '-fonts', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/fonts.css', array(), null );
 		wp_enqueue_style( $this->plugin_name );
 		wp_enqueue_style( $this->plugin_name . '-widget' );
 	}
@@ -354,7 +354,7 @@ class Admin {
 	 *
 	 */
 	public function smaily_subscription_widget_init() {
-		$widget = new Widget( $this->options, $this );
+		$widget = new Widget( $this->options );
 		register_widget( $widget );
 	}
 }

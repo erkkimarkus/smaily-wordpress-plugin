@@ -233,7 +233,7 @@ class Cron {
 	}
 
 	/**
-	 * Update mail_sent and mail_sent_time status in smaily_abandoned_carts table.
+	 * Update mail_sent and mail_sent_time status in abandoned cart table.
 	 *
 	 * @param int $customer_id Customer ID.
 	 * @return void

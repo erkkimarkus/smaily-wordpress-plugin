@@ -182,10 +182,10 @@ class Smaily_WP_Connect {
 	 * - Integrations\WooCommerce\Data_Handler.                Handles woocommerce related data retrieval
 	 * - Integrations\WooCommerce\Data_Prepare.                Class for preparing Woocommerce related data
 	 * - Integrations\WooCommerce\Cron.                        Handles data synchronization between Smaily and WooCommerce.
-	 * - Integrations\WooCommerce\Cart                         Manages status of user cart in smaily_abandoned_carts table.
+	 * - Integrations\WooCommerce\Cart                         Manages status of user cart in abandoned carts table.
 	 * - Integrations\WooCommerce\Subscriber_Synchronization   Defines functionality for user subscriptions
 	 * - Integrations\WooCommerce\Profile_Settings.            Adds and controls WordPress/Woocommerce fields.
-	 * - Integrations\WooCommerce\Smaily_Rss.                  Handles RSS generation for Smaily newsletter.
+	 * - Integrations\WooCommerce\Rss.                         Handles RSS generation for Smaily newsletter.
 	 *
 	 * Create an instance of the loader which will be used to register the hooks
 	 * with WordPress.

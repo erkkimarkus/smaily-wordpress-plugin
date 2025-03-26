@@ -35,7 +35,7 @@ $labels      = array(
 					disabled
 				<?php endif; ?>
 				type="checkbox"
-				id="smaily_sync_<?php echo esc_attr( $field ); ?>"
+				id="<?php echo sprintf( '%s[%s]', esc_attr( Options::SUBSCRIBER_SYNC_FIELDS_OPTION ), esc_attr( $field ) ); ?>"
 				name="<?php echo sprintf( '%s[%s]', esc_attr( Options::SUBSCRIBER_SYNC_FIELDS_OPTION ), esc_attr( $field ) ); ?>"
 				value="1"
 				<?php checked( $enabled || in_array( $field, $mandatory, true ) ); ?>
