@@ -39,7 +39,7 @@ jobs:
       uses: php-actions/composer@v6
       with:
         container_workdir: /app/${{ env.WP_PLUGIN_NAME }}
-        command: exec wp i18n update-po languages/smaily.pot languages/
+        command: exec wp i18n update-po languages/${{ env.WP_PLUGIN_NAME }}.pot languages/
 
     - name: Generate Translation MO files
       uses: php-actions/composer@v6
