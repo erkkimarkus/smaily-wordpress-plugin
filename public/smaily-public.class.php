@@ -95,6 +95,7 @@ class Public_Base {
 		$subdomain        = $this->options->get_subdomain();
 		$success_url      = $shortcode_attrs['success_url'];
 
+		ob_start();
 		$this->render_template(
 			$template_path,
 			compact(
@@ -107,6 +108,7 @@ class Public_Base {
 				'success_url'
 			)
 		);
+		return ob_get_clean();
 	}
 
 	/**
