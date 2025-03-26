@@ -30,7 +30,7 @@ msgstr "Hüljatud Ostukorvi Meeldetuletuskirjad"
 msgid "Additional Fields"
 msgstr "Täiendavad väljad"
 
-#: integrations/woocommerce/profile-settings.class.php:163
+#: integrations/woocommerce/profile-settings.class.php:112
 msgid "Additional Information"
 msgstr "Lisateave"
 
@@ -94,7 +94,7 @@ msgid "Billing form"
 msgstr "Arvelduse vorm"
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:23
-#: integrations/woocommerce/profile-settings.class.php:44
+#: integrations/woocommerce/profile-settings.class.php:395
 msgid "Birthday"
 msgstr "Sünnipäev"
 
@@ -242,11 +242,11 @@ msgstr "Aktiveeriga Smaily Opt-In vormi seadetes."
 msgid "Enable Subscriber Synchronization"
 msgstr "Aktiveeri Uudiskirjaga Liitujate Sünkroniseerimine"
 
-#: integrations/woocommerce/profile-settings.class.php:45
+#: integrations/woocommerce/profile-settings.class.php:396
 msgid "Enter birthday"
 msgstr "Sisestage sünnipäev"
 
-#: integrations/woocommerce/profile-settings.class.php:34
+#: integrations/woocommerce/profile-settings.class.php:385
 msgid "Enter phone number"
 msgstr "Sisestage telefoninumber"
 
@@ -261,7 +261,7 @@ msgstr "Veateade"
 msgid "Failure URL"
 msgstr "Tõrke URL"
 
-#: integrations/woocommerce/profile-settings.class.php:24
+#: integrations/woocommerce/profile-settings.class.php:375
 msgid "Female"
 msgstr "Naine"
 
@@ -294,7 +294,7 @@ msgid "Full width subscribe button"
 msgstr "Täislaiuses liitumisnupp"
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:25
-#: integrations/woocommerce/profile-settings.class.php:19
+#: integrations/woocommerce/profile-settings.class.php:370
 msgid "Gender"
 msgstr "Sugu"
 
@@ -382,7 +382,7 @@ msgstr "Asukoht"
 msgid "Make a connection"
 msgstr "Looge ühendus"
 
-#: integrations/woocommerce/profile-settings.class.php:23
+#: integrations/woocommerce/profile-settings.class.php:374
 msgid "Male"
 msgstr "Mees"
 
@@ -444,7 +444,7 @@ msgid "Order notes"
 msgstr "Tellimuse märkmed"
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:26
-#: integrations/woocommerce/profile-settings.class.php:33
+#: integrations/woocommerce/profile-settings.class.php:384
 msgid "Phone"
 msgstr "Telefon"
 
@@ -681,7 +681,7 @@ msgid "Subscriber Synchronization allows you Synchronize newsletter subscribers 
 msgstr "Uudiskirjaga Liitujate Sünkroniseerimine võimaldab  teill sünkroniseerida uudiskirja tellijaid ja nende andmeid otse Smaily'ga"
 
 #: blocks/checkout-optin/smaily-integration.class.php:59
-#: integrations/woocommerce/profile-settings.class.php:55
+#: integrations/woocommerce/profile-settings.class.php:406
 msgid "Subscribe to newsletter"
 msgstr "Liitu uudiskirjaga"
 

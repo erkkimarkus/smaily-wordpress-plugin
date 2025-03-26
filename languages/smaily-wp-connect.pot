@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-03-25T10:52:30+00:00\n"
+"POT-Creation-Date: 2025-03-26T10:30:26+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.11.0\n"
 "X-Domain: smaily-wp-connect\n"
@@ -143,17 +143,17 @@ msgid "Site Title"
 msgstr ""
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:23
-#: integrations/woocommerce/profile-settings.class.php:44
+#: integrations/woocommerce/profile-settings.class.php:395
 msgid "Birthday"
 msgstr ""
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:25
-#: integrations/woocommerce/profile-settings.class.php:19
+#: integrations/woocommerce/profile-settings.class.php:370
 msgid "Gender"
 msgstr ""
 
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:26
-#: integrations/woocommerce/profile-settings.class.php:33
+#: integrations/woocommerce/profile-settings.class.php:384
 msgid "Phone"
 msgstr ""
 
@@ -515,7 +515,7 @@ msgid "User newsletter subscription"
 msgstr ""
 
 #: blocks/checkout-optin/smaily-integration.class.php:59
-#: integrations/woocommerce/profile-settings.class.php:55
+#: integrations/woocommerce/profile-settings.class.php:406
 msgid "Subscribe to newsletter"
 msgstr ""
 
@@ -649,24 +649,24 @@ msgstr ""
 msgid "In every 15 minutes"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:23
+#: integrations/woocommerce/profile-settings.class.php:112
+msgid "Additional Information"
+msgstr ""
+
+#: integrations/woocommerce/profile-settings.class.php:374
 msgid "Male"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:24
+#: integrations/woocommerce/profile-settings.class.php:375
 msgid "Female"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:34
+#: integrations/woocommerce/profile-settings.class.php:385
 msgid "Enter phone number"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:45
+#: integrations/woocommerce/profile-settings.class.php:396
 msgid "Enter birthday"
-msgstr ""
-
-#: integrations/woocommerce/profile-settings.class.php:163
-msgid "Additional Information"
 msgstr ""
 
 #: public/partials/smaily-public-basic.php:7
