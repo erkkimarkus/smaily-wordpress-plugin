@@ -12,58 +12,7 @@ class Profile_Settings {
 	 */
 	private $fields;
 
-	public function __construct() {
-		$fields = array(
-			'user_gender'     => array(
-				'type'                 => 'radio',
-				'label'                => __( 'Gender', 'smaily-wp-connect' ),
-				'required'             => false,
-				'class'                => array( 'tog' ),
-				'options'              => array(
-					1 => __( 'Male', 'smaily-wp-connect' ),
-					2 => __( 'Female', 'smaily-wp-connect' ),
-				),
-				'hide_in_account'      => false,
-				'hide_in_admin'        => false,
-				'hide_in_checkout'     => false,
-				'hide_in_registration' => false,
-			),
-			'user_phone'      => array(
-				'type'                 => 'tel',
-				'label'                => __( 'Phone', 'smaily-wp-connect' ),
-				'placeholder'          => __( 'Enter phone number', 'smaily-wp-connect' ),
-				'required'             => false,
-				'class'                => array( 'regular-text' ),
-				'hide_in_account'      => false,
-				'hide_in_admin'        => false,
-				'hide_in_checkout'     => true,
-				'hide_in_registration' => false,
-			),
-			'user_dob'        => array(
-				'type'                 => 'date',
-				'label'                => __( 'Birthday', 'smaily-wp-connect' ),
-				'placeholder'          => __( 'Enter birthday', 'smaily-wp-connect' ),
-				'required'             => false,
-				'class'                => array( 'regular-text' ),
-				'hide_in_account'      => false,
-				'hide_in_admin'        => false,
-				'hide_in_checkout'     => false,
-				'hide_in_registration' => false,
-			),
-			'user_newsletter' => array(
-				'type'                 => 'checkbox',
-				'label'                => __( 'Subscribe to newsletter', 'smaily-wp-connect' ),
-				'required'             => false,
-				'hide_in_account'      => false,
-				'hide_in_admin'        => false,
-				'hide_in_checkout'     => false,
-				'hide_in_registration' => false,
-			),
-		);
-
-		$enabled_fields = $this->filter_enabled_fields( $fields );
-		$this->fields   = apply_filters( 'smaily_account_fields', $enabled_fields );
-	}
+	public function __construct() {}
 
 	/**
 	 * Register hooks for the WooCommerce profile settings integration.
@@ -96,7 +45,7 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_print_user_frontend_fields() {
-		$fields            = $this->fields;
+		$fields            = $this->get_fields();
 		$is_user_logged_in = is_user_logged_in();
 
 		foreach ( $fields as $key => $field_args ) {
@@ -130,7 +79,7 @@ class Profile_Settings {
 	 * @return array $checkout_fields Updated checkout fields
 	 */
 	public function smaily_checkout_fields( $checkout_fields ) {
-		$fields       = $this->fields;
+		$fields       = $this->get_fields();
 		$billing_list = array( 'user_gender', 'user_phone', 'user_dob' );
 
 		foreach ( $fields as $key => $field_args ) {
@@ -158,11 +107,10 @@ class Profile_Settings {
 	 * @return void
 	 */
 	public function smaily_print_user_admin_fields() {
-		$fields = $this->fields;
+		$fields = $this->get_fields();
 		?>
 		<h2><?php esc_html_e( 'Additional Information', 'smaily-wp-connect' ); ?></h2>
-		<table class="form-table" id="smaily-additional-information">
-
+		<table class="form-table" id="smaily-wp-connect-additional-information">
 			<?php foreach ( $fields as $key => $field_args ) { ?>
 				<?php
 				if ( ! empty( $field_args['hide_in_admin'] ) ) {
@@ -222,7 +170,7 @@ class Profile_Settings {
 
 		$fields = array();
 		$action = isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : '';
-		foreach ( $this->fields as $key => $field_args ) {
+		foreach ( $this->get_fields() as $key => $field_args ) {
 			if ( ! $this->smaily_is_field_visible( $field_args, $action ) ) {
 				continue;
 			}
@@ -400,9 +348,74 @@ class Profile_Settings {
 		$position = get_option( Options::CHECKOUT_SUBSCRIPTION_POSITION_OPTION, Options::CHECKOUT_SUBSCRIPTION_DEFAULT_POSITION );
 
 		if ( $position === 'before' ) {
-			$checkout_fields[ $location ] = array( 'user_newsletter' => $this->fields['user_newsletter'] ) + $checkout_fields[ $location ];
+			$checkout_fields[ $location ] = array( 'user_newsletter' => $this->get_fields()['user_newsletter'] ) + $checkout_fields[ $location ];
 		} else {
-			$checkout_fields[ $location ]['user_newsletter'] = $this->fields['user_newsletter'];
+			$checkout_fields[ $location ]['user_newsletter'] = $this->get_fields()['user_newsletter'];
 		}
+	}
+
+	/**
+	 * Get fields to be added to WooCommerce account and checkout forms.
+	 *
+	 * Notice! The fields are not added during the constructor as the
+	 * translations are not available at that point.
+	 *
+	 * @return array
+	 */
+	private function get_fields() {
+		if ( ! isset( $this->fields ) ) {
+			$fields = array(
+				'user_gender'     => array(
+					'type'                 => 'radio',
+					'label'                => __( 'Gender', 'smaily-wp-connect' ),
+					'required'             => false,
+					'class'                => array( 'tog' ),
+					'options'              => array(
+						1 => __( 'Male', 'smaily-wp-connect' ),
+						2 => __( 'Female', 'smaily-wp-connect' ),
+					),
+					'hide_in_account'      => false,
+					'hide_in_admin'        => false,
+					'hide_in_checkout'     => false,
+					'hide_in_registration' => false,
+				),
+				'user_phone'      => array(
+					'type'                 => 'tel',
+					'label'                => __( 'Phone', 'smaily-wp-connect' ),
+					'placeholder'          => __( 'Enter phone number', 'smaily-wp-connect' ),
+					'required'             => false,
+					'class'                => array( 'regular-text' ),
+					'hide_in_account'      => false,
+					'hide_in_admin'        => false,
+					'hide_in_checkout'     => true,
+					'hide_in_registration' => false,
+				),
+				'user_dob'        => array(
+					'type'                 => 'date',
+					'label'                => __( 'Birthday', 'smaily-wp-connect' ),
+					'placeholder'          => __( 'Enter birthday', 'smaily-wp-connect' ),
+					'required'             => false,
+					'class'                => array( 'regular-text' ),
+					'hide_in_account'      => false,
+					'hide_in_admin'        => false,
+					'hide_in_checkout'     => false,
+					'hide_in_registration' => false,
+				),
+				'user_newsletter' => array(
+					'type'                 => 'checkbox',
+					'label'                => __( 'Subscribe to newsletter', 'smaily-wp-connect' ),
+					'required'             => false,
+					'hide_in_account'      => false,
+					'hide_in_admin'        => false,
+					'hide_in_checkout'     => false,
+					'hide_in_registration' => false,
+				),
+			);
+
+			$enabled_fields = $this->filter_enabled_fields( $fields );
+			$this->fields   = apply_filters( 'smaily_wp_connect_account_fields', $enabled_fields );
+		}
+
+		return $this->fields;
 	}
 }

@@ -197,3 +197,20 @@
     margin-top: 3px;
   }
 }
+
+#smaily-wp-connect-additional-information {
+  #user_gender_field {
+    > span {
+      display: flex;
+      flex-direction: column;
+
+      > input {
+        margin-bottom: 4px;
+      }
+
+      > label {
+        margin-bottom: 10px;
+      }
+    }
+  }
+}
