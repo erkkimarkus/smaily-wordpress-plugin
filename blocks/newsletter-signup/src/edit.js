@@ -4,9 +4,6 @@ import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
 import { useState, useEffect, useRef } from '@wordpress/element';
 import {
 	Button,
-	Card,
-	CardBody,
-	CardHeader,
 	Notice,
 	PanelBody,
 	RangeControl,
@@ -128,8 +125,8 @@ export default function Edit({ attributes, setAttributes }) {
 
 	return (
 		<>
-			<Card isBorderless={true} {...blockProps}>
-				<CardHeader
+			<div {...blockProps}>
+				<div
 					className="smaily-newsletter-block-notice-container"
 					style={{ flexDirection: 'column', alignItems: 'inherit' }}
 				>
@@ -143,8 +140,8 @@ export default function Edit({ attributes, setAttributes }) {
 							{errorMessage}
 						</Notice>
 					)}
-				</CardHeader>
-				<CardBody>
+				</div>
+				<div>
 					<form>
 						{showNameField && (
 							<TextControl
@@ -169,8 +166,8 @@ export default function Edit({ attributes, setAttributes }) {
 							{subscribeButtonLabel}
 						</Button>
 					</form>
-				</CardBody>
-			</Card>
+				</div>
+			</div>
 			<InspectorControls>
 				<PanelBody title={__('Visible fields', 'smaily-wp-connect')}>
 					<ToggleControl
