@@ -111,7 +111,7 @@ class Renderer {
 						</p>
 						<?php
 							$anchor = esc_html__( 'read the detailed guide', 'smaily-wp-connect' );
-							$domain = esc_url( __( 'https://smaily.com/help/how-to/ecommerce-integrations/smaily-plugin-for-wordpress#toc-heading-4', 'smaily-wp-connect' ) );
+							$domain = esc_url( __( 'https://smaily.com/help/how-to/ecommerce-integrations/smaily-wp-connect', 'smaily-wp-connect' ) );
 							$link   = sprintf( '<a href="%s" target="_blank">%s</a>', $domain, $anchor );
 							echo sprintf(
 								/* translators: 1: link to setting up block component guide */
