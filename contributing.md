@@ -31,11 +31,30 @@ The `user.sh` script will read your user id, group id, names and store it in `.e
     $ ./user.sh
     $ docker compose build
 
+This installs the latest version of WordPress and also includes the following plugins:
+- [Contact Form 7](https://wordpress.org/plugins/contact-form-7/)
+- [WooCommerce](https://wordpress.org/plugins/woocommerce/)
+- [Really Simple Captcha](https://wordpress.org/plugins/really-simple-captcha/)
+- [Mailhog for WordPress](https://wordpress.org/plugins/wp-mailhog-smtp/)
+
 And boot up the environment:
 
     $ docker compose up -d
 
 During first run WordPress installation wizard guides you through the setup process. After completing the installation, the site can be accessed from `http://localhost:8080` and the administration interface from `http://localhost:8080/wp-admin` URL.
+
+## Running the minimum supported version
+
+The plugin should be compatible with the latest version of WordPress and the minimum supported version. The minimum supported version is defined in the `compose.min.yaml` file. Also the latest plugin versions that are compatible with the minimum supported versions are defined there.
+
+It is recommended to clean up the environment before switching between the latest and minimum supported versions. You can do this by running:
+
+    $ docker compose -f compose.min.yaml -f compose.yaml down --remove-orphans --volumes
+
+To run the minimum supported version, you can use the following command:
+
+    $ docker compose -f compose.min.yaml -f compose.yaml build
+    $ docker compose -f compose.min.yaml -f compose.yaml up -d
 
 # Internals
 

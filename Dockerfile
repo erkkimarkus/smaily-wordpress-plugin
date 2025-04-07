@@ -1,4 +1,6 @@
-FROM wordpress:6.6.2
+ARG WORDPRESS_VERSION=6.7.2
+
+FROM wordpress:${WORDPRESS_VERSION}
 
 ARG user_id
 ARG group_id
@@ -34,14 +36,15 @@ RUN apt-get update \
     g++ \
     libicu-dev \
     less \
-    msginit \
+    gettext \
     unzip \
+    zip \
     wget \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install node and npm.
-ENV NODE_VERSION=22.13.1
+ARG NODE_VERSION=22.13.1
 RUN wget -O /tmp/node.tar.xz "https://nodejs.org/dist/v22.13.1/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     && mkdir /tmp/node && tar -xvf /tmp/node.tar.xz -C /tmp/node --strip-components=1 \
     && mv /tmp/node/bin/* /usr/local/bin \
@@ -54,30 +57,31 @@ RUN docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
 # Install Contact Form 7.
-ENV CF7_VERSION="5.9.8"
+ARG CF7_VERSION="latest-stable"
 RUN wget -O /tmp/cf7.zip "https://downloads.wordpress.org/plugin/contact-form-7.${CF7_VERSION}.zip" \
     && unzip /tmp/cf7.zip -d /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/cf7.zip
 
 # Install Really Simple CAPTCHA.
-ENV RSC_VERSION="2.3"
-RUN wget -O /tmp/rsc.zip "https://downloads.wordpress.org/plugin/really-simple-captcha.${RSC_VERSION}.zip" \
+ARG REALLY_SIMPLE_CAPTCHA_VERSION="latest-stable"
+RUN wget -O /tmp/rsc.zip "https://downloads.wordpress.org/plugin/really-simple-captcha.${REALLY_SIMPLE_CAPTCHA_VERSION}.zip" \
     && unzip /tmp/rsc.zip -d  /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/rsc.zip
 
-# Install Plugin Check.
-ENV PCP_VERSION="1.1.0"
-RUN wget -O /tmp/pcp.zip "https://downloads.wordpress.org/plugin/plugin-check.${PCP_VERSION}.zip" \
+# Install Plugin Check. Always check with the latest version.
+ENV PLUGIN_CHECK_VERSION="latest-stable"
+RUN wget -O /tmp/pcp.zip "https://downloads.wordpress.org/plugin/plugin-check.${PLUGIN_CHECK_VERSION}.zip" \
     && unzip /tmp/pcp.zip -d  /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/pcp.zip
 
 # WooCommerce
-ENV WC_VERSION="9.3.1"
-RUN wget -O /tmp/wc.zip "https://downloads.wordpress.org/plugin/woocommerce.${WC_VERSION}.zip" \
+ARG WOOCOMMERCE_VERSION="latest-stable"
+RUN wget -O /tmp/wc.zip "https://downloads.wordpress.org/plugin/woocommerce.${WOOCOMMERCE_VERSION}.zip" \
     && unzip /tmp/wc.zip -d  /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/wc.zip
 
 # MailHog
-RUN wget -O /tmp/mailhog.zip "https://downloads.wordpress.org/plugin/wp-mailhog-smtp.latest-stable.zip" \
+ARG MAILHOG_VERSION="latest-stable"
+RUN wget -O /tmp/mailhog.zip "https://downloads.wordpress.org/plugin/wp-mailhog-smtp.${MAILHOG_VERSION}.zip" \
     && unzip /tmp/mailhog.zip -d  /usr/src/wordpress/wp-content/plugins \
     && rm /tmp/mailhog.zip
