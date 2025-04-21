@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Includes;
 
+require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cart.class.php';
+
 use Smaily_Connect\Integrations\WooCommerce\Cart;
 
 class Lifecycle {
