@@ -7,8 +7,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-03-18T10:16:35+00:00\n"
-"PO-Revision-Date: 2025-03-18T10:16:35+00:00\n"
+"POT-Creation-Date: 2025-04-21T11:49:45+00:00\n"
+"PO-Revision-Date: 2025-04-21T11:49:45+00:00\n"
 "Language: et\n"
 "Plural-Forms: nplurals = 2; plural = (n !== 1)\n"
 "X-Generator: Tolgee\n"
@@ -328,6 +328,11 @@ msgstr "Kuidas lisada RSS-voogu oma kirjapõhja?"
 msgid "How to create API credentials?"
 msgstr "Kuidas luua API ligipääsu?"
 
+#. Plugin URI of the plugin
+#: smaily-connect.php
+msgid "https://github.com/sendsmaily/smaily-wordpress-plugin"
+msgstr "https://github.com/sendsmaily/smaily-wordpress-plugin"
+
 #. Author URI of the plugin
 #: smaily-connect.php
 msgid "https://smaily.com"
@@ -349,9 +354,13 @@ msgstr "Iga 15 minuti järel"
 msgid "Input does not contain a recognizable email address."
 msgstr "Vigane e-posti aadress."
 
-#: integrations/cf7/public.class.php:116
+#: integrations/cf7/public.class.php:119
 msgid "Input does not contain a valid email address."
 msgstr "Vigane e-posti aadress."
+
+#: integrations/cf7/public.class.php:116
+msgid "Invalid data submitted."
+msgstr "Sisestatud andmed on vigased."
 
 #: admin/partials/smaily-admin-woocommerce-abandoned-cart.php:19
 #: admin/partials/smaily-admin-woocommerce-subscriber-sync.php:19
@@ -681,7 +690,7 @@ msgstr "Uudiskirjaga Liitujate Sünkroniseerimine võimaldab  teill sünkronisee
 msgid "Subscribe to newsletter"
 msgstr "Liitu uudiskirjaga"
 
-#: integrations/cf7/public.class.php:119
+#: integrations/cf7/public.class.php:122
 #: public/partials/smaily-public-basic.php:11
 msgid "Subscribing failed with unknown reason."
 msgstr "Uudiskirjaga liitumine ebaõnnestus teadmata põhjusel."
@@ -772,6 +781,16 @@ msgstr "Uudiskirjaga liitujate kogumiseks saate kasutada järgmisi meetodeid:"
 msgid "You can view the example form %1$s."
 msgstr "Saate vaadata näidisvormi %s."
 
+#. Plugin Name of the plugin
+#: smaily-connect.php
+#: integrations/cf7/service.class.php:39
+msgid "Smaily Connect"
+msgstr ""
+
+#: admin/smaily-admin-renderer.class.php:114
+msgid "https://smaily.com/help/how-to/ecommerce-integrations/smaily-connect"
+msgstr ""
+
 #: blocks/checkout-optin/build/block.json
 #: blocks/checkout-optin/src/block.json
 msgctxt "block title"
@@ -818,19 +837,4 @@ msgstr ""
 #: blocks/newsletter-signup/src/block.json
 msgctxt "block keyword"
 msgid "form"
-msgstr ""
-
-#. Plugin Name of the plugin
-#: smaily-connect.php
-#: integrations/cf7/service.class.php:39
-msgid "Smaily Connect"
-msgstr ""
-
-#. Plugin URI of the plugin
-#: smaily-connect.php
-msgid "https://github.com/sendsmaily/smaily-wordpress-plugin"
-msgstr ""
-
-#: admin/smaily-admin-renderer.class.php:114
-msgid "https://smaily.com/help/how-to/ecommerce-integrations/smaily-connect"
 msgstr ""

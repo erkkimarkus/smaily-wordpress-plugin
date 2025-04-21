@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-04-21T10:57:01+00:00\n"
+"POT-Creation-Date: 2025-04-21T11:49:41+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.11.0\n"
 "X-Domain: smaily-connect\n"
@@ -621,10 +621,14 @@ msgid "Form was not submitted using POST method."
 msgstr ""
 
 #: integrations/cf7/public.class.php:116
-msgid "Input does not contain a valid email address."
+msgid "Invalid data submitted."
 msgstr ""
 
 #: integrations/cf7/public.class.php:119
+msgid "Input does not contain a valid email address."
+msgstr ""
+
+#: integrations/cf7/public.class.php:122
 #: public/partials/smaily-public-basic.php:11
 msgid "Subscribing failed with unknown reason."
 msgstr ""
