@@ -1,14 +1,14 @@
 <?php
 
-namespace Smaily_WP_Connect;
+namespace Smaily_Connect;
 
-use Smaily_WP_Connect\Admin\Settings;
-use Smaily_WP_Connect\Includes\Cypher;
-use Smaily_WP_Connect\Includes\Helper;
-use Smaily_WP_Connect\Includes\Options;
-use Smaily_WP_Connect\Includes\Smaily_Client;
-use Smaily_WP_Connect\Includes\Widget;
-use Smaily_WP_Connect\Integrations\WooCommerce\Rss;
+use Smaily_Connect\Admin\Settings;
+use Smaily_Connect\Includes\Cypher;
+use Smaily_Connect\Includes\Helper;
+use Smaily_Connect\Includes\Options;
+use Smaily_Connect\Includes\Smaily_Client;
+use Smaily_Connect\Includes\Widget;
+use Smaily_Connect\Integrations\WooCommerce\Rss;
 
 class Admin {
 	/**
@@ -79,7 +79,7 @@ class Admin {
 		add_action( 'pre_update_option_' . Options::API_CREDENTIALS_OPTION, array( $this, 'validate_api_credentials_after_save' ), 10, 3 );
 		add_action( 'widgets_init', array( $this, 'smaily_subscription_widget_init' ) );
 		add_action( 'wp_ajax_smaily_admin_save', array( $this, 'smaily_admin_save' ) );
-		add_filter( 'plugin_action_links_' . plugin_basename( SMAILY_WP_CONNECT_PLUGIN_FILE ), array( $this, 'settings_link' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( SMAILY_CONNECT_PLUGIN_FILE ), array( $this, 'settings_link' ) );
 	}
 
 	/**
@@ -89,12 +89,12 @@ class Admin {
 	 */
 	public function settings_page() {
 		add_menu_page(
-			__( 'Smaily Settings', 'smaily-wp-connect' ),
+			__( 'Smaily Settings', 'smaily-connect' ),
 			'Smaily',
 			'manage_options',
 			$this->plugin_name,
 			array( $this, 'render_admin_page' ),
-			'data:image/svg+xml;base64,' . base64_encode( file_get_contents( SMAILY_WP_CONNECT_PLUGIN_PATH . '/gfx/icon.svg' ) )
+			'data:image/svg+xml;base64,' . base64_encode( file_get_contents( SMAILY_CONNECT_PLUGIN_PATH . '/gfx/icon.svg' ) )
 		);
 	}
 
@@ -107,7 +107,7 @@ class Admin {
 			return wp_die( 'Insufficient permissions' );
 		}
 
-		include_once SMAILY_WP_CONNECT_PLUGIN_PATH . '/admin/partials/smaily-admin-page.php';
+		include_once SMAILY_CONNECT_PLUGIN_PATH . '/admin/partials/smaily-admin-page.php';
 	}
 
 	/**
@@ -145,9 +145,9 @@ class Admin {
 		$credentials_valid = $this->validate_api_credentials( $new_value['subdomain'], $new_value['username'], $new_value['password'] );
 		if ( $credentials_valid[0] === true ) {
 			add_settings_error(
-				'smaily_wp_connect_messages',
+				'smaily_connect_messages',
 				'credentials_validated',
-				__( 'API credentials validated successfully!', 'smaily-wp-connect' ),
+				__( 'API credentials validated successfully!', 'smaily-connect' ),
 				'success'
 			);
 
@@ -160,17 +160,17 @@ class Admin {
 			switch ( $credentials_valid[1] ) {
 				case 404:
 					add_settings_error(
-						'smaily_wp_connect_messages',
+						'smaily_connect_messages',
 						'invalid_api_credentials',
-						__( 'Check subdomain. API credentials validation failed.', 'smaily-wp-connect' ),
+						__( 'Check subdomain. API credentials validation failed.', 'smaily-connect' ),
 						'error'
 					);
 					break;
 				default:
 					add_settings_error(
-						'smaily_wp_connect_messages',
+						'smaily_connect_messages',
 						'invalid_api_credentials',
-						__( 'API credentials validation failed. Please check your details.', 'smaily-wp-connect' ),
+						__( 'API credentials validation failed. Please check your details.', 'smaily-connect' ),
 						'error'
 					);
 					break;
@@ -211,8 +211,8 @@ class Admin {
 		if ( ! isset( $this->tabs ) ) {
 			$tabs = array(
 				'connection' => array(
-					'title'              => __( 'Connection', 'smaily-wp-connect' ),
-					'submit_button_text' => $this->options->has_credentials() ? __( 'Disconnect', 'smaily-wp-connect' ) : __( 'Make a connection', 'smaily-wp-connect' ),
+					'title'              => __( 'Connection', 'smaily-connect' ),
+					'submit_button_text' => $this->options->has_credentials() ? __( 'Disconnect', 'smaily-connect' ) : __( 'Make a connection', 'smaily-connect' ),
 					'url'                => add_query_arg(
 						array(
 							'page' => $this->plugin_name,
@@ -221,14 +221,14 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_connection_tab_settings' ),
-					'option_group'       => 'smaily_wp_connect_connection',
-					'page'               => 'smaily_wp_connect_tab_connection',
+					'option_group'       => 'smaily_connect_connection',
+					'page'               => 'smaily_connect_tab_connection',
 				),
 			);
 
 			if ( $this->options->has_credentials() ) {
 				$tabs['tutorial'] = array(
-					'title'             => __( 'Getting started', 'smaily-wp-connect' ),
+					'title'             => __( 'Getting started', 'smaily-connect' ),
 					'url'               => add_query_arg(
 						array(
 							'page' => $this->plugin_name,
@@ -237,15 +237,15 @@ class Admin {
 						''
 					),
 					'register_settings' => array( $this->settings, 'register_tutorial_tab_settings' ),
-					'option_group'      => 'smaily_wp_connect_tutorial',
-					'page'              => 'smaily_wp_connect_tab_tutorial',
+					'option_group'      => 'smaily_connect_tutorial',
+					'page'              => 'smaily_connect_tab_tutorial',
 				);
 			}
 
 			if ( Helper::is_woocommerce_active() && $this->options->has_credentials() ) {
 				$tabs['subscriber_sync'] = array(
-					'title'              => __( 'Subscriber Synchronization', 'smaily-wp-connect' ),
-					'submit_button_text' => __( 'Save', 'smaily-wp-connect' ),
+					'title'              => __( 'Subscriber Synchronization', 'smaily-connect' ),
+					'submit_button_text' => __( 'Save', 'smaily-connect' ),
 					'url'                => add_query_arg(
 						array(
 							'page' => $this->plugin_name,
@@ -254,13 +254,13 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_subscriber_sync_tab_settings' ),
-					'option_group'       => 'smaily_wp_connect_subscriber_sync',
-					'page'               => 'smaily_wp_connect_tab_subscriber_sync',
+					'option_group'       => 'smaily_connect_subscriber_sync',
+					'page'               => 'smaily_connect_tab_subscriber_sync',
 				);
 
 				$tabs['abandoned_cart'] = array(
-					'title'              => __( 'Abandoned Cart', 'smaily-wp-connect' ),
-					'submit_button_text' => __( 'Save', 'smaily-wp-connect' ),
+					'title'              => __( 'Abandoned Cart', 'smaily-connect' ),
+					'submit_button_text' => __( 'Save', 'smaily-connect' ),
 					'url'                => add_query_arg(
 						array(
 							'page' => $this->plugin_name,
@@ -269,13 +269,13 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_abandoned_cart_tab_settings' ),
-					'option_group'       => 'smaily_wp_connect_abandoned_cart',
-					'page'               => 'smaily_wp_connect_tab_abandoned_cart',
+					'option_group'       => 'smaily_connect_abandoned_cart',
+					'page'               => 'smaily_connect_tab_abandoned_cart',
 				);
 
 				$tabs['rss'] = array(
-					'title'              => __( 'RSS', 'smaily-wp-connect' ),
-					'submit_button_text' => __( 'Save', 'smaily-wp-connect' ),
+					'title'              => __( 'RSS', 'smaily-connect' ),
+					'submit_button_text' => __( 'Save', 'smaily-connect' ),
 					'url'                => add_query_arg(
 						array(
 							'page' => $this->plugin_name,
@@ -284,8 +284,8 @@ class Admin {
 						''
 					),
 					'register_settings'  => array( $this->settings, 'register_rss_tab_settings' ),
-					'option_group'       => 'smaily_wp_connect_rss',
-					'page'               => 'smaily_wp_connect_tab_rss',
+					'option_group'       => 'smaily_connect_rss',
+					'page'               => 'smaily_connect_tab_rss',
 				);
 			}
 
@@ -300,10 +300,10 @@ class Admin {
 	 *
 	 */
 	public function enqueue_styles() {
-		wp_register_style( $this->plugin_name, SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/smaily-admin.css', array(), $this->version, 'all' );
-		wp_register_style( $this->plugin_name . '-widget', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/smaily-widget-admin.css', array(), $this->version, 'all' );
+		wp_register_style( $this->plugin_name, SMAILY_CONNECT_PLUGIN_URL . '/admin/css/smaily-admin.css', array(), $this->version, 'all' );
+		wp_register_style( $this->plugin_name . '-widget', SMAILY_CONNECT_PLUGIN_URL . '/admin/css/smaily-widget-admin.css', array(), $this->version, 'all' );
 
-		wp_enqueue_style( $this->plugin_name . '-fonts', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/css/fonts.css', array(), null );
+		wp_enqueue_style( $this->plugin_name . '-fonts', SMAILY_CONNECT_PLUGIN_URL . '/admin/css/fonts.css', array(), null );
 		wp_enqueue_style( $this->plugin_name );
 		wp_enqueue_style( $this->plugin_name . '-widget' );
 	}
@@ -313,9 +313,9 @@ class Admin {
 	 *
 	 */
 	public function enqueue_scripts() {
-		wp_register_script( $this->plugin_name . '-jscolor', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/js/jscolor.min.js', array(), $this->version, true );
-		wp_register_script( $this->plugin_name, SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/js/smaily-admin.js', array( 'jquery', 'jquery-ui-tabs' ), $this->version, true );
-		wp_register_script( $this->plugin_name . '-widget', SMAILY_WP_CONNECT_PLUGIN_URL . '/admin/js/admin-widget.js', array( 'jquery', $this->plugin_name . '-jscolor' ), $this->version, true );
+		wp_register_script( $this->plugin_name . '-jscolor', SMAILY_CONNECT_PLUGIN_URL . '/admin/js/jscolor.min.js', array(), $this->version, true );
+		wp_register_script( $this->plugin_name, SMAILY_CONNECT_PLUGIN_URL . '/admin/js/smaily-admin.js', array( 'jquery', 'jquery-ui-tabs' ), $this->version, true );
+		wp_register_script( $this->plugin_name . '-widget', SMAILY_CONNECT_PLUGIN_URL . '/admin/js/admin-widget.js', array( 'jquery', $this->plugin_name . '-jscolor' ), $this->version, true );
 
 		wp_enqueue_script( $this->plugin_name . '-jscolor' );
 		wp_enqueue_script( $this->plugin_name );
@@ -343,7 +343,7 @@ class Admin {
 	 */
 	public function settings_link( $links ) {
 		// receive all current links and add custom link to the list.
-		$settings_link = '<a href="admin.php?page=' . esc_attr( $this->plugin_name ) . '">' . esc_html__( 'Settings', 'smaily-wp-connect' ) . '</a>';
+		$settings_link = '<a href="admin.php?page=' . esc_attr( $this->plugin_name ) . '">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>';
 		// Settings before disable.
 		array_unshift( $links, $settings_link );
 		return $links;

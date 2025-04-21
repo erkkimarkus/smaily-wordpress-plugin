@@ -1,10 +1,10 @@
 <?php
 
-namespace Smaily_WP_Connect;
+namespace Smaily_Connect;
 
 use Exception;
-use Smaily_WP_Connect\Includes\Helper;
-use Smaily_WP_Connect\Includes\Options;
+use Smaily_Connect\Includes\Helper;
+use Smaily_Connect\Includes\Options;
 
 class Public_Base {
 	/**
@@ -62,7 +62,7 @@ class Public_Base {
 	 *
 	 */
 	public function add_shortcodes() {
-		add_shortcode( 'smaily_wp_connect_newsletter_form', array( $this, 'smaily_shortcode_render' ) );
+		add_shortcode( 'smaily_connect_newsletter_form', array( $this, 'smaily_shortcode_render' ) );
 	}
 
 	/**
@@ -74,7 +74,7 @@ class Public_Base {
 		// Allow overriding the template.
 		$template_path = locate_template( 'smaily/smaily-public-basic.php' );
 		if ( ! $template_path ) {
-			$template_path = SMAILY_WP_CONNECT_PLUGIN_PATH . 'public/partials/smaily-public-basic.php';
+			$template_path = SMAILY_CONNECT_PLUGIN_PATH . 'public/partials/smaily-public-basic.php';
 		}
 
 		$shortcode_attrs = shortcode_atts(

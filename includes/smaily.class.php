@@ -1,21 +1,21 @@
 <?php
 
-use Smaily_WP_Connect\Admin;
-use Smaily_WP_Connect\Includes\API;
-use Smaily_WP_Connect\Includes\Blocks;
-use Smaily_WP_Connect\Includes\Helper;
-use Smaily_WP_Connect\Includes\Lifecycle;
-use Smaily_WP_Connect\Includes\Options;
-use Smaily_WP_Connect\Integrations\CF7\Admin as Smaily_CF7_Admin;
-use Smaily_WP_Connect\Integrations\CF7\Public_Base as Smaily_CF7_Public;
-use Smaily_WP_Connect\Integrations\WooCommerce\Cart;
-use Smaily_WP_Connect\Integrations\WooCommerce\Cron;
-use Smaily_WP_Connect\Integrations\WooCommerce\Profile_Settings;
-use Smaily_WP_Connect\Integrations\WooCommerce\Rss;
-use Smaily_WP_Connect\Integrations\WooCommerce\Subscriber_Synchronization;
-use Smaily_WP_Connect\Public_Base;
+use Smaily_Connect\Admin;
+use Smaily_Connect\Includes\API;
+use Smaily_Connect\Includes\Blocks;
+use Smaily_Connect\Includes\Helper;
+use Smaily_Connect\Includes\Lifecycle;
+use Smaily_Connect\Includes\Options;
+use Smaily_Connect\Integrations\CF7\Admin as Smaily_CF7_Admin;
+use Smaily_Connect\Integrations\CF7\Public_Base as Smaily_CF7_Public;
+use Smaily_Connect\Integrations\WooCommerce\Cart;
+use Smaily_Connect\Integrations\WooCommerce\Cron;
+use Smaily_Connect\Integrations\WooCommerce\Profile_Settings;
+use Smaily_Connect\Integrations\WooCommerce\Rss;
+use Smaily_Connect\Integrations\WooCommerce\Subscriber_Synchronization;
+use Smaily_Connect\Public_Base;
 
-class Smaily_WP_Connect {
+class Smaily_Connect {
 	/**
 	 * The unique identifier of this plugin.
 	 *
@@ -199,36 +199,36 @@ class Smaily_WP_Connect {
 	 * @access private
 	 */
 	private function load_dependencies() {
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-renderer.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-sanitizer.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-settings.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'admin/smaily-admin.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'blocks/newsletter-signup/smaily-integration.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-api.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-blocks.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-cypher.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-helper.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-logger.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-options.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-client.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'includes/smaily-widget.class.php';
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'public/smaily-public.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-renderer.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-sanitizer.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-settings.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'blocks/newsletter-signup/smaily-integration.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-api.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-blocks.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-cypher.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-helper.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-logger.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-options.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-client.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-widget.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'public/smaily-public.class.php';
 
 		$this->options = new Options();
 
 		if ( Helper::is_woocommerce_active() ) {
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cart.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cron.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/data-handler.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/profile-settings.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/rss.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/subscriber-synchronization.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cart.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cron.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/data-handler.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/profile-settings.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/rss.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/subscriber-synchronization.class.php';
 		}
 
 		if ( Helper::is_cf7_active() ) {
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/cf7/admin.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/cf7/public.class.php';
-			require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/cf7/service.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/cf7/admin.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/cf7/public.class.php';
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/cf7/service.class.php';
 		}
 	}
 

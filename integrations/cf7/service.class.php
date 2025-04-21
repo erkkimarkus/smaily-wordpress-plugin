@@ -1,11 +1,11 @@
 <?php
 
-namespace Smaily_WP_Connect\Integrations\CF7;
+namespace Smaily_Connect\Integrations\CF7;
 
 class_exists( 'WPCF7_Service' ) || exit;
 
 use WPCF7_Service;
-use Smaily_WP_Connect\Includes\Options;
+use Smaily_Connect\Includes\Options;
 
 class Service extends WPCF7_Service {
 	/**
@@ -36,7 +36,7 @@ class Service extends WPCF7_Service {
 	}
 
 	public function get_title() {
-		return __( 'Smaily WP Connect', 'smaily-wp-connect' );
+		return __( 'Smaily Connect', 'smaily-connect' );
 	}
 
 	public function is_active() {
@@ -58,7 +58,7 @@ class Service extends WPCF7_Service {
 		$args = wp_parse_args( $args, array() );
 
 		$url = menu_page_url( $this->plugin_name, false );
-		$url = add_query_arg( array( 'service' => 'smaily-wp-connect' ), $url );
+		$url = add_query_arg( array( 'service' => 'smaily-connect' ), $url );
 
 		if ( ! empty( $args ) ) {
 			$url = add_query_arg( $args, $url );
@@ -74,23 +74,23 @@ class Service extends WPCF7_Service {
 	public function display( $action = '' ) {
 		?>
 		<p>
-			<?php esc_html_e( 'Smaily email marketing and automation plugin for Contact Form 7 allows you to automatically add newsletter subscribers to your Smaily subscriber list, by using forms created in Contact Form 7.', 'smaily-wp-connect' ); ?>
+			<?php esc_html_e( 'Smaily email marketing and automation plugin for Contact Form 7 allows you to automatically add newsletter subscribers to your Smaily subscriber list, by using forms created in Contact Form 7.', 'smaily-connect' ); ?>
 		</p>
 		<p>
 			<strong>
 				<a href="https://smaily.com/integrations/smaily-for-contact-form-7">
-					<?php esc_html_e( 'Smaily integration', 'smaily-wp-connect' ); ?>
+					<?php esc_html_e( 'Smaily integration', 'smaily-connect' ); ?>
 				</a>
 			</strong>
 		</p>
 		<?php if ( $this->is_active() ) : ?>
 			<p class="dashicons-before dashicons-yes">
-				<?php esc_html_e( 'Smaily integration is active on this site.', 'smaily-wp-connect' ); ?>
+				<?php esc_html_e( 'Smaily integration is active on this site.', 'smaily-connect' ); ?>
 			</p>
 		<?php endif ?>
 		<p>
 			<a class="button" href="<?php echo esc_url( menu_page_url( $this->plugin_name, false ) ); ?>">
-				<?php esc_html_e( 'Setup integration', 'smaily-wp-connect' ); ?>
+				<?php esc_html_e( 'Setup integration', 'smaily-connect' ); ?>
 			</a>
 		</p>
 		<?php

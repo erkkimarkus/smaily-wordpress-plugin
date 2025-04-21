@@ -1,8 +1,8 @@
 <?php
 
-namespace Smaily_WP_Connect\Blocks\Checkout_Optin;
+namespace Smaily_Connect\Blocks\Checkout_Optin;
 
-use Smaily_WP_Connect\Includes\Options;
+use Smaily_Connect\Includes\Options;
 use Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface;
 
 define( 'SMAILY_CHECKOUT_OPTIN_VERSION', '1.0.0' );
@@ -56,7 +56,7 @@ class Integration implements IntegrationInterface {
 
 		$data = array(
 			'smailyCheckoutOptinActive' => $enabled,
-			'optInDefaultText'          => __( 'Subscribe to newsletter', 'smaily-wp-connect' ),
+			'optInDefaultText'          => __( 'Subscribe to newsletter', 'smaily-connect' ),
 		);
 
 		return $data;
@@ -83,7 +83,7 @@ class Integration implements IntegrationInterface {
 
 		wp_set_script_translations(
 			'smaily-checkout-optin-block-editor', // script handle
-			'smaily-wp-connect', // text domain
+			'smaily-connect', // text domain
 			__DIR__ . '/languages'
 		);
 	}
@@ -108,7 +108,7 @@ class Integration implements IntegrationInterface {
 		);
 		wp_set_script_translations(
 			'smaily-checkout-optin-block-frontend', // script handle
-			'smaily-wp-connect', // text domain
+			'smaily-connect', // text domain
 			__DIR__ . '/languages'
 		);
 	}

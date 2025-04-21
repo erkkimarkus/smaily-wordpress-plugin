@@ -1,6 +1,6 @@
 <?php
 
-namespace Smaily_WP_Connect\Integrations\WooCommerce;
+namespace Smaily_Connect\Integrations\WooCommerce;
 
 use WC_Product;
 
@@ -100,9 +100,9 @@ class Rss {
 
 		// Render products RSS feed, if requested.
 		if ( $render_rss_feed === true ) {
-			return SMAILY_WP_CONNECT_PLUGIN_PATH . 'public/template/smaily-rss-feed.php';
+			return SMAILY_CONNECT_PLUGIN_PATH . 'public/template/smaily-rss-feed.php';
 		} elseif ( $pagename === 'smaily-rss-feed' ) {
-			return SMAILY_WP_CONNECT_PLUGIN_PATH . 'public/template/smaily-rss-feed.php';
+			return SMAILY_CONNECT_PLUGIN_PATH . 'public/template/smaily-rss-feed.php';
 		}
 
 		// Load normal template as a fallback.
@@ -113,9 +113,9 @@ class Rss {
 	 * Conditionally flush rewrite rules.
 	 */
 	public function maybe_flush_rewrite_rules() {
-		if ( get_option( 'smaily_wp_connect_flush_rewrite_rules' ) ) {
+		if ( get_option( 'smaily_connect_flush_rewrite_rules' ) ) {
 			flush_rewrite_rules();
-			delete_option( 'smaily_wp_connect_flush_rewrite_rules' );
+			delete_option( 'smaily_connect_flush_rewrite_rules' );
 		}
 	}
 

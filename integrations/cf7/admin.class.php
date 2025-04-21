@@ -1,9 +1,9 @@
 <?php
 
-namespace Smaily_WP_Connect\Integrations\CF7;
+namespace Smaily_Connect\Integrations\CF7;
 
-use Smaily_WP_Connect\Includes\Helper;
-use Smaily_WP_Connect\Includes\Options;
+use Smaily_Connect\Includes\Helper;
+use Smaily_Connect\Includes\Options;
 use WPCF7_ContactForm;
 use WPCF7_Integration;
 
@@ -94,7 +94,7 @@ class Admin {
 	public function add_tab( $panels ) {
 		$panel = array(
 			'smailyforcf7' => array(
-				'title'    => __( 'Smaily for Contact Form 7', 'smaily-wp-connect' ),
+				'title'    => __( 'Smaily for Contact Form 7', 'smaily-connect' ),
 				'callback' => array( $this, 'panel_content' ),
 			),
 		);
@@ -121,7 +121,7 @@ class Admin {
 		$form_tags       = \WPCF7_FormTagsManager::get_instance()->get_scanned_tags();
 		$captcha_enabled = $this->is_captcha_enabled( $form_tags );
 
-		require_once SMAILY_WP_CONNECT_PLUGIN_PATH . 'integrations/cf7/partials/smaily-cf7-admin.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/cf7/partials/smaily-cf7-admin.php';
 	}
 
 	/**

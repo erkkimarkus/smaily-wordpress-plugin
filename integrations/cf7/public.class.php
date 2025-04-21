@@ -1,10 +1,10 @@
 <?php
 
-namespace Smaily_WP_Connect\Integrations\CF7;
+namespace Smaily_Connect\Integrations\CF7;
 
-use Smaily_WP_Connect\Includes\Helper;
-use Smaily_WP_Connect\Includes\Options;
-use Smaily_WP_Connect\Includes\Smaily_Client;
+use Smaily_Connect\Includes\Helper;
+use Smaily_Connect\Includes\Options;
+use Smaily_Connect\Includes\Smaily_Client;
 use Transliterator;
 use WPCF7_ContactForm;
 use WPCF7_Submission;
@@ -87,7 +87,7 @@ class Public_Base {
 				$payload['email'] = ! is_null( $posted_value ) ? $posted_value : '';
 			} elseif ( $is_single_option_radio || $is_single_option_menu ) {
 				// Single option dropdown menu and radio button can only have one value.
-				$payload[ $this->format_field( $tag->name ) ] = $tag->values[0];
+				$payload[ $this->format_field( $tag->name ) ] = $posted_value[0] ?? '';
 			} elseif ( $tag->basetype === 'select' || $tag->basetype === 'radio' || $tag->basetype === 'checkbox' ) {
 				// Tags with multiple options need to have default values, because browsers do not send values of unchecked inputs.
 				foreach ( $tag->values as $value ) {
@@ -106,17 +106,20 @@ class Public_Base {
 		$response = $request->trigger_automation( (int) $cf7_settings['autoresponder_id'], array( $payload ) );
 
 		if ( empty( $response['body'] ) ) {
-			$error_message = esc_html__( 'Something went wrong', 'smaily-wp-connect' );
+			$error_message = esc_html__( 'Something went wrong', 'smaily-connect' );
 		} elseif ( 101 !== (int) $response['body']['code'] ) {
 			switch ( $response['body']['code'] ) {
 				case 201:
-					$error_message = esc_html__( 'Form was not submitted using POST method.', 'smaily-wp-connect' );
+					$error_message = esc_html__( 'Form was not submitted using POST method.', 'smaily-connect' );
+					break;
+				case 203:
+					$error_message = esc_html__( 'Invalid data submitted.', 'smaily-connect' );
 					break;
 				case 204:
-					$error_message = esc_html__( 'Input does not contain a valid email address.', 'smaily-wp-connect' );
+					$error_message = esc_html__( 'Input does not contain a valid email address.', 'smaily-connect' );
 					break;
 				default:
-					$error_message = esc_html__( 'Subscribing failed with unknown reason.', 'smaily-wp-connect' );
+					$error_message = esc_html__( 'Subscribing failed with unknown reason.', 'smaily-connect' );
 					break;
 			}
 		}

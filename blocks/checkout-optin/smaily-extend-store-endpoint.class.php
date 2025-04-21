@@ -1,6 +1,6 @@
 <?php
 
-namespace Smaily_WP_Connect\Blocks\Checkout_Optin;
+namespace Smaily_Connect\Blocks\Checkout_Optin;
 
 use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\CheckoutSchema;
@@ -53,7 +53,7 @@ class Extend_Store_Endpoint {
 	public static function extend_checkout_schema() {
 		return array(
 			'user_newsletter' => array(
-				'description' => __( 'User newsletter subscription', 'smaily-wp-connect' ),
+				'description' => __( 'User newsletter subscription', 'smaily-connect' ),
 				'type'        => 'boolean',
 				'context'     => array( 'view', 'edit' ),
 				'readonly'    => false,
