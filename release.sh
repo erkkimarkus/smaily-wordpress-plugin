@@ -145,7 +145,7 @@ svn commit --username=$SVN_USER -m "Release "${VERSION}", see readme.txt for the
 
 # REMOVE THE TEMP DIRS
 echo "CLEANING UP"
-cd $GIT_REPO_PATH && git checkout master
+cd $GIT_REPO_PATH && git checkout main
 rm -Rf $TEMP_SVN_REPO
 
 # DONE, BYE
