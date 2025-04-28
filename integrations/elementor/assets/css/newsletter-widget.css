@@ -1,0 +1,43 @@
+.smaily-connect-elementor-newsletter-form {
+    display: flex;
+    gap: 10px;
+
+    input[type="email"] input[type="text"] {
+        height: 40px;
+    }
+}
+
+.smaily-connect-elementor-newsletter-form-notice__container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 0;
+}
+
+.smaily-connect-elementor-newsletter-form-notice__content {
+    padding: 0 0 0 16px;
+}
+
+.smaily-connect-elementor-newsletter-form-input-container {
+    display: flex;
+    flex-grow: 1;
+    flex-direction: column;
+
+    input {
+        padding-left: 12px;
+        transition: all 0.3s ease;
+    }
+}
+
+.smaily-connect-elementor-newsletter-form-visible-fields {
+    display: flex;
+    gap: 10px;
+    flex-grow: 1;
+}
+
+.smaily-connect-elementor-newsletter-form-submit-button {
+    min-width: 140px;
+    height: 48px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}

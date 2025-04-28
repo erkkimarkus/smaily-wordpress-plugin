@@ -5,7 +5,7 @@ Requires PHP: 7.0
 Requires at least: 6.0
 Tested up to: 6.8
 WC tested up to: 9.6.1
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv3 or later
 
 The Smaily Connect plugin integrates Contact Form 7 and WooCommerce, offering a complete email marketing and automation solution.
@@ -14,7 +14,7 @@ The Smaily Connect plugin integrates Contact Form 7 and WooCommerce, offering a 
 
 **Smaily Connect – The Only Email Marketing Plugin You Need!**
 
-Transform your **WordPress website, WooCommerce store, and Contact Form 7** into an **email marketing powerhouse** with Smaily – the all-in-one plugin designed to **automate your marketing, grow your audience, and drive more sales effortlessly**.
+Transform your **WordPress website, WooCommerce store, Contact Form 7 and Elementor** into an **email marketing powerhouse** with Smaily – the all-in-one plugin designed to **automate your marketing, grow your audience, and drive more sales effortlessly**.
 
 **Why Smaily Connect?**
 
@@ -23,6 +23,8 @@ Transform your **WordPress website, WooCommerce store, and Contact Form 7** into
 **Automate Like a Pro** – Send high-converting emails effortlessly: welcome emails and abandoned cart reminders – **without lifting a finger**.
 
 **Smart Form Integration** – Sync your **Contact Form 7** submissions directly to your Smaily lists for a frictionless email collection experience.
+
+**Elementor Integration** – Build beautiful newsletter sign-up forms right inside Elementor using our dedicated widget!
 
 **Smarter Email Campaigns** – Segment your audience and send **relevant offers, tailored product updates, and engaging content** that keeps subscribers interested and active.
 
@@ -58,6 +60,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
+= 1.1.0 =
+
+Introduced a new Elementor widget that makes it easy to add a Smaily subscription form when building pages with Elementor.
+
 = 1.0.0 =
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
@@ -75,3 +81,4 @@ If upgrading from individual Smaily plugins to the combined version, please revi
 5. Import Products To Templates From RSS-Feed
 6. Opt-In Form Block
 7. Integrate With Contact Form 7
+8. Smaily Elementor Opt-In Form

@@ -1,15 +1,17 @@
 <?php
 /*
  * Author URI:        https://smaily.com
- * Author:            Sendsmaily LLC
- * Description:       Smaily integration plugin that includes WooCommerce and Contact Form 7 integrations.
+ * Author:            Smaily
+ * Description:       Smaily integration plugin that includes WooCommerce, Elementor and Contact Form 7 integrations.
  * Domain Path:       /languages
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.en.html
  * License:           GPL-3.0+
+ * Requires at least: 6.0
+ * Requires PHP:      7.0
  * Plugin Name:       Smaily Connect
- * Plugin URI:        https://github.com/sendsmaily/smaily-wordpress-plugin
+ * Plugin URI:        https://smaily.com/help/user-manual/smaily-connect-for-wordpress/
  * Text Domain:       smaily-connect
- * Version:           1.0.0
+ * Version:           1.1.0
 */
 
 // Exit if accessed directly.
@@ -20,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Current plugin version.
  */
-define( 'SMAILY_CONNECT_PLUGIN_VERSION', '1.0.0' );
+define( 'SMAILY_CONNECT_PLUGIN_VERSION', '1.1.0' );
 
 /**
  * The name of the plugin.

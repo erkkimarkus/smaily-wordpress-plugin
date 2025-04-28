@@ -61,6 +61,19 @@ class Helper {
 	}
 
 	/**
+	 * Check if Elementor is active.
+	 *
+	 * @return bool True if Elementor is active, false otherwise.
+	 */
+	public static function is_elementor_active() {
+		if ( function_exists( 'is_plugin_active' ) ) {
+			return is_plugin_active( 'elementor/elementor.php' );
+		} else {
+			return class_exists( 'Elementor\Plugin' );
+		}
+	}
+
+	/**
 	 * Check if the user is on an admin view. Since is_admin itself is not as reliable, incorporate additional checks.
 	 *
 	 * @return bool True if the view is for admins.
@@ -320,5 +333,30 @@ class Helper {
 		$uri      = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
 
 		return $protocol . $host . $uri;
+	}
+
+	/**
+	 * Determines if the current request is a redirect from Smaily sign up form.
+	 * Also determines if the request is a success or error based on the response code
+	 * from Smaily.
+	 *
+	 * The response is a redirect from Smaily sign up form.
+	 * Form documentation: https://smaily.com/help/how-to/forms-subscriptions/an-example-of-a-signup-form/
+	 * Response codes: https://smaily.com/help/api/general/response-codes/
+	 *
+	 * @return string|bool 'success' or 'error' if the URL contains a code, false otherwise.
+	 */
+	public static function get_optin_form_response_type() {
+		$code       = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : null;
+		$is_success = $code === '101';
+		$is_error   = $code && ! $is_success;
+
+		if ( $is_success ) {
+			return 'success';
+		} elseif ( $is_error ) {
+			return 'error';
+		}
+
+		return false;
 	}
 }
