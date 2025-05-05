@@ -1,0 +1,20 @@
+{
+  "name": "smaily-connect-blocks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts collection for managing Smaily Connect block components",
+  "workspaces": [
+    "checkout-optin",
+    "landingpage",
+    "newsletter-signup"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "ci": "npm ci --workspaces",
+    "format": "npm run format --workspaces",
+    "lint": "npm run lint:js --workspaces && npm run lint:css --workspaces",
+    "test": "npm run test:unit --workspaces"
+  },
+  "author": "Smaily",
+  "license": "ISC"
+}
