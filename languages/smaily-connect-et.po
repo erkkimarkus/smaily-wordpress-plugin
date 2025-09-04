@@ -7,10 +7,10 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-04-30T09:05:47+00:00\n"
-"PO-Revision-Date: 2025-04-30T09:05:47+00:00\n"
+"POT-Creation-Date: 2025-09-02T08:02:40+00:00\n"
+"PO-Revision-Date: 2025-09-02T08:02:40+00:00\n"
 "Language: et\n"
-"Plural-Forms: nplurals = 2; plural = (n !== 1)\n"
+"Plural-Forms: nplurals=2; plural=(n !== 1)\n"
 "X-Generator: Tolgee\n"
 
 #: admin/smaily-admin.class.php:262
@@ -43,7 +43,7 @@ msgstr "Lisab kassasse uudiskirja tellimise märkeruudu."
 msgid "Add the Smaily Sign-Up Form block to any page or post. The block is available in the block editor."
 msgstr "Lisage Smaily Registreerimisvorm mis tahes lehele või postitusele. Vorm on saadaval plokkide redaktoris."
 
-#: includes/smaily-options.class.php:159
+#: includes/smaily-options.class.php:161
 msgid "After"
 msgstr "Pärast"
 
@@ -79,7 +79,7 @@ msgstr "Kasvavalt"
 msgid "Automatically Synchronize subscribers using the daily Subscriber Synchronization."
 msgstr "Sünkroniseerige uudiskirjaga liitujaid automaatselt kasutades igapäevast Uudiskirjaga Liitujate Sünkroniseerimist."
 
-#: integrations/cf7/partials/smaily-cf7-admin.php:42
+#: integrations/cf7/partials/smaily-cf7-admin.php:51
 #: integrations/elementor/newsletter-widget.class.php:454
 #: blocks/newsletter-signup/build/index.js:1
 #: blocks/newsletter-signup/src/edit.js:290
@@ -100,11 +100,11 @@ msgstr "Automaatvastaja ID"
 msgid "Background Color"
 msgstr "Taustavärv"
 
-#: includes/smaily-options.class.php:158
+#: includes/smaily-options.class.php:160
 msgid "Before"
 msgstr "Enne"
 
-#: includes/smaily-options.class.php:183
+#: includes/smaily-options.class.php:185
 msgid "Billing form"
 msgstr "Arvelduse vorm"
 
@@ -174,7 +174,7 @@ msgstr "Nupu piirjoone raadius"
 msgid "Button Text"
 msgstr "Nupu Tekst"
 
-#: integrations/cf7/partials/smaily-cf7-admin.php:26
+#: integrations/cf7/partials/smaily-cf7-admin.php:27
 msgid "CAPTCHA disabled. Please use a CAPTCHA if this is a public site."
 msgstr "CAPTCHA välja lülitatud. Palun kasutage CAPTCHA, kui tegemist on avaliku saidiga."
 
@@ -199,7 +199,7 @@ msgstr "Koguda uudiskirjaga liitujaid kassas."
 msgid "Color"
 msgstr "Värv"
 
-#: integrations/cf7/partials/smaily-cf7-admin.php:13
+#: integrations/cf7/partials/smaily-cf7-admin.php:12
 msgid "Configuring Smaily integration is disabled when using \"Add New Form\". Please save this form or edit an already existing form"
 msgstr "Smaily integratsiooni seadistamine on uue kontaktivormi lisamisel välja lülitatud. Palun salvestage see vorm või redigeerige juba olemasolevat vormi."
 
@@ -357,7 +357,7 @@ msgstr "Luba kassas uudiskirjaga liitumine"
 msgid "Enabled"
 msgstr "Lubatud"
 
-#: integrations/cf7/partials/smaily-cf7-admin.php:32
+#: integrations/cf7/partials/smaily-cf7-admin.php:34
 msgid "Enable Smaily for this form"
 msgstr "Aktiveeri Smaily selle vormi jaoks"
 
@@ -462,7 +462,7 @@ msgstr "vorm"
 msgid "For more configuration options %1$s."
 msgstr "Rohkemate seadistusvõimaluste jaoks %s."
 
-#: integrations/cf7/public.class.php:113
+#: integrations/cf7/public.class.php:121
 #: public/partials/smaily-public-basic.php:8
 msgid "Form was not submitted using POST method."
 msgstr "Vormi ei saadetud POST meetodit kasutades."
@@ -577,7 +577,7 @@ msgstr "Iga 15 minuti järel"
 msgid "Input does not contain a recognizable email address."
 msgstr "Vigane e-posti aadress."
 
-#: integrations/cf7/public.class.php:119
+#: integrations/cf7/public.class.php:127
 msgid "Input does not contain a valid email address."
 msgstr "Vigane e-posti aadress."
 
@@ -585,7 +585,7 @@ msgstr "Vigane e-posti aadress."
 msgid "Input Fields"
 msgstr "Sisestusväljad"
 
-#: integrations/cf7/public.class.php:116
+#: integrations/cf7/public.class.php:124
 msgid "Invalid data submitted."
 msgstr "Sisestatud andmed on vigased."
 
@@ -646,6 +646,10 @@ msgstr "Mees"
 msgid "Modified At"
 msgstr "Muudetud"
 
+#: admin/partials/notices/1_3_0_upgrade_cf7_notice.php:2
+msgid "Multiple Contact Form 7 forms detected! Please review Smaily Connect integration settings for your forms. You can now configure each form individually."
+msgstr "Tuvastati mitu Contact Form 7 vormi! Palun kontrollige Smaily Connect-i integratsiooni seadeid. Nüüd on võimalik iga vormi seadistada eraldi."
+
 #: admin/smaily-admin-settings.class.php:429
 #: integrations/elementor/newsletter-widget.class.php:383
 #: public/partials/smaily-public-basic.php:36
@@ -697,7 +701,7 @@ msgid "No automations created"
 msgstr "Automaatvastajaid pole loodud"
 
 #: includes/smaily-widget.class.php:145
-#: integrations/cf7/partials/smaily-cf7-admin.php:47
+#: integrations/cf7/partials/smaily-cf7-admin.php:56
 #: integrations/elementor/newsletter-widget.class.php:326
 #: blocks/newsletter-signup/build/index.js:1
 #: blocks/newsletter-signup/src/edit.js:298
@@ -733,7 +737,7 @@ msgstr "Lisa uudiskirjaga liitujad otse Smaily'sse sujuvaks e-posti turunduseks.
 msgid "Order by"
 msgstr "Sorteeri"
 
-#: includes/smaily-options.class.php:184
+#: includes/smaily-options.class.php:186
 msgid "Order notes"
 msgstr "Tellimuse märkmed"
 
@@ -750,7 +754,7 @@ msgstr "Äärised"
 msgid "Phone"
 msgstr "Telefon"
 
-#: integrations/cf7/partials/smaily-cf7-admin.php:22
+#: integrations/cf7/partials/smaily-cf7-admin.php:21
 msgid "Please authenticate Smaily credentials under Smaily Settings."
 msgstr "Palun kinnitage Smaily API kasutaja Smaily seadete alt."
 
@@ -845,7 +849,7 @@ msgstr "Toote SKU"
 msgid "read the detailed guide"
 msgstr "lugege üksikasjalikku juhendit"
 
-#: includes/smaily-options.class.php:182
+#: includes/smaily-options.class.php:184
 msgid "Registration form"
 msgstr "Registreerimisvorm"
 
@@ -890,7 +894,7 @@ msgstr "Integratsiooni seadistamine"
 msgid "Set up the Smaily Classic Subscription widget."
 msgstr "Seadistage Smaily Classic Uudiskirja vidin."
 
-#: includes/smaily-options.class.php:185
+#: includes/smaily-options.class.php:187
 msgid "Shipping form"
 msgstr "Tarne vorm"
 
@@ -949,7 +953,7 @@ msgstr "Puudub Smaily API ühendus. Liitumisvorm ei tööta!"
 msgid "Smaily email marketing and automation plugin for Contact Form 7 allows you to automatically add newsletter subscribers to your Smaily subscriber list, by using forms created in Contact Form 7."
 msgstr "Contact Form 7 Smaily meiliturunduse ja automatiseerimise pistikprogramm võimaldab teil automaatselt koguda uudiskirjaga liitujaid kasutades Contact Form 7 loodud vorme."
 
-#: integrations/cf7/admin.class.php:97
+#: integrations/cf7/admin.class.php:134
 msgid "Smaily for Contact Form 7"
 msgstr "Smaily Contact Form 7-me Jaoks"
 
@@ -1005,7 +1009,7 @@ msgstr "Smaily Sätted"
 msgid "Solid"
 msgstr "Täisjoon"
 
-#: integrations/cf7/public.class.php:109
+#: integrations/cf7/public.class.php:117
 msgid "Something went wrong"
 msgstr "Midagi läks valesti"
 
@@ -1049,7 +1053,7 @@ msgstr "Uudiskirjaga Liitujate Sünkroniseerimine võimaldab  teill sünkronisee
 msgid "Subscribe to newsletter"
 msgstr "Liitu uudiskirjaga"
 
-#: integrations/cf7/public.class.php:122
+#: integrations/cf7/public.class.php:130
 #: public/partials/smaily-public-basic.php:11
 msgid "Subscribing failed with unknown reason."
 msgstr "Uudiskirjaga liitumine ebaõnnestus teadmata põhjusel."

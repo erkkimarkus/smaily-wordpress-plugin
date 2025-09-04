@@ -1,6 +1,7 @@
 <?php
 
 use Smaily_Connect\Admin;
+use Smaily_Connect\Admin\Notices;
 use Smaily_Connect\Includes\API;
 use Smaily_Connect\Includes\Blocks;
 use Smaily_Connect\Includes\Helper;
@@ -43,6 +44,15 @@ class Smaily_Connect {
 	 * @var    Admin $admin Admin class instance.
 	 */
 	protected $admin;
+
+	/**
+	 * Admin_Notices class instance.
+	 *
+	 *
+	 * @access private
+	 * @var    Notices $notices Admin_Notices class instance.
+	 */
+	protected $admin_notices;
 
 	/**
 	 * Blocks class instance.
@@ -179,23 +189,24 @@ class Smaily_Connect {
 	 *
 	 * Include the following files that make up the plugin:
 	 *
-	 * - Helper.    Defines helper methods for various purposes.
-	 * - Logger.    Defines the logging functionality.
-	 * - Admin.     Defines all hooks for the admin area.
-	 * - Block.     Define the Gutenberg newsletter subscription block functionality.
-	 * - Options.   Defines the database related queries of Options API.
-	 * - Widget.    Defines the widget functionality.
-	 * - Public_Base.    Defines all hooks for the public side of the site.
+	 * - Admin_Notices. Defines the notice management functionality on the admin side.
+	 * - Admin.         Defines all hooks for the admin area.
+	 * - Block.         Define the Gutenberg newsletter subscription block functionality.
+	 * - Helper.        Defines helper methods for various purposes.
+	 * - Logger.        Defines the logging functionality.
+	 * - Options.       Defines the database related queries of Options API.
+	 * - Public_Base.   Defines all hooks for the public side of the site.
+	 * - Widget.        Defines the widget functionality.
 	 *
 	 * Woocommerce related dependencies
 	 *
+	 * - Integrations\WooCommerce\Cart                         Manages status of user cart in abandoned carts table.
+	 * - Integrations\WooCommerce\Cron.                        Handles data synchronization between Smaily and WooCommerce.
 	 * - Integrations\WooCommerce\Data_Handler.                Handles woocommerce related data retrieval
 	 * - Integrations\WooCommerce\Data_Prepare.                Class for preparing Woocommerce related data
-	 * - Integrations\WooCommerce\Cron.                        Handles data synchronization between Smaily and WooCommerce.
-	 * - Integrations\WooCommerce\Cart                         Manages status of user cart in abandoned carts table.
-	 * - Integrations\WooCommerce\Subscriber_Synchronization   Defines functionality for user subscriptions
 	 * - Integrations\WooCommerce\Profile_Settings.            Adds and controls WordPress/Woocommerce fields.
 	 * - Integrations\WooCommerce\Rss.                         Handles RSS generation for Smaily newsletter.
+	 * - Integrations\WooCommerce\Subscriber_Synchronization   Defines functionality for user subscriptions
 	 *
 	 * Create an instance of the loader which will be used to register the hooks
 	 * with WordPress.
@@ -209,6 +220,7 @@ class Smaily_Connect {
 	 * @access private
 	 */
 	private function load_dependencies() {
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-notices.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-renderer.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-sanitizer.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-settings.class.php';
@@ -216,11 +228,12 @@ class Smaily_Connect {
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'blocks/newsletter-signup/smaily-integration.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-api.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-blocks.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-client.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-cypher.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-helper.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-logger.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-notice-registry.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-options.class.php';
-		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-client.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-widget.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'public/smaily-public.class.php';
 
@@ -255,6 +268,9 @@ class Smaily_Connect {
 		$this->admin = new Admin( $this->options, $this->plugin_name, $this->version );
 		$this->admin->register_hooks();
 
+		$this->admin_notices = new Notices();
+		$this->admin_notices->register_hooks();
+
 		$this->api = new API( $this->options, $this->plugin_name );
 		$this->api->register_hooks();
 
@@ -287,7 +303,7 @@ class Smaily_Connect {
 		}
 
 		if ( Helper::is_cf7_active() ) {
-			$this->cf7_admin = new Smaily_CF7_Admin( $this->options, $this->plugin_name );
+			$this->cf7_admin = new Smaily_CF7_Admin( $this->options, $this->plugin_name, $this->version );
 			$this->cf7_admin->register_hooks();
 		}
 
