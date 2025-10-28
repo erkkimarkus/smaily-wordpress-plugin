@@ -138,8 +138,8 @@ class Rss {
 				continue;
 			}
 
-			$current_price = $product->get_price();
-			$regular_price = $product->get_regular_price();
+			$current_price = Helper::get_current_price_with_tax( $product );
+			$regular_price = Helper::get_regular_price_with_tax( $product );
 			$url           = get_permalink( $product->get_id() );
 
 			if ( $url === false ) {
@@ -148,8 +148,8 @@ class Rss {
 
 			$rss_feed_item = array(
 				'current_price' => $current_price,
-				'regular_price' => $product->is_on_sale() ? $regular_price : $current_price,
-				'discount'      => self::calculate_discount( floatval( $current_price ), floatval( $regular_price ) ),
+				'regular_price' => $regular_price,
+				'discount'      => Helper::calculate_discount( floatval( $current_price ), floatval( $regular_price ) ),
 				'url'           => $url,
 				'title'         => $product->get_title(),
 				'created_at'    => $product->get_date_created()->format( DATE_RFC822 ),
@@ -163,24 +163,6 @@ class Rss {
 		return $items;
 	}
 
-	/**
-	 * Calculates discount percentage between the current price and the regular price.
-	 *
-	 * @param float $current_price
-	 * @param float $regular_price
-	 * @return float
-	 */
-	private static function calculate_discount( $current_price, $regular_price ) {
-		if ( $current_price > $regular_price ) {
-			return 0.0;
-		}
-
-		if ( $regular_price > 0 ) {
-			return round( 100 - ( $current_price / $regular_price * 100 ), 2 );
-		}
-
-		return 0.0;
-	}
 
 	/**
 	 * Get the thumbnail image URL for the product.
