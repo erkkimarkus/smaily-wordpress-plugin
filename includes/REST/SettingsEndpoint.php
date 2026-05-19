@@ -55,12 +55,12 @@ class SettingsEndpoint {
 
 	private const VALID_TABS = array( 'connection', 'subscribers', 'woocommerce', 'recommendations' );
 
-	private const LEGACY_OPTION_API_CREDENTIALS  = 'smaily_connect_api_credentials';
-	private const LEGACY_OPTION_SYNC_ENABLED     = 'smaily_connect_subscriber_sync_enabled';
-	private const LEGACY_OPTION_SYNC_FIELDS      = 'smaily_connect_subscriber_sync_fields';
-	private const LEGACY_OPTION_CHECKOUT_OPTIN   = 'smaily_connect_checkout_subscription_enabled';
-	private const LEGACY_OPTION_CART_CUTOFF      = 'smaily_connect_abandoned_cart_cutoff';
-	private const LEGACY_OPTION_CART_STATUS      = 'smaily_connect_abandoned_cart_status';
+	private const LEGACY_OPTION_API_CREDENTIALS = 'smaily_connect_api_credentials';
+	private const LEGACY_OPTION_SYNC_ENABLED    = 'smaily_connect_subscriber_sync_enabled';
+	private const LEGACY_OPTION_SYNC_FIELDS     = 'smaily_connect_subscriber_sync_fields';
+	private const LEGACY_OPTION_CHECKOUT_OPTIN  = 'smaily_connect_checkout_subscription_enabled';
+	private const LEGACY_OPTION_CART_CUTOFF     = 'smaily_connect_abandoned_cart_cutoff';
+	private const LEGACY_OPTION_CART_STATUS     = 'smaily_connect_abandoned_cart_status';
 
 	public function register(): void {
 		register_rest_route(
@@ -105,14 +105,24 @@ class SettingsEndpoint {
 
 		if ( ! in_array( $tab, self::VALID_TABS, true ) ) {
 			return $this->error_response(
-				array( array( 'field' => 'tab', 'message' => __( 'Unknown settings tab.', 'smaily-connect' ) ) ),
+				array(
+					array(
+						'field'   => 'tab',
+						'message' => __( 'Unknown settings tab.', 'smaily-connect' ),
+					),
+				),
 				400
 			);
 		}
 
 		if ( ! is_array( $data ) ) {
 			return $this->error_response(
-				array( array( 'field' => 'data', 'message' => __( 'Payload must be an object.', 'smaily-connect' ) ) ),
+				array(
+					array(
+						'field'   => 'data',
+						'message' => __( 'Payload must be an object.', 'smaily-connect' ),
+					),
+				),
 				400
 			);
 		}
@@ -215,9 +225,9 @@ class SettingsEndpoint {
 	 * @param array<string, mixed> $data
 	 */
 	private function save_subscribers( array $data ): WP_REST_Response {
-		$sync_enabled = ! empty( $data['subscriberSyncEnabled'] );
-		$fields_raw   = isset( $data['syncFields'] ) && is_array( $data['syncFields'] ) ? $data['syncFields'] : array();
-		$fields       = array_values(
+		$sync_enabled   = ! empty( $data['subscriberSyncEnabled'] );
+		$fields_raw     = isset( $data['syncFields'] ) && is_array( $data['syncFields'] ) ? $data['syncFields'] : array();
+		$fields         = array_values(
 			array_filter(
 				array_map(
 					static fn ( $f ): string => sanitize_key( (string) $f ),
