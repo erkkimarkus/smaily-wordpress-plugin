@@ -56,6 +56,16 @@ class Cron {
 	/**
 	 * Custom cron schedule for smaily Cron.
 	 *
+	 * TODO(phase-4-marketplace-prep): the BETA fork migrated all
+	 * smaily_connect_cron_* WP-Cron entries to Action Scheduler in sub-PR
+	 * 5.D. The 'smaily_connect_15_minutes' interval is no longer used by
+	 * any Smaily-owned cron, but third-party plugins MAY have started
+	 * relying on it (the filter exposes it for anyone who adds
+	 * wp_schedule_event(..., 'smaily_connect_15_minutes', ...)). Before
+	 * marketplace publication, audit third-party usage via grep on the
+	 * pilot install and, if nothing depends on it, delete this filter
+	 * registration and drop the smaily_cron_schedules method entirely.
+	 *
 	 * @param array $schedules Schedules array.
 	 * @return array $schedules Updated array.
 	 */

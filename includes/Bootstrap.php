@@ -96,6 +96,38 @@ final class Bootstrap {
 		// when Action Scheduler's runner cycle fires.
 		add_action( EventQueue::FLUSH_HOOK, array( $this, 'on_flush_event_queue' ) );
 		add_action( 'smly_plus_retry_failed_events', array( $this, 'on_flush_event_queue' ) );
+
+		// Bridges from new AS hook names → legacy WP-Cron hook names.
+		// The legacy Smaily_Connect\Integrations\WooCommerce\Cron class
+		// still has its add_action() registrations on these hook names;
+		// firing them via do_action() keeps business logic unchanged
+		// while moving scheduling to Action Scheduler. See
+		// Migration\WPCronAuditor for the corresponding WP-Cron clear.
+		add_action( 'smly_plus_contact_sync', array( $this, 'on_contact_sync_tick' ) );
+		add_action( 'smly_plus_abandoned_cart', array( $this, 'on_abandoned_cart_tick' ) );
+	}
+
+	/**
+	 * AS callback for smly_plus_contact_sync (daily). Bridges to the
+	 * legacy `smaily_connect_cron_sync_subscribers` hook so the existing
+	 * Smaily_Connect\Integrations\WooCommerce\Cron::smaily_sync_subscribers
+	 * callback runs unchanged.
+	 */
+	public function on_contact_sync_tick(): void {
+		do_action( 'smaily_connect_cron_sync_subscribers' );
+	}
+
+	/**
+	 * AS callback for smly_plus_abandoned_cart (every 15 minutes). Fires
+	 * the two legacy hook names in order — status first (which marks
+	 * abandoned carts), then email (which sends the reminder). The same
+	 * ordering the upstream WP-Cron used; both hooks fired in the same
+	 * 15-minute interval, and the legacy Cron class's email handler
+	 * relies on the status pass having run first.
+	 */
+	public function on_abandoned_cart_tick(): void {
+		do_action( 'smaily_connect_cron_abandoned_carts_status' );
+		do_action( 'smaily_connect_cron_abandoned_carts_email' );
 	}
 
 	/**
