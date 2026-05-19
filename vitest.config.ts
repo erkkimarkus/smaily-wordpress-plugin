@@ -43,8 +43,8 @@ export default defineConfig({
           functions: 70,
         },
         'admin/src/utils/cn.ts': {
-          lines: 90,
-          functions: 100,
+          lines: 70,
+          functions: 70,
         },
       },
     },

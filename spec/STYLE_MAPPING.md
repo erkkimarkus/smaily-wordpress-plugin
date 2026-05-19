@@ -45,16 +45,20 @@ Tooni ümber hindangud (vt §6 review-checklist):
 | `brand.soft.bg` | `#FCE4EC` | Soft pill backgrounds (näit "Newsletter") (Pink 50) |
 | `brand.soft.text` | `#AD1457` | Soft pill text (Pink 800) |
 
-### 2.2. Terminal-action color (eraldi brand'ist)
+### 2.2. Terminal-action color (success-banneritele, MITTE primary nuppudele)
 
-Smaily UI näitab "Send campaign" nuppu **rohelisena** — see on terminal-action color (Stripe-mustriga sarnane: brand-color = identiteet, action = green). Plugin-wizardis kasutame seda **ainult Step 6 "Finish" nupul**, kõik teised "Continue"-nupud on brand-pink.
+**Korrektsioon 2026-05-20 (sub-PR 2.D)**: varasem versioon kirjutas Step 6 Finish nupp rohelisena (Stripe-style "brand = identity, action = green"). Erkki täpsustas: **kõik primary action-nupud sh Step 6 Finish on brand-pink** — terminal-color rohelist kasutame **ainult success-banneritel** ("Backfill complete", "Settings saved", jne).
+
+Põhjus: ühe-värvi-primary-action muster on järjekindlam ja Smaily-UI ei kasuta primary nuppude jaoks rohelist.
 
 | Token | Hex (hinnatud) | Kontekst |
 |-------|----------------|----------|
-| `success.DEFAULT` | `#10B981` | Step 6 Finish nupp, success banners (Emerald 500) |
+| `success.DEFAULT` | `#10B981` | ~~Step 6 Finish nupp~~ (eemaldatud), success banners (Emerald 500) |
 | `success.hover` | `#059669` | (Emerald 600) |
 | `success.soft.bg` | `#D1FAE5` | Success banners background (Emerald 100) |
 | `success.soft.text` | `#065F46` | Success banners text (Emerald 800) |
+
+**Code-le juhis**: `Button` primitive säilitab `variant='success'` (banner-action'iks, näit. "Got it" banneri sulgemiseks), aga **`WizardFooter` Finish-nupp kasutab `variant='primary'`** (pink, sama mis Continue Step 1-5-l).
 
 ### 2.3. Neutrals (Smaily on "puhas" cool-grey)
 
