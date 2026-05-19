@@ -198,6 +198,187 @@ describe('wizardReducer — navigation', () => {
   });
 });
 
+describe('wizardReducer — Mode A per-account connection', () => {
+  const seed: WizardState = {
+    ...baseState,
+    multilingualMode: 'A',
+    perLanguageAccounts: [
+      {
+        accountKey: 'account_et',
+        language: 'et_EE',
+        credentials: { subdomain: 'demo-et', username: 'u', password: 'p' },
+        connection: { kind: 'idle' },
+      },
+      {
+        accountKey: 'account_en',
+        language: 'en_US',
+        credentials: { subdomain: 'demo-en', username: 'u', password: 'p' },
+        connection: { kind: 'idle' },
+      },
+    ],
+  };
+
+  it('flips only the matched per-account connection to pending', () => {
+    const next = wizardReducer(seed, {
+      type: 'TEST_MODE_ACCOUNT_CONNECTION_START',
+      payload: { accountKey: 'account_et' },
+    });
+
+    expect(next.perLanguageAccounts[0]?.connection.kind).toBe('pending');
+    expect(next.perLanguageAccounts[1]?.connection.kind).toBe('idle');
+  });
+
+  it('stamps a success message with the account name', () => {
+    const next = wizardReducer(seed, {
+      type: 'TEST_MODE_ACCOUNT_CONNECTION_SUCCESS',
+      payload: { accountKey: 'account_en', accountName: 'Pet Shop EN' },
+    });
+
+    expect(next.perLanguageAccounts[1]?.connection).toEqual({
+      kind: 'success',
+      message: 'Pet Shop EN',
+    });
+  });
+
+  it('records failures with the error string', () => {
+    const next = wizardReducer(seed, {
+      type: 'TEST_MODE_ACCOUNT_CONNECTION_FAILURE',
+      payload: { accountKey: 'account_et', error: 'rejected' },
+    });
+
+    expect(next.perLanguageAccounts[0]?.connection).toEqual({
+      kind: 'failure',
+      error: 'rejected',
+    });
+  });
+
+  it('SET_DEFAULT_FALLBACK_ACCOUNT_KEY swaps the chosen fallback', () => {
+    const next = wizardReducer(baseState, {
+      type: 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY',
+      payload: 'account_et',
+    });
+    expect(next.defaultFallbackAccountKey).toBe('account_et');
+  });
+});
+
+describe('wizardReducer — Step 3 WC automations', () => {
+  it('toggles welcomeEnabled / firstOrderEnabled / abandonedCartEnabled', () => {
+    let s = wizardReducer(baseState, { type: 'SET_WELCOME_ENABLED', payload: true });
+    expect(s.welcomeEnabled).toBe(true);
+
+    s = wizardReducer(s, { type: 'SET_FIRST_ORDER_ENABLED', payload: true });
+    expect(s.firstOrderEnabled).toBe(true);
+
+    s = wizardReducer(s, { type: 'SET_ABANDONED_CART_ENABLED', payload: true });
+    expect(s.abandonedCartEnabled).toBe(true);
+  });
+
+  it('clamps abandoned-cart cutoff to a 10-minute minimum', () => {
+    const next = wizardReducer(baseState, {
+      type: 'SET_ABANDONED_CART_CUTOFF_MINUTES',
+      payload: 5,
+    });
+    expect(next.abandonedCartCutoffMinutes).toBe(10);
+
+    const okay = wizardReducer(baseState, {
+      type: 'SET_ABANDONED_CART_CUTOFF_MINUTES',
+      payload: 45,
+    });
+    expect(okay.abandonedCartCutoffMinutes).toBe(45);
+  });
+
+  it('upserts a mapping (insert + update by composite key)', () => {
+    const inserted = wizardReducer(baseState, {
+      type: 'UPSERT_AUTOMATION_MAPPING',
+      payload: {
+        triggerType: 'welcome',
+        language: 'et_EE',
+        accountKey: 'default',
+        workflowId: '42',
+        isDefaultFallback: true,
+      },
+    });
+    expect(inserted.automationMappings).toHaveLength(1);
+
+    const updated = wizardReducer(inserted, {
+      type: 'UPSERT_AUTOMATION_MAPPING',
+      payload: {
+        triggerType: 'welcome',
+        language: 'et_EE',
+        accountKey: 'default',
+        workflowId: '99', // re-mapped
+        isDefaultFallback: true,
+      },
+    });
+    expect(updated.automationMappings).toHaveLength(1);
+    expect(updated.automationMappings[0]?.workflowId).toBe('99');
+  });
+
+  it('removes a mapping by composite key', () => {
+    const seed = wizardReducer(baseState, {
+      type: 'UPSERT_AUTOMATION_MAPPING',
+      payload: {
+        triggerType: 'welcome',
+        language: 'et_EE',
+        accountKey: 'default',
+        workflowId: '42',
+        isDefaultFallback: false,
+      },
+    });
+
+    const removed = wizardReducer(seed, {
+      type: 'REMOVE_AUTOMATION_MAPPING',
+      payload: { triggerType: 'welcome', language: 'et_EE', accountKey: 'default' },
+    });
+    expect(removed.automationMappings).toHaveLength(0);
+  });
+
+  it('SET_AUTOMATION_FALLBACK gives exactly one row per trigger the fallback flag', () => {
+    let s = baseState;
+    s = wizardReducer(s, {
+      type: 'UPSERT_AUTOMATION_MAPPING',
+      payload: {
+        triggerType: 'welcome',
+        language: 'et_EE',
+        accountKey: 'default',
+        workflowId: '1',
+        isDefaultFallback: true,
+      },
+    });
+    s = wizardReducer(s, {
+      type: 'UPSERT_AUTOMATION_MAPPING',
+      payload: {
+        triggerType: 'welcome',
+        language: 'en_US',
+        accountKey: 'default',
+        workflowId: '2',
+        isDefaultFallback: false,
+      },
+    });
+
+    const switched = wizardReducer(s, {
+      type: 'SET_AUTOMATION_FALLBACK',
+      payload: { triggerType: 'welcome', language: 'en_US', accountKey: 'default' },
+    });
+
+    const fallback = switched.automationMappings.filter((m) => m.isDefaultFallback);
+    expect(fallback).toHaveLength(1);
+    expect(fallback[0]?.language).toBe('en_US');
+  });
+});
+
+describe('wizardReducer — Step 4 rec-engine features', () => {
+  it('toggles a single feature without touching the others', () => {
+    const next = wizardReducer(baseState, {
+      type: 'SET_REC_ENGINE_FEATURE',
+      payload: { feature: 'trackBrowsing', enabled: true },
+    });
+
+    expect(next.recEngineFeatures.trackBrowsing).toBe(true);
+    expect(next.recEngineFeatures.syncOrders).toBe(baseState.recEngineFeatures.syncOrders);
+  });
+});
+
 describe('wizardReducer — exhaustiveness guard', () => {
   it('throws when handed an action type the switch does not cover', () => {
     // This intentionally bypasses the TypeScript narrowing — production code

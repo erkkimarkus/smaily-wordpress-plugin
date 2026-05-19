@@ -84,6 +84,7 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     smailyConnection: env.smailyConnected ? { kind: 'success' } : idleAsync,
     multilingualMode: env.multilingualMode ?? 'single',
     perLanguageAccounts: [],
+    defaultFallbackAccountKey: 'default',
     recEngineSetupToken: '',
     recEngineConnection: idleAsync,
 
@@ -92,5 +93,19 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     wordpressSubscriptionCheckbox: env.wordpressSubscriptionCheckbox ?? false,
     checkoutSubscriptionCheckbox: env.checkoutSubscriptionCheckbox ?? false,
     contactsBackfill: idleBackfill,
+
+    automationMappings: [],
+    welcomeEnabled: false,
+    firstOrderEnabled: false,
+    abandonedCartEnabled: false,
+    abandonedCartCutoffMinutes: 30,
+
+    recEngineFeatures: {
+      syncOrders: true,
+      syncCustomers: true,
+      syncProducts: true,
+      trackCartEvents: true,
+      trackBrowsing: false,
+    },
   };
 }

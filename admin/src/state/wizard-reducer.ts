@@ -3,10 +3,15 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  type AutomationMapping,
   type ModeAccount,
   type WizardAction,
   type WizardState,
 } from './types';
+
+function mappingKey(m: AutomationMapping): string {
+  return `${m.triggerType}|${m.language}|${m.accountKey}`;
+}
 
 /**
  * Wizard reducer — drives both /wizard and /settings panels.
@@ -38,6 +43,7 @@ export const wizardInitialState: WizardState = {
   smailyConnection: idleAsync,
   multilingualMode: 'single',
   perLanguageAccounts: [],
+  defaultFallbackAccountKey: 'default',
   recEngineSetupToken: '',
   recEngineConnection: idleAsync,
 
@@ -46,6 +52,20 @@ export const wizardInitialState: WizardState = {
   wordpressSubscriptionCheckbox: false,
   checkoutSubscriptionCheckbox: false,
   contactsBackfill: idleBackfill,
+
+  automationMappings: [],
+  welcomeEnabled: false,
+  firstOrderEnabled: false,
+  abandonedCartEnabled: false,
+  abandonedCartCutoffMinutes: 30,
+
+  recEngineFeatures: {
+    syncOrders: true,
+    syncCustomers: true,
+    syncProducts: true,
+    trackCartEvents: true,
+    trackBrowsing: false,
+  },
 };
 
 const MAX_STEP = 6;
@@ -125,6 +145,39 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         ),
       };
 
+    case 'TEST_MODE_ACCOUNT_CONNECTION_START':
+      return {
+        ...state,
+        perLanguageAccounts: state.perLanguageAccounts.map((acct): ModeAccount =>
+          acct.accountKey === action.payload.accountKey
+            ? { ...acct, connection: { kind: 'pending' } }
+            : acct,
+        ),
+      };
+
+    case 'TEST_MODE_ACCOUNT_CONNECTION_SUCCESS':
+      return {
+        ...state,
+        perLanguageAccounts: state.perLanguageAccounts.map((acct): ModeAccount =>
+          acct.accountKey === action.payload.accountKey
+            ? { ...acct, connection: { kind: 'success', message: action.payload.accountName } }
+            : acct,
+        ),
+      };
+
+    case 'TEST_MODE_ACCOUNT_CONNECTION_FAILURE':
+      return {
+        ...state,
+        perLanguageAccounts: state.perLanguageAccounts.map((acct): ModeAccount =>
+          acct.accountKey === action.payload.accountKey
+            ? { ...acct, connection: { kind: 'failure', error: action.payload.error } }
+            : acct,
+        ),
+      };
+
+    case 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY':
+      return { ...state, defaultFallbackAccountKey: action.payload };
+
     case 'SET_REC_ENGINE_SETUP_TOKEN':
       return {
         ...state,
@@ -192,6 +245,71 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       return {
         ...state,
         contactsBackfill: { ...state.contactsBackfill, status: 'cancelled' },
+      };
+
+    // Step 3: WC automations -----------------------------------------------
+    case 'SET_WELCOME_ENABLED':
+      return { ...state, welcomeEnabled: action.payload };
+
+    case 'SET_FIRST_ORDER_ENABLED':
+      return { ...state, firstOrderEnabled: action.payload };
+
+    case 'SET_ABANDONED_CART_ENABLED':
+      return { ...state, abandonedCartEnabled: action.payload };
+
+    case 'SET_ABANDONED_CART_CUTOFF_MINUTES':
+      return {
+        ...state,
+        // PLUGIN.md §5: min 10, default 30. Clamp into the valid range.
+        abandonedCartCutoffMinutes: Math.max(10, Math.floor(action.payload)),
+      };
+
+    case 'UPSERT_AUTOMATION_MAPPING': {
+      const key = mappingKey(action.payload);
+      const exists = state.automationMappings.find((m) => mappingKey(m) === key);
+      const mappings = exists
+        ? state.automationMappings.map((m) => (mappingKey(m) === key ? action.payload : m))
+        : [...state.automationMappings, action.payload];
+      return { ...state, automationMappings: mappings };
+    }
+
+    case 'REMOVE_AUTOMATION_MAPPING':
+      return {
+        ...state,
+        automationMappings: state.automationMappings.filter(
+          (m) =>
+            !(
+              m.triggerType === action.payload.triggerType &&
+              m.language === action.payload.language &&
+              m.accountKey === action.payload.accountKey
+            ),
+        ),
+      };
+
+    case 'SET_AUTOMATION_FALLBACK': {
+      // Exactly one row per triggerType should have is_default_fallback=true.
+      return {
+        ...state,
+        automationMappings: state.automationMappings.map((m) =>
+          m.triggerType === action.payload.triggerType
+            ? {
+                ...m,
+                isDefaultFallback:
+                  m.language === action.payload.language && m.accountKey === action.payload.accountKey,
+              }
+            : m,
+        ),
+      };
+    }
+
+    // Step 4: Recommendations ----------------------------------------------
+    case 'SET_REC_ENGINE_FEATURE':
+      return {
+        ...state,
+        recEngineFeatures: {
+          ...state.recEngineFeatures,
+          [action.payload.feature]: action.payload.enabled,
+        },
       };
 
     // Wizard navigation ----------------------------------------------------

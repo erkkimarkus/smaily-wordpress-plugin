@@ -82,7 +82,9 @@ describe('Step 1 → Step 2 integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('state-connection')).toHaveTextContent('success');
     });
-    expect(screen.getByText(/connected to smaily/i)).toBeInTheDocument();
+    // "Connected: My Pet Shop" when API returned accountName, or
+    // "Connected to Smaily." when it didn't — both indicate success.
+    expect(screen.getByText(/connected/i)).toBeInTheDocument();
 
     // 3. Step 2 backfill start.
     fireEvent.click(screen.getByRole('button', { name: /start backfill/i }));

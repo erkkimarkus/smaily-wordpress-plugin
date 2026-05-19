@@ -64,6 +64,22 @@ export interface ModeAccount {
 }
 
 /**
+ * Workflow → trigger mapping populated by Step 3. One row per
+ * (trigger, language, accountKey) combination — Mode B uses
+ * accountKey='default' for every row; Mode A varies per language.
+ */
+export type AutomationTrigger = 'welcome' | 'first_order' | 'abandoned_cart';
+
+export interface AutomationMapping {
+  triggerType: AutomationTrigger;
+  /** Language code from env.detectedLanguages, or 'default' for single-language sites. */
+  language: string;
+  accountKey: string;
+  workflowId: string;
+  isDefaultFallback: boolean;
+}
+
+/**
  * Single source-of-truth state for both wizard and settings.
  *
  * Field-population strategy: Phase 2 sub-PR 2.B defines the full shape
@@ -95,8 +111,32 @@ export interface WizardState {
   smailyConnection: AsyncStatus;
   multilingualMode: MultilingualMode;
   perLanguageAccounts: ModeAccount[];
+  /**
+   * Mode A fallback selector — the accountKey of the credential set that
+   * handles contacts whose detected language has no per-language entry.
+   * Values: 'default' (= smailyCredentials) | any perLanguageAccounts[].accountKey.
+   */
+  defaultFallbackAccountKey: string;
   recEngineSetupToken: string;
   recEngineConnection: AsyncStatus;
+
+  /** Step 3 — WooCommerce automations. Workflow id per (trigger, account_key). */
+  automationMappings: AutomationMapping[];
+  welcomeEnabled: boolean;
+  firstOrderEnabled: boolean;
+  abandonedCartEnabled: boolean;
+  /** Minutes a cart stays untouched before the abandoned-cart trigger fires. */
+  abandonedCartCutoffMinutes: number;
+
+  /** Step 4 — Recommendations. */
+  recEngineFeatures: {
+    syncOrders: boolean;
+    syncCustomers: boolean;
+    syncProducts: boolean;
+    trackCartEvents: boolean;
+    /** Browse tracking is opt-in (PLUGIN.md §1: "vaikimisi väljas, GDPR-tundlik"). */
+    trackBrowsing: boolean;
+  };
 
   /** Step 2 — Subscribers. */
   subscriberSyncEnabled: boolean;
@@ -163,6 +203,10 @@ export type WizardAction =
   | { type: 'ADD_MODE_ACCOUNT'; payload: ModeAccount }
   | { type: 'REMOVE_MODE_ACCOUNT'; payload: { accountKey: string } }
   | { type: 'UPDATE_MODE_ACCOUNT_CREDENTIALS'; payload: { accountKey: string; credentials: Partial<SmailyCredentials> } }
+  | { type: 'TEST_MODE_ACCOUNT_CONNECTION_START'; payload: { accountKey: string } }
+  | { type: 'TEST_MODE_ACCOUNT_CONNECTION_SUCCESS'; payload: { accountKey: string; accountName?: string } }
+  | { type: 'TEST_MODE_ACCOUNT_CONNECTION_FAILURE'; payload: { accountKey: string; error: string } }
+  | { type: 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY'; payload: string }
   | { type: 'SET_REC_ENGINE_SETUP_TOKEN'; payload: string }
   | { type: 'TEST_REC_ENGINE_CONNECTION_START' }
   | { type: 'TEST_REC_ENGINE_CONNECTION_SUCCESS'; payload: { message?: string } }
@@ -177,6 +221,18 @@ export type WizardAction =
   | { type: 'BACKFILL_START'; payload: { jobType: 'contacts' } }
   | { type: 'BACKFILL_PROGRESS'; payload: { jobType: 'contacts'; progress: BackfillProgress } }
   | { type: 'BACKFILL_CANCEL'; payload: { jobType: 'contacts' } }
+
+  // Step 3: WooCommerce automations -----------------------------------------
+  | { type: 'SET_WELCOME_ENABLED'; payload: boolean }
+  | { type: 'SET_FIRST_ORDER_ENABLED'; payload: boolean }
+  | { type: 'SET_ABANDONED_CART_ENABLED'; payload: boolean }
+  | { type: 'SET_ABANDONED_CART_CUTOFF_MINUTES'; payload: number }
+  | { type: 'UPSERT_AUTOMATION_MAPPING'; payload: AutomationMapping }
+  | { type: 'REMOVE_AUTOMATION_MAPPING'; payload: { triggerType: AutomationTrigger; language: string; accountKey: string } }
+  | { type: 'SET_AUTOMATION_FALLBACK'; payload: { triggerType: AutomationTrigger; language: string; accountKey: string } }
+
+  // Step 4: Recommendations -------------------------------------------------
+  | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'syncOrders' | 'syncCustomers' | 'syncProducts' | 'trackCartEvents' | 'trackBrowsing'; enabled: boolean } }
 
   // Wizard navigation --------------------------------------------------------
   | { type: 'WIZARD_GO_TO_STEP'; payload: { step: number } }

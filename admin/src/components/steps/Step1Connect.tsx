@@ -1,89 +1,78 @@
-import { useEffect, type Dispatch } from 'react';
+import { useCallback, type Dispatch } from 'react';
 
-import { type WizardAction, type WizardState } from '../../state/types';
-import { useTestConnection } from '../../hooks/useTestConnection';
-import { Banner, Button, Card, Input, Label } from '../primitives';
+import {
+  emptyCredentials,
+  idleAsync,
+  type SmailyCredentials,
+  type WizardAction,
+  type WizardState,
+} from '../../state/types';
+import { Card, Radio } from '../primitives';
 import { MultilingualModePicker } from '../wizard';
+import { CredentialBlock } from './CredentialBlock';
 
 export interface Step1ConnectProps {
   state: WizardState;
   dispatch: Dispatch<WizardAction>;
   /**
    * True when rendered inside Settings tabs. Hides the wizard-only
-   * eyebrow ("Step 1 of 6") + the marketing intro paragraph; the
-   * field cards stay identical so a Connection-tab page is just the
-   * same Step 1 minus the chrome.
+   * eyebrow + intro paragraph; the field cards stay identical.
    */
   inSettings?: boolean;
 }
 
 /**
- * Step 1 — Connect Smaily account.
+ * Step 1 — Connect Smaily account(s).
  *
- * Three field groupings:
- *   1. Smaily credentials (subdomain + username + password)
+ *   1. Default-account credential block (always rendered)
  *   2. MultilingualModePicker — auto-hides for single-language sites
- *   3. Per-language credential blocks (Mode A only)
- *   4. Optional rec-engine setup-token paste (Phase 3 wires up)
+ *   3. Mode A: per-language credential blocks + default-fallback radio
+ *   4. Optional rec-engine setup-token paste (Phase 3 wires validate)
  *
- * The Test Connection button is shared between (1) and (3); each
- * block tracks its own AsyncStatus in WizardState so a Mode A row
- * can be tested individually.
+ * Mode A blocks lazily create perLanguageAccounts entries on first
+ * field edit. No useEffect auto-seeding — keeps state minimal and
+ * avoids races with the SET_MULTILINGUAL_MODE dispatch.
  */
-export function Step1Connect({ state, dispatch, inSettings = false }: Step1ConnectProps): React.JSX.Element {
-  const { mutate: testConnection, status, error, reset } = useTestConnection();
+export function Step1Connect({
+  state,
+  dispatch,
+  inSettings = false,
+}: Step1ConnectProps): React.JSX.Element {
+  // Default-account handlers
+  const onDefaultCredentialsChange = useCallback(
+    (payload: Partial<SmailyCredentials>) => {
+      dispatch({ type: 'SET_SMAILY_CREDENTIALS', payload });
+    },
+    [dispatch],
+  );
 
-  // Reset hook status when the parent dispatches a credential edit so
-  // the success banner doesn't linger across mutations.
-  useEffect(() => {
-    if (state.smailyConnection.kind === 'idle' && (status === 'success' || status === 'error')) {
-      reset();
-    }
-  }, [state.smailyConnection.kind, status, reset]);
+  const onDefaultConnStart = useCallback(
+    () => dispatch({ type: 'TEST_SMAILY_CONNECTION_START' }),
+    [dispatch],
+  );
+  const onDefaultConnSuccess = useCallback(
+    (accountName?: string) =>
+      dispatch({ type: 'TEST_SMAILY_CONNECTION_SUCCESS', payload: { accountName } }),
+    [dispatch],
+  );
+  const onDefaultConnFailure = useCallback(
+    (errorMessage: string) =>
+      dispatch({ type: 'TEST_SMAILY_CONNECTION_FAILURE', payload: { error: errorMessage } }),
+    [dispatch],
+  );
 
-  // Mirror the hook status into the reducer's smailyConnection so the
-  // wizard footer's canAdvance gating + Settings banner reflect the
-  // same source of truth.
-  useEffect(() => {
-    if (status === 'pending' && state.smailyConnection.kind !== 'pending') {
-      dispatch({ type: 'TEST_SMAILY_CONNECTION_START' });
-    } else if (status === 'success' && state.smailyConnection.kind !== 'success') {
-      dispatch({
-        type: 'TEST_SMAILY_CONNECTION_SUCCESS',
-        payload: { accountName: '' },
-      });
-    } else if (status === 'error' && state.smailyConnection.kind !== 'failure') {
-      dispatch({
-        type: 'TEST_SMAILY_CONNECTION_FAILURE',
-        payload: { error: error ?? 'Connection failed.' },
-      });
-    }
-  }, [status, error, dispatch, state.smailyConnection.kind]);
-
-  const handleFieldChange = (field: 'subdomain' | 'username' | 'password') => (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ): void => {
-    dispatch({
-      type: 'SET_SMAILY_CREDENTIALS',
-      payload: { [field]: event.target.value },
-    });
-  };
-
-  const handleTestClick = (): void => {
-    void testConnection(state.smailyCredentials);
-  };
-
-  const credentialsComplete =
-    state.smailyCredentials.subdomain !== '' &&
-    state.smailyCredentials.username !== '' &&
-    state.smailyCredentials.password !== '';
+  const isModeA = state.multilingualMode === 'A' && state.env.detectedLanguages.length > 1;
 
   return (
     <div className="space-y-6">
       {!inSettings && (
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">Step 1 of 6</p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">Connect your Smaily account</h2>
+          <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
+            Step 1 of 6
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">
+            Connect your Smaily account
+          </h2>
           <p className="mt-2 text-sm text-text-secondary">
             Enter the credentials from your Smaily admin → Settings → API. We&apos;ll verify them
             before saving — nothing is persisted until you click Continue.
@@ -91,76 +80,19 @@ export function Step1Connect({ state, dispatch, inSettings = false }: Step1Conne
         </div>
       )}
 
-      <Card title="Smaily API credentials">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <Label htmlFor="smaily-subdomain" required>
-              Subdomain
-            </Label>
-            <Input
-              id="smaily-subdomain"
-              value={state.smailyCredentials.subdomain}
-              onChange={handleFieldChange('subdomain')}
-              placeholder="mypetshop"
-              autoComplete="off"
-              className="mt-1"
-            />
-            <p className="mt-1 text-xs text-text-tertiary">
-              The bit before <code className="font-mono">.sendsmaily.net</code>.
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="smaily-username" required>
-              API username
-            </Label>
-            <Input
-              id="smaily-username"
-              value={state.smailyCredentials.username}
-              onChange={handleFieldChange('username')}
-              autoComplete="off"
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="smaily-password" required>
-              API password
-            </Label>
-            <Input
-              id="smaily-password"
-              type="password"
-              value={state.smailyCredentials.password}
-              onChange={handleFieldChange('password')}
-              autoComplete="new-password"
-              className="mt-1"
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 flex items-center justify-between gap-4">
-          <Button
-            variant="secondary"
-            onClick={handleTestClick}
-            disabled={!credentialsComplete}
-            loading={status === 'pending'}
-            type="button"
-          >
-            Test connection
-          </Button>
-
-          {state.smailyConnection.kind === 'success' && (
-            <Banner tone="success" className="flex-1">
-              Connected to Smaily.
-            </Banner>
-          )}
-          {state.smailyConnection.kind === 'failure' && (
-            <Banner tone="danger" className="flex-1">
-              {state.smailyConnection.error}
-            </Banner>
-          )}
-        </div>
-      </Card>
+      <CredentialBlock
+        title={isModeA ? 'Smaily credentials (default account)' : 'Smaily API credentials'}
+        description={
+          isModeA ? 'Used as the catch-all when a contact has no detected language.' : undefined
+        }
+        credentials={state.smailyCredentials}
+        connection={state.smailyConnection}
+        onCredentialsChange={onDefaultCredentialsChange}
+        onConnectionStart={onDefaultConnStart}
+        onConnectionSuccess={onDefaultConnSuccess}
+        onConnectionFailure={onDefaultConnFailure}
+        idSuffix="default"
+      />
 
       <MultilingualModePicker
         value={state.multilingualMode}
@@ -168,17 +100,129 @@ export function Step1Connect({ state, dispatch, inSettings = false }: Step1Conne
         detectedLanguages={state.env.detectedLanguages}
       />
 
-      {state.multilingualMode === 'A' && state.env.detectedLanguages.length > 1 && (
-        <Card
-          title="Per-language Smaily accounts"
-          description="Add a Smaily subdomain for each language. Contacts route to the matching account based on their detected locale."
-        >
-          <p className="text-sm text-text-secondary">
-            Sub-PR 2.E follow-up wires the per-language credential editor — the data shape is already
-            in WizardState.perLanguageAccounts.
-          </p>
-        </Card>
+      {isModeA && (
+        <>
+          {state.env.detectedLanguages.map((language) => (
+            <PerLanguageBlock
+              key={language}
+              state={state}
+              dispatch={dispatch}
+              language={language}
+            />
+          ))}
+
+          <Card
+            title="Default fallback account"
+            description="Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
+          >
+            <FallbackPicker state={state} dispatch={dispatch} />
+          </Card>
+        </>
       )}
     </div>
   );
+}
+
+interface PerLanguageBlockProps {
+  state: WizardState;
+  dispatch: Dispatch<WizardAction>;
+  language: string;
+}
+
+function PerLanguageBlock({
+  state,
+  dispatch,
+  language,
+}: PerLanguageBlockProps): React.JSX.Element {
+  const accountKey = `account_${language}`;
+  const account = state.perLanguageAccounts.find((a) => a.accountKey === accountKey) ?? null;
+
+  const credentials = account?.credentials ?? emptyCredentials;
+  const connection = account?.connection ?? idleAsync;
+
+  return (
+    <CredentialBlock
+      title={`Account for ${humaniseLocale(language)}`}
+      description={`Contacts with the ${humaniseLocale(language)} locale will sync to this Smaily account.`}
+      credentials={credentials}
+      connection={connection}
+      onCredentialsChange={(payload) => {
+        if (account === null) {
+          dispatch({
+            type: 'ADD_MODE_ACCOUNT',
+            payload: {
+              accountKey,
+              language,
+              credentials: { ...credentials, ...payload },
+              connection: idleAsync,
+            },
+          });
+        } else {
+          dispatch({
+            type: 'UPDATE_MODE_ACCOUNT_CREDENTIALS',
+            payload: { accountKey, credentials: payload },
+          });
+        }
+      }}
+      onConnectionStart={() =>
+        dispatch({ type: 'TEST_MODE_ACCOUNT_CONNECTION_START', payload: { accountKey } })
+      }
+      onConnectionSuccess={(accountName) =>
+        dispatch({
+          type: 'TEST_MODE_ACCOUNT_CONNECTION_SUCCESS',
+          payload: { accountKey, accountName },
+        })
+      }
+      onConnectionFailure={(errorMessage) =>
+        dispatch({
+          type: 'TEST_MODE_ACCOUNT_CONNECTION_FAILURE',
+          payload: { accountKey, error: errorMessage },
+        })
+      }
+      idSuffix={language}
+    />
+  );
+}
+
+interface FallbackPickerProps {
+  state: WizardState;
+  dispatch: Dispatch<WizardAction>;
+}
+
+function FallbackPicker({ state, dispatch }: FallbackPickerProps): React.JSX.Element {
+  return (
+    <div className="space-y-2">
+      <Radio
+        name="smaily-default-fallback"
+        value="default"
+        checked={state.defaultFallbackAccountKey === 'default'}
+        onChange={() => dispatch({ type: 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY', payload: 'default' })}
+        label="Default account"
+      />
+      {state.env.detectedLanguages.map((language) => {
+        const accountKey = `account_${language}`;
+        return (
+          <Radio
+            key={accountKey}
+            name="smaily-default-fallback"
+            value={accountKey}
+            checked={state.defaultFallbackAccountKey === accountKey}
+            onChange={() =>
+              dispatch({ type: 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY', payload: accountKey })
+            }
+            label={humaniseLocale(language)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function humaniseLocale(locale: string): string {
+  // Strip variant subtag — turn 'et_EE' into 'et-EE'. WordPress ships a
+  // get_locale -> display-name table for the back-end, but the React
+  // bundle doesn't have access to it. Phase 4 polish can wire
+  // wp.i18n.localize-script for full names; pilot-time the locale code
+  // is readable enough.
+  return locale.replace(/_/g, '-');
 }

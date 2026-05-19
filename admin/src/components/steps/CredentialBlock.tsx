@@ -1,0 +1,144 @@
+import { useEffect } from 'react';
+
+import { useTestConnection } from '../../hooks/useTestConnection';
+import { type AsyncStatus, type SmailyCredentials } from '../../state/types';
+import { Banner, Button, Card, Input, Label } from '../primitives';
+
+export interface CredentialBlockProps {
+  title: string;
+  description?: string;
+  credentials: SmailyCredentials;
+  connection: AsyncStatus;
+  onCredentialsChange: (credentials: Partial<SmailyCredentials>) => void;
+  /** Called on each phase of the local Test Connection cycle. */
+  onConnectionStart: () => void;
+  onConnectionSuccess: (accountName?: string) => void;
+  onConnectionFailure: (error: string) => void;
+  /** Suffix added to input ids so multiple blocks on the page don't collide. */
+  idSuffix: string;
+}
+
+/**
+ * Reusable Smaily credential card. Step 1 instantiates it once for the
+ * default account and N more times in Mode A (one per detected
+ * language). Each block owns a useTestConnection hook so the cards are
+ * independently exercisable without sharing a pending state.
+ *
+ * The hook's async lifecycle mirrors the parent reducer's slot via the
+ * onConnection* callbacks — Step 1 keeps the canonical AsyncStatus in
+ * state.smailyConnection or state.perLanguageAccounts[].connection so
+ * Step 6's Done summary + the wizard footer's canAdvance gating both
+ * see the same source of truth.
+ */
+export function CredentialBlock({
+  title,
+  description,
+  credentials,
+  connection,
+  onCredentialsChange,
+  onConnectionStart,
+  onConnectionSuccess,
+  onConnectionFailure,
+  idSuffix,
+}: CredentialBlockProps): React.JSX.Element {
+  const { mutate, status, data, error, reset } = useTestConnection();
+
+  // Mirror hook state into the parent reducer. Each lifecycle transition
+  // fires exactly one dispatch per phase.
+  useEffect(() => {
+    if (status === 'pending' && connection.kind !== 'pending') {
+      onConnectionStart();
+    } else if (status === 'success' && connection.kind !== 'success') {
+      onConnectionSuccess(data?.accountName);
+    } else if (status === 'error' && connection.kind !== 'failure') {
+      onConnectionFailure(error ?? 'Connection failed.');
+    }
+  }, [status, data, error, connection.kind, onConnectionStart, onConnectionSuccess, onConnectionFailure]);
+
+  // Reset the hook when the parent clears the connection slot — e.g. on
+  // credential edit dispatching SET_SMAILY_CREDENTIALS, which the
+  // reducer flips back to idle.
+  useEffect(() => {
+    if (connection.kind === 'idle' && (status === 'success' || status === 'error')) {
+      reset();
+    }
+  }, [connection.kind, status, reset]);
+
+  const handleField = (field: keyof SmailyCredentials) =>
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      onCredentialsChange({ [field]: event.target.value });
+    };
+
+  const isComplete =
+    credentials.subdomain !== '' && credentials.username !== '' && credentials.password !== '';
+
+  return (
+    <Card title={title} description={description}>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div>
+          <Label htmlFor={`smaily-subdomain-${idSuffix}`} required>
+            Subdomain
+          </Label>
+          <Input
+            id={`smaily-subdomain-${idSuffix}`}
+            value={credentials.subdomain}
+            onChange={handleField('subdomain')}
+            placeholder="mypetshop"
+            autoComplete="off"
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor={`smaily-username-${idSuffix}`} required>
+            API username
+          </Label>
+          <Input
+            id={`smaily-username-${idSuffix}`}
+            value={credentials.username}
+            onChange={handleField('username')}
+            autoComplete="off"
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor={`smaily-password-${idSuffix}`} required>
+            API password
+          </Label>
+          <Input
+            id={`smaily-password-${idSuffix}`}
+            type="password"
+            value={credentials.password}
+            onChange={handleField('password')}
+            autoComplete="new-password"
+            className="mt-1"
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-4">
+        <Button
+          variant="secondary"
+          onClick={() => void mutate(credentials)}
+          disabled={!isComplete}
+          loading={status === 'pending'}
+          type="button"
+        >
+          Test connection
+        </Button>
+
+        {connection.kind === 'success' && (
+          <Banner tone="success" className="flex-1">
+            {connection.message ? `Connected: ${connection.message}` : 'Connected to Smaily.'}
+          </Banner>
+        )}
+        {connection.kind === 'failure' && (
+          <Banner tone="danger" className="flex-1">
+            {connection.error}
+          </Banner>
+        )}
+      </div>
+    </Card>
+  );
+}
