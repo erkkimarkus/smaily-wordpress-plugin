@@ -8,7 +8,7 @@
  * License:              GPL-3.0+
  * Requires at least:    6.2
  * Requires PHP:         8.0
- * WC requires at least: 7.0
+ * WC requires at least: 6.9
  * WC tested up to:      8.5
  * Plugin Name:          Smaily Connect (BETA)
  * Plugin URI:           https://smaily.com/help/user-manual/smaily-connect-for-wordpress/
