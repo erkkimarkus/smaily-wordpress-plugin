@@ -44,8 +44,8 @@ use Smaily\Connect\Smaily\EventQueue;
  */
 class HookHandler {
 
-	public const EVENT_CONTACT_SYNC         = 'contact.sync';
-	public const EVENT_AUTOMATION_WELCOME   = 'automation.welcome';
+	public const EVENT_CONTACT_SYNC           = 'contact.sync';
+	public const EVENT_AUTOMATION_WELCOME     = 'automation.welcome';
 	public const EVENT_AUTOMATION_FIRST_ORDER = 'automation.first_order';
 
 	private const OPTION_SUBSCRIBER_SYNC_ENABLED = 'smly_plus_subscriber_sync_enabled';
@@ -183,9 +183,9 @@ class HookHandler {
 	 */
 	private function build_contact_payload( \WP_User $user ): array {
 		return array(
-			'email'      => (string) $user->user_email,
-			'language'   => $this->detect_language_for_user( $user ),
-			'fields'     => array(
+			'email'    => (string) $user->user_email,
+			'language' => $this->detect_language_for_user( $user ),
+			'fields'   => array(
 				'first_name' => (string) $user->first_name,
 				'last_name'  => (string) $user->last_name,
 				'user_id'    => (string) $user->ID,
@@ -242,12 +242,16 @@ class HookHandler {
 		$wrote_any = false;
 
 		foreach ( self::ORDER_META_KEYS as $meta_key => $cookie_name ) {
-			$value = isset( $_COOKIE[ $cookie_name ] ) ? (string) $_COOKIE[ $cookie_name ] : '';
+			if ( ! isset( $_COOKIE[ $cookie_name ] ) ) {
+				continue;
+			}
+
+			$value = sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) );
 			if ( $value === '' ) {
 				continue;
 			}
 
-			$order->update_meta_data( $meta_key, sanitize_text_field( $value ) );
+			$order->update_meta_data( $meta_key, $value );
 			$wrote_any = true;
 		}
 
@@ -256,8 +260,8 @@ class HookHandler {
 		}
 	}
 
-	private function is_enabled( string $option_key, bool $default ): bool {
-		$value = get_option( $option_key, $default );
+	private function is_enabled( string $option_key, bool $fallback ): bool {
+		$value = get_option( $option_key, $fallback );
 
 		if ( is_bool( $value ) ) {
 			return $value;

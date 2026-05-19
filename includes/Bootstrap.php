@@ -53,11 +53,11 @@ final class Bootstrap {
 
 	private bool $booted = false;
 
-	private ?EventQueue $event_queue                   = null;
-	private ?WorkflowResolverInterface $resolver       = null;
-	private ?Credentials $credentials                  = null;
-	private ?AutomationRouter $automation_router       = null;
-	private ?Flusher $flusher                          = null;
+	private ?EventQueue $event_queue             = null;
+	private ?WorkflowResolverInterface $resolver = null;
+	private ?Credentials $credentials            = null;
+	private ?AutomationRouter $automation_router = null;
+	private ?Flusher $flusher                    = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -292,8 +292,8 @@ final class Bootstrap {
 
 	public function automation_router(): AutomationRouter {
 		if ( $this->automation_router === null ) {
-			$bootstrap                = $this;
-			$this->automation_router  = new AutomationRouter(
+			$bootstrap               = $this;
+			$this->automation_router = new AutomationRouter(
 				$this->workflow_resolver(),
 				static function ( string $account_key ) use ( $bootstrap ): Client {
 					return $bootstrap->smaily_client( $account_key );

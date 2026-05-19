@@ -52,6 +52,7 @@ final class HookHandlerTest extends TestCase {
 		Functions\when( 'get_user_locale' )->justReturn( 'et_EE' );
 		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
 		Functions\when( 'sanitize_text_field' )->returnArg( 1 );
+		Functions\when( 'wp_unslash' )->returnArg( 1 );
 
 		// Default Settings: subscriber sync on, welcome / first_order off.
 		Functions\when( 'get_option' )->alias(

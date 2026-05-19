@@ -43,8 +43,8 @@
     },
     "scripts": {
         "install-block-modules": "npm run ci --prefix blocks",
-        "lint": "phpcs . && npm run lint --prefix blocks",
-        "lint:php": "phpcs .",
+        "lint": "phpcs -n . && npm run lint --prefix blocks",
+        "lint:php": "phpcs -n .",
         "analyze": "phpstan analyse --memory-limit=1G",
         "test": "phpunit && npm run test --prefix blocks",
         "test:php": "phpunit",

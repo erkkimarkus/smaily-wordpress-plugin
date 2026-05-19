@@ -42,8 +42,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class Credentials {
 
-	public const DEFAULT_ACCOUNT_KEY = 'default';
-	public const LEGACY_OPTION_KEY   = 'smaily_connect_api_credentials';
+	public const DEFAULT_ACCOUNT_KEY  = 'default';
+	public const LEGACY_OPTION_KEY    = 'smaily_connect_api_credentials';
 	public const PHASE2_OPTION_PREFIX = 'smly_plus_credentials_';
 
 	/**
