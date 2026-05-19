@@ -17,6 +17,7 @@ use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\REST\TestConnectionEndpoint;
+use Smaily\Connect\REST\WorkflowsEndpoint;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
@@ -119,7 +120,21 @@ final class Bootstrap {
 	 */
 	public function register_rest_endpoints(): void {
 		( new TestConnectionEndpoint() )->register();
-		( new BackfillEndpoint( new BackfillJob( $this->smaily_client() ) ) )->register();
+
+		try {
+			( new BackfillEndpoint( new BackfillJob( $this->smaily_client() ) ) )->register();
+		} catch ( \RuntimeException $e ) {
+			// Credentials not configured yet — skip Backfill registration
+			// quietly. Step 2 won't surface the panel until Settings is saved.
+			error_log( '[smaily-connect] BackfillEndpoint registration skipped: ' . $e->getMessage() );
+		}
+
+		( new WorkflowsEndpoint(
+			$this->credentials(),
+			static function ( string $subdomain, string $username, string $password ): Client {
+				return new Client( $subdomain, $username, $password );
+			}
+		) )->register();
 	}
 
 	/**
