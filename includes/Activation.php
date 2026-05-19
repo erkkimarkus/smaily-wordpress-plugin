@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect;
 
+use Smaily\Connect\DB\Migrator;
+
 /**
  * Runs on plugin activation.
  *
@@ -44,13 +46,7 @@ final class Activation {
 	}
 
 	private static function run_migrations(): void {
-		// Placeholder: the DB\Migrator sub-commit replaces this with a real call:
-		//
-		//   ( new DB\Migrator() )->migrate();
-		//
-		// Activation hook is the correct trigger because dbDelta() expects a
-		// fully loaded WP environment, which is guaranteed on the activation
-		// request.
+		( new Migrator() )->migrate();
 	}
 
 	private function __construct() {
