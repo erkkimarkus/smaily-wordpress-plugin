@@ -937,6 +937,52 @@ Iga faasi PR'i Erkkile review'le saates, kirjuta ka kommentaaridesse:
 
 ---
 
+## 10. Hilis-muudatuste log (faas-haaval)
+
+Otsused, mis on tehtud spec'i v1.1 publitseerimise järel ja mis kõrvalkalduvad literaal-tekstist. Pikemas plaanis liiguvad need järgmise PROJECT_PLAN versiooni põhi-teksti.
+
+### Faas 1 (2026-05-19)
+
+**WorkflowResolverInterface signatuur** (sub-PR 3, commit `7e0e9ba`, kinnitatud sub-PR 4 review'l):
+
+Spec'i §3.1 p23 pakkus:
+```php
+MultilingualRouter::resolveWorkflowId($trigger, $language, $mode): ?string
+```
+
+Implementeeritud kuju:
+```php
+WorkflowResolverInterface::resolve_workflow(string $trigger_type, ?string $language): ?WorkflowMatch
+```
+
+Kolm autonoomset signatuuri-otsust:
+
+1. **snake_case meetodinimed** — kogu uus `Smaily\Connect\*` namespace kasutab WP-konventsiooni snake_case'i (`enqueue`, `trigger_automation`, jne). Kõrvalkalduvus spec'i camelCase'ist ühtsuse pärast.
+
+2. **`?WorkflowMatch` (tagastus) asemel `?string`** — Mode A vajab nii `workflow_id` kui `account_key`'d, et valida õige Smaily credential set. Skalaarse stringi puhul peaks `AutomationRouter` teadma Mode A loogikat ja päringuma settings'i credentials'i jaoks eraldi. Object-tagastus hoiab AutomationRouter'i mode-agnostiliseks.
+
+3. **`$mode` parameetri eemaldus** — Router-i implementatsioon loeb mode-i ise `smly_plus_multilingual_mode` option'ist. Single-source-of-truth — caller-side ei pea iga kutsega mode'i sünk hoidma.
+
+Põhjendus aktsepteeritud Erkki poolt sub-PR 4 review'l (2026-05-19): "Kolm autonoomset signatuuri-otsust on kõik paremad kui mu spec'i pakutud literaal."
+
+**PHPCS baas-ruleset** (sub-PR 1.E, commit `ac2cb2c`):
+
+Spec'i §1.4 pakkus "PSR-12 + WPCS hybrid". Implementeeritud kuju: `WordPress-Core` baas (matching upstream `sendsmaily/smaily-wordpress-plugin`), millele lisanduvad `WordPress.Security` + `WordPress.WP.I18n` + `PHPCompatibilityWP`. Põhjus: upstream-merge-kompatibilsus.  Stricter PSR-12-style reeglid uue koodi jaoks lisanduvad path-spetsiifiliselt, kui vajaduseks on.
+
+**PHPCS cache disabled** (sub-PR 4, commit `93b540d`):
+
+Spec'i ei pakkunud konkreetset cache-strateegiat. Implementeeritud: cache **keelatud** phpcs.xml.dist-is. Põhjus: sub-PR 4 CI-failure näitas, et cache'iga lokaalne "0 errors" ja CI tegelik 18 errors võivad kõrvalkalduda. CI on alati cold, lokaalne peab match'ima.
+
+**Composer platform.php pin** (sub-PR 4, commit `c54af5f`):
+
+Spec'i §1.4 ei spetsifitseerinud composer-resolve-strateegiat. Implementeeritud: `config.platform.php = "8.0.99"` composer.json-i. Põhjus: ilma selleta resolve'iti deps kohaliku PHP versiooni vastu (8.5), mis lock'is PHP 8.4+ pakette → CI matrix PHP 8.0-8.3 failub. Platform-pin hoiab lock-file stabiilsuse kõikide matrix-versioonide vahel.
+
+**`readonly` properties tagasi-lükkamine** (sub-PR 4, commit `c54af5f`):
+
+`Smaily\Connect\Smaily\WorkflowMatch` oli algses kujuga `public readonly` constructor property promotion'iga (PHP 8.1+ feature). Plugin floor on PHP 8.0 (PLUGIN.md "Requires PHP: 8.0"). Implementeeritud: regular `public` properties + body-style constructor. Docblock-mark säilitab semantilist immutability-d. **Tagasi panna kui PHP floor liigub 8.1-le.**
+
+---
+
 **Lõpp**
 
 See plaan on **autoritatiivne suunis Code-agendile**. Otsused, mis siin pole kirjas ja mis ei ole **autonoomia-ulatuse** (vt §1.2) sees, vajavad Erkki kinnitust enne implementatsiooni.
