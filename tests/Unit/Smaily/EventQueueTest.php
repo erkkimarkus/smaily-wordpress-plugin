@@ -114,6 +114,79 @@ final class EventQueueTest extends TestCase {
 		self::assertCount( 0, $wpdb->inserts, 'No insert should be attempted on JSON failure.' );
 	}
 
+	public function test_pending_runs_prepared_statement_and_returns_rows(): void {
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		$rows = array(
+			array(
+				'id'         => 1,
+				'event_type' => 'contact.sync',
+				'entity_id'  => '42',
+				'payload'    => '{}',
+				'created_at' => '2026-05-19 12:00:00',
+				'attempts'   => 0,
+			),
+		);
+		$wpdb->next_results = $rows;
+
+		$result = ( new EventQueue() )->pending( 25 );
+
+		self::assertSame( $rows, $result );
+		self::assertCount( 1, $wpdb->prepare_calls );
+		self::assertStringContainsString( 'FROM wp_smly_plus_event_queue', $wpdb->prepare_calls[0]['sql'] );
+		self::assertSame( EventQueue::STATUS_PENDING, $wpdb->prepare_calls[0]['args'][0] );
+		self::assertSame( 25, $wpdb->prepare_calls[0]['args'][1] );
+	}
+
+	public function test_pending_returns_empty_array_when_get_results_returns_non_array(): void {
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		$wpdb->next_results = null;
+
+		self::assertSame( array(), ( new EventQueue() )->pending() );
+	}
+
+	public function test_mark_sent_writes_status_sent_via_update(): void {
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->mark_sent( 42 );
+
+		self::assertCount( 1, $wpdb->updates );
+		self::assertSame( 'wp_smly_plus_event_queue', $wpdb->updates[0]['table'] );
+		self::assertSame(
+			array( 'status' => EventQueue::STATUS_SENT ),
+			$wpdb->updates[0]['data']
+		);
+		self::assertSame( array( 'id' => 42 ), $wpdb->updates[0]['where'] );
+	}
+
+	public function test_mark_failed_writes_status_and_error_message(): void {
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->mark_failed( 7, 'timeout' );
+
+		self::assertCount( 1, $wpdb->updates );
+		self::assertSame( EventQueue::STATUS_FAILED, $wpdb->updates[0]['data']['status'] );
+		self::assertSame( 'timeout', $wpdb->updates[0]['data']['last_error'] );
+		self::assertSame( array( 'id' => 7 ), $wpdb->updates[0]['where'] );
+	}
+
+	public function test_record_attempt_bumps_counter_via_raw_query(): void {
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->record_attempt( 5, 'rate limited' );
+
+		self::assertCount( 1, $wpdb->prepare_calls );
+		self::assertStringContainsString( 'attempts = attempts + 1', $wpdb->prepare_calls[0]['sql'] );
+		self::assertSame( array( 'rate limited', 5 ), $wpdb->prepare_calls[0]['args'] );
+		self::assertCount( 1, $wpdb->queries );
+	}
+
 	/**
 	 * Builds a fake $wpdb compatible enough with EventQueue's usage to record
 	 * insert() and update() calls without touching a real database.
@@ -148,6 +221,42 @@ final class EventQueueTest extends TestCase {
 
 			public function insert( string $table, array $data, array $formats ) {
 				return false;
+			}
+		};
+	}
+
+	/**
+	 * Build a $wpdb stub that covers the full surface EventQueue's read /
+	 * mutate methods touch — prepare(), get_results(), update(), query().
+	 */
+	private function fake_wpdb_full(): object {
+		return new class() {
+			public string $prefix = 'wp_';
+
+			public array $prepare_calls = array();
+			public array $updates       = array();
+			public array $queries       = array();
+
+			/** @var array<int, array<string, mixed>>|null */
+			public ?array $next_results = array();
+
+			public function prepare( string $sql, ...$args ): string {
+				$this->prepare_calls[] = compact( 'sql', 'args' );
+				return $sql;
+			}
+
+			public function get_results( string $sql, string $output = ARRAY_A ) {
+				return $this->next_results;
+			}
+
+			public function update( string $table, array $data, array $where, $format = null, $where_format = null ): int {
+				$this->updates[] = compact( 'table', 'data', 'where' );
+				return 1;
+			}
+
+			public function query( string $sql ): int {
+				$this->queries[] = $sql;
+				return 1;
 			}
 		};
 	}

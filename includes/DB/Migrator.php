@@ -131,7 +131,13 @@ final class Migrator {
 			)
 		);
 
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		// dbDelta() ships in wp-admin/includes/upgrade.php and only loads
+		// on demand from WP-Admin requests + activation. We require_once
+		// it here on first use; tests that stub dbDelta() with Brain\Monkey
+		// can skip the require because the function is already declared.
+		if ( ! function_exists( 'dbDelta' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		}
 		dbDelta( $sql );
 	}
 
