@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    name="Smaily Connect"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+
+    <description>Coding standards for Smaily Connect (BETA fork, 2.0.x).</description>
+
+    <!-- What to scan. -->
+    <file>.</file>
+    <exclude-pattern>/vendor/*</exclude-pattern>
+    <exclude-pattern>/node_modules/*</exclude-pattern>
+    <exclude-pattern>/blocks/*/build/*</exclude-pattern>
+    <exclude-pattern>/blocks/*/node_modules/*</exclude-pattern>
+    <exclude-pattern>/tmp/*</exclude-pattern>
+    <exclude-pattern>/staging/*</exclude-pattern>
+    <exclude-pattern>/tests/*</exclude-pattern>
+
+    <arg name="cache" />
+    <arg name="parallel" value="8" />
+    <arg name="extensions" value="php" />
+    <arg name="colors" />
+    <arg value="ps" />
+
+    <!-- Security baseline — keep upstream's choice to relax the
+         NonceVerification.Recommended sniff (real nonce checks live in the
+         REST controller layer, not in the hook callbacks themselves). -->
+    <rule ref="WordPress.Security">
+        <exclude name="WordPress.Security.NonceVerification.Recommended" />
+    </rule>
+
+    <!-- Base ruleset: WordPress-Extra (includes WordPress-Core + extra sniffs).
+         Yoda condition rule omitted: modern PHP tooling catches the
+         assignment-instead-of-comparison mistake the rule guards against, and
+         Yoda style is unfamiliar to many contributors. -->
+    <rule ref="WordPress-Extra">
+        <exclude name="WordPress.PHP.YodaConditions.NotYoda" />
+        <exclude name="WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder" />
+    </rule>
+
+    <!-- Generic extras kept from upstream. -->
+    <rule ref="Generic.Commenting.Todo" />
+
+    <!-- PHP version compatibility check.
+         Plugin header sets "Requires PHP: 8.0", so we lint against PHP 8.0+. -->
+    <config name="testVersion" value="8.0-" />
+    <rule ref="PHPCompatibilityWP">
+        <include-pattern>*\.php$</include-pattern>
+    </rule>
+
+    <!-- Minimum supported WordPress version (matches the plugin header). -->
+    <config name="minimum_supported_wp_version" value="6.2" />
+
+    <!-- i18n: enforce the smaily-connect text-domain. -->
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="smaily-connect" />
+            </property>
+        </properties>
+    </rule>
+
+    <!-- File-naming exclusions:
+         - Upstream class files use the smaily-*.class.php pattern (not the
+           WPCS-preferred class-{name}.php). We keep that pattern intact for
+           the legacy tree, so the file-name sniff is excluded universally.
+         - The PSR-4 includes/ namespace uses PascalCase filenames
+           (Bootstrap.php, Constants.php), which also trips WPCS's naming
+           sniff. Excluding the rule once covers both cases. -->
+    <rule ref="WordPress.Files.FileName.NotHyphenatedLowercase">
+        <exclude-pattern>*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Files.FileName.InvalidClassFileName">
+        <exclude-pattern>*</exclude-pattern>
+    </rule>
+</ruleset>
