@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "format": "prettier --write \"admin/src/**/*.{ts,tsx,css}\" \"public/js/lib/**/*.ts\""
+    "format": "prettier --write \"admin/src/**/*.{ts,tsx,css}\" \"public/js/lib/**/*.ts\"",
+    "ci:strict": "vendor/bin/phpcs --no-cache --runtime-set ignore_warnings_on_exit 1 && vendor/bin/phpstan analyse --memory-limit=1G --no-progress && vendor/bin/phpunit --testsuite=unit && npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "clsx": "^2.1.1",
