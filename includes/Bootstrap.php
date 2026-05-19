@@ -19,6 +19,7 @@ use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Smaily\Flusher;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
 
 /**
@@ -56,6 +57,7 @@ final class Bootstrap {
 	private ?WorkflowResolverInterface $resolver       = null;
 	private ?Credentials $credentials                  = null;
 	private ?AutomationRouter $automation_router       = null;
+	private ?Flusher $flusher                          = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -88,6 +90,12 @@ final class Bootstrap {
 		add_action( 'before_woocommerce_init', array( $this, 'declare_woocommerce_compatibility' ) );
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( $this, 'register_woocommerce_hooks' ) );
+		add_action( 'init', array( $this, 'register_action_scheduler_jobs' ) );
+
+		// AS callbacks live at request-level priority so they're available
+		// when Action Scheduler's runner cycle fires.
+		add_action( EventQueue::FLUSH_HOOK, array( $this, 'on_flush_event_queue' ) );
+		add_action( 'smly_plus_retry_failed_events', array( $this, 'on_flush_event_queue' ) );
 	}
 
 	/**
@@ -100,6 +108,44 @@ final class Bootstrap {
 	 */
 	public function register_woocommerce_hooks(): void {
 		WooHooks::register( new WooHookHandler( $this->event_queue() ) );
+	}
+
+	/**
+	 * Schedule the recurring Action Scheduler jobs that drive the queue.
+	 *
+	 * Idempotent — `as_has_scheduled_action()` skips the schedule call
+	 * when a row already exists. Activation seeds the same actions; this
+	 * `init` registration re-runs every request so a deactivation /
+	 * reactivation that cancelled the recurring rows restores them
+	 * without the user having to re-save Settings.
+	 *
+	 *   smly_plus_flush_event_queue   — every 60 seconds — Flusher::flush()
+	 *   smly_plus_retry_failed_events — every 5 minutes  — same callback,
+	 *                                                       handles events
+	 *                                                       still in 'pending'
+	 *                                                       with attempts > 0
+	 */
+	public function register_action_scheduler_jobs(): void {
+		if ( ! function_exists( 'as_has_scheduled_action' ) || ! function_exists( 'as_schedule_recurring_action' ) ) {
+			return;
+		}
+
+		if ( ! as_has_scheduled_action( EventQueue::FLUSH_HOOK, array(), EventQueue::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, EventQueue::FLUSH_HOOK, array(), EventQueue::AS_GROUP );
+		}
+
+		if ( ! as_has_scheduled_action( 'smly_plus_retry_failed_events', array(), EventQueue::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 300, 'smly_plus_retry_failed_events', array(), EventQueue::AS_GROUP );
+		}
+	}
+
+	/**
+	 * Action Scheduler callback for smly_plus_flush_event_queue and
+	 * smly_plus_retry_failed_events. Both hooks share Flusher::flush()
+	 * since the EventQueue::pending() query already includes retries.
+	 */
+	public function on_flush_event_queue(): void {
+		$this->flusher()->flush();
 	}
 
 	/**
@@ -195,6 +241,21 @@ final class Bootstrap {
 		);
 
 		return $this->smaily_clients[ $account_key ];
+	}
+
+	public function flusher(): Flusher {
+		if ( $this->flusher === null ) {
+			$bootstrap     = $this;
+			$this->flusher = new Flusher(
+				$this->event_queue(),
+				$this->automation_router(),
+				static function ( string $account_key ) use ( $bootstrap ): Client {
+					return $bootstrap->smaily_client( $account_key );
+				}
+			);
+		}
+
+		return $this->flusher;
 	}
 
 	public function automation_router(): AutomationRouter {

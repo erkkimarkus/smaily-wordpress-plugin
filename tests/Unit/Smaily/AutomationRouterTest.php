@@ -101,7 +101,7 @@ final class AutomationRouterTest extends TestCase {
 		self::assertSame( 'et_account', $captured_key );
 	}
 
-	public function test_returns_false_on_api_exception(): void {
+	public function test_lets_api_exception_bubble_for_flusher_retry_handling(): void {
 		$resolver = $this->resolverThatReturns( new WorkflowMatch( 1, 'default' ) );
 
 		$client = $this->createMock( Client::class );
@@ -112,9 +112,10 @@ final class AutomationRouterTest extends TestCase {
 
 		$router = new AutomationRouter( $resolver, $factory );
 
-		self::assertFalse(
-			$router->trigger_automation( 'welcome', array( 'email' => 'a@b.c' ) )
-		);
+		$this->expectException( \Smaily\Connect\Smaily\ApiException::class );
+		$this->expectExceptionCode( 429 );
+
+		$router->trigger_automation( 'welcome', array( 'email' => 'a@b.c' ) );
 	}
 
 	private function resolverThatReturns( ?WorkflowMatch $match ): WorkflowResolverInterface {

@@ -1,0 +1,295 @@
+<?php
+/**
+ * Flusher dispatch tests.
+ *
+ * @package Smaily\Connect\Tests
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Unit\Smaily;
+
+use Brain\Monkey;
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\HookHandler;
+use Smaily\Connect\Smaily\ApiException;
+use Smaily\Connect\Smaily\AutomationRouter;
+use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Smaily\Flusher;
+use Smaily\Connect\Smaily\WorkflowMatch;
+use Smaily\Connect\Smaily\WorkflowResolverInterface;
+
+final class FlusherTest extends TestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+		Monkey\setUp();
+	}
+
+	protected function tearDown(): void {
+		Monkey\tearDown();
+		parent::tearDown();
+	}
+
+	public function test_contact_sync_event_calls_upsert_subscribers_and_marks_sent(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 1,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode(
+						array(
+							'email'    => 'a@b.c',
+							'language' => 'et_EE',
+							'fields'   => array(
+								'first_name' => 'Alice',
+								'user_id'    => '42',
+							),
+						)
+					),
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->expects( $this->once() )
+			->method( 'upsert_subscribers' )
+			->with(
+				$this->callback(
+					static function ( array $rows ): bool {
+						return $rows[0]['email'] === 'a@b.c'
+							&& $rows[0]['first_name'] === 'Alice'
+							&& $rows[0]['user_id'] === '42';
+					}
+				)
+			);
+
+		$flusher = new Flusher(
+			$queue,
+			$this->automation_router_returning_true(),
+			static fn () => $client
+		);
+
+		$stats = $flusher->flush();
+
+		self::assertSame( 1, $stats['sent'] );
+		self::assertSame( 0, $stats['failed'] );
+		self::assertSame( 0, $stats['retried'] );
+		self::assertSame( array( 1 ), $queue->marked_sent );
+	}
+
+	public function test_automation_event_routes_through_automation_router(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 5,
+					'event_type' => HookHandler::EVENT_AUTOMATION_WELCOME,
+					'payload'    => json_encode(
+						array(
+							'email'    => 'newbie@example.test',
+							'language' => 'en_US',
+							'fields'   => array( 'first_name' => 'Newbie' ),
+						)
+					),
+				),
+			)
+		);
+
+		$captured = array();
+		$router   = new class( $captured ) extends AutomationRouter {
+			private array $sink;
+
+			public function __construct( array &$sink ) {
+				$this->sink = &$sink;
+				// Skip parent constructor — we override trigger_automation directly.
+			}
+
+			public function trigger_automation(
+				string $trigger_type,
+				array $contact_data,
+				array $additional_fields = array()
+			): bool {
+				$this->sink[] = compact( 'trigger_type', 'contact_data', 'additional_fields' );
+				return true;
+			}
+		};
+
+		$flusher = new Flusher( $queue, $router, static fn () => null );
+		$flusher->flush();
+
+		self::assertCount( 1, $captured );
+		self::assertSame( 'welcome', $captured[0]['trigger_type'] );
+		self::assertSame( 'newbie@example.test', $captured[0]['contact_data']['email'] );
+		self::assertSame( 'en_US', $captured[0]['contact_data']['language'] );
+		self::assertSame( array( 'first_name' => 'Newbie' ), $captured[0]['additional_fields'] );
+	}
+
+	public function test_missing_email_short_circuits_and_marks_sent(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 9,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'fields' => array( 'first_name' => 'No-Email' ) ) ),
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->expects( $this->never() )->method( 'upsert_subscribers' );
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client );
+		$stats   = $flusher->flush();
+
+		self::assertSame( 1, $stats['sent'], 'Missing email is terminal-skip → mark_sent.' );
+		self::assertSame( 0, $stats['failed'] );
+	}
+
+	public function test_unknown_event_type_marks_failed(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 10,
+					'event_type' => 'mystery.unknown',
+					'payload'    => json_encode( array( 'email' => 'a@b.c' ) ),
+				),
+			)
+		);
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => null );
+		$stats   = $flusher->flush();
+
+		self::assertSame( 0, $stats['sent'] );
+		self::assertSame( 1, $stats['failed'] );
+		self::assertCount( 1, $queue->marked_failed );
+		self::assertStringContainsString( 'unknown_event_type', $queue->marked_failed[0]['error'] );
+	}
+
+	public function test_malformed_payload_marks_failed(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 11,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => 'not-json',
+				),
+			)
+		);
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => null );
+		$stats   = $flusher->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertSame( 'payload_decode_failure', $queue->marked_failed[0]['error'] );
+	}
+
+	public function test_api_exception_records_attempt_for_retry(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 12,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'email' => 'a@b.c', 'fields' => array() ) ),
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )
+			->willThrowException( new ApiException( 'rate limited', 429 ) );
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client );
+		$stats   = $flusher->flush();
+
+		self::assertSame( 0, $stats['sent'] );
+		self::assertSame( 0, $stats['failed'] );
+		self::assertSame( 1, $stats['retried'], 'ApiException → record_attempt, not mark_failed.' );
+		self::assertCount( 1, $queue->attempts );
+		self::assertSame( 12, $queue->attempts[0]['id'] );
+	}
+
+	public function test_automation_skip_no_workflow_match_is_terminal_sent(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 13,
+					'event_type' => HookHandler::EVENT_AUTOMATION_WELCOME,
+					'payload'    => json_encode(
+						array(
+							'email'    => 'no-mapping@example.test',
+							'language' => 'fr_FR',
+							'fields'   => array(),
+						)
+					),
+				),
+			)
+		);
+
+		$router = new class extends AutomationRouter {
+			public function __construct() {}
+
+			public function trigger_automation(
+				string $trigger_type,
+				array $contact_data,
+				array $additional_fields = array()
+			): bool {
+				return false; // no workflow mapped — terminal skip
+			}
+		};
+
+		$flusher = new Flusher( $queue, $router, static fn () => null );
+		$stats   = $flusher->flush();
+
+		self::assertSame( 1, $stats['sent'] );
+		self::assertSame( 0, $stats['retried'] );
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $events
+	 */
+	private function fake_queue( array $events ): EventQueue {
+		return new class( $events ) extends EventQueue {
+			/** @var array<int, array<string, mixed>> */
+			private array $events;
+
+			public array $marked_sent   = array();
+			public array $marked_failed = array();
+			public array $attempts      = array();
+
+			public function __construct( array $events ) {
+				$this->events = $events;
+			}
+
+			public function pending( int $limit = 50 ): array {
+				return $this->events;
+			}
+
+			public function mark_sent( int $id ): void {
+				$this->marked_sent[] = $id;
+			}
+
+			public function mark_failed( int $id, string $error ): void {
+				$this->marked_failed[] = compact( 'id', 'error' );
+			}
+
+			public function record_attempt( int $id, string $error ): void {
+				$this->attempts[] = compact( 'id', 'error' );
+			}
+		};
+	}
+
+	private function automation_router_returning_true(): AutomationRouter {
+		return new class extends AutomationRouter {
+			public function __construct() {}
+
+			public function trigger_automation(
+				string $trigger_type,
+				array $contact_data,
+				array $additional_fields = array()
+			): bool {
+				return true;
+			}
+		};
+	}
+}

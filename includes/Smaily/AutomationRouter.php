@@ -29,8 +29,18 @@ defined( 'ABSPATH' ) || exit;
  * PLUGIN.md §5/§9 lists the three trigger types this router handles.
  * Multilingual mapping logic lives in Multilingual\Router (sub-PR 4),
  * which implements WorkflowResolverInterface.
+ *
+ * Error model (refactored for sub-PR 5.C Flusher dispatch):
+ *   - Returns true on success (workflow matched and API accepted).
+ *   - Returns false when the dispatch is a terminal skip — no workflow
+ *     mapped for (trigger, language), or email is missing. The Flusher
+ *     marks these events `sent` (logically skipped) rather than `failed`,
+ *     because a retry won't change the outcome.
+ *   - Throws Smaily\ApiException when the API call itself failed (4xx,
+ *     5xx, transport). The Flusher records the attempt and lets the
+ *     retry policy take over.
  */
-final class AutomationRouter {
+class AutomationRouter {
 
 	/** @var callable(string $account_key): Client */
 	private $client_factory;
@@ -100,11 +110,10 @@ final class AutomationRouter {
 
 		$client = ( $this->client_factory )( $match->account_key );
 
-		try {
-			$client->trigger_automation( $match->workflow_id, array( $address ) );
-		} catch ( ApiException $e ) {
-			return false;
-		}
+		// Let ApiException bubble up — the Flusher (sub-PR 5.C) uses it to
+		// distinguish transient failures (retry) from terminal skips
+		// (false return).
+		$client->trigger_automation( $match->workflow_id, array( $address ) );
 
 		return true;
 	}
