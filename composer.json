@@ -35,6 +35,9 @@
             "dealerdirect/phpcodesniffer-composer-installer": true,
             "phpstan/extension-installer": true,
             "composer/installers": true
+        },
+        "platform": {
+            "php": "8.0.99"
         }
     },
     "scripts": {
