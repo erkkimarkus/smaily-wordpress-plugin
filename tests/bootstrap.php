@@ -56,6 +56,39 @@ if ( ! defined( 'OBJECT_K' ) ) {
 // in isolation without standing up wp-includes/rest-api.php. The shims
 // expose just enough surface (get_param, set_param, response code +
 // data) that our endpoints rely on.
+// Legacy Cypher shim — the real class lives in
+// includes/smaily-cypher.class.php and isn't autoloaded by Composer
+// (only the new Smaily\Connect\* namespace is). Tests that call
+// encrypt/decrypt rely on this stub. Production callers always have
+// the real class because smaily-connect.php's require_once chain runs
+// first.
+if ( ! class_exists( \Smaily_Connect\Includes\Cypher::class ) ) {
+	// phpcs:ignore Squiz.Commenting.ClassComment.Missing -- test shim.
+	eval( <<<'PHP'
+namespace Smaily_Connect\Includes;
+
+class Cypher {
+	public static $decrypt_calls = array();
+	public static $encrypt_calls = array();
+	public static $decrypt_return = '';
+	public static $encrypt_return = '';
+
+	public static function decrypt( $cyphertext ): string {
+		self::$decrypt_calls[] = $cyphertext;
+		return self::$decrypt_return;
+	}
+
+	public static function encrypt( $password ): string {
+		self::$encrypt_calls[] = $password;
+		return self::$encrypt_return !== ''
+			? self::$encrypt_return
+			: 'encrypted:' . $password;
+	}
+}
+PHP
+	);
+}
+
 if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		public string $code = '';

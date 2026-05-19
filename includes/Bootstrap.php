@@ -16,6 +16,7 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
+use Smaily\Connect\REST\SettingsEndpoint;
 use Smaily\Connect\REST\TestConnectionEndpoint;
 use Smaily\Connect\REST\WorkflowsEndpoint;
 use Smaily\Connect\Settings\Credentials;
@@ -135,6 +136,8 @@ final class Bootstrap {
 				return new Client( $subdomain, $username, $password );
 			}
 		) )->register();
+
+		( new SettingsEndpoint() )->register();
 	}
 
 	/**

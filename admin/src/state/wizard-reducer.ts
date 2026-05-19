@@ -66,6 +66,13 @@ export const wizardInitialState: WizardState = {
     trackCartEvents: true,
     trackBrowsing: false,
   },
+
+  dirtyTabs: {
+    connection: false,
+    subscribers: false,
+    woocommerce: false,
+    recommendations: false,
+  },
 };
 
 const MAX_STEP = 6;
@@ -309,6 +316,30 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         recEngineFeatures: {
           ...state.recEngineFeatures,
           [action.payload.feature]: action.payload.enabled,
+        },
+      };
+
+    // Settings dirty-tab tracking ------------------------------------------
+    case 'MARK_TAB_DIRTY':
+      return {
+        ...state,
+        dirtyTabs: { ...state.dirtyTabs, [action.payload.tab]: true },
+      };
+
+    case 'CLEAR_TAB_DIRTY':
+      return {
+        ...state,
+        dirtyTabs: { ...state.dirtyTabs, [action.payload.tab]: false },
+      };
+
+    case 'CLEAR_ALL_TABS_DIRTY':
+      return {
+        ...state,
+        dirtyTabs: {
+          connection: false,
+          subscribers: false,
+          woocommerce: false,
+          recommendations: false,
         },
       };
 

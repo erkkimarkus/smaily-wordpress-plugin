@@ -28,6 +28,13 @@ export interface SmailyCredentials {
 export type MultilingualMode = 'single' | 'A' | 'B' | 'C';
 
 /**
+ * The five Settings tab slugs. Maps 1:1 to URL hashes (#connection,
+ * #subscribers, ...). Integrations is informational so it never
+ * appears in dirtyTabs.
+ */
+export type SettingsTabKey = 'connection' | 'subscribers' | 'woocommerce' | 'recommendations';
+
+/**
  * Discriminated union for API-call lifecycle (connection tests, backfill
  * starts, save-settings round-trips). The discriminator (`kind`) lets
  * components render the right state without nullable bools.
@@ -138,6 +145,19 @@ export interface WizardState {
     trackBrowsing: boolean;
   };
 
+  /**
+   * Per-tab dirty flag — true when the tab's slice of state diverges from
+   * what was last persisted via POST /settings. Settings UI surfaces Save +
+   * Discard CTAs based on these flags. Wizard context ignores them — the
+   * Finish button saves everything at once.
+   */
+  dirtyTabs: {
+    connection: boolean;
+    subscribers: boolean;
+    woocommerce: boolean;
+    recommendations: boolean;
+  };
+
   /** Step 2 — Subscribers. */
   subscriberSyncEnabled: boolean;
   syncFields: string[];
@@ -233,6 +253,11 @@ export type WizardAction =
 
   // Step 4: Recommendations -------------------------------------------------
   | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'syncOrders' | 'syncCustomers' | 'syncProducts' | 'trackCartEvents' | 'trackBrowsing'; enabled: boolean } }
+
+  // Settings dirty-tab tracking ---------------------------------------------
+  | { type: 'MARK_TAB_DIRTY'; payload: { tab: SettingsTabKey } }
+  | { type: 'CLEAR_TAB_DIRTY'; payload: { tab: SettingsTabKey } }
+  | { type: 'CLEAR_ALL_TABS_DIRTY' }
 
   // Wizard navigation --------------------------------------------------------
   | { type: 'WIZARD_GO_TO_STEP'; payload: { step: number } }

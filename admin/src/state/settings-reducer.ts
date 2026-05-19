@@ -107,5 +107,12 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
       trackCartEvents: true,
       trackBrowsing: false,
     },
+
+    dirtyTabs: {
+      connection: false,
+      subscribers: false,
+      woocommerce: false,
+      recommendations: false,
+    },
   };
 }
