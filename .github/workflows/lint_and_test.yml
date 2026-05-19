@@ -82,6 +82,12 @@ jobs:
       - name: TypeScript strict typecheck
         run: npm run typecheck
 
+      - name: ESLint (React + TypeScript)
+        run: npm run lint
+
+      - name: Vitest unit suite
+        run: npm test
+
       - name: Vite production build
         run: npm run build
 
