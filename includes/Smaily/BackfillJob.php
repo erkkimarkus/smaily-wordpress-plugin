@@ -31,8 +31,12 @@ defined( 'ABSPATH' ) || exit;
  *
  * The Smaily API call itself is delegated to a Client instance supplied
  * via constructor injection so tests don't need wp_remote_post mocks.
+ *
+ * Not final: REST endpoint + Bootstrap tests subclass with anonymous
+ * doubles to short-circuit start() / process_batch() without exercising
+ * the WP user-table read path. Same rationale as Smaily\Client.
  */
-final class BackfillJob {
+class BackfillJob {
 
 	public const BACKFILL_TARGET = 'smaily';
 	public const BACKFILL_TYPE   = 'contacts';

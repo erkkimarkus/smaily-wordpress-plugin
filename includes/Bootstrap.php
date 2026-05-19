@@ -15,8 +15,11 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
+use Smaily\Connect\REST\BackfillEndpoint;
+use Smaily\Connect\REST\TestConnectionEndpoint;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\AutomationRouter;
+use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
@@ -105,6 +108,51 @@ final class Bootstrap {
 		// Migration\WPCronAuditor for the corresponding WP-Cron clear.
 		add_action( 'smly_plus_contact_sync', array( $this, 'on_contact_sync_tick' ) );
 		add_action( 'smly_plus_abandoned_cart', array( $this, 'on_abandoned_cart_tick' ) );
+
+		// REST endpoints + the AS callback that drives the backfill loop.
+		add_action( 'rest_api_init', array( $this, 'register_rest_endpoints' ) );
+		add_action( BackfillEndpoint::TICK_HOOK, array( $this, 'on_backfill_tick' ), 10, 1 );
+	}
+
+	/**
+	 * Register the namespaced /wp-json/smaily-connect/v1/* routes.
+	 */
+	public function register_rest_endpoints(): void {
+		( new TestConnectionEndpoint() )->register();
+		( new BackfillEndpoint( new BackfillJob( $this->smaily_client() ) ) )->register();
+	}
+
+	/**
+	 * AS callback for BackfillEndpoint::TICK_HOOK. Processes one batch
+	 * (≤100 users by default per BackfillJob) and reschedules another
+	 * tick 30s out if the job hasn't reached its terminal state.
+	 *
+	 * @param string $job_type Currently only "contacts"; Phase 3 adds more.
+	 */
+	public function on_backfill_tick( string $job_type = 'contacts' ): void {
+		if ( $job_type !== 'contacts' ) {
+			return;
+		}
+
+		try {
+			$client = $this->smaily_client();
+		} catch ( \RuntimeException $e ) {
+			// Credentials gone missing mid-job — bail; the cancel/status
+			// endpoints will surface the stalled state to the UI.
+			return;
+		}
+
+		$job    = new BackfillJob( $client );
+		$result = $job->process_batch();
+
+		if ( ! $result['completed'] && function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action(
+				time() + 30,
+				BackfillEndpoint::TICK_HOOK,
+				array( 'job_type' => $job_type ),
+				EventQueue::AS_GROUP
+			);
+		}
 	}
 
 	/**

@@ -52,6 +52,52 @@ if ( ! defined( 'OBJECT_K' ) ) {
 	define( 'OBJECT_K', 'OBJECT_K' );
 }
 
+// WP REST infrastructure stubs — the unit suite tests endpoint handlers
+// in isolation without standing up wp-includes/rest-api.php. The shims
+// expose just enough surface (get_param, set_param, response code +
+// data) that our endpoints rely on.
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public string $code = '';
+		public string $message = '';
+		public array $data = array();
+		public function __construct( string $code = '', string $message = '', array $data = array() ) {
+			$this->code    = $code;
+			$this->message = $message;
+			$this->data    = $data;
+		}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data() { return $this->data; }
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		/** @var array<string, mixed> */
+		private array $params = array();
+		public function get_param( string $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+		public function set_param( string $key, $value ): void {
+			$this->params[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		private $data;
+		private int $status;
+		public function __construct( $data = null, int $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+		public function get_data() { return $this->data; }
+		public function get_status(): int { return $this->status; }
+	}
+}
+
 // 2. Composer autoloader — registers PSR-4 mappings. Actual class files
 //    load lazily on first reference; by now ABSPATH is set so the
 //    direct-access guards in those files won't short-circuit.

@@ -1,0 +1,136 @@
+<?php
+/**
+ * TestConnectionEndpoint tests.
+ *
+ * @package Smaily\Connect\Tests
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Unit\REST;
+
+use Brain\Monkey;
+use Brain\Monkey\Functions;
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\REST\TestConnectionEndpoint;
+use Smaily\Connect\Smaily\Client;
+use WP_REST_Request;
+
+final class TestConnectionEndpointTest extends TestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+		Monkey\setUp();
+
+		Functions\when( 'sanitize_text_field' )->returnArg( 1 );
+		Functions\when( '__' )->returnArg( 1 );
+		Functions\when( 'apply_filters' )->returnArg( 2 );
+		Functions\when( 'get_bloginfo' )->justReturn( 'x' );
+	}
+
+	protected function tearDown(): void {
+		Monkey\tearDown();
+		parent::tearDown();
+	}
+
+	public function test_permission_check_denies_users_without_manage_options(): void {
+		Functions\when( 'current_user_can' )->justReturn( false );
+
+		$endpoint = new TestConnectionEndpoint();
+		$result   = $endpoint->permission_check( new WP_REST_Request() );
+
+		self::assertInstanceOf( \WP_Error::class, $result );
+		self::assertSame( 403, $result->get_error_data()['status'] );
+	}
+
+	public function test_permission_check_passes_for_admin(): void {
+		Functions\when( 'current_user_can' )->justReturn( true );
+
+		self::assertTrue(
+			( new TestConnectionEndpoint() )->permission_check( new WP_REST_Request() )
+		);
+	}
+
+	public function test_register_calls_register_rest_route_with_post_method_and_subdomain_args(): void {
+		$captured_args = null;
+		Functions\when( 'register_rest_route' )->alias(
+			static function ( string $namespace, string $route, array $args ) use ( &$captured_args ): bool {
+				$captured_args = compact( 'namespace', 'route', 'args' );
+				return true;
+			}
+		);
+
+		( new TestConnectionEndpoint() )->register();
+
+		self::assertNotNull( $captured_args );
+		self::assertSame( 'smaily-connect/v1', $captured_args['namespace'] );
+		self::assertSame( '/test-smaily', $captured_args['route'] );
+		self::assertSame( 'POST', $captured_args['args']['methods'] );
+		self::assertArrayHasKey( 'subdomain', $captured_args['args']['args'] );
+		self::assertArrayHasKey( 'username', $captured_args['args']['args'] );
+		self::assertArrayHasKey( 'password', $captured_args['args']['args'] );
+		self::assertTrue( $captured_args['args']['args']['subdomain']['required'] );
+	}
+
+	public function test_handle_returns_connected_true_when_client_validates_credentials(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', 's3cret' );
+
+		$endpoint = $this->endpoint_with_client( true );
+		$response = $endpoint->handle( $request );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertTrue( $response->get_data()['connected'] );
+		self::assertNull( $response->get_data()['error'] );
+	}
+
+	public function test_handle_returns_connected_false_when_credentials_rejected(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', 'wrong' );
+
+		$endpoint = $this->endpoint_with_client( false );
+		$response = $endpoint->handle( $request );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertFalse( $response->get_data()['connected'] );
+		self::assertNotNull( $response->get_data()['error'] );
+	}
+
+	public function test_handle_short_circuits_when_required_field_empty(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', '' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', 's3cret' );
+
+		// No Client should ever be built — assert by failing the factory.
+		$endpoint = new class extends TestConnectionEndpoint {
+			protected function build_client( string $subdomain, string $username, string $password ): Client {
+				throw new \RuntimeException( 'Client must not be built when fields are empty' );
+			}
+		};
+
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		self::assertNotNull( $response->get_data()['error'] );
+	}
+
+	private function endpoint_with_client( bool $connection_result ): TestConnectionEndpoint {
+		$client = $this->createMock( Client::class );
+		$client->method( 'test_connection' )->willReturn( $connection_result );
+
+		return new class( $client ) extends TestConnectionEndpoint {
+			private Client $injected;
+			public function __construct( Client $injected ) {
+				$this->injected = $injected;
+			}
+			protected function build_client( string $subdomain, string $username, string $password ): Client {
+				return $this->injected;
+			}
+		};
+	}
+}
