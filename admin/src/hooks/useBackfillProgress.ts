@@ -1,0 +1,178 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import {
+  cancelBackfill,
+  getBackfillStatus,
+  startBackfill,
+  type BackfillJobType,
+} from '../api/backfill';
+import { type BackfillProgress } from '../state/types';
+
+const idleProgress: BackfillProgress = {
+  status: 'idle',
+  processed: 0,
+  total: 0,
+  percent: 0,
+  etaSeconds: null,
+  error: null,
+};
+
+export interface UseBackfillProgressOptions {
+  /** Poll interval in ms while status === 'running'. Default 5_000. */
+  intervalMs?: number;
+  /** Job type to track. Phase 1 only has 'contacts'. */
+  jobType?: BackfillJobType;
+  /**
+   * When false, polling is suspended even if the job is still
+   * running server-side.
+   */
+  enabled?: boolean;
+}
+
+export interface UseBackfillProgressResult {
+  progress: BackfillProgress;
+  /** Network failure that broke the polling loop. */
+  pollError: string | null;
+  start: () => Promise<void>;
+  cancel: () => Promise<void>;
+}
+
+/**
+ * Polls /backfill/status until the job reaches a terminal state.
+ *
+ * Architecture note: we drive the poll loop through a recursive
+ * setTimeout chain inside pollOnce() rather than re-running a
+ * useEffect on every response. Reason: when two consecutive polls
+ * both return status='running', the React state doesn't change shape
+ * — only `processed` increments — and React batches the renders, so
+ * a useEffect keyed on `progress.status` would only fire on the
+ * initial transition into 'running' and never re-schedule.
+ *
+ * Cadence per PLUGIN.md §12:
+ *   - wizard context (Step 2 first run): 5s — feels live
+ *   - settings context (background tracking): 30s — light on the server
+ */
+export function useBackfillProgress(options: UseBackfillProgressOptions = {}): UseBackfillProgressResult {
+  const jobType = options.jobType ?? 'contacts';
+  const intervalMs = options.intervalMs ?? 5_000;
+  const enabled = options.enabled ?? true;
+
+  const [progress, setProgress] = useState<BackfillProgress>(idleProgress);
+  const [pollError, setPollError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loopActiveRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      loopActiveRef.current = false;
+    };
+  }, []);
+
+  const pollOnce = useCallback(async (): Promise<void> => {
+    try {
+      const response = await getBackfillStatus(jobType);
+      if (!mountedRef.current) {
+        return;
+      }
+      setProgress({
+        status: response.status,
+        processed: response.processed,
+        total: response.total,
+        percent: response.percent,
+        etaSeconds: response.eta_seconds,
+        error: null,
+      });
+      setPollError(null);
+
+      // Self-chain — schedule the next poll only while the server
+      // still reports 'running' AND the loop hasn't been cancelled.
+      if (response.status === 'running' && loopActiveRef.current && mountedRef.current) {
+        timerRef.current = setTimeout(() => {
+          if (mountedRef.current && loopActiveRef.current) {
+            void pollOnce();
+          }
+        }, intervalMs);
+      } else {
+        loopActiveRef.current = false;
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setPollError(err instanceof Error ? err.message : 'Failed to fetch backfill status');
+      }
+      loopActiveRef.current = false;
+    }
+  }, [jobType, intervalMs]);
+
+  // Kick the polling chain off whenever progress.status enters 'running'
+  // from a terminal state (idle/completed/failed/cancelled). The chain
+  // self-terminates inside pollOnce; this effect only handles the
+  // initial trigger + the enabled/disabled toggle.
+  useEffect(() => {
+    if (!enabled) {
+      loopActiveRef.current = false;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (progress.status === 'running' && !loopActiveRef.current) {
+      loopActiveRef.current = true;
+      timerRef.current = setTimeout(() => {
+        if (mountedRef.current && loopActiveRef.current) {
+          void pollOnce();
+        }
+      }, intervalMs);
+    } else if (progress.status !== 'running') {
+      loopActiveRef.current = false;
+    }
+
+    return undefined;
+  }, [enabled, progress.status, intervalMs, pollOnce]);
+
+  const start = useCallback(async (): Promise<void> => {
+    setPollError(null);
+    try {
+      const response = await startBackfill(jobType);
+      if (!mountedRef.current) {
+        return;
+      }
+      setProgress({
+        status: 'running',
+        processed: 0,
+        total: response.total,
+        percent: 0,
+        etaSeconds: null,
+        error: null,
+      });
+    } catch (err) {
+      if (mountedRef.current) {
+        setPollError(err instanceof Error ? err.message : 'Failed to start backfill');
+      }
+    }
+  }, [jobType]);
+
+  const cancel = useCallback(async (): Promise<void> => {
+    try {
+      await cancelBackfill(jobType);
+      if (mountedRef.current) {
+        setProgress((prev) => ({ ...prev, status: 'cancelled' }));
+      }
+      loopActiveRef.current = false;
+    } catch (err) {
+      if (mountedRef.current) {
+        setPollError(err instanceof Error ? err.message : 'Failed to cancel backfill');
+      }
+    }
+  }, [jobType]);
+
+  return { progress, pollError, start, cancel };
+}

@@ -46,6 +46,16 @@ export default defineConfig({
           lines: 70,
           functions: 70,
         },
+        // Sub-PR 2.E.1 — hooks consume API wrappers. Threshold lifts as
+        // sub-PR 2.G adds the remaining hooks (useWorkflows, etc).
+        'admin/src/hooks/**/*.ts': {
+          lines: 70,
+          functions: 70,
+        },
+        'admin/src/api/**/*.ts': {
+          lines: 70,
+          functions: 70,
+        },
       },
     },
   },
