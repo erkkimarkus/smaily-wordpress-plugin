@@ -28,11 +28,14 @@
         <exclude name="WordPress.Security.NonceVerification.Recommended" />
     </rule>
 
-    <!-- Base ruleset: WordPress-Extra (includes WordPress-Core + extra sniffs).
+    <!-- Base ruleset: WordPress-Core (matches upstream's baseline so the BETA
+         fork can rebase / merge back cleanly without a wall of style noise on
+         pre-existing files). Stricter PSR-12-style rules for the new
+         Smaily\Connect\* tree can be layered via path-specific rules later.
          Yoda condition rule omitted: modern PHP tooling catches the
          assignment-instead-of-comparison mistake the rule guards against, and
          Yoda style is unfamiliar to many contributors. -->
-    <rule ref="WordPress-Extra">
+    <rule ref="WordPress-Core">
         <exclude name="WordPress.PHP.YodaConditions.NotYoda" />
         <exclude name="WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder" />
     </rule>
