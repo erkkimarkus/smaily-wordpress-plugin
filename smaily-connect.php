@@ -102,3 +102,9 @@ require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily.class.php';
 if ( class_exists( 'Smaily_Connect' ) ) {
 	new Smaily_Connect( SMAILY_CONNECT_PLUGIN_NAME, SMAILY_CONNECT_PLUGIN_VERSION );
 }
+
+/**
+ * Boot the namespaced Smaily\Connect\* code path. Runs alongside the legacy
+ * class above; the two coexist in disjoint namespaces during the BETA.
+ */
+\Smaily\Connect\Bootstrap::instance()->boot();
