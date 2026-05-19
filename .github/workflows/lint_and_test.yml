@@ -62,6 +62,41 @@ jobs:
       - name: PHPUnit (unit suite)
         run: composer run test:php
 
+  admin_bundle:
+    name: Admin bundle (Vite + Tailwind + TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript strict typecheck
+        run: npm run typecheck
+
+      - name: Vite production build
+        run: npm run build
+
+      - name: Verify expected dist artefacts exist
+        run: |
+          test -f dist/admin/admin.js
+          test -f dist/admin/admin.css
+          test -f dist/client/rec-engine-client.js
+
+      - name: Bundle size budget (admin.js must stay under 250KB gzipped)
+        run: |
+          size=$(gzip -c dist/admin/admin.js | wc -c)
+          echo "admin.js gzipped size = $size bytes"
+          test "$size" -lt 256000 || (echo "Bundle exceeded 250KB gzipped budget" && exit 1)
+
   blocks:
     name: Gutenberg blocks (lint + test)
     runs-on: ubuntu-latest
