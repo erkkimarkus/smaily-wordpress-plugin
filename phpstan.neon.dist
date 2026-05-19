@@ -16,8 +16,10 @@ parameters:
 
     bootstrapFiles:
         # szepeviktor/phpstan-wordpress is auto-registered via
-        # phpstan/extension-installer, so its bootstrap loads automatically.
-        # This list stays in place for any project-specific stubs we need
-        # to add later.
+        # phpstan/extension-installer, so its WordPress stubs load
+        # automatically. WooCommerce stubs aren't part of that bundle —
+        # load them explicitly so WC_Order / wc_get_order / etc. resolve
+        # under static analysis.
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
 
     treatPhpDocTypesAsCertain: true

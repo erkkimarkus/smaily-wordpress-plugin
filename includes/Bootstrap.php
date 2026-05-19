@@ -12,6 +12,8 @@ namespace Smaily\Connect;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\AutomationRouter;
@@ -85,6 +87,19 @@ final class Bootstrap {
 
 		add_action( 'before_woocommerce_init', array( $this, 'declare_woocommerce_compatibility' ) );
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+		add_action( 'init', array( $this, 'register_woocommerce_hooks' ) );
+	}
+
+	/**
+	 * Wire the WC + user hook callbacks into add_action().
+	 *
+	 * Deferred to `init` so WooCommerce's hook names are guaranteed
+	 * registered with WP by the time we call add_action() on them. WC's
+	 * own plugin file fires on `plugins_loaded` priority 5, so by `init`
+	 * everything is in place.
+	 */
+	public function register_woocommerce_hooks(): void {
+		WooHooks::register( new WooHookHandler( $this->event_queue() ) );
 	}
 
 	/**

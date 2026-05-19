@@ -31,8 +31,12 @@ defined( 'ABSPATH' ) || exit;
  * enqueue() cheap (it's invoked from hot paths like user_register and
  * woocommerce_checkout_order_processed) and concentrates retry policy in
  * one place — the flush job.
+ *
+ * Not final: tests subclass with an anonymous double to record enqueue()
+ * calls without standing up $wpdb + Action Scheduler. Same rationale as
+ * Smaily\Client.
  */
-final class EventQueue {
+class EventQueue {
 
 	public const TABLE_SUFFIX = 'smly_plus_event_queue';
 
