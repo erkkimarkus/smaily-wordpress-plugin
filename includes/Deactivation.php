@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Runs on plugin deactivation.
  *

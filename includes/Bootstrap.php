@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Singleton entry point invoked from smaily-connect.php.
  *

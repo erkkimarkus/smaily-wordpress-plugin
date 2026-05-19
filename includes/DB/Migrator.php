@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\DB;
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily\Connect\Constants;
 
 /**
