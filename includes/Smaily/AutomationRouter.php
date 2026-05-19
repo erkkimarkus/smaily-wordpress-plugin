@@ -88,7 +88,13 @@ final class AutomationRouter {
 
 		$address = array_merge(
 			array( 'email' => $email ),
-			array_diff_key( $contact_data, array( 'email' => true, 'language' => true ) ),
+			array_diff_key(
+				$contact_data,
+				array(
+					'email'    => true,
+					'language' => true,
+				)
+			),
 			$additional_fields
 		);
 

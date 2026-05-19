@@ -44,18 +44,16 @@ final class DetectorFactory {
 		}
 
 		if ( defined( 'ICL_SITEPRESS_VERSION' ) ) {
-			return self::$cached = new WPMLAdapter();
+			self::$cached = new WPMLAdapter();
+		} elseif ( function_exists( 'pll_languages_list' ) ) {
+			self::$cached = new PolylangAdapter();
+		} elseif ( function_exists( 'trp_get_url_for_language' ) ) {
+			self::$cached = new TranslatePressAdapter();
+		} else {
+			self::$cached = new SiteLocaleAdapter();
 		}
 
-		if ( function_exists( 'pll_languages_list' ) ) {
-			return self::$cached = new PolylangAdapter();
-		}
-
-		if ( function_exists( 'trp_get_url_for_language' ) ) {
-			return self::$cached = new TranslatePressAdapter();
-		}
-
-		return self::$cached = new SiteLocaleAdapter();
+		return self::$cached;
 	}
 
 	/**

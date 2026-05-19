@@ -81,8 +81,8 @@ final class WPMLAdapter implements DetectorInterface {
 			$name[ $lang ]        = (string) get_the_title( $translated_id );
 			$description[ $lang ] = (string) get_post_field( 'post_excerpt', $translated_id );
 
-			$permalink         = apply_filters( 'wpml_permalink', get_permalink( $translated_id ), $lang );
-			$url[ $lang ]      = is_string( $permalink ) ? $permalink : '';
+			$permalink    = apply_filters( 'wpml_permalink', get_permalink( $translated_id ), $lang );
+			$url[ $lang ] = is_string( $permalink ) ? $permalink : '';
 		}
 
 		return array(

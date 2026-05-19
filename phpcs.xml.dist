@@ -15,7 +15,12 @@
     <exclude-pattern>/staging/*</exclude-pattern>
     <exclude-pattern>/tests/*</exclude-pattern>
 
-    <arg name="cache" />
+    <!-- Cache deliberately not enabled: PHPCS per-file cache can hide
+         violations in newly added files when an old summary line (0
+         errors) happens to land on cached results. CI always runs cold,
+         so disabling cache locally keeps the two environments in lockstep.
+         For a fast iterative workflow on a single file, pass
+         the cache flag ad hoc rather than re-enabling it project-wide. -->
     <arg name="parallel" value="8" />
     <arg name="extensions" value="php" />
     <arg name="colors" />
@@ -23,9 +28,14 @@
 
     <!-- Security baseline — keep upstream's choice to relax the
          NonceVerification.Recommended sniff (real nonce checks live in the
-         REST controller layer, not in the hook callbacks themselves). -->
+         REST controller layer, not in the hook callbacks themselves).
+         Also relax ExceptionNotEscaped: exception messages flow to error
+         logs and admin notices that escape contextually, not to the page
+         output stream, so the sniff produces false positives for every
+         throw new ApiException(sprintf(...)) construction. -->
     <rule ref="WordPress.Security">
         <exclude name="WordPress.Security.NonceVerification.Recommended" />
+        <exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped" />
     </rule>
 
     <!-- Base ruleset: WordPress-Core (matches upstream's baseline so the BETA

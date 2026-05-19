@@ -102,14 +102,21 @@ final class EventQueue {
 		global $wpdb;
 
 		$table = $this->table_name();
-		$sql   = $wpdb->prepare(
-			"SELECT id, event_type, entity_id, payload, created_at, attempts FROM {$table}"
-				. ' WHERE status = %s ORDER BY created_at ASC LIMIT %d',
-			self::STATUS_PENDING,
-			$limit
-		);
 
-		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		// Table name interpolation is unavoidable — MySQL forbids
+		// parameterising the FROM clause. $table is controlled.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, event_type, entity_id, payload, created_at, attempts FROM {$table} WHERE status = %s ORDER BY created_at ASC LIMIT %d",
+				self::STATUS_PENDING,
+				$limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return is_array( $rows ) ? $rows : array();
 	}
@@ -146,13 +153,20 @@ final class EventQueue {
 	 */
 	public function record_attempt( int $id, string $error ): void {
 		global $wpdb;
+
+		$table = $this->table_name();
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$this->table_name()} SET attempts = attempts + 1, last_error = %s WHERE id = %d",
+				"UPDATE {$table} SET attempts = attempts + 1, last_error = %s WHERE id = %d",
 				$error,
 				$id
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/**

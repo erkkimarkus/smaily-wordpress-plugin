@@ -81,8 +81,8 @@ final class PolylangAdapter implements DetectorInterface {
 			$name[ $lang ]        = (string) get_the_title( $translated_id );
 			$description[ $lang ] = (string) get_post_field( 'post_excerpt', $translated_id );
 
-			$permalink     = get_permalink( $translated_id );
-			$url[ $lang ]  = is_string( $permalink ) ? $permalink : '';
+			$permalink    = get_permalink( $translated_id );
+			$url[ $lang ] = is_string( $permalink ) ? $permalink : '';
 		}
 
 		return array(

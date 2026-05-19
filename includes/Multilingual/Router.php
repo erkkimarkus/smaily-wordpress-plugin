@@ -97,15 +97,21 @@ final class Router implements WorkflowResolverInterface {
 
 		$table = $wpdb->prefix . self::TABLE_SUFFIX;
 
+		// MySQL forbids parameterising table names in prepared statements;
+		// $table is composed from $wpdb->prefix + a private const so the
+		// interpolation is safe. Real arguments use %s placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT workflow_id, account_key, language FROM {$table}"
-					. ' WHERE trigger_type = %s AND language = %s LIMIT 1',
+				"SELECT workflow_id, account_key, language FROM {$table} WHERE trigger_type = %s AND language = %s LIMIT 1",
 				$trigger_type,
 				$language
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $this->row_to_match( $row );
 	}
@@ -115,14 +121,18 @@ final class Router implements WorkflowResolverInterface {
 
 		$table = $wpdb->prefix . self::TABLE_SUFFIX;
 
+		// See find_mapping() — table-name interpolation rationale.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT workflow_id, account_key, language FROM {$table}"
-					. ' WHERE trigger_type = %s AND is_default_fallback = 1 LIMIT 1',
+				"SELECT workflow_id, account_key, language FROM {$table} WHERE trigger_type = %s AND is_default_fallback = 1 LIMIT 1",
 				$trigger_type
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $this->row_to_match( $row );
 	}

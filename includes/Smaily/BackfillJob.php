@@ -70,17 +70,14 @@ final class BackfillJob {
 
 		$table = $this->table_name();
 
+		// Table name interpolation: MySQL forbids parameterising it,
+		// $table is composed from controlled values ($wpdb->prefix + a
+		// private const). Real arguments are bound via %s / %d placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query(
 			$wpdb->prepare(
-				"INSERT INTO {$table} (job_type, target, status, total_count, processed_count, started_at)"
-					. ' VALUES (%s, %s, %s, %d, %d, %s)'
-					. ' ON DUPLICATE KEY UPDATE status = VALUES(status),'
-					. ' total_count = VALUES(total_count),'
-					. ' processed_count = 0,'
-					. ' cursor = NULL,'
-					. ' started_at = VALUES(started_at),'
-					. ' completed_at = NULL,'
-					. ' error_message = NULL',
+				"INSERT INTO {$table} (job_type, target, status, total_count, processed_count, started_at) VALUES (%s, %s, %s, %d, %d, %s) ON DUPLICATE KEY UPDATE status = VALUES(status), total_count = VALUES(total_count), processed_count = 0, cursor = NULL, started_at = VALUES(started_at), completed_at = NULL, error_message = NULL",
 				self::BACKFILL_TYPE,
 				self::BACKFILL_TARGET,
 				'running',
@@ -97,6 +94,8 @@ final class BackfillJob {
 				self::BACKFILL_TARGET
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $id;
 	}
@@ -115,6 +114,9 @@ final class BackfillJob {
 		global $wpdb;
 
 		$table = $this->table_name();
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$state = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT id, cursor, processed_count, total_count FROM {$table} WHERE job_type = %s AND target = %s",
@@ -123,6 +125,8 @@ final class BackfillJob {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $state ) ) {
 			return array(

@@ -95,8 +95,8 @@ final class TranslatePressAdapter implements DetectorInterface {
 			if ( $source_description !== '' ) {
 				$description[ $lang ] = $source_description;
 			}
-			$permalink     = $this->get_translated_permalink( $post_id, $lang );
-			$url[ $lang ]  = $permalink ?? '';
+			$permalink    = $this->get_translated_permalink( $post_id, $lang );
+			$url[ $lang ] = $permalink ?? '';
 		}
 
 		return array(
