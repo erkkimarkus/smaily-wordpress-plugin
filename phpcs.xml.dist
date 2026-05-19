@@ -15,12 +15,36 @@
     <exclude-pattern>/staging/*</exclude-pattern>
     <exclude-pattern>/tests/*</exclude-pattern>
 
-    <!-- Cache deliberately not enabled: PHPCS per-file cache can hide
-         violations in newly added files when an old summary line (0
-         errors) happens to land on cached results. CI always runs cold,
-         so disabling cache locally keeps the two environments in lockstep.
-         For a fast iterative workflow on a single file, pass
-         the cache flag ad hoc rather than re-enabling it project-wide. -->
+    <!--
+         Cache deliberately NOT enabled here.
+
+         Lesson from sub-PR 4 (commit 93b540d): the upstream phpcs.xml
+         carried an arg-cache entry. Locally we kept getting a green
+         "0 errors, 0 warnings" summary on the new namespaced code even
+         though CI was failing with 18 violations on the same commits.
+         Two factors conspired:
+
+           1. PHPCS per-file cache stamps each scanned file with a hash of
+              file content plus ruleset config. Files added in later
+              sub-PRs were scanned once, returned clean, then stayed
+              cached even when neighbour-files violations changed the
+              surrounding ruleset evaluation.
+
+           2. The parallel-worker summary "8 / 8" is a worker-chunk count,
+              NOT a file count. With cache hits and parallel chunking,
+              real violations on 18 lines hid behind a benign summary.
+
+         CI always runs cold. Disabling cache locally is the only reliable
+         way to keep local and CI in lockstep. The cost is ~600ms per full
+         scan, acceptable on a plugin-sized codebase.
+
+         Need a fast iterative workflow on a single file? Pass the cache
+         flag ad hoc on the command line, never re-enable it project-wide.
+
+         Future agents: see also the feedback-no-phpcs-cache memory entry
+         in the persistent memory; rationale is duplicated there so it
+         survives if this file is regenerated.
+    -->
     <arg name="parallel" value="8" />
     <arg name="extensions" value="php" />
     <arg name="colors" />
