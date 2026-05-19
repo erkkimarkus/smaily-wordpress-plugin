@@ -36,6 +36,22 @@ if ( ! defined( 'SMAILY_CONNECT_VERSION' ) ) {
 	define( 'SMAILY_CONNECT_VERSION', '2.0.0-beta.1' );
 }
 
+// wpdb output-format constants used by $wpdb->get_row / get_results.
+// In production these are defined in wp-includes/load.php long before any
+// plugin file loads, but unit tests don't bootstrap WP.
+if ( ! defined( 'ARRAY_A' ) ) {
+	define( 'ARRAY_A', 'ARRAY_A' );
+}
+if ( ! defined( 'ARRAY_N' ) ) {
+	define( 'ARRAY_N', 'ARRAY_N' );
+}
+if ( ! defined( 'OBJECT' ) ) {
+	define( 'OBJECT', 'OBJECT' );
+}
+if ( ! defined( 'OBJECT_K' ) ) {
+	define( 'OBJECT_K', 'OBJECT_K' );
+}
+
 // 2. Composer autoloader — registers PSR-4 mappings. Actual class files
 //    load lazily on first reference; by now ABSPATH is set so the
 //    direct-access guards in those files won't short-circuit.
