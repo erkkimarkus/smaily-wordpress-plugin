@@ -24,6 +24,29 @@ export default defineConfig({
         'admin/src/index.tsx', // mount-only, covered by manual sanity test
       ],
       reporter: ['text', 'html'],
+
+      /**
+       * Per Erkki's sub-PR 2.C spec: enforce 70 % only on the classes
+       * PROJECT_PLAN.md §1.4 marks critical. Primitives and step
+       * components have no threshold — they're visual surfaces best
+       * covered by integration tests in sub-PR 2.E rather than unit
+       * tests of every prop combination.
+       */
+      thresholds: {
+        'admin/src/state/wizard-reducer.ts': {
+          lines: 70,
+          functions: 70,
+          branches: 70,
+        },
+        'admin/src/state/settings-reducer.ts': {
+          lines: 70,
+          functions: 70,
+        },
+        'admin/src/utils/cn.ts': {
+          lines: 90,
+          functions: 100,
+        },
+      },
     },
   },
 

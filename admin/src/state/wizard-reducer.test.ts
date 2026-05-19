@@ -198,6 +198,19 @@ describe('wizardReducer — navigation', () => {
   });
 });
 
+describe('wizardReducer — exhaustiveness guard', () => {
+  it('throws when handed an action type the switch does not cover', () => {
+    // This intentionally bypasses the TypeScript narrowing — production code
+    // can never reach here, but a malformed dispatch from non-typed sources
+    // (browser dev-tools, malicious extension) should fail loudly rather
+    // than silently return state.
+    expect(() =>
+      // @ts-expect-error — deliberately invalid action to exercise assertNever
+      wizardReducer(baseState, { type: 'NEVER_DEFINED_ACTION' }),
+    ).toThrow(/unhandled action/);
+  });
+});
+
 describe('buildSettingsInitialState', () => {
   it('marks the state as inSettings and zeroes currentStep', () => {
     const s = buildSettingsInitialState();
