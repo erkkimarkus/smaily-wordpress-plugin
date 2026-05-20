@@ -34,26 +34,23 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
       )}
     >
       <span className="relative inline-flex h-4 w-4 shrink-0">
+        {/* Sub-PR 2.H.13 — same hidden-input pattern as Checkbox + Toggle. */}
         <input
           ref={ref}
           type="radio"
           disabled={disabled}
-          // Sub-PR 2.H.10 — full WP-core CSS override.
-          //
-          // wp-admin/css/forms.css gives <input type="radio"> a 1rem
-          // square + 1px border + grey background + inset shadow + a
-          // -.25rem top margin (specificity 0,0,1,1). 2.H.6 promoted
-          // only margin with `!`; Erkki's DevTools-Elements screenshot
-          // showed the rest of the WP-core block still winning. Every
-          // overriding class now carries `!` so the native input fills
-          // the wrapper as the rounded brand dot we actually want.
-          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded-full !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          className="peer !absolute !inset-0 !m-0 !h-full !w-full !min-w-0 !p-0 !opacity-0 cursor-inherit"
           {...rest}
         />
-        {/* Inner dot — visible only when :checked. */}
+        {/* Visible outer ring. */}
         <span
-          className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand opacity-0 peer-checked:opacity-100"
           aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full border border-border-strong bg-surface transition-colors duration-120 peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-1"
+        />
+        {/* Inner brand dot — visible only when peer is :checked. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand opacity-0 peer-checked:opacity-100"
         />
       </span>
 
