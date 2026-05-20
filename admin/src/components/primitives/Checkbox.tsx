@@ -47,7 +47,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
           // margin/padding) is promoted with `!` so the native input
           // fills its wrapper and shows our brand colours instead of
           // WP's grey-square defaults.
-          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand checked:!bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded-sm !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand checked:!bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Checkmark icon — visible only when the input is :checked. */}
