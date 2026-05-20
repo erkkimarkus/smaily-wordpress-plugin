@@ -15,6 +15,37 @@
 /readme.md
 /vendor*
 
+# BETA-fork additions — Phase 2 sub-PR 2.H drove a 49MB ZIP because
+# the upstream .zipignore predates these directories. Each line below
+# was bundled into the artifact by accident and serves no purpose at
+# runtime (WordPress only needs dist/admin/*, the PHP tree, and
+# blocks/*/build/*). Order matches the on-disk size of the offender —
+# node_modules dominates everything else by two orders of magnitude.
+/node_modules*
+/coverage*
+/tests*
+/admin/src*
+/admin/dist*
+/dist/client*
+/spec*
+/.github*
+/.wp-env.json
+/TESTING.md
+/phpstan.neon.dist
+/phpunit.xml.dist
+/tsconfig*.json
+/vite.config.ts
+/vitest.config.ts
+/package.json
+/package-lock.json
+/eslint.config.cjs
+/.eslintrc*
+/.prettier*
+/tailwind.config.js
+/postcss.config.js
+/Makefile
+/*.log
+
 # Blocks
 /blocks/.gitignore
 /blocks/*/__tests__*
