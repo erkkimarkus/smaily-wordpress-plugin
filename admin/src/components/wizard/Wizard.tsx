@@ -1,7 +1,10 @@
-import { useReducer } from 'react';
+import { useReducer, useState } from 'react';
 
+import { saveSettings } from '../../api/saveSettings';
+import { buildTabPayload } from '../../state/buildTabPayload';
 import { wizardReducer } from '../../state/wizard-reducer';
-import { type WizardState } from '../../state/types';
+import { type SettingsTabKey, type WizardState } from '../../state/types';
+import { Banner } from '../primitives';
 import {
   Step1Connect,
   Step2Subscribers,
@@ -45,6 +48,8 @@ const STEP_LABELS: Array<{ label: string; description: string }> = [
  */
 export function Wizard({ initialState }: WizardProps): React.JSX.Element {
   const [state, dispatch] = useReducer(wizardReducer, initialState);
+  const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [finishError, setFinishError] = useState<string | null>(null);
 
   const railItems: StepRailItem[] = STEP_LABELS.map((entry, idx) => ({
     id: idx + 1,
@@ -58,14 +63,53 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
 
   const handleContinue = (): void => dispatch({ type: 'WIZARD_NEXT_STEP' });
   const handleBack = (): void => dispatch({ type: 'WIZARD_PREVIOUS_STEP' });
-  const handleFinish = (): void => {
-    // Phase 2 stub — full multi-tab save is a Phase 3 task. For now
-    // redirect to the Settings page so the user can verify their
-    // saved credentials persisted.
+
+  // Sub-PR 2.H.17 — Finish actually persists wizard state.
+  //
+  // The earlier Phase 2 stub redirected to Settings without saving,
+  // so Erkki could walk Step 1..6, click Finish, and end up on a
+  // Settings page showing empty credentials — the wizard's state
+  // lived only in React. Now Finish POSTs all four settings-tab
+  // payloads in sequence (connection → subscribers → woocommerce →
+  // recommendations) and only redirects on a clean run; a failure
+  // surfaces an inline banner with the field-level error so the
+  // user can hop back to the relevant step.
+  const handleFinish = async (): Promise<void> => {
+    setFinishStatus('saving');
+    setFinishError(null);
+
+    const tabs: SettingsTabKey[] = [
+      'connection',
+      'subscribers',
+      'woocommerce',
+      'recommendations',
+    ];
+
+    for (const tab of tabs) {
+      const payload = buildTabPayload(state, tab);
+      try {
+        const response = await saveSettings({ tab, data: payload });
+        if (!response.saved) {
+          const message = response.errors
+            .map((e) => `${e.field}: ${e.message}`)
+            .join('; ') || 'Save failed.';
+          setFinishStatus('error');
+          setFinishError(`Couldn't save ${tab}: ${message}`);
+          return;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Network error';
+        setFinishStatus('error');
+        setFinishError(`Couldn't save ${tab}: ${message}`);
+        return;
+      }
+    }
+
     if (typeof window !== 'undefined') {
       window.location.href = 'admin.php?page=smaily-connect-settings';
     }
   };
+
   const handleStepClick = (step: number): void =>
     dispatch({ type: 'WIZARD_GO_TO_STEP', payload: { step } });
 
@@ -80,16 +124,24 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
 
         <div className="min-w-0 flex-1">
           <div className="rounded-lg bg-surface shadow-card">
-            <div className="px-6 py-6">{renderStep(state, dispatch)}</div>
+            <div className="px-6 py-6">
+              {renderStep(state, dispatch)}
+              {finishStatus === 'error' && finishError !== null && (
+                <Banner tone="danger" className="mt-4">
+                  {finishError}
+                </Banner>
+              )}
+            </div>
 
             <WizardFooter
               currentStep={state.currentStep}
               totalSteps={6}
               onBack={handleBack}
               onContinue={handleContinue}
-              onFinish={handleFinish}
+              onFinish={() => void handleFinish()}
               canAdvance={canAdvance}
               advanceHint={advanceHint}
+              loading={finishStatus === 'saving'}
             />
           </div>
         </div>

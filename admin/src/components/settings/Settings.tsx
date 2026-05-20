@@ -9,6 +9,7 @@ import {
 
 import { useSaveSettings } from '../../hooks/useSaveSettings';
 import { actionToTab } from '../../state/action-to-tab';
+import { buildTabPayload } from '../../state/buildTabPayload';
 import {
   buildSettingsInitialState,
   type ServerEnv,
@@ -270,38 +271,3 @@ function TabPanel({
   return <div>{children}</div>;
 }
 
-/**
- * Strip the wizardState shape into the tab-specific payload the
- * Settings endpoint accepts. Each tab handler on the PHP side reads
- * a different slice; this keeps the wire format small + targeted.
- */
-function buildTabPayload(state: WizardState, tab: SettingsTabKey): Record<string, unknown> {
-  switch (tab) {
-    case 'connection':
-      return {
-        smailyCredentials: state.smailyCredentials,
-        multilingualMode: state.multilingualMode,
-        perLanguageAccounts: state.perLanguageAccounts,
-        defaultFallbackAccountKey: state.defaultFallbackAccountKey,
-      };
-    case 'subscribers':
-      return {
-        subscriberSyncEnabled: state.subscriberSyncEnabled,
-        syncFields: state.syncFields,
-        wordpressSubscriptionCheckbox: state.wordpressSubscriptionCheckbox,
-        checkoutSubscriptionCheckbox: state.checkoutSubscriptionCheckbox,
-      };
-    case 'woocommerce':
-      return {
-        welcomeEnabled: state.welcomeEnabled,
-        firstOrderEnabled: state.firstOrderEnabled,
-        abandonedCartEnabled: state.abandonedCartEnabled,
-        abandonedCartCutoffMinutes: state.abandonedCartCutoffMinutes,
-        automationMappings: state.automationMappings,
-      };
-    case 'recommendations':
-      return {
-        recEngineFeatures: state.recEngineFeatures,
-      };
-  }
-}
