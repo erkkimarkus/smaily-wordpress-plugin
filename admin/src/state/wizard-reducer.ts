@@ -109,10 +109,31 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       // — keep the saved list intact when entering it so users don't lose
       // configuration on a B → A toggle.
       const leavingModeA = state.multilingualMode === 'A' && action.payload !== 'A';
+      const enteringModeA = state.multilingualMode !== 'A' && action.payload === 'A';
+
+      // Mode A has no notion of a "default" account — per-language entries
+      // ARE the credential sets. If the user enters Mode A while
+      // defaultFallbackAccountKey is still pointing at the legacy
+      // 'default', repoint it at the first detected language so the
+      // fallback radio lands on a real account from the start.
+      let nextFallback = state.defaultFallbackAccountKey;
+      if (enteringModeA && nextFallback === 'default') {
+        const firstLanguage = state.env.detectedLanguages[0];
+        if (firstLanguage !== undefined) {
+          nextFallback = `account_${firstLanguage}`;
+        }
+      }
+      // Leaving Mode A: snap back to the legacy 'default' so the Mode B/C
+      // single-account flow has the canonical fallback marker.
+      if (leavingModeA) {
+        nextFallback = 'default';
+      }
+
       return {
         ...state,
         multilingualMode: action.payload,
         perLanguageAccounts: leavingModeA ? [] : state.perLanguageAccounts,
+        defaultFallbackAccountKey: nextFallback,
       };
     }
 

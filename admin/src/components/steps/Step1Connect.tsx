@@ -80,19 +80,21 @@ export function Step1Connect({
         </div>
       )}
 
-      <CredentialBlock
-        title={isModeA ? 'Smaily credentials (default account)' : 'Smaily API credentials'}
-        description={
-          isModeA ? 'Used as the catch-all when a contact has no detected language.' : undefined
-        }
-        credentials={state.smailyCredentials}
-        connection={state.smailyConnection}
-        onCredentialsChange={onDefaultCredentialsChange}
-        onConnectionStart={onDefaultConnStart}
-        onConnectionSuccess={onDefaultConnSuccess}
-        onConnectionFailure={onDefaultConnFailure}
-        idSuffix="default"
-      />
+      {/* Mode A has no shared "default" credential set — the per-language
+          blocks below ARE the credential sets. Mode B/C/single all share
+          one default Smaily account, so this block stays for them. */}
+      {!isModeA && (
+        <CredentialBlock
+          title="Smaily API credentials"
+          credentials={state.smailyCredentials}
+          connection={state.smailyConnection}
+          onCredentialsChange={onDefaultCredentialsChange}
+          onConnectionStart={onDefaultConnStart}
+          onConnectionSuccess={onDefaultConnSuccess}
+          onConnectionFailure={onDefaultConnFailure}
+          idSuffix="default"
+        />
+      )}
 
       <MultilingualModePicker
         value={state.multilingualMode}
@@ -190,15 +192,11 @@ interface FallbackPickerProps {
 }
 
 function FallbackPicker({ state, dispatch }: FallbackPickerProps): React.JSX.Element {
+  // Mode A only — the picker isn't rendered outside `isModeA`, so we
+  // know every option here is a real per-language account. No
+  // "Default account" radio (there is no shared default in Mode A).
   return (
     <div className="space-y-2">
-      <Radio
-        name="smaily-default-fallback"
-        value="default"
-        checked={state.defaultFallbackAccountKey === 'default'}
-        onChange={() => dispatch({ type: 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY', payload: 'default' })}
-        label="Default account"
-      />
       {state.env.detectedLanguages.map((language) => {
         const accountKey = `account_${language}`;
         return (

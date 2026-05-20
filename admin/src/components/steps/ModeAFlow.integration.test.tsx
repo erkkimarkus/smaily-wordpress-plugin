@@ -35,15 +35,51 @@ describe('Step 1 — Mode A multi-account flow', () => {
 
     render(<Host />);
 
-    // "default account" appears twice (block heading + fallback label) so
-    // we use getAllByText; per-language headings are unique.
-    expect(screen.getAllByText(/default account/i).length).toBeGreaterThan(0);
+    // Sub-PR 2.H.2: Mode A has NO shared "default account" — the only
+    // surface labelled "default" is the fallback CARD title ("Default
+    // fallback account"). The default credential block + the "Default
+    // account" radio option are both removed.
+    expect(screen.queryByRole('radio', { name: /^default account$/i })).toBeNull();
     expect(screen.getByText(/account for et-EE/i)).toBeInTheDocument();
     expect(screen.getByText(/account for en-US/i)).toBeInTheDocument();
 
-    // MultilingualModePicker (3 radios) + fallback picker (3 radios) =
-    // six total when mode A is selected with 2 detected languages.
-    expect(screen.getAllByRole('radio').length).toBe(6);
+    // MultilingualModePicker (3 radios A/B/C) + fallback picker (2 radios:
+    // et, en — no "default") = 5 total in Mode A with 2 detected languages.
+    expect(screen.getAllByRole('radio').length).toBe(5);
+  });
+
+  it('retargets fallback to the first language on B → A switch', () => {
+    const seeded = {
+      ...wizardInitialState,
+      multilingualMode: 'B' as const,
+      env: {
+        ...wizardInitialState.env,
+        detectedLanguages: ['et_EE', 'en_US'],
+      },
+      // Default-fallback starts at 'default' in Mode B — that's the
+      // canonical value.
+      defaultFallbackAccountKey: 'default',
+    };
+
+    function Host(): React.JSX.Element {
+      const [state, dispatch] = useReducer(wizardReducer, seeded);
+      return (
+        <>
+          <Step1Connect state={state} dispatch={dispatch} />
+          <output data-testid="fallback">{state.defaultFallbackAccountKey}</output>
+        </>
+      );
+    }
+
+    render(<Host />);
+
+    expect(screen.getByTestId('fallback')).toHaveTextContent('default');
+
+    // Switch to Mode A — reducer must retarget fallback to account_et_EE
+    // (first detected language) since 'default' has no meaning in Mode A.
+    fireEvent.click(screen.getByLabelText(/separate smaily accounts/i));
+
+    expect(screen.getByTestId('fallback')).toHaveTextContent('account_et_EE');
   });
 
   it('lazily creates perLanguageAccounts on first field edit', async () => {
@@ -82,8 +118,10 @@ describe('Step 1 — Mode A multi-account flow', () => {
 
     expect(screen.getByTestId('account-count')).toHaveTextContent('0');
 
-    // Multiple "Subdomain" labels exist (default + per-language) so we
-    // address the Estonian one by its id directly.
+    // Per-language Subdomain inputs use idSuffix={language} — sub-PR
+    // 2.H.2 removed the default credential block in Mode A so the
+    // Estonian block is now the first one rendered, but we still
+    // target it by id to be explicit.
     const subdomainInput = document.querySelector<HTMLInputElement>('#smaily-subdomain-et_EE');
     expect(subdomainInput).not.toBeNull();
     fireEvent.change(subdomainInput!, { target: { value: 'estonia' } });
