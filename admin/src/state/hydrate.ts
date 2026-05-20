@@ -18,6 +18,14 @@ import {
  * UI can render before the server has fully populated every option.
  */
 export interface BootPayload {
+  /**
+   * Short git SHA of the bundle + PHP that staging is running, with
+   * `-dirty` suffix if the build tree had uncommitted changes.
+   * `dev` when git wasn't available at packaging time. Surfaces in the
+   * browser console as `window.smailyConnectBoot.buildHash` so Erkki
+   * can confirm "this WP is running THIS commit" without rebuilding.
+   */
+  buildHash: string;
   nonce: string;
   /** Base URL for the REST namespace — passed to configureApiClient. */
   restUrl: string;

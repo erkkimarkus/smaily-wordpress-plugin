@@ -172,7 +172,19 @@ function smaily_connect_enqueue_admin_bundle( string $hook_suffix ): void {
 	}
 
 	$detector = new EnvDetector();
-	$boot     = array(
+
+	// Sub-PR 2.H.8 — buildHash for "is staging running the code I just
+	// shipped?" certainty. composer run package writes dist/build-hash.txt
+	// at packaging time (short git SHA + dirty marker). PHP reads it
+	// here and emits to the boot payload; `window.smailyConnectBoot.buildHash`
+	// in the browser console answers the question without rebuilding.
+	$build_hash_file = SMAILY_CONNECT_PLUGIN_PATH . 'dist/build-hash.txt';
+	$build_hash      = file_exists( $build_hash_file )
+		? trim( (string) file_get_contents( $build_hash_file ) ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		: 'dev';
+
+	$boot = array(
+		'buildHash'     => $build_hash,
 		'nonce'         => wp_create_nonce( 'wp_rest' ),
 		// Trailing slash matters — configureApiClient strips it,
 		// but the rest_url() helper returns it without one on some
