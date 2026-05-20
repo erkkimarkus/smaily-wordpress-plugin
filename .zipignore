@@ -13,7 +13,12 @@
 /Dockerfile
 /phpcs.xml
 /readme.md
-/vendor*
+# /vendor was excluded by upstream because their release CI runs
+# `composer install --no-dev` before `composer run package` and emits
+# vendor/ into the staging directory anyway. Locally-built ZIPs need
+# vendor/ inside the archive (WP plugin install can't run composer on
+# the target host) — we now ship the prod-only autoload bundle here
+# instead. See chore(release) commit for context.
 
 # BETA-fork additions — Phase 2 sub-PR 2.H drove a 49MB ZIP because
 # the upstream .zipignore predates these directories. Each line below
