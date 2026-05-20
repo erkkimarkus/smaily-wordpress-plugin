@@ -7,7 +7,7 @@
 -- `visitor_id` is the UUID v4 the plugin generates when an anonymous
 -- session first appears (set in the smaily_anon_sid cookie, 30-day TTL).
 -- After an identify event (login / register / checkout / email_link),
--- `email` is filled in and the four `identified_*` fields are set;
+-- `email` is filled in and the four `identified_*` fields are set,
 -- subsequent visits update only `last_seen_at`.
 --
 -- `identified_source` mirrors PLUGIN.md §10 enum values

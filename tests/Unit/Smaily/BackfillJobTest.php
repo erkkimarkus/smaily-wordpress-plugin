@@ -61,7 +61,7 @@ final class BackfillJobTest extends TestCase {
 		$wpdb            = $this->fake_wpdb_for_process_batch(
 			array(
 				'id'              => 77,
-				'cursor'          => '0',
+				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '2',
 			)
@@ -101,14 +101,14 @@ final class BackfillJobTest extends TestCase {
 		// processed_count + cursor updated.
 		self::assertCount( 1, $wpdb->updates );
 		self::assertSame( 'completed', $wpdb->updates[0]['data']['status'] );
-		self::assertSame( '2', $wpdb->updates[0]['data']['cursor'] );
+		self::assertSame( '2', $wpdb->updates[0]['data']['cursor_value'] );
 	}
 
 	public function test_process_batch_skips_fresh_users(): void {
 		$wpdb            = $this->fake_wpdb_for_process_batch(
 			array(
 				'id'              => 77,
-				'cursor'          => '0',
+				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
 			)
@@ -149,7 +149,7 @@ final class BackfillJobTest extends TestCase {
 		$wpdb            = $this->fake_wpdb_for_process_batch(
 			array(
 				'id'              => 77,
-				'cursor'          => '0',
+				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
 			)

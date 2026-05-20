@@ -6,12 +6,16 @@
 -- `account_key` is a logical identifier the Settings layer assigns to
 -- each Smaily-credential set ("default", "et_account", "en_account", …).
 -- In Mode B/C there's exactly one credential set so account_key is
--- always "default"; Mode A introduces several.
+-- always "default" (Mode A introduces several).
 --
 -- `is_default_fallback` marks the row that handles users whose detected
 -- language has no explicit mapping. Exactly one row per trigger_type
--- should have it set; the application layer enforces that invariant on
--- write.
+-- should have it set, and the application layer enforces that invariant
+-- on write.
+--
+-- dbDelta caveat: the parser splits on `;` even inside SQL `--` comment
+-- blocks, so semicolons in comments silently break the migration. Keep
+-- comments semicolon-free.
 
 CREATE TABLE {prefix}smly_plus_automation_mapping (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

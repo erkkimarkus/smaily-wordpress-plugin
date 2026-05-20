@@ -15,7 +15,7 @@ CREATE TABLE {prefix}smly_plus_backfill_job (
   status VARCHAR(16) NOT NULL DEFAULT 'idle',
   total_count INT UNSIGNED DEFAULT NULL,
   processed_count INT UNSIGNED NOT NULL DEFAULT 0,
-  cursor VARCHAR(255) DEFAULT NULL,
+  cursor_value VARCHAR(255) DEFAULT NULL,
   started_at DATETIME DEFAULT NULL,
   completed_at DATETIME DEFAULT NULL,
   error_message TEXT,

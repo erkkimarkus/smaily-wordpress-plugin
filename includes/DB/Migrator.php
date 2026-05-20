@@ -123,6 +123,23 @@ final class Migrator {
 			return;
 		}
 
+		// Strip SQL line comments BEFORE handing the buffer to dbDelta.
+		//
+		// dbDelta's parser splits the input on `;` and then runs each
+		// segment through its CREATE-TABLE/ALTER-TABLE regex. SQL `--`
+		// comments are not whitespace to it — comment text that contains
+		// a semicolon or that wraps across lines bleeds into the next
+		// statement, producing nonsense queries like
+		// `ALTER TABLE … ADD COLUMN PLUGIN.md §3`. wp-env first-run hit
+		// this on automation_mapping and rec_visitor migrations; the
+		// CREATE TABLE never landed, dbDelta swallowed the syntax errors,
+		// and schema_version still ticked forward — silent data loss.
+		//
+		// Stripping `-- …` comments + blank lines flattens the file to
+		// the actual DDL dbDelta knows how to parse. The leading file
+		// header comments are still readable in source.
+		$sql = (string) preg_replace( '/^[ \t]*--.*$/m', '', $sql );
+
 		$sql = strtr(
 			$sql,
 			array(
