@@ -20,3 +20,4 @@ phpunit.xml
 # Test coverage output.
 tmp/
 .phpcs-cache
+.claude/
