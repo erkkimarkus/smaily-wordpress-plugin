@@ -247,7 +247,11 @@ class EnvDetector {
 				// Password intentionally omitted; UI shows it blank.
 				'password'  => '',
 			),
-			'multilingualMode'              => (string) get_option( 'smly_plus_multilingual_mode', 'single' ),
+			// Empty string when the option was never set — lets hydrate
+			// pick an env-aware default (Mode B for multilingual sites,
+			// 'single' otherwise). Once the merchant explicitly saves a
+			// mode via Settings the actual value lands here and wins.
+			'multilingualMode'              => (string) get_option( 'smly_plus_multilingual_mode', '' ),
 			'defaultFallbackAccountKey'     => (string) get_option( 'smly_plus_default_fallback_account', 'default' ),
 
 			// Step 2: subscribers.

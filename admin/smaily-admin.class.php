@@ -135,6 +135,23 @@ class Admin {
 		// The flow can be sanitize -> validate after save -> sanitize
 		// https://core.trac.wordpress.org/ticket/21989
 
+		// Sub-PR 2.H.5 — REST_REQUEST early skip.
+		//
+		// pre_update_option_* is a `mixed` filter: whatever it returns is
+		// the value WordPress writes to wp_options. The new
+		// SettingsEndpoint (REST) already encrypts + validates and hands
+		// us the final credential array; if this legacy hook then calls
+		// validate_api_credentials() (HTTP roundtrip to Smaily) and the
+		// dummy/test credentials it sees fail validation, the `else`
+		// branch returns $old_value — wiping the merchant's write back to
+		// the previous (often empty) value.
+		//
+		// REST callers own their own validation path. Bail out early
+		// returning the value SettingsEndpoint computed.
+		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			return $new_value;
+		}
+
 		if ( $new_value['subdomain'] === ''
 			&& $new_value['username'] === ''
 			&& $new_value['password'] === ''

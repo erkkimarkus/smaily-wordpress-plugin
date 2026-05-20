@@ -41,7 +41,15 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
           ref={ref}
           type="checkbox"
           disabled={disabled}
-          className="peer absolute h-full w-full cursor-inherit appearance-none rounded border border-border-strong bg-surface checked:border-brand checked:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          // Sub-PR 2.H.5 — m-0 / p-0 neutralise WP-admin forms.css.
+          // forms.css gives <input type="checkbox"> the same -4px top
+          // margin as radio plus an `outline: none` reset; Tailwind's
+          // appearance-none doesn't override the margin. Erkki noted
+          // that the checkmark glyph mis-aligned independently of the
+          // radio dot — same root cause, applied per-element so a
+          // future style change for one shape doesn't pull the other
+          // out of alignment.
+          className="peer absolute m-0 h-full w-full cursor-inherit appearance-none rounded border border-border-strong bg-surface p-0 checked:border-brand checked:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Checkmark icon — visible only when the input is :checked. */}

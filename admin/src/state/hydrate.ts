@@ -116,10 +116,18 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
   const env = boot.envSnapshot;
   const s = boot.savedSettings;
 
+  // Mode default per Erkki's 2.H.5 spec: until the merchant explicitly
+  // picks one, multilingual sites land on Mode B (single Smaily account
+  // with per-language automation branches — PLUGIN.md §4: "kõige
+  // tüüpilisem"). Single-language sites land on 'single'. A stored
+  // mode always wins — we never overwrite a deliberate choice.
   const validModes = ['single', 'A', 'B', 'C'] as const;
-  const mode = (validModes as readonly string[]).includes(s.multilingualMode)
+  const hasSavedMode = (validModes as readonly string[]).includes(s.multilingualMode);
+  const envDefault: WizardState['multilingualMode'] =
+    env.detectedLanguages.length > 1 ? 'B' : 'single';
+  const mode: WizardState['multilingualMode'] = hasSavedMode
     ? (s.multilingualMode as WizardState['multilingualMode'])
-    : 'single';
+    : envDefault;
 
   return {
     inSettings,

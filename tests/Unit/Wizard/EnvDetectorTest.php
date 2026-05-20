@@ -135,7 +135,11 @@ final class EnvDetectorTest extends TestCase {
 	public function test_saved_settings_carries_default_toggle_values_when_options_absent(): void {
 		$saved = ( new EnvDetector() )->saved_settings();
 
-		self::assertSame( 'single', $saved['multilingualMode'] );
+		// Sub-PR 2.H.5: multilingualMode default is empty string when
+		// the option was never written — hydrate.ts uses the env to
+		// decide Mode B vs 'single'. We do NOT default to 'single' here
+		// any more.
+		self::assertSame( '', $saved['multilingualMode'] );
 		self::assertSame( 'default', $saved['defaultFallbackAccountKey'] );
 		self::assertTrue( $saved['subscriberSyncEnabled'] );
 		self::assertSame( 30, $saved['abandonedCartCutoffMinutes'] );
