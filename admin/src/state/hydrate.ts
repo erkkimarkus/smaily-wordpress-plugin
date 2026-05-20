@@ -19,7 +19,8 @@ import {
  */
 export interface BootPayload {
   nonce: string;
-  restRoot: string;
+  /** Base URL for the REST namespace — passed to configureApiClient. */
+  restUrl: string;
   /** 'wizard' | 'settings' — same string the data-view attribute carries. */
   view: 'wizard' | 'settings' | 'unknown';
   envSnapshot: {

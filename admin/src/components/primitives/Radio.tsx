@@ -22,12 +22,17 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
   return (
     <label
       className={cn(
-        'group inline-flex items-start gap-3',
+        // items-center keeps the dot vertically centred with the label's
+        // first line — items-start (the old value) drifted the dot up a
+        // pixel or two on font-semibold labels like the
+        // MultilingualModePicker card titles, which Erkki's staging
+        // walkthrough surfaced as visibly misaligned.
+        'group inline-flex items-center gap-3',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         className,
       )}
     >
-      <span className="relative mt-0.5 inline-flex h-4 w-4 shrink-0">
+      <span className="relative inline-flex h-4 w-4 shrink-0">
         <input
           ref={ref}
           type="radio"

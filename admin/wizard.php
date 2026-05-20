@@ -169,7 +169,10 @@ function smaily_connect_enqueue_admin_bundle( string $hook_suffix ): void {
 	$detector = new EnvDetector();
 	$boot     = array(
 		'nonce'         => wp_create_nonce( 'wp_rest' ),
-		'restRoot'      => esc_url_raw( rest_url( 'smaily-connect/v1' ) ),
+		// Trailing slash matters — configureApiClient strips it,
+		// but the rest_url() helper returns it without one on some
+		// permalink configurations. Always emit canonical form.
+		'restUrl'       => esc_url_raw( rest_url( 'smaily-connect/v1/' ) ),
 		'view'          => isset( $_GET['page'] ) && $_GET['page'] === 'smaily-connect-settings' ? 'settings' : 'wizard', // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		'envSnapshot'   => $detector->snapshot(),
 		'savedSettings' => $detector->saved_settings(),
