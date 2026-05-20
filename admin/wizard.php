@@ -30,9 +30,14 @@ use Smaily\Connect\Wizard\EnvDetector;
  */
 function smaily_connect_register_admin_pages(): void {
 	$capability = 'manage_options';
-	$icon       = 'data:image/svg+xml;base64,' . base64_encode(
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm9 4-7 4v7h14v-7z"/></svg>'
-	);
+
+	// Reuse the legacy Smaily brand mark — `gfx/icon.svg` is the same
+	// asset upstream's add_menu_page() loaded. Keeps the sidebar visual
+	// identity consistent with what merchants already recognise.
+	$icon_path = SMAILY_CONNECT_PLUGIN_PATH . 'gfx/icon.svg';
+	$icon      = file_exists( $icon_path )
+		? 'data:image/svg+xml;base64,' . base64_encode( (string) file_get_contents( $icon_path ) ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		: 'dashicons-email-alt';
 
 	add_menu_page(
 		__( 'Smaily Connect', 'smaily-connect' ),

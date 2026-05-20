@@ -142,9 +142,33 @@ class Admin {
 			return $new_value;
 		}
 
+		// Sub-PR 2.H.4 — Variant C guard.
+		//
+		// This hook runs from pre_update_option_smaily_connect_api_credentials,
+		// which fires on EVERY update_option() call regardless of context.
+		// The new SettingsEndpoint (REST) saves credentials via update_option
+		// without the wp-admin options.php request lifecycle that legacy
+		// settings-form submissions ride on. In that REST context
+		// add_settings_error() / settings_errors() / get_current_screen()
+		// haven't been loaded (wp-admin/includes/template.php is admin-only),
+		// so the bare calls below raise "Call to undefined function" and
+		// the REST response becomes a 500.
+		//
+		// We can't drop the calls — the legacy options.php form still
+		// surfaces them to the user as inline notices. We guard with
+		// function_exists() so REST silently skips the notice flow and
+		// returns from this hook normally; the actual encryption +
+		// validation work still runs and the option update still
+		// persists.
+		$add_settings_error = static function ( string $slug, string $code, string $message, string $type ): void {
+			if ( function_exists( 'add_settings_error' ) ) {
+				add_settings_error( $slug, $code, $message, $type );
+			}
+		};
+
 		$credentials_valid = $this->validate_api_credentials( $new_value['subdomain'], $new_value['username'], $new_value['password'] );
 		if ( $credentials_valid[0] === true ) {
-			add_settings_error(
+			$add_settings_error(
 				'smaily_connect_messages',
 				'credentials_validated',
 				__( 'API credentials validated successfully!', 'smaily-connect' ),
@@ -159,7 +183,7 @@ class Admin {
 		} else {
 			switch ( $credentials_valid[1] ) {
 				case 404:
-					add_settings_error(
+					$add_settings_error(
 						'smaily_connect_messages',
 						'invalid_api_credentials',
 						__( 'Check subdomain. API credentials validation failed.', 'smaily-connect' ),
@@ -167,7 +191,7 @@ class Admin {
 					);
 					break;
 				default:
-					add_settings_error(
+					$add_settings_error(
 						'smaily_connect_messages',
 						'invalid_api_credentials',
 						__( 'API credentials validation failed. Please check your details.', 'smaily-connect' ),

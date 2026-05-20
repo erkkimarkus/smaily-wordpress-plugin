@@ -56,13 +56,19 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
       </span>
 
       {(label || description) && (
-        // Same line-height-as-box trick as Radio — see comment there.
-        <span className="select-none text-sm leading-[1rem]">
-          {label && <span className="block text-text-primary">{label}</span>}
-          {description && (
-            <span className="block leading-snug text-text-secondary">{description}</span>
-          )}
-        </span>
+        // Same explicit-box alignment fix as Radio — see comment there.
+        description ? (
+          <span className="flex flex-col gap-0.5 select-none">
+            {label && (
+              <span className="flex h-4 items-center text-sm text-text-primary">{label}</span>
+            )}
+            <span className="text-sm leading-snug text-text-secondary">{description}</span>
+          </span>
+        ) : (
+          <span className="flex h-4 items-center select-none text-sm text-text-primary">
+            {label}
+          </span>
+        )
       )}
     </label>
   );

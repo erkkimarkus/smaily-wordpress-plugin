@@ -48,19 +48,33 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
       </span>
 
       {(label || description) && (
-        // leading-[1rem] makes the label line-box exactly 16px tall —
-        // identical to the dot wrapper — so items-center on the parent
-        // produces a pixel-perfect alignment. Inter's natural ascent
-        // pushed leading-snug (1.375) above the dot by ~1.5px on Erkki's
-        // staging, which sub-PR 2.H.1's items-center alone didn't fix.
-        // Description (when present) flows underneath via the block span;
-        // its leading is independent so multi-line copy still reads OK.
-        <span className="select-none text-sm leading-[1rem]">
-          {label && <span className="block text-text-primary">{label}</span>}
-          {description && (
-            <span className="block leading-snug text-text-secondary">{description}</span>
-          )}
-        </span>
+        // sub-PR 2.H.4 alignment fix.
+        //
+        // The previous attempts (items-center alone in 2.H.1, then
+        // items-center + leading-[1rem] in 2.H.3) still drifted because
+        // they relied on the text line-box height matching the dot
+        // wrapper. Tailwind's arbitrary leading value worked locally
+        // but Inter's vertical metrics inside the line-box left the
+        // glyphs ~1px above the box centre on Erkki's staging.
+        //
+        // Concrete fix: give the label row an EXPLICIT 16px height
+        // (h-4 = same as the dot wrapper) and centre the text inside
+        // it via flex items-center. Pixel-perfect alignment now comes
+        // from two identical 16px boxes, not from line-box trickery.
+        // The description (when present) flows underneath at its own
+        // natural leading.
+        description ? (
+          <span className="flex flex-col gap-0.5 select-none">
+            {label && (
+              <span className="flex h-4 items-center text-sm text-text-primary">{label}</span>
+            )}
+            <span className="text-sm leading-snug text-text-secondary">{description}</span>
+          </span>
+        ) : (
+          <span className="flex h-4 items-center select-none text-sm text-text-primary">
+            {label}
+          </span>
+        )
       )}
     </label>
   );
