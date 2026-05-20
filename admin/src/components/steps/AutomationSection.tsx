@@ -183,7 +183,11 @@ function AutomationRow({
 
   const options =
     status === 'success'
-      ? workflows.map((w) => ({ value: w.id, label: w.name, hint: w.type || undefined }))
+      ? workflows.map((w) => ({
+          value: w.id,
+          label: w.name,
+          hint: w.status === 'INACTIVE' ? 'inactive' : undefined,
+        }))
       : [];
 
   const value = mapping?.workflowId ?? '';

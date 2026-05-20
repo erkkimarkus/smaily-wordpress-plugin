@@ -109,6 +109,28 @@ final class ClientTest extends TestCase {
 		self::assertStringStartsWith( 'smaily-connect/', $captured_args['user-agent'] );
 	}
 
+	public function test_list_autoresponders_hits_the_documented_smaily_endpoint(): void {
+		// Sub-PR 2.H.14 — pin the URL so a future refactor can't quietly
+		// flip back to the bogus /api/workflows.php that returned empty
+		// rows and made the dropdown surface `#{id}` placeholders.
+		$captured_url = null;
+		Functions\when( 'wp_remote_get' )->alias(
+			static function ( $url, $args ) use ( &$captured_url ) {
+				$captured_url = $url;
+				return array();
+			}
+		);
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '[]' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		( new Client( 'demo', 'alice', 's3cret' ) )->list_autoresponders();
+
+		self::assertIsString( $captured_url );
+		self::assertStringContainsString( '/api/autoresponder.php', $captured_url );
+		self::assertStringContainsString( 'status=ACTIVE', $captured_url );
+	}
+
 	private function successful_response( string $body ): array {
 		return array(
 			'response' => array( 'code' => 200 ),

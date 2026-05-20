@@ -18,7 +18,7 @@ describe('useWorkflows', () => {
   it('fetches the list on mount and ends in status="success"', async () => {
     vi.spyOn(api, 'listWorkflows').mockResolvedValue({
       workflows: [
-        { id: '42', name: 'Welcome', type: 'form_submitted' },
+        { id: '42', name: 'Welcome', status: 'ACTIVE' },
       ],
     });
 
@@ -35,7 +35,7 @@ describe('useWorkflows', () => {
 
   it('reuses the cache when the same account_key is mounted twice', async () => {
     const spy = vi.spyOn(api, 'listWorkflows').mockResolvedValue({
-      workflows: [{ id: '7', name: 'Cached', type: '' }],
+      workflows: [{ id: '7', name: 'Cached', status: 'ACTIVE' }],
     });
 
     const first = renderHook(() => useWorkflows('et'));
@@ -54,11 +54,11 @@ describe('useWorkflows', () => {
   it('refetches when refresh() is called even if the cache is populated', async () => {
     const spy = vi
       .spyOn(api, 'listWorkflows')
-      .mockResolvedValueOnce({ workflows: [{ id: '1', name: 'A', type: '' }] })
+      .mockResolvedValueOnce({ workflows: [{ id: '1', name: 'A', status: 'ACTIVE' }] })
       .mockResolvedValueOnce({
         workflows: [
-          { id: '1', name: 'A', type: '' },
-          { id: '2', name: 'B (added)', type: '' },
+          { id: '1', name: 'A', status: 'ACTIVE' },
+          { id: '2', name: 'B (added)', status: 'ACTIVE' },
         ],
       });
 

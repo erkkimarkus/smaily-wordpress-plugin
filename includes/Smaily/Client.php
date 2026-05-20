@@ -60,12 +60,28 @@ class Client {
 	}
 
 	/**
-	 * GET /api/workflows.php?trigger_type=form_submitted
+	 * GET /api/autoresponder.php — list automation workflows.
+	 *
+	 * Spec: https://smaily.com/help/api/automations-2/list-automation-workflows/
+	 * Returns a JSON array of rows shaped roughly:
+	 *   [ { "id": 1, "name": "Welcome series",
+	 *       "status": "ACTIVE"|"INACTIVE",
+	 *       "sections": [...], "tags": [...],
+	 *       "created_at": ..., "activated_at": ... }, … ]
+	 *
+	 * We pass `status=ACTIVE` so the dropdown only carries automations
+	 * the merchant can actually use; legacy mappings that point at an
+	 * INACTIVE workflow are surfaced as warnings by the React layer.
+	 *
+	 * Sub-PR 2.H.14 — previously this method called `workflows.php`
+	 * with `trigger_type=form_submitted`, which isn't a real Smaily
+	 * route. Smaily returned an empty body, the normaliser fell back
+	 * to `#{id}` placeholder names, and Erkki's "#3 / #4" surfaced.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
 	public function list_autoresponders(): array {
-		$body = $this->request( 'GET', 'workflows', array( 'trigger_type' => 'form_submitted' ) );
+		$body = $this->request( 'GET', 'autoresponder', array( 'status' => 'ACTIVE' ) );
 
 		return is_array( $body ) ? $body : array();
 	}

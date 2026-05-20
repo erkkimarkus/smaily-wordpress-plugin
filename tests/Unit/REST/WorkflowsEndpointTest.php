@@ -62,8 +62,8 @@ final class WorkflowsEndpointTest extends TestCase {
 
 		$client = $this->createMock( Client::class );
 		$client->method( 'list_autoresponders' )->willReturn( array(
-			array( 'id' => 42, 'name' => 'Welcome series', 'trigger_type' => 'form_submitted' ),
-			array( 'id' => 99, 'name' => 'Cart reminder', 'trigger_type' => 'cart' ),
+			array( 'id' => 42, 'name' => 'Welcome series', 'status' => 'ACTIVE' ),
+			array( 'id' => 99, 'name' => 'Cart reminder', 'status' => 'INACTIVE' ),
 			array( 'id' => 0,  'name' => 'Should be dropped' ),     // missing id
 			'not an array',                                          // junk row
 		) );
@@ -79,17 +79,28 @@ final class WorkflowsEndpointTest extends TestCase {
 		self::assertCount( 2, $data['workflows'], 'Junk + zero-id rows must be filtered out.' );
 		self::assertSame( '42', $data['workflows'][0]['id'] );
 		self::assertSame( 'Welcome series', $data['workflows'][0]['name'] );
-		self::assertSame( 'form_submitted', $data['workflows'][0]['type'] );
+		self::assertSame( 'ACTIVE', $data['workflows'][0]['status'] );
+		self::assertSame( 'INACTIVE', $data['workflows'][1]['status'] );
 	}
 
-	public function test_falls_back_to_synthetic_name_when_smaily_omits_one(): void {
+	public function test_drops_workflows_without_a_name(): void {
+		// Sub-PR 2.H.14 — Smaily's /api/autoresponder.php always returns
+		// `name`; a row missing it indicates either a broken upstream
+		// response or a different endpoint. Either way the dropdown
+		// can't surface a meaningful label, so we drop the row instead
+		// of falling back to `#{id}` (which previously misled Erkki
+		// into thinking #3 / #4 were the real workflow names).
 		$set         = new CredentialSet( 'demo', 'alice', 's3cret' );
 		$credentials = $this->createMock( Credentials::class );
 		$credentials->method( 'get' )->willReturn( $set );
 
 		$client = $this->createMock( Client::class );
 		$client->method( 'list_autoresponders' )->willReturn(
-			array( array( 'id' => 7 ) ),
+			array(
+				array( 'id' => 7 ),                       // no name → dropped
+				array( 'id' => 8, 'name' => '   ' ),       // whitespace-only → dropped
+				array( 'id' => 9, 'name' => 'Real name' ), // kept
+			),
 		);
 
 		$endpoint = new WorkflowsEndpoint( $credentials, static fn (): Client => $client );
@@ -99,7 +110,8 @@ final class WorkflowsEndpointTest extends TestCase {
 
 		$data = $endpoint->handle( $request )->get_data();
 
-		self::assertSame( '#7', $data['workflows'][0]['name'] );
+		self::assertCount( 1, $data['workflows'] );
+		self::assertSame( 'Real name', $data['workflows'][0]['name'] );
 	}
 
 	public function test_returns_error_message_when_smaily_throws(): void {

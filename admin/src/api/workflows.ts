@@ -3,8 +3,8 @@ import { apiRequest } from './client';
 export interface Workflow {
   id: string;
   name: string;
-  /** Smaily trigger_type (e.g. "form_submitted") — empty when the API doesn't surface one. */
-  type: string;
+  /** "ACTIVE" / "INACTIVE" from Smaily; empty when the API didn't surface one. */
+  status: string;
 }
 
 export interface WorkflowsResponse {

@@ -20,8 +20,8 @@ describe('listWorkflows', () => {
       new Response(
         JSON.stringify({
           workflows: [
-            { id: '42', name: 'Welcome', type: 'form_submitted' },
-            { id: '99', name: 'Cart', type: 'cart' },
+            { id: '42', name: 'Welcome', status: 'ACTIVE' },
+            { id: '99', name: 'Cart', status: 'ACTIVE' },
           ],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },

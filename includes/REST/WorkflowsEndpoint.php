@@ -26,7 +26,7 @@ use WP_REST_Response;
  *   200 OK
  *   {
  *     "workflows": [
- *       { "id": "42", "name": "Welcome series", "type": "form_submitted" },
+ *       { "id": "42", "name": "Welcome series", "status": "ACTIVE" },
  *       ...
  *     ]
  *   }
@@ -134,14 +134,17 @@ class WorkflowsEndpoint {
 	/**
 	 * Map the Smaily-API workflow shape into a stable React-side contract.
 	 *
-	 * Smaily's response format has drifted across versions; defensive
-	 * coding here means UI changes are insulated from upstream surface
-	 * shifts. Rows missing `id` are dropped — they can't be referenced
-	 * in the mapping table either way.
+	 * Smaily's /api/autoresponder.php returns rows with `id`, `name`,
+	 * `status`, plus a bunch of metadata (sections, tags, timestamps)
+	 * the wizard doesn't need. We keep only what the dropdown renders.
+	 *
+	 * Rows missing `id` or `name` are dropped — a workflow without a
+	 * name can't be picked from a dropdown anyway, and the previous
+	 * `#{id}` placeholder was actively misleading Erkki's staging.
 	 *
 	 * @param array<int, array<string, mixed>> $rows
 	 *
-	 * @return array<int, array{id: string, name: string, type: string}>
+	 * @return array<int, array{id: string, name: string, status: string}>
 	 */
 	private function normalise( array $rows ): array {
 		$normalised = array();
@@ -151,15 +154,16 @@ class WorkflowsEndpoint {
 				continue;
 			}
 
-			$id = isset( $row['id'] ) ? (string) $row['id'] : '';
-			if ( $id === '' || $id === '0' ) {
+			$id   = isset( $row['id'] ) ? (string) $row['id'] : '';
+			$name = isset( $row['name'] ) ? trim( (string) $row['name'] ) : '';
+			if ( $id === '' || $id === '0' || $name === '' ) {
 				continue;
 			}
 
 			$normalised[] = array(
-				'id'   => $id,
-				'name' => isset( $row['name'] ) ? (string) $row['name'] : sprintf( '#%s', $id ),
-				'type' => isset( $row['trigger_type'] ) ? (string) $row['trigger_type'] : '',
+				'id'     => $id,
+				'name'   => $name,
+				'status' => isset( $row['status'] ) ? (string) $row['status'] : '',
 			);
 		}
 
