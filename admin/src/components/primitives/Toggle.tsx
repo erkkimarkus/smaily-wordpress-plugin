@@ -25,7 +25,13 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(function Toggle(
   return (
     <label
       className={cn(
-        'group inline-flex items-center gap-3',
+        // Sub-PR 2.H.12 — `flex` (block-level) instead of `inline-flex`
+        // so vertical containers (space-y-* / flex-col) actually stack
+        // these block-by-block. Erkki's "two toggles on the same row"
+        // bug came from <label inline-flex> children sitting in a
+        // <div space-y-4>: inline-tasandi flow rule packed them
+        // side-by-side until one ran off the right edge.
+        'group flex items-center gap-3',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         className,
       )}

@@ -31,26 +31,39 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
         // sweep, Erkki's screenshot caught it in the next walkthrough.
         // Multi-line labels (description) still flow underneath because
         // the label is rendered with `block` spans.
-        'group inline-flex items-center gap-3',
+        // Sub-PR 2.H.12 — block-level `flex` (see Toggle.tsx comment).
+        'group flex items-center gap-3',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         className,
       )}
     >
       <span className="relative inline-flex h-4 w-4 shrink-0">
+        {/*
+         * Sub-PR 2.H.12 — native input is FULLY hidden, the visible glyph
+         * is a separate <span aria-hidden>.
+         *
+         * The 2.H.10 attempt fought wp-admin/css/forms.css by promoting
+         * every Tailwind utility to !important. That made the BACKGROUND
+         * correct (brand-pink on checked) but the native checkbox itself
+         * was still being rendered by Chrome's UA stylesheet behind our
+         * border. Erkki's screenshot caught the WP-grey square bleeding
+         * through under the brand-pink fill — an opacity-0 + absolute
+         * native input is the canonical hidden-checkbox pattern and
+         * sidesteps every browser-specific quirk we kept hitting.
+         */}
         <input
           ref={ref}
           type="checkbox"
           disabled={disabled}
-          // Sub-PR 2.H.10 — full WP-core CSS override. See Radio.tsx
-          // for the wp-admin/css/forms.css specificity story. The full
-          // list (width/height/min-width/border/background/shadow/
-          // margin/padding) is promoted with `!` so the native input
-          // fills its wrapper and shows our brand colours instead of
-          // WP's grey-square defaults.
-          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded-sm !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand checked:!bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          className="peer !absolute !inset-0 !m-0 !h-full !w-full !min-w-0 !p-0 !opacity-0 cursor-inherit"
           {...rest}
         />
-        {/* Checkmark icon — visible only when the input is :checked. */}
+        {/* Visible box — its appearance is driven by peer-checked. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-sm border border-border-strong bg-surface transition-colors duration-120 peer-checked:border-brand peer-checked:bg-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-1"
+        />
+        {/* Checkmark — visible only when peer is :checked. */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full text-text-white opacity-0 peer-checked:opacity-100"
           viewBox="0 0 16 16"
