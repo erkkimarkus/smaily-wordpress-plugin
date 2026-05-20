@@ -160,6 +160,13 @@ export function Step2Subscribers({
               {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
               {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
             </p>
+            {isRunning && (
+              <p className="mt-2 text-xs text-text-tertiary">
+                Backfill runs in the background on your server. You can safely
+                leave this page or close the browser — the job will continue.
+                Return here any time to check progress.
+              </p>
+            )}
           </div>
         )}
 
