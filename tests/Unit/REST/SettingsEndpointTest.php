@@ -36,6 +36,16 @@ final class SettingsEndpointTest extends TestCase {
 				return true;
 			}
 		);
+		// Sub-PR 2.H.16 — post-save readback log needs get_option.
+		$writes =& $this->option_writes;
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = false ) use ( &$writes ) {
+				return $writes[ $key ] ?? $default;
+			}
+		);
+		Functions\when( 'wp_json_encode' )->alias(
+			static fn ( $value ): string => json_encode( $value )
+		);
 	}
 
 	protected function tearDown(): void {
@@ -81,6 +91,51 @@ final class SettingsEndpointTest extends TestCase {
 		self::assertArrayHasKey( 'smaily_connect_api_credentials', $this->option_writes );
 		self::assertSame( 'mypetshop', $this->option_writes['smaily_connect_api_credentials']['subdomain'] );
 		self::assertSame( 'B', $this->option_writes['smly_plus_multilingual_mode'] );
+	}
+
+	public function test_connection_tab_persists_credentials_plus_verified_flag_mode_b(): void {
+		// Regression test for sub-PR 2.H.15. Erkki's staging reported a
+		// blank smailyCredentials round-trip on Mode B + multilingual
+		// (Polylang, two languages). The legacy 2.H.10 path didn't carry
+		// the verified-flag write. Pin both writes here so any future
+		// reorder / early-return between credential persistence and the
+		// verified flag fails the suite.
+		$endpoint = new SettingsEndpoint();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'connection' );
+		$request->set_param(
+			'data',
+			array(
+				'smailyCredentials' => array(
+					'subdomain' => 'smailydemo',
+					'username'  => 'iedky7',
+					'password'  => 'plaintext',
+				),
+				'multilingualMode'         => 'B',
+				'perLanguageAccounts'      => array(),
+				'defaultFallbackAccountKey' => 'default',
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertTrue( $response->get_data()['saved'] );
+
+		// Credentials persisted with full triple.
+		self::assertArrayHasKey( 'smaily_connect_api_credentials', $this->option_writes );
+		$creds = $this->option_writes['smaily_connect_api_credentials'];
+		self::assertSame( 'smailydemo', $creds['subdomain'] );
+		self::assertSame( 'iedky7', $creds['username'] );
+		self::assertNotSame( '', $creds['password'], 'Password must be encrypted, not blank.' );
+
+		// Verified flag flipped on alongside the credential write.
+		self::assertTrue( $this->option_writes['smly_plus_default_connection_verified'] );
+
+		// Mode B carried through.
+		self::assertSame( 'B', $this->option_writes['smly_plus_multilingual_mode'] );
+		self::assertSame( 'default', $this->option_writes['smly_plus_default_fallback_account'] );
 	}
 
 	public function test_connection_tab_rejects_missing_subdomain(): void {
