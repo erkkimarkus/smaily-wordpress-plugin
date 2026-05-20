@@ -114,6 +114,15 @@ final class Bootstrap {
 		// REST endpoints + the AS callback that drives the backfill loop.
 		add_action( 'rest_api_init', array( $this, 'register_rest_endpoints' ) );
 		add_action( BackfillEndpoint::TICK_HOOK, array( $this, 'on_backfill_tick' ), 10, 1 );
+
+		// Admin UI (wizard + settings React mount). The two helpers in
+		// admin/wizard.php are intentionally loaded only on admin requests
+		// — there's no point pulling them in on REST or front-end loads.
+		if ( is_admin() ) {
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/wizard.php';
+			add_action( 'admin_menu', 'smaily_connect_register_admin_pages' );
+			add_action( 'admin_enqueue_scripts', 'smaily_connect_enqueue_admin_bundle' );
+		}
 	}
 
 	/**

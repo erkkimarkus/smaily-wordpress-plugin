@@ -9,3 +9,4 @@
 export { MultilingualModePicker, type MultilingualModePickerProps } from './MultilingualModePicker';
 export { StepRail, type StepRailItem, type StepRailProps } from './StepRail';
 export { WizardFooter, type WizardFooterProps } from './WizardFooter';
+export { Wizard, type WizardProps } from './Wizard';

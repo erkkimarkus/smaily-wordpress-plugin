@@ -3,6 +3,8 @@ parameters:
     paths:
         - smaily-connect.php
         - includes/
+        - admin/wizard.php
+        - admin/settings.php
 
     excludePaths:
         analyse:
@@ -21,5 +23,9 @@ parameters:
         # load them explicitly so WC_Order / wc_get_order / etc. resolve
         # under static analysis.
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        # Plugin lifecycle constants (SMAILY_CONNECT_PLUGIN_PATH etc) —
+        # set at runtime by smaily-connect.php but invisible to the
+        # static analyser's per-file walk.
+        - tests/phpstan-bootstrap.php
 
     treatPhpDocTypesAsCertain: true

@@ -30,6 +30,13 @@ import {
 
 export interface SettingsProps {
   initialEnv?: ServerEnv;
+  /**
+   * Pre-hydrated state from admin/src/state/hydrate.ts. When provided,
+   * supersedes `initialEnv` — App.tsx hydrates once from the PHP boot
+   * payload and hands the same WizardState to both Wizard and Settings.
+   * Tests + Storybook still construct Settings with just `initialEnv`.
+   */
+  initialState?: WizardState;
 }
 
 const TABS: Array<{ value: SettingsTabKey | 'integrations'; label: string }> = [
@@ -70,11 +77,11 @@ type AnyTab = SettingsTabKey | 'integrations';
  *      Phase 4 polish can snapshot pristine state for an in-place revert,
  *      but for the pilot a hard reload is acceptable and bulletproof.
  */
-export function Settings({ initialEnv = {} }: SettingsProps): React.JSX.Element {
+export function Settings({ initialEnv = {}, initialState }: SettingsProps): React.JSX.Element {
   const [rawState, rawDispatch] = useReducer(
     wizardReducer,
-    initialEnv,
-    buildSettingsInitialState,
+    null,
+    () => initialState ?? buildSettingsInitialState(initialEnv),
   );
 
   // Mode-A destructive-change guard + dirty-tab tagging wrap.
