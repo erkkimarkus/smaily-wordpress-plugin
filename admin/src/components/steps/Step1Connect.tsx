@@ -80,6 +80,17 @@ export function Step1Connect({
         </div>
       )}
 
+      {/* Layout per Erkki's 2.H.3 spec: multilingual-mode picker is
+          always the first interactive section so the page header
+          doesn't move when modes flip. The credential surface below
+          adapts to the selected mode (shared default vs per-language)
+          but its position on the page stays stable. */}
+      <MultilingualModePicker
+        value={state.multilingualMode}
+        onChange={(mode) => dispatch({ type: 'SET_MULTILINGUAL_MODE', payload: mode })}
+        detectedLanguages={state.env.detectedLanguages}
+      />
+
       {/* Mode A has no shared "default" credential set — the per-language
           blocks below ARE the credential sets. Mode B/C/single all share
           one default Smaily account, so this block stays for them. */}
@@ -95,12 +106,6 @@ export function Step1Connect({
           idSuffix="default"
         />
       )}
-
-      <MultilingualModePicker
-        value={state.multilingualMode}
-        onChange={(mode) => dispatch({ type: 'SET_MULTILINGUAL_MODE', payload: mode })}
-        detectedLanguages={state.env.detectedLanguages}
-      />
 
       {isModeA && (
         <>

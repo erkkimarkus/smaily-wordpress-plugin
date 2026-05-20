@@ -25,12 +25,18 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
   return (
     <label
       className={cn(
-        'group inline-flex items-start gap-3',
+        // items-center keeps the box vertically centred against single-line
+        // labels (the dominant case — Step 2 field grid, Step 4 toggles).
+        // Same fix as Radio.tsx in sub-PR 2.H.1; checkbox missed the
+        // sweep, Erkki's screenshot caught it in the next walkthrough.
+        // Multi-line labels (description) still flow underneath because
+        // the label is rendered with `block` spans.
+        'group inline-flex items-center gap-3',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         className,
       )}
     >
-      <span className="relative mt-0.5 inline-flex h-4 w-4 shrink-0">
+      <span className="relative inline-flex h-4 w-4 shrink-0">
         <input
           ref={ref}
           type="checkbox"
@@ -50,9 +56,12 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
       </span>
 
       {(label || description) && (
-        <span className="select-none text-sm leading-snug">
+        // Same line-height-as-box trick as Radio — see comment there.
+        <span className="select-none text-sm leading-[1rem]">
           {label && <span className="block text-text-primary">{label}</span>}
-          {description && <span className="block text-text-secondary">{description}</span>}
+          {description && (
+            <span className="block leading-snug text-text-secondary">{description}</span>
+          )}
         </span>
       )}
     </label>

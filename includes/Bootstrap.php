@@ -122,31 +122,60 @@ final class Bootstrap {
 			require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/wizard.php';
 			add_action( 'admin_menu', 'smaily_connect_register_admin_pages' );
 			add_action( 'admin_enqueue_scripts', 'smaily_connect_enqueue_admin_bundle' );
+
+			// Hide the legacy "Smaily" top-level menu now that the new
+			// "Smaily Connect" menu carries Setup wizard + Settings.
+			// Erkki's 2.H.3 decision: two menus on staging are confusing,
+			// pull the trigger before Phase 3 ships rec-engine UI on top.
+			//
+			// Priority 99 runs AFTER the legacy admin's admin_menu
+			// callback (default priority 10), so remove_menu_page sees a
+			// registered slug and actually removes it. Data layer is
+			// untouched — Settings\Credentials still reads the legacy
+			// wp_options keys for Mode B/C default credentials.
+			add_action( 'admin_menu', 'smaily_connect_hide_legacy_menu', 99 );
 		}
 	}
 
 	/**
 	 * Register the namespaced /wp-json/smaily-connect/v1/* routes.
+	 *
+	 * Array-loop registration per Erkki's 2.H.3 spec: every endpoint
+	 * sits in one place so a new route can't accidentally skip the
+	 * registration line (sub-PR 2.H caught BackfillEndpoint dropping
+	 * out of this list earlier because its constructor threw on
+	 * unconfigured credentials — fixed now by making the BackfillJob
+	 * dependency lazy via a factory). Phase 3 adds rec-engine routes
+	 * by appending to this array, never by adding a parallel
+	 * ->register() call.
 	 */
 	public function register_rest_endpoints(): void {
-		( new TestConnectionEndpoint() )->register();
+		$bootstrap = $this;
 
-		try {
-			( new BackfillEndpoint( new BackfillJob( $this->smaily_client() ) ) )->register();
-		} catch ( \RuntimeException $e ) {
-			// Credentials not configured yet — skip Backfill registration
-			// quietly. Step 2 won't surface the panel until Settings is saved.
-			error_log( '[smaily-connect] BackfillEndpoint registration skipped: ' . $e->getMessage() );
+		$endpoints = array(
+			new TestConnectionEndpoint(),
+			new BackfillEndpoint(
+				static function () use ( $bootstrap ): ?BackfillJob {
+					try {
+						return new BackfillJob( $bootstrap->smaily_client() );
+					} catch ( \RuntimeException $e ) {
+						// Credentials missing — endpoint returns 503 at runtime.
+						return null;
+					}
+				}
+			),
+			new WorkflowsEndpoint(
+				$this->credentials(),
+				static function ( string $subdomain, string $username, string $password ): Client {
+					return new Client( $subdomain, $username, $password );
+				}
+			),
+			new SettingsEndpoint(),
+		);
+
+		foreach ( $endpoints as $endpoint ) {
+			$endpoint->register();
 		}
-
-		( new WorkflowsEndpoint(
-			$this->credentials(),
-			static function ( string $subdomain, string $username, string $password ): Client {
-				return new Client( $subdomain, $username, $password );
-			}
-		) )->register();
-
-		( new SettingsEndpoint() )->register();
 	}
 
 	/**

@@ -40,7 +40,7 @@ use WP_REST_Response;
  *     The endpoint surface here is stable; only the JOB_TYPE_HANDLERS map
  *     grows. Cancelling an "orders" job in Phase 3 will hit the same route.
  */
-final class BackfillEndpoint {
+class BackfillEndpoint {
 
 	public const ROUTE_PREFIX = '/backfill';
 	public const TABLE_SUFFIX = 'smly_plus_backfill_job';
@@ -61,10 +61,24 @@ final class BackfillEndpoint {
 	 */
 	private const SUPPORTED_JOB_TYPES = array( 'contacts' );
 
-	private BackfillJob $job;
+	/**
+	 * Factory that constructs a BackfillJob on demand. Lazy because the
+	 * Smaily Client dependency requires credentials, which the merchant
+	 * may not have configured yet — we still need the route registered
+	 * so the UI doesn't 404 before they finish Step 1 of the wizard.
+	 * Returning null from the factory yields a 503 response so the
+	 * caller surfaces "Smaily not connected" instead of an exception.
+	 *
+	 * @var callable(): ?BackfillJob
+	 */
+	private $job_factory;
 
-	public function __construct( BackfillJob $job ) {
-		$this->job = $job;
+	/**
+	 * @param callable(): ?BackfillJob $job_factory Factory producing a
+	 *   BackfillJob at request time, or null when credentials are absent.
+	 */
+	public function __construct( callable $job_factory ) {
+		$this->job_factory = $job_factory;
 	}
 
 	public function register(): void {
@@ -123,7 +137,21 @@ final class BackfillEndpoint {
 			return $this->unsupported_job_type_response();
 		}
 
-		$job_id = $this->job->start();
+		$job = ( $this->job_factory )();
+		if ( ! $job instanceof BackfillJob ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'smaily_not_configured',
+					'message' => __(
+						'Smaily credentials are not configured. Finish Step 1 of the setup wizard first.',
+						'smaily-connect'
+					),
+				),
+				503
+			);
+		}
+
+		$job_id = $job->start();
 
 		// Schedule the first AS tick so backfill processing begins
 		// immediately. The tick handler reschedules itself until the job

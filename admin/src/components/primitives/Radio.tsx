@@ -48,9 +48,18 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
       </span>
 
       {(label || description) && (
-        <span className="select-none text-sm leading-snug">
+        // leading-[1rem] makes the label line-box exactly 16px tall —
+        // identical to the dot wrapper — so items-center on the parent
+        // produces a pixel-perfect alignment. Inter's natural ascent
+        // pushed leading-snug (1.375) above the dot by ~1.5px on Erkki's
+        // staging, which sub-PR 2.H.1's items-center alone didn't fix.
+        // Description (when present) flows underneath via the block span;
+        // its leading is independent so multi-line copy still reads OK.
+        <span className="select-none text-sm leading-[1rem]">
           {label && <span className="block text-text-primary">{label}</span>}
-          {description && <span className="block text-text-secondary">{description}</span>}
+          {description && (
+            <span className="block leading-snug text-text-secondary">{description}</span>
+          )}
         </span>
       )}
     </label>

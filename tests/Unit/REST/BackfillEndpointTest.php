@@ -41,7 +41,7 @@ final class BackfillEndpointTest extends TestCase {
 		$request = new WP_REST_Request();
 		$request->set_param( 'job_type', 'magic-job' );
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$response = $endpoint->start( $request );
 
 		self::assertSame( 400, $response->get_status() );
@@ -72,7 +72,7 @@ final class BackfillEndpointTest extends TestCase {
 			}
 		);
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 77 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 77 ) );
 		$response = $endpoint->start( $request );
 
 		self::assertSame( 200, $response->get_status() );
@@ -90,7 +90,7 @@ final class BackfillEndpointTest extends TestCase {
 
 		$GLOBALS['wpdb'] = $this->fake_wpdb_with_state( null );
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$response = $endpoint->status( $request );
 
 		self::assertSame( 'idle', $response->get_data()['status'] );
@@ -113,7 +113,7 @@ final class BackfillEndpointTest extends TestCase {
 			)
 		);
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$data     = $endpoint->status( $request )->get_data();
 
 		self::assertSame( 25, $data['percent'] );
@@ -137,7 +137,7 @@ final class BackfillEndpointTest extends TestCase {
 			}
 		);
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$response = $endpoint->cancel( $request );
 
 		self::assertTrue( $response->get_data()['cancelled'] );
@@ -153,16 +153,31 @@ final class BackfillEndpointTest extends TestCase {
 
 		$GLOBALS['wpdb'] = $this->fake_wpdb_for_cancel( false );
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$response = $endpoint->cancel( $request );
 
 		self::assertFalse( $response->get_data()['cancelled'] );
 	}
 
+	public function test_start_returns_503_when_credentials_factory_returns_null(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'job_type', 'contacts' );
+
+		// Factory returns null — mirrors Bootstrap's behaviour when
+		// Smaily credentials aren't yet configured. The endpoint must
+		// still surface a structured 503, never a 200 / exception.
+		$endpoint = new BackfillEndpoint( static fn (): ?BackfillJob => null );
+		$response = $endpoint->start( $request );
+
+		self::assertSame( 503, $response->get_status() );
+		$data = $response->get_data();
+		self::assertSame( 'smaily_not_configured', $data['error'] );
+	}
+
 	public function test_permission_check_denies_users_without_manage_options(): void {
 		Functions\when( 'current_user_can' )->justReturn( false );
 
-		$endpoint = new BackfillEndpoint( $this->fake_job( 0 ) );
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 0 ) );
 		$result   = $endpoint->permission_check( new WP_REST_Request() );
 
 		self::assertInstanceOf( \WP_Error::class, $result );
