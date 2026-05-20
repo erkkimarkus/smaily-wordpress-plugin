@@ -25,18 +25,35 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(function Toggle(
   return (
     <label
       className={cn(
-        'group inline-flex items-start gap-3',
+        'group inline-flex items-center gap-3',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         className,
       )}
     >
-      <span className="relative mt-0.5 inline-flex h-5 w-9 shrink-0">
+      <span className="relative inline-flex h-5 w-9 shrink-0">
         <input
           ref={ref}
           type="checkbox"
           role="switch"
           disabled={disabled}
-          className="peer absolute h-full w-full cursor-inherit appearance-none rounded-full bg-border-strong transition-colors duration-120 checked:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          // Sub-PR 2.H.10 — full WP-core CSS override.
+          //
+          // Erkki's DevTools Computed pane (screenshot 2026-05-20) showed
+          // wp-admin/css/forms.css ships:
+          //   input[type=checkbox], input[type=radio] {
+          //     width: 1rem; height: 1rem; min-width: 1rem;
+          //     border: 1px solid #8c8f94; border-radius: 4px;
+          //     background: #fff;
+          //     box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+          //     margin: -.25rem .25rem 0 0;
+          //     padding: 0 !important;
+          //   }
+          // Specificity 0,0,1,1 — beats utility classes (0,0,1,0). The
+          // native input rendered as a 16x16 white-with-grey-border
+          // square INSIDE the 20x36 toggle pill, with a -4px top margin
+          // pulling it skew. Promoting every overriding class with `!`
+          // makes the native input fill the pill cleanly.
+          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !border-0 !rounded-full !bg-border-strong cursor-inherit appearance-none transition-colors duration-120 checked:!bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Thumb. Translate on :checked to slide right. */}
@@ -47,10 +64,18 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(function Toggle(
       </span>
 
       {(label || description) && (
-        <span className="select-none text-sm leading-snug">
-          {label && <span className="block text-text-primary">{label}</span>}
-          {description && <span className="block text-text-secondary">{description}</span>}
-        </span>
+        description ? (
+          <span className="flex flex-col gap-0.5 select-none">
+            {label && (
+              <span className="flex h-5 items-center text-sm text-text-primary">{label}</span>
+            )}
+            <span className="text-sm leading-snug text-text-secondary">{description}</span>
+          </span>
+        ) : (
+          <span className="flex h-5 items-center select-none text-sm text-text-primary">
+            {label}
+          </span>
+        )
       )}
     </label>
   );

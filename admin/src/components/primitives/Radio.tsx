@@ -37,17 +37,16 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
           ref={ref}
           type="radio"
           disabled={disabled}
-          // Sub-PR 2.H.6 — !m-0 / !p-0 with !important override.
+          // Sub-PR 2.H.10 — full WP-core CSS override.
           //
-          // wp-admin/css/forms.css ships:
-          //   input[type=checkbox], input[type=radio] {
-          //     margin: -0.25rem 0.25rem 0 0;
-          //   }
-          // Specificity 0,0,1,1 — beats Tailwind's `.m-0` (0,0,1,0)
-          // unless we promote with !important. Erkki's DevTools
-          // confirmed the selector by name; 2.H.5's plain m-0 was the
-          // right axis but the wrong weight.
-          className="peer absolute !m-0 h-full w-full cursor-inherit appearance-none rounded-full border border-border-strong bg-surface !p-0 checked:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          // wp-admin/css/forms.css gives <input type="radio"> a 1rem
+          // square + 1px border + grey background + inset shadow + a
+          // -.25rem top margin (specificity 0,0,1,1). 2.H.6 promoted
+          // only margin with `!`; Erkki's DevTools-Elements screenshot
+          // showed the rest of the WP-core block still winning. Every
+          // overriding class now carries `!` so the native input fills
+          // the wrapper as the rounded brand dot we actually want.
+          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded-full !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Inner dot — visible only when :checked. */}

@@ -41,11 +41,13 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
           ref={ref}
           type="checkbox"
           disabled={disabled}
-          // Sub-PR 2.H.6 — !important override. See Radio.tsx for
-          // the wp-admin/css/forms.css specificity story. Same fix,
-          // applied per-element so a future style change for one
-          // shape doesn't quietly pull the other out of alignment.
-          className="peer absolute !m-0 h-full w-full cursor-inherit appearance-none rounded border border-border-strong bg-surface !p-0 checked:border-brand checked:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          // Sub-PR 2.H.10 — full WP-core CSS override. See Radio.tsx
+          // for the wp-admin/css/forms.css specificity story. The full
+          // list (width/height/min-width/border/background/shadow/
+          // margin/padding) is promoted with `!` so the native input
+          // fills its wrapper and shows our brand colours instead of
+          // WP's grey-square defaults.
+          className="peer absolute !m-0 !p-0 !h-full !w-full !min-w-0 !shadow-none !rounded !border !border-border-strong !bg-surface cursor-inherit appearance-none checked:!border-brand checked:!bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Checkmark icon — visible only when the input is :checked. */}
