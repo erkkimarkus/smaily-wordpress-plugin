@@ -5,6 +5,8 @@ dist/
 coverage/
 .env
 smaily-connect.zip
+smaily-connect-*.zip
+*.zip
 languages/*.po~
 
 # Local PHPCS / PHPStan / PHPUnit override files (the .dist versions are
