@@ -53,6 +53,8 @@ export interface BootPayload {
      * populated.
      */
     smailyConnected: boolean;
+    /** True once the merchant clicked Finish on Step 6 (sub-PR 2.H.18). */
+    setupCompleted: boolean;
     multilingualMode: string;
     defaultFallbackAccountKey: string;
     subscriberSyncEnabled: boolean;

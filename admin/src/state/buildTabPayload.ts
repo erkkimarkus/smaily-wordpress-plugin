@@ -41,5 +41,9 @@ export function buildTabPayload(
       return {
         recEngineFeatures: state.recEngineFeatures,
       };
+    case 'finish':
+      // Wizard-only pseudo-tab — no payload, the server just flips
+      // the smly_plus_setup_completed option.
+      return {};
   }
 }

@@ -48,8 +48,8 @@ const STEP_LABELS: Array<{ label: string; description: string }> = [
  */
 export function Wizard({ initialState }: WizardProps): React.JSX.Element {
   const [state, dispatch] = useReducer(wizardReducer, initialState);
-  const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'error'>('idle');
-  const [finishError, setFinishError] = useState<string | null>(null);
+  const [navStatus, setNavStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [navError, setNavError] = useState<string | null>(null);
 
   const railItems: StepRailItem[] = STEP_LABELS.map((entry, idx) => ({
     id: idx + 1,
@@ -61,50 +61,58 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
   const canAdvance = computeCanAdvance(state);
   const advanceHint = computeAdvanceHint(state);
 
-  const handleContinue = (): void => dispatch({ type: 'WIZARD_NEXT_STEP' });
+  const saveAndAdvance = async (tab: SettingsTabKey | null): Promise<boolean> => {
+    if (tab === null) {
+      return true;
+    }
+    setNavStatus('saving');
+    setNavError(null);
+    const payload = buildTabPayload(state, tab);
+    try {
+      const response = await saveSettings({ tab, data: payload });
+      if (!response.saved) {
+        const message =
+          response.errors.map((e) => `${e.field}: ${e.message}`).join('; ') ||
+          'Save failed.';
+        setNavStatus('error');
+        setNavError(`Couldn't save ${tab}: ${message}`);
+        return false;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      setNavStatus('error');
+      setNavError(`Couldn't save ${tab}: ${message}`);
+      return false;
+    }
+    setNavStatus('idle');
+    return true;
+  };
+
+  // Sub-PR 2.H.18 — save-on-Continue.
+  //
+  // Each Continue persists the step's payload before navigating.
+  // Step 5 (Integrations) is info-only — Continue navigates without
+  // a save. Step 6 is the Finish action, not Continue.
+  const handleContinue = async (): Promise<void> => {
+    const tab = stepToTab(state.currentStep);
+    const ok = await saveAndAdvance(tab);
+    if (!ok) {
+      // Stay on the current step so the merchant can correct or retry.
+      return;
+    }
+    dispatch({ type: 'WIZARD_NEXT_STEP' });
+  };
+
   const handleBack = (): void => dispatch({ type: 'WIZARD_PREVIOUS_STEP' });
 
-  // Sub-PR 2.H.17 — Finish actually persists wizard state.
-  //
-  // The earlier Phase 2 stub redirected to Settings without saving,
-  // so Erkki could walk Step 1..6, click Finish, and end up on a
-  // Settings page showing empty credentials — the wizard's state
-  // lived only in React. Now Finish POSTs all four settings-tab
-  // payloads in sequence (connection → subscribers → woocommerce →
-  // recommendations) and only redirects on a clean run; a failure
-  // surfaces an inline banner with the field-level error so the
-  // user can hop back to the relevant step.
+  // Finish is now lightweight — every step has already persisted its
+  // slice on Continue, so this just flips the setup-completed flag
+  // and redirects to Settings.
   const handleFinish = async (): Promise<void> => {
-    setFinishStatus('saving');
-    setFinishError(null);
-
-    const tabs: SettingsTabKey[] = [
-      'connection',
-      'subscribers',
-      'woocommerce',
-      'recommendations',
-    ];
-
-    for (const tab of tabs) {
-      const payload = buildTabPayload(state, tab);
-      try {
-        const response = await saveSettings({ tab, data: payload });
-        if (!response.saved) {
-          const message = response.errors
-            .map((e) => `${e.field}: ${e.message}`)
-            .join('; ') || 'Save failed.';
-          setFinishStatus('error');
-          setFinishError(`Couldn't save ${tab}: ${message}`);
-          return;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Network error';
-        setFinishStatus('error');
-        setFinishError(`Couldn't save ${tab}: ${message}`);
-        return;
-      }
+    const ok = await saveAndAdvance('finish');
+    if (!ok) {
+      return;
     }
-
     if (typeof window !== 'undefined') {
       window.location.href = 'admin.php?page=smaily-connect-settings';
     }
@@ -126,9 +134,9 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
           <div className="rounded-lg bg-surface shadow-card">
             <div className="px-6 py-6">
               {renderStep(state, dispatch)}
-              {finishStatus === 'error' && finishError !== null && (
+              {navStatus === 'error' && navError !== null && (
                 <Banner tone="danger" className="mt-4">
-                  {finishError}
+                  {navError}
                 </Banner>
               )}
             </div>
@@ -137,11 +145,11 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
               currentStep={state.currentStep}
               totalSteps={6}
               onBack={handleBack}
-              onContinue={handleContinue}
+              onContinue={() => void handleContinue()}
               onFinish={() => void handleFinish()}
               canAdvance={canAdvance}
               advanceHint={advanceHint}
-              loading={finishStatus === 'saving'}
+              loading={navStatus === 'saving'}
             />
           </div>
         </div>
@@ -169,6 +177,28 @@ function renderStep(
       return <Step6Done state={state} />;
     default:
       return <Step1Connect state={state} dispatch={dispatch} />;
+  }
+}
+
+/**
+ * Map a 1-based wizard step to the settings tab whose payload it owns.
+ * Step 5 (Integrations) is info-only — no tab. Step 6 is the Finish
+ * action, which uses the 'finish' pseudo-tab on its own.
+ */
+function stepToTab(step: number): SettingsTabKey | null {
+  switch (step) {
+    case 1:
+      return 'connection';
+    case 2:
+      return 'subscribers';
+    case 3:
+      return 'woocommerce';
+    case 4:
+      return 'recommendations';
+    case 5:
+    case 6:
+    default:
+      return null;
   }
 }
 

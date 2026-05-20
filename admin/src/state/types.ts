@@ -32,7 +32,21 @@ export type MultilingualMode = 'single' | 'A' | 'B' | 'C';
  * #subscribers, ...). Integrations is informational so it never
  * appears in dirtyTabs.
  */
-export type SettingsTabKey = 'connection' | 'subscribers' | 'woocommerce' | 'recommendations';
+/**
+ * Settings tab keys.
+ *
+ * The first four are real PillTabs in the Settings UI. `finish` is a
+ * wizard-only pseudo-tab — `POST /settings { tab: 'finish' }` toggles
+ * `smly_plus_setup_completed`; Settings UI never surfaces it. We
+ * fold it into the same endpoint so the boot payload / nonce /
+ * permission-check plumbing is reused.
+ */
+export type SettingsTabKey =
+  | 'connection'
+  | 'subscribers'
+  | 'woocommerce'
+  | 'recommendations'
+  | 'finish';
 
 /**
  * Discriminated union for API-call lifecycle (connection tests, backfill

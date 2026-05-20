@@ -137,8 +137,13 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
     window.location.reload();
   }, []);
 
+  // 'finish' is a wizard-only pseudo-tab and never lands in PillTabs;
+  // narrow it out alongside 'integrations' so dirtyTabs indexing is
+  // safe.
   const tabIsDirty =
-    activeTab !== 'integrations' ? rawState.dirtyTabs[activeTab] : false;
+    activeTab !== 'integrations' && activeTab !== 'finish'
+      ? rawState.dirtyTabs[activeTab]
+      : false;
 
   return (
     <div className="min-h-screen bg-page-bg font-sans text-text-primary">
@@ -156,7 +161,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
               value: t.value,
               label: t.label,
               badge:
-                t.value !== 'integrations' && rawState.dirtyTabs[t.value]
+                t.value !== 'integrations' && t.value !== 'finish' && rawState.dirtyTabs[t.value]
                   ? '•'
                   : undefined,
             }))}

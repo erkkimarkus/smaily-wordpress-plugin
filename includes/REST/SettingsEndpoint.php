@@ -53,7 +53,7 @@ class SettingsEndpoint {
 
 	public const ROUTE = '/settings';
 
-	private const VALID_TABS = array( 'connection', 'subscribers', 'woocommerce', 'recommendations' );
+	private const VALID_TABS = array( 'connection', 'subscribers', 'woocommerce', 'recommendations', 'finish' );
 
 	private const LEGACY_OPTION_API_CREDENTIALS = 'smaily_connect_api_credentials';
 	private const LEGACY_OPTION_SYNC_ENABLED    = 'smaily_connect_subscriber_sync_enabled';
@@ -136,11 +136,27 @@ class SettingsEndpoint {
 				return $this->save_woocommerce( $data );
 			case 'recommendations':
 				return $this->save_recommendations( $data );
+			case 'finish':
+				return $this->save_finish();
 			default:
 				// Defensive — in_array() above forbids reaching here, but the
 				// switch needs a terminal arm for return-type narrowing.
 				return $this->error_response( array(), 400 );
 		}
+	}
+
+	/**
+	 * Wizard-only pseudo-tab — flips the setup-completed flag after the
+	 * merchant clicks Finish on Step 6.
+	 *
+	 * Every earlier step already persisted its own slice via Continue
+	 * (sub-PR 2.H.18 save-on-Continue flow). This call carries no
+	 * payload; the only side-effect is the option write that the React
+	 * boot reads next time the merchant lands on /wizard.
+	 */
+	private function save_finish(): WP_REST_Response {
+		update_option( 'smly_plus_setup_completed', true );
+		return $this->success_response();
 	}
 
 	/**

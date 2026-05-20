@@ -253,6 +253,11 @@ class EnvDetector {
 			// it to render the compact "✓ Connected" view instead of
 			// forcing a password re-entry on every wizard pass.
 			'smailyConnected'               => (bool) get_option( 'smly_plus_default_connection_verified', false ),
+			// Sub-PR 2.H.18 — true once Step 6 Finish ran. The wizard
+			// uses this to know whether the merchant has completed at
+			// least one walk-through; Phase-2 logic doesn't gate on
+			// it, but Phase-3 progressive-disclosure (sub-PR 2.I) will.
+			'setupCompleted'                => (bool) get_option( 'smly_plus_setup_completed', false ),
 			// Empty string when the option was never set — lets hydrate
 			// pick an env-aware default (Mode B for multilingual sites,
 			// 'single' otherwise). Once the merchant explicitly saves a
