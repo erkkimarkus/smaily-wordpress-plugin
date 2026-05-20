@@ -30,6 +30,21 @@ export function Step4Recommendations({
 }: Step4RecommendationsProps): React.JSX.Element {
   const isConnected = state.recEngineConnection.kind === 'success';
 
+  // Sub-PR 2.H.15 — Variant4b's "Back to Step 1" CTA now routes
+  // depending on whether the user is inside the wizard or the
+  // Settings tabs. Wizard dispatches WIZARD_GO_TO_STEP; Settings
+  // changes location.hash to the Connection tab where the
+  // rec-engine setup-token field lives.
+  const handleBackToStep1 = (): void => {
+    if (inSettings) {
+      if (typeof window !== 'undefined') {
+        window.location.hash = 'connection';
+      }
+      return;
+    }
+    dispatch({ type: 'WIZARD_GO_TO_STEP', payload: { step: 1 } });
+  };
+
   return (
     <div className="space-y-6">
       {!inSettings && (
@@ -47,7 +62,11 @@ export function Step4Recommendations({
         </div>
       )}
 
-      {isConnected ? <Variant4a state={state} dispatch={dispatch} /> : <Variant4b />}
+      {isConnected ? (
+        <Variant4a state={state} dispatch={dispatch} />
+      ) : (
+        <Variant4b inSettings={inSettings} onBackToStep1={handleBackToStep1} />
+      )}
     </div>
   );
 }
@@ -124,7 +143,13 @@ function Variant4a({
   );
 }
 
-function Variant4b(): React.JSX.Element {
+function Variant4b({
+  inSettings,
+  onBackToStep1,
+}: {
+  inSettings: boolean;
+  onBackToStep1: () => void;
+}): React.JSX.Element {
   return (
     <Card title="Personalised product recommendations in every email">
       <p className="text-sm text-text-secondary">
@@ -146,8 +171,10 @@ function Variant4b(): React.JSX.Element {
         <Button variant="primary" type="button" onClick={() => window.open('https://smaily.com/recommendations/', '_blank')}>
           Activate recommendations engine →
         </Button>
-        <Button variant="ghost" type="button">
-          Already have an endpoint? Back to Step 1
+        <Button variant="ghost" type="button" onClick={onBackToStep1}>
+          {inSettings
+            ? 'Already have an endpoint? Open Connection tab'
+            : 'Already have an endpoint? Back to Step 1'}
         </Button>
       </div>
     </Card>

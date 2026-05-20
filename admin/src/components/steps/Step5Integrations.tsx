@@ -11,8 +11,16 @@ interface IntegrationCard {
   description: string;
   /** Detection key from state.env — true means the integration is installed. */
   installedKey: 'elementorPresent' | 'cf7Present' | null;
-  /** Relative WP admin path (admin_url() prefixes it server-side). */
-  href: string;
+  /**
+   * Sub-PR 2.H.15 — separate hrefs per installed state. The old single
+   * `href` shipped users to `admin.php?page=wpcf7` even when CF7 was
+   * absent, which WordPress renders as "Sorry, you are not allowed to
+   * access this page" because the slug doesn't resolve. Each card now
+   * has an explicit hrefInstalled (the plugin's own settings page) and
+   * hrefMissing (plugin-install search filtered to the matching plugin).
+   */
+  hrefInstalled: string;
+  hrefMissing: string;
   /** Button label depending on installed state. */
   ctaInstalled: string;
   ctaMissing: string;
@@ -23,7 +31,8 @@ const CARDS: IntegrationCard[] = [
     title: 'Elementor',
     description: 'The Smaily subscription-form widget is available in the Elementor editor.',
     installedKey: 'elementorPresent',
-    href: 'admin.php?page=elementor-app',
+    hrefInstalled: 'admin.php?page=elementor-app',
+    hrefMissing: 'plugin-install.php?s=elementor&tab=search&type=term',
     ctaInstalled: 'Open Elementor',
     ctaMissing: 'Install Elementor',
   },
@@ -31,7 +40,8 @@ const CARDS: IntegrationCard[] = [
     title: 'Contact Form 7',
     description: 'Configure individual CF7 forms in Forms → Smaily tab.',
     installedKey: 'cf7Present',
-    href: 'admin.php?page=wpcf7',
+    hrefInstalled: 'admin.php?page=wpcf7',
+    hrefMissing: 'plugin-install.php?s=contact+form+7&tab=search&type=term',
     ctaInstalled: 'Open CF7',
     ctaMissing: 'Install Contact Form 7',
   },
@@ -39,7 +49,8 @@ const CARDS: IntegrationCard[] = [
     title: 'Smaily Landing Pages',
     description: 'Embed Smaily landing pages anywhere via the Gutenberg block.',
     installedKey: null,
-    href: 'post-new.php?post_type=page',
+    hrefInstalled: 'post-new.php?post_type=page',
+    hrefMissing: 'post-new.php?post_type=page',
     ctaInstalled: 'Add a new page',
     ctaMissing: 'Add a new page',
   },
@@ -92,7 +103,7 @@ export function Step5Integrations({
             >
               <p className="text-sm text-text-secondary">{card.description}</p>
               <a
-                href={card.href}
+                href={installed ? card.hrefInstalled : card.hrefMissing}
                 className="mt-4 inline-flex h-8 items-center justify-center rounded bg-brand-soft-bg px-3 text-sm font-medium text-brand-soft-text hover:bg-brand-soft-bg/80"
               >
                 {installed ? card.ctaInstalled : card.ctaMissing} →

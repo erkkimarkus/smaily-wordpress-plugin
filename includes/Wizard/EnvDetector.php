@@ -247,6 +247,12 @@ class EnvDetector {
 				// Password intentionally omitted; UI shows it blank.
 				'password'  => '',
 			),
+			// Sub-PR 2.H.15 — "already connected" UX. SettingsEndpoint
+			// flips this to true after a Save (which itself implies a
+			// successful Test connection had just run). hydrate.ts uses
+			// it to render the compact "✓ Connected" view instead of
+			// forcing a password re-entry on every wizard pass.
+			'smailyConnected'               => (bool) get_option( 'smly_plus_default_connection_verified', false ),
 			// Empty string when the option was never set — lets hydrate
 			// pick an env-aware default (Mode B for multilingual sites,
 			// 'single' otherwise). Once the merchant explicitly saves a

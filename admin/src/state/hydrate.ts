@@ -46,6 +46,13 @@ export interface BootPayload {
   };
   savedSettings: {
     smailyCredentials: { subdomain: string; username: string; password: string };
+    /**
+     * True when the server marked the default account as previously
+     * verified (sub-PR 2.H.15). hydrate.ts seeds `smailyConnection`
+     * to success when this is true AND subdomain + username are
+     * populated.
+     */
+    smailyConnected: boolean;
     multilingualMode: string;
     defaultFallbackAccountKey: string;
     subscriberSyncEnabled: boolean;
@@ -147,7 +154,12 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       storeTotals: env.storeTotals,
     },
     smailyCredentials: { ...s.smailyCredentials },
-    smailyConnection: idleAsync,
+    smailyConnection:
+      s.smailyConnected &&
+      s.smailyCredentials.subdomain !== '' &&
+      s.smailyCredentials.username !== ''
+        ? { kind: 'success', message: s.smailyCredentials.username }
+        : idleAsync,
     multilingualMode: mode,
     perLanguageAccounts: [],
     defaultFallbackAccountKey: s.defaultFallbackAccountKey || 'default',

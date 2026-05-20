@@ -181,6 +181,18 @@ class SettingsEndpoint {
 			)
 		);
 
+		// Sub-PR 2.H.15 — mark the default account as verified.
+		//
+		// The Settings UI only fires Save after a successful "Test
+		// connection" round-trip; reaching this code path implies the
+		// merchant just demonstrated that these credentials authenticate.
+		// We persist that fact so hydrate.ts can re-render the
+		// "✓ Connected" view on next page load and skip the forced
+		// password re-entry that previously blocked second wizard
+		// passes (Erkki couldn't even complete a re-walkthrough without
+		// minting a fresh Smaily API user).
+		update_option( 'smly_plus_default_connection_verified', true );
+
 		update_option( 'smly_plus_multilingual_mode', $multilingual );
 
 		// Mode A per-language credentials.

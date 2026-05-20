@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useTestConnection } from '../../hooks/useTestConnection';
 import { type AsyncStatus, type SmailyCredentials } from '../../state/types';
@@ -43,6 +43,29 @@ export function CredentialBlock({
 }: CredentialBlockProps): React.JSX.Element {
   const { mutate, status, data, error, reset } = useTestConnection();
 
+  // Sub-PR 2.H.15 "already connected" UX.
+  //
+  // When hydrate.ts marks a saved credential set as previously verified
+  // (subdomain + username populated, smailyConnected flag set by the
+  // server), we render the compact "✓ Connected" view instead of three
+  // empty input fields. Without this the merchant has to retype their
+  // password on every wizard pass even though the connection is still
+  // working — they'd have to mint a new Smaily API user just to walk
+  // through the wizard again.
+  //
+  // `isVerifiedAndPristine` collapses to false the moment the user
+  // edits any field (handled below in handleField) or the parent
+  // reducer clears `connection` (e.g. credential mutation flips it
+  // back to idle).
+  const isVerifiedAndPristine =
+    connection.kind === 'success' &&
+    credentials.subdomain !== '' &&
+    credentials.username !== '' &&
+    credentials.password === '';
+  const [editMode, setEditMode] = useState<'view' | 'edit'>(
+    isVerifiedAndPristine ? 'view' : 'edit',
+  );
+
   // Mirror hook state into the parent reducer. Each lifecycle transition
   // fires exactly one dispatch per phase.
   useEffect(() => {
@@ -66,11 +89,33 @@ export function CredentialBlock({
 
   const handleField = (field: keyof SmailyCredentials) =>
     (event: React.ChangeEvent<HTMLInputElement>): void => {
+      // Any keystroke flips back to edit-mode — the saved verified
+      // state no longer reflects what's on screen.
+      setEditMode('edit');
       onCredentialsChange({ [field]: event.target.value });
     };
 
+  const handleEditClick = (): void => setEditMode('edit');
+
   const isComplete =
     credentials.subdomain !== '' && credentials.username !== '' && credentials.password !== '';
+
+  if (editMode === 'view' && isVerifiedAndPristine) {
+    return (
+      <Card title={title} description={description}>
+        <div className="flex items-center justify-between gap-4">
+          <Banner tone="success" className="flex-1">
+            <span className="font-medium">✓ Connected</span> as{' '}
+            <span className="font-mono">{credentials.username}</span> @{' '}
+            <span className="font-mono">{credentials.subdomain}.sendsmaily.net</span>
+          </Banner>
+          <Button variant="ghost" type="button" onClick={handleEditClick}>
+            Edit credentials
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card title={title} description={description}>
