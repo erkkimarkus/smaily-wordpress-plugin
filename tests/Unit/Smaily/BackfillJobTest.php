@@ -32,6 +32,13 @@ final class BackfillJobTest extends TestCase {
 		// Pass-through for update_user_meta — tests don't need to inspect it
 		// unless an assertion explicitly cares.
 		Functions\when( 'update_user_meta' )->justReturn( true );
+
+		// Sub-PR 2.H.15 — SubscriberPayloadBuilder reads sync-toggle
+		// opt-ins from this option. null falls back to the documented
+		// "every cross-channel field enabled" default.
+		Functions\when( 'get_option' )->justReturn( null );
+		Functions\when( 'get_site_url' )->justReturn( 'http://example.test' );
+		Functions\when( 'get_bloginfo' )->justReturn( 'Example Shop' );
 	}
 
 	protected function tearDown(): void {

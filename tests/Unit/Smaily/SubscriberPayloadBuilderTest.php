@@ -1,0 +1,225 @@
+<?php
+/**
+ * Tests for SubscriberPayloadBuilder — single source of truth for
+ * WP user → Smaily contact-payload mapping.
+ *
+ * @package Smaily\Connect\Tests
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Unit\Smaily;
+
+use Brain\Monkey;
+use Brain\Monkey\Functions;
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
+
+final class SubscriberPayloadBuilderTest extends TestCase {
+
+	/** @var array<string, array<string, string>> */
+	private array $user_meta_fixtures = array();
+
+	protected function setUp(): void {
+		parent::setUp();
+		Monkey\setUp();
+
+		Functions\when( 'get_site_url' )->justReturn( 'http://example.test' );
+		Functions\when( 'get_bloginfo' )->justReturn( 'Example Shop' );
+		Functions\when( 'get_option' )->justReturn( null );
+
+		// get_user_meta lookups dispatch into per-test fixtures keyed
+		// by "<user_id>:<meta_key>". Tests set entries via
+		// $this->seed_meta() before running build().
+		$fixtures =& $this->user_meta_fixtures;
+		Functions\when( 'get_user_meta' )->alias(
+			static function ( int $user_id, string $key, bool $single = false ) use ( &$fixtures ) {
+				$bucket_key = $user_id . ':' . $key;
+				return $fixtures[ $bucket_key ] ?? '';
+			}
+		);
+	}
+
+	protected function tearDown(): void {
+		Monkey\tearDown();
+		parent::tearDown();
+		$this->user_meta_fixtures = array();
+	}
+
+	public function test_email_and_store_always_present_even_without_opt_ins(): void {
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$user = $this->fake_user( 42, 'alice@example.test' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'alice@example.test', $payload['email'] );
+		self::assertSame( 'http://example.test', $payload['store'] );
+		self::assertArrayNotHasKey( 'first_name', $payload );
+	}
+
+	public function test_opt_in_fields_map_to_canonical_smaily_names(): void {
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				'first_name',
+				'last_name',
+				'nickname',
+				'user_phone',
+				'customer_id',
+				'customer_group',
+				'first_registered',
+				'site_title',
+			)
+		);
+
+		$user = $this->fake_user(
+			42,
+			'alice@example.test',
+			array(
+				'first_name'      => 'Alice',
+				'last_name'       => 'Smith',
+				'nickname'        => 'al',
+				'roles'           => array( 'customer', 'subscriber' ),
+				'user_registered' => '2024-01-15 12:00:00',
+			)
+		);
+		$this->seed_meta( 42, 'user_phone', '+372 555 12345' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Alice', $payload['first_name'] );
+		self::assertSame( 'Smith', $payload['last_name'] );
+		self::assertSame( 'al', $payload['nickname'] );
+		self::assertSame( '+372 555 12345', $payload['user_phone'] );
+		self::assertSame( '42', $payload['customer_id'] );
+		self::assertSame( 'customer', $payload['customer_group'] );
+		self::assertSame( '2024-01-15 12:00:00', $payload['first_registered'] );
+		self::assertSame( 'Example Shop', $payload['site_title'] );
+	}
+
+	public function test_gender_enum_transforms_zero_to_female(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'user_gender' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test' );
+		$this->seed_meta( 42, 'user_gender', '0' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Female', $payload['user_gender'] );
+	}
+
+	public function test_gender_enum_transforms_non_zero_to_male(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'user_gender' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test' );
+		$this->seed_meta( 42, 'user_gender', '1' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Male', $payload['user_gender'] );
+	}
+
+	public function test_birthday_normalises_to_yyyy_mm_dd(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'birthday' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test' );
+		$this->seed_meta( 42, 'user_dob', '2014-03-28' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( '2014-03-28', $payload['birthday'] );
+	}
+
+	public function test_birthday_with_unparseable_value_is_dropped(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'birthday' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test' );
+		$this->seed_meta( 42, 'user_dob', 'definitely-not-a-date' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertArrayNotHasKey( 'birthday', $payload );
+	}
+
+	public function test_unknown_field_names_in_option_are_silently_dropped(): void {
+		Functions\when( 'get_option' )->justReturn(
+			array( 'first_name', 'totally_made_up_field' )
+		);
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Alice', $payload['first_name'] );
+		self::assertArrayNotHasKey( 'totally_made_up_field', $payload );
+	}
+
+	public function test_empty_source_value_omits_the_field_from_payload(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'first_name', 'last_name', 'user_phone' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+		// last_name not seeded → empty string. user_phone meta not seeded → empty.
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Alice', $payload['first_name'] );
+		self::assertArrayNotHasKey( 'last_name', $payload, 'Empty values must be omitted, not sent as empty strings.' );
+		self::assertArrayNotHasKey( 'user_phone', $payload );
+	}
+
+	public function test_null_stored_option_defaults_to_all_supported_fields(): void {
+		// get_option returns null when the merchant never saved — falls
+		// back to the documented merchant-friendly default.
+		Functions\when( 'get_option' )->justReturn( null );
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		// All cross-channel fields available; only those with non-empty
+		// source values land in the payload.
+		self::assertSame( 'Alice', $payload['first_name'] );
+		self::assertSame( '42', $payload['customer_id'] );
+	}
+
+	public function test_build_fields_wraps_the_same_set_without_email(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'first_name' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+
+		$fields = ( new SubscriberPayloadBuilder() )->build_fields( $user );
+
+		self::assertSame( 'http://example.test', $fields['store'] );
+		self::assertSame( 'Alice', $fields['first_name'] );
+		self::assertArrayNotHasKey( 'email', $fields, 'build_fields() is the nested-shape used by HookHandler; email lives one level up.' );
+	}
+
+	/**
+	 * @param array<string, mixed> $overrides
+	 */
+	private function fake_user( int $id, string $email, array $overrides = array() ): \WP_User {
+		$defaults = array(
+			'ID'              => $id,
+			'user_email'      => $email,
+			'first_name'      => '',
+			'last_name'       => '',
+			'nickname'        => '',
+			'roles'           => array(),
+			'user_registered' => '',
+		);
+		$attrs = array_merge( $defaults, $overrides );
+
+		return new class( $attrs ) extends \WP_User {
+			/** @param array<string, mixed> $attrs */
+			public function __construct( array $attrs ) {
+				foreach ( $attrs as $k => $v ) {
+					$this->{$k} = $v;
+				}
+			}
+		};
+	}
+
+	private function seed_meta( int $user_id, string $key, string $value ): void {
+		$this->user_meta_fixtures[ $user_id . ':' . $key ] = $value;
+	}
+}

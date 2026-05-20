@@ -64,6 +64,8 @@ class HookHandler {
 
 	private EventQueue $queue;
 
+	private ?\Smaily\Connect\Smaily\SubscriberPayloadBuilder $builder = null;
+
 	public function __construct( EventQueue $queue ) {
 		$this->queue = $queue;
 	}
@@ -185,11 +187,7 @@ class HookHandler {
 		return array(
 			'email'    => (string) $user->user_email,
 			'language' => $this->detect_language_for_user( $user ),
-			'fields'   => array(
-				'first_name' => (string) $user->first_name,
-				'last_name'  => (string) $user->last_name,
-				'user_id'    => (string) $user->ID,
-			),
+			'fields'   => $this->payload_builder()->build_fields( $user ),
 		);
 	}
 
@@ -200,11 +198,15 @@ class HookHandler {
 		return array(
 			'email'    => (string) $user->user_email,
 			'language' => $this->detect_language_for_user( $user ),
-			'fields'   => array(
-				'first_name' => (string) $user->first_name,
-				'last_name'  => (string) $user->last_name,
-			),
+			'fields'   => $this->payload_builder()->build_fields( $user ),
 		);
+	}
+
+	private function payload_builder(): \Smaily\Connect\Smaily\SubscriberPayloadBuilder {
+		if ( $this->builder === null ) {
+			$this->builder = new \Smaily\Connect\Smaily\SubscriberPayloadBuilder();
+		}
+		return $this->builder;
 	}
 
 	private function detect_language_for_user( \WP_User $user ): string {

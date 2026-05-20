@@ -56,6 +56,8 @@ class BackfillJob {
 
 	private int $freshness_seconds;
 
+	private ?SubscriberPayloadBuilder $builder = null;
+
 	public function __construct( Client $client, int $freshness_seconds = self::DEFAULT_FRESHNESS_SECONDS ) {
 		$this->client            = $client;
 		$this->freshness_seconds = $freshness_seconds;
@@ -282,11 +284,14 @@ class BackfillJob {
 	 * @return array<string, mixed>
 	 */
 	private function build_subscriber_payload( \WP_User $user ): array {
-		return array(
-			'email'      => (string) $user->user_email,
-			'first_name' => (string) $user->first_name,
-			'last_name'  => (string) $user->last_name,
-		);
+		return $this->payload_builder()->build( $user );
+	}
+
+	private function payload_builder(): SubscriberPayloadBuilder {
+		if ( $this->builder === null ) {
+			$this->builder = new SubscriberPayloadBuilder();
+		}
+		return $this->builder;
 	}
 
 	private function record_error( int $job_id, string $message ): void {
