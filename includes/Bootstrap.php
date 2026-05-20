@@ -186,6 +186,11 @@ final class Bootstrap {
 	 * @param string $job_type Currently only "contacts"; Phase 3 adds more.
 	 */
 	public function on_backfill_tick( string $job_type = 'contacts' ): void {
+		// Diagnostic — sub-PR 2.H.6. Erkki's staging fires three ticks
+		// in the same second with status=idle; this line tells us the
+		// hook is reachable + which job_type WP-Cron passes.
+		error_log( sprintf( '[smaily-connect backfill.tick] fired job_type=%s', $job_type ) );
+
 		if ( $job_type !== 'contacts' ) {
 			return;
 		}
@@ -193,6 +198,7 @@ final class Bootstrap {
 		try {
 			$client = $this->smaily_client();
 		} catch ( \RuntimeException $e ) {
+			error_log( '[smaily-connect backfill.tick] credentials missing: ' . $e->getMessage() );
 			// Credentials gone missing mid-job — bail; the cancel/status
 			// endpoints will surface the stalled state to the UI.
 			return;
@@ -200,6 +206,14 @@ final class Bootstrap {
 
 		$job    = new BackfillJob( $client );
 		$result = $job->process_batch();
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.tick] result processed=%d remaining=%d completed=%s',
+				(int) $result['processed'],
+				(int) $result['remaining'],
+				! empty( $result['completed'] ) ? 'true' : 'false'
+			)
+		);
 
 		if ( ! $result['completed'] && function_exists( 'as_schedule_single_action' ) ) {
 			as_schedule_single_action(

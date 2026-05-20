@@ -37,12 +37,17 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
           ref={ref}
           type="radio"
           disabled={disabled}
-          // Sub-PR 2.H.5 — m-0 / p-0 neutralise the WP-admin forms.css
-          // reset which gives <input type="radio"> a negative top margin
-          // (margin: -0.25rem 0.25rem 0 0). Without these, the dot
-          // wrapper inherits that offset and the visible glyph drifts
-          // upward by ~4px — exactly what Erkki spotted on staging.
-          className="peer absolute m-0 h-full w-full cursor-inherit appearance-none rounded-full border border-border-strong bg-surface p-0 checked:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+          // Sub-PR 2.H.6 — !m-0 / !p-0 with !important override.
+          //
+          // wp-admin/css/forms.css ships:
+          //   input[type=checkbox], input[type=radio] {
+          //     margin: -0.25rem 0.25rem 0 0;
+          //   }
+          // Specificity 0,0,1,1 — beats Tailwind's `.m-0` (0,0,1,0)
+          // unless we promote with !important. Erkki's DevTools
+          // confirmed the selector by name; 2.H.5's plain m-0 was the
+          // right axis but the wrong weight.
+          className="peer absolute !m-0 h-full w-full cursor-inherit appearance-none rounded-full border border-border-strong bg-surface !p-0 checked:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
           {...rest}
         />
         {/* Inner dot — visible only when :checked. */}

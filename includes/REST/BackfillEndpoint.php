@@ -132,6 +132,14 @@ class BackfillEndpoint {
 	}
 
 	public function start( WP_REST_Request $request ): WP_REST_Response {
+		// Diagnostic — sub-PR 2.H.6.
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.endpoint.start] requested job_type=%s',
+				(string) $request->get_param( 'job_type' )
+			)
+		);
+
 		$job_type = $this->resolve_job_type( $request );
 		if ( $job_type === null ) {
 			return $this->unsupported_job_type_response();
@@ -139,6 +147,7 @@ class BackfillEndpoint {
 
 		$job = ( $this->job_factory )();
 		if ( ! $job instanceof BackfillJob ) {
+			error_log( '[smaily-connect backfill.endpoint.start] factory returned null — credentials missing' );
 			return new WP_REST_Response(
 				array(
 					'error'   => 'smaily_not_configured',
@@ -152,6 +161,7 @@ class BackfillEndpoint {
 		}
 
 		$job_id = $job->start();
+		error_log( sprintf( '[smaily-connect backfill.endpoint.start] start() returned row_id=%d', $job_id ) );
 
 		// Schedule the first AS tick so backfill processing begins
 		// immediately. The tick handler reschedules itself until the job

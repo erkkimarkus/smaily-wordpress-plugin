@@ -74,6 +74,18 @@ class BackfillJob {
 
 		$table = $this->table_name();
 
+		// Diagnostic logging — sub-PR 2.H.6. Erkki's staging shows AS
+		// ticks completing with zero work; these lines let us see in
+		// debug.log which decision branch fires. Drop these after the
+		// pilot stabilises (Phase 4).
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.start] total_users=%d table=%s',
+				$total,
+				$table
+			)
+		);
+
 		// Table name interpolation: MySQL forbids parameterising it,
 		// $table is composed from controlled values ($wpdb->prefix + a
 		// private const). Real arguments are bound via %s / %d placeholders.
@@ -100,6 +112,17 @@ class BackfillJob {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		$last_error = isset( $wpdb->last_error ) && (string) $wpdb->last_error !== ''
+			? (string) $wpdb->last_error
+			: '(none)';
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.start] row_id=%d wpdb_last_error=%s',
+				$id,
+				$last_error
+			)
+		);
 
 		return $id;
 	}
@@ -133,6 +156,7 @@ class BackfillJob {
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $state ) ) {
+			error_log( '[smaily-connect backfill.batch] state row missing — start() was never run or insert failed' );
 			return array(
 				'processed' => 0,
 				'remaining' => 0,
@@ -144,8 +168,22 @@ class BackfillJob {
 		$users  = $this->fetch_users_after( $after, $batch_size );
 		$synced = 0;
 
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.batch] state_id=%s status=%s processed=%s/%s cursor_after=%d fetched_users=%d',
+				isset( $state['id'] ) ? (string) $state['id'] : '?',
+				isset( $state['status'] ) ? (string) $state['status'] : '?',
+				isset( $state['processed_count'] ) ? (string) $state['processed_count'] : '?',
+				isset( $state['total_count'] ) ? (string) $state['total_count'] : '?',
+				$after,
+				count( $users )
+			)
+		);
+
+		$fresh_skips = 0;
 		foreach ( $users as $user ) {
 			if ( $this->is_fresh( (int) $user->ID ) ) {
+				++$fresh_skips;
 				continue;
 			}
 
@@ -155,10 +193,25 @@ class BackfillJob {
 				update_user_meta( (int) $user->ID, self::META_KEY, time() );
 				++$synced;
 			} catch ( ApiException $e ) {
+				error_log(
+					sprintf(
+						'[smaily-connect backfill.batch] user_id=%d upsert_failed: %s',
+						(int) $user->ID,
+						$e->getMessage()
+					)
+				);
 				$this->record_error( (int) $state['id'], $e->getMessage() );
 				break;
 			}
 		}
+
+		error_log(
+			sprintf(
+				'[smaily-connect backfill.batch] synced=%d fresh_skipped=%d',
+				$synced,
+				$fresh_skips
+			)
+		);
 
 		$processed = (int) $state['processed_count'] + count( $users );
 		$cursor    = empty( $users ) ? $after : (int) end( $users )->ID;
