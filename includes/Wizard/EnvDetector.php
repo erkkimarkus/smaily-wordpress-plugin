@@ -18,6 +18,7 @@ use Smaily\Connect\Multilingual\SiteLocaleAdapter;
 use Smaily\Connect\Multilingual\TranslatePressAdapter;
 use Smaily\Connect\Multilingual\WPMLAdapter;
 use Smaily\Connect\Settings\Credentials;
+use Smaily\Connect\Settings\RecEngineSettings;
 
 /**
  * One-shot snapshot of the WP site state the wizard / settings panels
@@ -282,6 +283,35 @@ class EnvDetector {
 			'firstOrderEnabled'             => (bool) get_option( 'smly_plus_first_order_enabled', false ),
 			'abandonedCartEnabled'          => (bool) get_option( 'smaily_connect_abandoned_cart_status', false ),
 			'automationMappings'            => $this->automation_mappings(),
+
+			// Step 4: rec-engine connection state (sub-PR 3.1). The
+			// api_key is DELIBERATELY omitted from the boot payload —
+			// it stays server-side, encrypted in wp_options. The React
+			// layer only needs to know whether we're connected and to
+			// what tenant. All engine requests go through the
+			// /rec-engine/ping proxy so the key never lands in the
+			// browser. See RECENGINE_API_CONTRACT.md §2 ("API-key ei
+			// tohi kunagi olla client-side koodis").
+			'recEngine'                     => $this->rec_engine_snapshot(),
+		);
+	}
+
+	/**
+	 * Snapshot the merchant-visible portion of the rec-engine tenant
+	 * binding for the boot payload. NEVER emits api_key, endpoints,
+	 * or the full config map — those stay in wp_options.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function rec_engine_snapshot(): array {
+		$settings = new RecEngineSettings();
+		return array(
+			'connected'     => $settings->is_connected(),
+			'tenantName'    => $settings->tenant_name(),
+			'tenantId'      => $settings->tenant_id(),
+			'engineVersion' => $settings->engine_version(),
+			'baseUrl'       => $settings->base_url(),
+			'issuedAt'      => $settings->issued_at(),
 		);
 	}
 

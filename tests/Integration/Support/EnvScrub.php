@@ -12,6 +12,8 @@ namespace Smaily\Connect\Tests\Integration\Support;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Settings\RecEngineSettings;
+
 /**
  * Mirror of uninstall.php's cleanup but WITHOUT dropping the custom
  * tables (we only TRUNCATE) — the schema must stay so the next test
@@ -30,11 +32,13 @@ final class EnvScrub {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
-		// wp_options — every smly_plus_* row and the legacy keys this plugin owns.
+		// wp_options — every smly_* row (smly_plus_* + smly_rec_*) and the
+		// legacy keys this plugin owns. The single LIKE 'smly_%' sweep
+		// covers both prefixes; uninstall.php uses the same pattern.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-				$wpdb->esc_like( 'smly_plus_' ) . '%'
+				$wpdb->esc_like( 'smly_' ) . '%'
 			)
 		);
 		$legacy_options = array(
@@ -72,7 +76,37 @@ final class EnvScrub {
 
 		// Invalidate alloptions so the in-process get_option() reflects
 		// the deletes immediately rather than serving the warm cache.
+		// LIKE-prefix DELETEs go straight to MariaDB and bypass the
+		// per-option cache delete that delete_option() normally fires,
+		// so we also have to flush the per-key entries — otherwise
+		// autoload=false options (smly_rec_api_key et al.) keep
+		// serving their pre-scrub values across tests.
 		wp_cache_delete( 'alloptions', 'options' );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$leftover_keys = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+				$wpdb->esc_like( 'smly_' ) . '%'
+			)
+		);
+		// phpcs:enable
+		// $leftover_keys is what survived the DELETE — usually empty;
+		// we also drop the known set we just scrubbed.
+		$keys_to_flush = array_merge( $leftover_keys, array(
+			RecEngineSettings::OPTION_CONNECTED,
+			RecEngineSettings::OPTION_API_KEY,
+			RecEngineSettings::OPTION_BASE_URL,
+			RecEngineSettings::OPTION_ENGINE_VERSION,
+			RecEngineSettings::OPTION_TENANT_ID,
+			RecEngineSettings::OPTION_TENANT_NAME,
+			RecEngineSettings::OPTION_ENDPOINTS,
+			RecEngineSettings::OPTION_CONFIG,
+			RecEngineSettings::OPTION_ISSUED_AT,
+		) );
+		foreach ( $keys_to_flush as $key ) {
+			wp_cache_delete( (string) $key, 'options' );
+			wp_cache_delete( (string) $key, 'notoptions' );
+		}
 	}
 
 	private function __construct() {

@@ -94,33 +94,37 @@ final class RecEngineConnectivityTest extends TestCase {
 		$content_type = strtolower( (string) wp_remote_retrieve_header( $response, 'content-type' ) );
 		$body         = (string) wp_remote_retrieve_body( $response );
 
-		// Vercel deployment-protection wall — 401 + HTML "Authentication
-		// Required" page. Skip with an attention-grabbing message so
-		// Erkki sees the signal in CI logs without the connectivity
-		// check blocking plugin-side regressions. Plugin-side tests
-		// are must-pass; this one is conditional per the agreed split
-		// (engine reachability isn't a regression in plugin code).
-		if ( stripos( $content_type, 'text/html' ) !== false
-			&& stripos( $body, 'Authentication Required' ) !== false
-		) {
+		// Engine returns HTML (Next.js admin app shell) — happens in two
+		// cases we treat the same way: (1) Vercel deployment-protection
+		// SSO wall in front of the production URL, (2) the engine
+		// backend P0 endpoints aren't implemented yet so /api/v1/* hits
+		// the admin Next.js 404 page. Either way, plugin-side tests
+		// shouldn't block on a half-built engine — skip loudly so
+		// Erkki sees the signal in CI logs.
+		$looks_like_html_shell = stripos( $content_type, 'text/html' ) !== false;
+		if ( $looks_like_html_shell ) {
+			$is_sso = stripos( $body, 'Authentication Required' ) !== false;
+			$reason = $is_sso
+				? 'Vercel deployment-protection SSO wall in front of the engine.'
+				: 'Engine backend P0 endpoints not yet implemented (got the Next.js admin 404 page).';
 			self::markTestSkipped(
 				sprintf(
 					"\n" .
 					"==========================================================\n" .
-					"REC-ENGINE CONNECTIVITY SKIPPED — Vercel SSO wall in front of %s\n" .
+					"REC-ENGINE CONNECTIVITY SKIPPED — %s\n" .
+					"URL: %s\n" .
 					"==========================================================\n" .
-					"The integration suite cannot reach the engine to verify the\n" .
-					"contract. Pick one of:\n" .
-					"  1. Vercel → Project Settings → Deployment Protection →\n" .
-					"     set Production to 'No Protection'.\n" .
-					"  2. Generate a Protection Bypass for Automation token and\n" .
-					"     export RECENGINE_BYPASS_TOKEN=<token> before running\n" .
-					"     the suite (CI env var + local shell).\n" .
-					"  3. Point RECENGINE_BASE_URL at a publicly-reachable engine.\n" .
-					"This test is non-blocking by design — Faas 3.1+ will still\n" .
-					"depend on engine reachability for feature work, so unblock\n" .
-					"this before 3.1.\n" .
+					"Plugin-side integration tests stay green; engine reachability\n" .
+					"isn't a regression in plugin code. Unblock before Faas 3.2+\n" .
+					"feature work, which depends on the engine answering per\n" .
+					"RECENGINE_API_CONTRACT.md.\n" .
+					"  - If SSO: Vercel Settings → Deployment Protection → No Protection,\n" .
+					"    OR export RECENGINE_BYPASS_TOKEN=<token>.\n" .
+					"  - If P0 endpoints missing: implement /setup/exchange +\n" .
+					"    /api/v1/ingest/ping with Bearer api-key auth.\n" .
+					"  - Or point RECENGINE_BASE_URL at a different deploy.\n" .
 					"==========================================================",
+					$reason,
 					$base
 				)
 			);

@@ -34,6 +34,11 @@ final class EndpointRegistryTest extends TestCase {
 		self::assertContains( 'POST /backfill/cancel', $paths );
 		self::assertContains( 'GET /workflows', $paths );
 		self::assertContains( 'POST /settings', $paths );
+
+		// Sub-PR 3.1 — rec-engine connect/health/disconnect.
+		self::assertContains( 'POST /rec-engine/setup-exchange', $paths );
+		self::assertContains( 'POST /rec-engine/ping', $paths );
+		self::assertContains( 'POST /rec-engine/disconnect', $paths );
 	}
 
 	public function test_every_expected_route_uses_supported_http_method(): void {

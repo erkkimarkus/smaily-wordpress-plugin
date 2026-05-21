@@ -12,8 +12,11 @@ namespace Smaily\Connect\REST;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Bootstrap;
+use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
+use Smaily\Connect\Smaily\RecEngine\SetupExchange;
 
 /**
  * One source of truth for the plugin's `/wp-json/smaily-connect/v1/*`
@@ -77,6 +80,15 @@ final class EndpointRegistry {
 				}
 			),
 			new SettingsEndpoint(),
+			new RecEngineEndpoint(
+				new RecEngineSettings(),
+				static function (): SetupExchange {
+					return new SetupExchange();
+				},
+				static function ( string $api_key, string $base_url ): RecEngineClient {
+					return new RecEngineClient( $api_key, $base_url );
+				}
+			),
 		);
 	}
 
@@ -119,6 +131,18 @@ final class EndpointRegistry {
 			array(
 				'method' => 'POST',
 				'path'   => '/settings',
+			),
+			array(
+				'method' => 'POST',
+				'path'   => '/rec-engine/setup-exchange',
+			),
+			array(
+				'method' => 'POST',
+				'path'   => '/rec-engine/ping',
+			),
+			array(
+				'method' => 'POST',
+				'path'   => '/rec-engine/disconnect',
 			),
 		);
 	}

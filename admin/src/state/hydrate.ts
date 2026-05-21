@@ -81,6 +81,20 @@ export interface BootPayload {
       workflowId: string;
       isDefaultFallback: boolean;
     }>;
+    /**
+     * Step 4 — rec-engine connection. The api_key intentionally never
+     * lands here; the React layer only needs the connected flag plus
+     * tenant display info. All authenticated calls flow through the
+     * /rec-engine/ping proxy on the server.
+     */
+    recEngine?: {
+      connected: boolean;
+      tenantName: string;
+      tenantId: string;
+      engineVersion: string;
+      baseUrl: string;
+      issuedAt: string;
+    };
   };
 }
 
@@ -182,7 +196,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     perLanguageAccounts: [],
     defaultFallbackAccountKey: s.defaultFallbackAccountKey || 'default',
     recEngineSetupToken: '',
-    recEngineConnection: idleAsync,
+    recEngineConnection: deriveRecEngineConnection(s.recEngine),
     automationMappings: normaliseAutomationMappings(s.automationMappings),
     welcomeEnabled: s.welcomeEnabled,
     firstOrderEnabled: s.firstOrderEnabled,
@@ -210,6 +224,25 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
 }
 
 const VALID_TRIGGERS: readonly AutomationTrigger[] = ['welcome', 'first_order', 'abandoned_cart'];
+
+/**
+ * Map the rec-engine boot snapshot into the existing AsyncStatus slot
+ * the wizard + Step 6 summary read. Connected → kind='success' with
+ * the tenant name as the display message. Not connected (or payload
+ * missing) → idle. Failure states surface via the live ping endpoint
+ * call inside Step 4, not at hydrate time.
+ */
+function deriveRecEngineConnection(
+  rec: BootPayload['savedSettings']['recEngine'],
+): WizardState['recEngineConnection'] {
+  if (rec && rec.connected) {
+    return {
+      kind: 'success',
+      message: rec.tenantName !== '' ? rec.tenantName : undefined,
+    };
+  }
+  return idleAsync;
+}
 
 function normaliseAutomationMappings(
   raw: BootPayload['savedSettings']['automationMappings'],

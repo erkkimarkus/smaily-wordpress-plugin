@@ -85,3 +85,4 @@ do_action( 'rest_api_init' );
 require_once __DIR__ . '/Support/EnvScrub.php';
 require_once __DIR__ . '/Support/DebugLogReader.php';
 require_once __DIR__ . '/Support/RestRequestHelper.php';
+require_once __DIR__ . '/Fixtures/RecEngineMockServer.php';
