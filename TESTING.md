@@ -105,11 +105,49 @@ The default admin credentials are `admin` / `password`.
 - `window.smailyConnectBoot` in the console returns the env snapshot
   + saved-settings payload.
 
+## Re-testing "fresh install"
+
+WordPress's plugin **Deactivate** + **Delete** flow does NOT remove rows
+from `wp_options` — uninstall.php is what wipes plugin state, and it
+only runs when the merchant explicitly clicks **Delete** in the
+plugins screen. Reactivating a deleted plugin therefore reads back any
+flags that survived (notably `smly_plus_setup_completed`), so the
+wizard-first gate at `/wp-admin/admin.php?page=smaily-connect-settings`
+thinks the merchant has already onboarded.
+
+To run a TRUE fresh-install test:
+
+1. **Plugin Delete via wp-admin** — uninstall.php fires automatically.
+   This is the production-correct path; use it for the canonical
+   regression test.
+2. **Or via wp-cli** when scripting:
+
+   ```bash
+   wp plugin uninstall smaily-connect          # fires uninstall.php
+   wp plugin install /path/to/smaily-connect.zip --activate
+   ```
+
+3. **Or via SQL** when neither of the above is convenient (smoke-
+   testing the wizard-first gate without re-uploading the ZIP):
+
+   ```bash
+   wp option delete smly_plus_setup_completed
+   wp option delete smly_plus_default_connection_verified
+   wp option delete smaily_connect_api_credentials
+   # …or wipe everything Smaily Connect owns:
+   wp db query "DELETE FROM wp_options WHERE option_name LIKE 'smly_plus_%'"
+   ```
+
+After any of the above, visiting `/wp-admin/admin.php?page=smaily-connect-settings`
+should redirect to `?page=smaily-connect-wizard`. The previously-misleading
+"my fresh install opens Settings" symptom was tracked to leftover
+`wp_options` rows — see commit log for sub-PR 2.J.
+
 ## Tear-down
 
 ```bash
 npx wp-env stop          # keeps volumes, restart with `start` later
-npx wp-env destroy       # full reset
+npx wp-env destroy       # full reset, wipes the wp_options table too
 ```
 
 ## Known limitations (Phase 2 scope)
