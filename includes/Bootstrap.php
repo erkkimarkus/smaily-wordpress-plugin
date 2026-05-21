@@ -16,9 +16,7 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
-use Smaily\Connect\REST\SettingsEndpoint;
-use Smaily\Connect\REST\TestConnectionEndpoint;
-use Smaily\Connect\REST\WorkflowsEndpoint;
+use Smaily\Connect\REST\EndpointRegistry;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
@@ -150,30 +148,7 @@ final class Bootstrap {
 	 * ->register() call.
 	 */
 	public function register_rest_endpoints(): void {
-		$bootstrap = $this;
-
-		$endpoints = array(
-			new TestConnectionEndpoint(),
-			new BackfillEndpoint(
-				static function () use ( $bootstrap ): ?BackfillJob {
-					try {
-						return new BackfillJob( $bootstrap->smaily_client() );
-					} catch ( \RuntimeException $e ) {
-						// Credentials missing — endpoint returns 503 at runtime.
-						return null;
-					}
-				}
-			),
-			new WorkflowsEndpoint(
-				$this->credentials(),
-				static function ( string $subdomain, string $username, string $password ): Client {
-					return new Client( $subdomain, $username, $password );
-				}
-			),
-			new SettingsEndpoint(),
-		);
-
-		foreach ( $endpoints as $endpoint ) {
+		foreach ( EndpointRegistry::endpoints( $this ) as $endpoint ) {
 			$endpoint->register();
 		}
 	}

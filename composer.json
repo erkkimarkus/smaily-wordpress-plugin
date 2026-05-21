@@ -49,6 +49,7 @@
         "test": "phpunit && npm run test --prefix blocks",
         "test:php": "phpunit",
         "test:php:coverage": "phpunit --coverage-text --coverage-html=tmp/coverage",
+        "test:integration": "bash bin/run-integration-tests.sh",
         "format": "phpcbf . && npm run format --prefix blocks",
         "build": "npm run build --prefix blocks",
         "extract-text-domain": "wp i18n make-pot . languages/smaily-connect.pot && msginit -i languages/smaily-connect.pot -o languages/smaily-connect-en.po -l en --no-translator",

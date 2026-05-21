@@ -20,7 +20,12 @@
             <directory>tests/Unit</directory>
         </testsuite>
         <testsuite name="integration">
+            <!-- Integration tests boot real WordPress via wp-env. -->
+            <!-- They run through phpunit.integration.xml.dist; this entry -->
+            <!-- exists so `phpunit listsuites` shows the suite for tooling. -->
             <directory>tests/Integration</directory>
+            <exclude>tests/Integration/Support</exclude>
+            <exclude>tests/Integration/bootstrap.php</exclude>
         </testsuite>
     </testsuites>
 
