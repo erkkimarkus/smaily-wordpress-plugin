@@ -138,7 +138,7 @@ class SetupExchange {
 		);
 
 		$response = wp_remote_post(
-			rtrim( $engine_base_url, '/' ) . '/setup/exchange',
+			rtrim( $engine_base_url, '/' ) . Client::PATH_SETUP_EXCHANGE,
 			array(
 				'timeout' => 10,
 				'headers' => array(

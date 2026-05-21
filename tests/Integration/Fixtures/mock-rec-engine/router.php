@@ -45,7 +45,11 @@ function save_state( string $path, array $state ): void {
 	file_put_contents( $path, json_encode( $state ) );
 }
 
-if ( $method === 'POST' && $path === '/setup/exchange' ) {
+// Sub-PR 3.1.2 — engine serves setup under /api/setup/exchange.
+// The plugin (Client::PATH_SETUP_EXCHANGE) now sends to the same
+// path; mock follows suit so integration tests exercise the live
+// route shape, not a mock-only convenience.
+if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 	$raw  = (string) file_get_contents( 'php://input' );
 	$body = json_decode( $raw, true );
 	if ( ! is_array( $body ) || ! isset( $body['setup_token'] ) ) {

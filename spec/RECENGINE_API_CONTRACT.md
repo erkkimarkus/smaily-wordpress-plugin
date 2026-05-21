@@ -19,7 +19,7 @@ Dokument konsolideerib varasema dialoogi (`RECENGINE_API_ANALYSIS.md` + `RECENGI
 5. [Vea-käsitsemine](#vea-käsitsemine)
 6. [Rate limiting](#rate-limiting)
 7. [Endpoint-id](#endpoint-id)
-   - [POST /setup/exchange](#1-post-setupexchange)
+   - [POST /api/setup/exchange](#1-post-apisetupexchange)
    - [GET /api/v1/ingest/ping](#2-get-apiv1ingestping)
    - [POST /api/v1/ingest/catalog](#3-post-apiv1ingestcatalog)
    - [POST /api/v1/ingest/customers](#4-post-apiv1ingestcustomers)
@@ -39,8 +39,8 @@ Dokument konsolideerib varasema dialoogi (`RECENGINE_API_ANALYSIS.md` + `RECENGI
 **Production base URL** (esimene pilot): `https://re-erkkimarkus-projects.vercel.app`
 
 > Eelmine pilootdeploy `re-seven-indol.vercel.app` on aegunud (sub-PR 3.0 connectivity-test tuvastas dead-URL'i). Kõik URL-näited allpool on uuendatud.
->
-> **Backend P0 staatus** (vt eraldi RECENGINE_TODO.md): pilootmootor on Vercel'is avalik (No Protection), AGA `/setup/exchange` + `/api/v1/ingest/*` endpoint'id pole veel implementeeritud — hetkel tagastavad Next.js admin'i 404-lehe. Plugin-poolne integration-suite (`RecEngineConnectivityTest`) skip'ib graatsiliselt, kuni mootori-tiim P0 lukku saab.
+
+**Path-prefiks**: KÕIK plugin-poolt mootorile saadetavad request'id kasutavad `/api` prefiksit, sh setup-exchange ise (`/api/setup/exchange`, mitte `/setup/exchange`). Spec v1.0 eelmine versioon dokumenteeris setup'i ilma `/api`-ta — see oli viga, mille sub-PR 3.1.2 paikkas. Engine'i tegelik route-tabel pakub kõike `/api/*` all. Tsentraliseeritud konstantide list elab plugin'i poolel `Smaily\Connect\Smaily\RecEngine\Client::PATH_*` peal.
 
 **Content-Type**: kõik requests + responses kasutavad `application/json; charset=utf-8`.
 - Mootor **alati** tagastab `Content-Type: application/json`, sealhulgas error-vastustes.
@@ -68,9 +68,9 @@ Dokument konsolideerib varasema dialoogi (`RECENGINE_API_ANALYSIS.md` + `RECENGI
 Authorization: Bearer sk_<random_32_chars>
 ```
 
-API-key on tenant-tasandi, omandatud `POST /setup/exchange` käigus. **API-key ei tohi kunagi olla client-side koodis** (JavaScript, mobile app bundle). Plugin-side server-proxy on kohustuslik browse-eventide jaoks.
+API-key on tenant-tasandi, omandatud `POST /api/setup/exchange` käigus. **API-key ei tohi kunagi olla client-side koodis** (JavaScript, mobile app bundle). Plugin-side server-proxy on kohustuslik browse-eventide jaoks.
 
-**Setup endpoint** (`POST /setup/exchange`) on **autentimata** (vt allpool) - see on ainus endpoint, kus API-key ei ole vajalik.
+**Setup endpoint** (`POST /api/setup/exchange`) on **autentimata** (vt allpool) - see on ainus endpoint, kus API-key ei ole vajalik.
 
 **Vastus autentimise vea puhul**:
 - `401 Unauthorized` kui Authorization header puudub või API-key on vale
@@ -258,13 +258,13 @@ X-RateLimit-Reset: 2026-05-19T10:15:28Z
 
 ## Endpoint-id
 
-### 1. POST /setup/exchange
+### 1. POST /api/setup/exchange
 
 Setup-token exchange. **Autentimata endpoint** (ainus).
 
 **Use-case**: pärast tenant create'imist admin UI's, Erkki saab setup URL-i (näit. `https://re-erkkimarkus-projects.vercel.app/setup/abc123xyz`). Plugin'i seadetes klient kleebib URL-i, plugin extract'b token'i (`abc123xyz`) ja kutsub seda endpoint'i tehnilise config'i saamiseks.
 
-**URL**: `POST /setup/exchange`
+**URL**: `POST /api/setup/exchange`
 
 **Auth**: puudub
 

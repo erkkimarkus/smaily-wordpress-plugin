@@ -49,6 +49,34 @@ class Client {
 	 */
 	public const SUPPORTED_MAJOR = 1;
 
+	// ---------------------------------------------------------------
+	// Path constants — every URL the plugin sends to the engine flows
+	// through these. Single source of truth: sub-PR 3.1.2 split out
+	// after an integration bug where SetupExchange called
+	// /setup/exchange (wrong) while Client::ping happened to call
+	// /api/v1/ingest/ping (right). Different call sites, no shared
+	// definition, drift.
+	//
+	// Engine actually serves SETUP_EXCHANGE under /api/setup/exchange
+	// (the /api prefix is consistent across the entire route
+	// surface). Spec doc updated in the same commit to match.
+	//
+	// Where the engine returns its own endpoints map in the
+	// setup-exchange response (RECENGINE_API_CONTRACT.md §7.1), Faas
+	// 3.2's ingest path should prefer that map; these constants are
+	// the fallback / type-safety anchor.
+	// ---------------------------------------------------------------
+	public const PATH_SETUP_EXCHANGE       = '/api/setup/exchange';
+	public const PATH_PING                 = '/api/v1/ingest/ping';
+	public const PATH_INGEST_CATALOG       = '/api/v1/ingest/catalog';
+	public const PATH_INGEST_CUSTOMERS     = '/api/v1/ingest/customers';
+	public const PATH_INGEST_ORDERS        = '/api/v1/ingest/orders';
+	public const PATH_INGEST_BROWSE        = '/api/v1/ingest/browse';
+	public const PATH_IDENTITY_MERGE       = '/api/v1/identity/merge';
+	public const PATH_CUSTOMER_EXPORT_FMT  = '/api/v1/customer/%s/export';
+	public const PATH_CUSTOMER_DELETE_FMT  = '/api/v1/customer/%s';
+	public const PATH_CUSTOMER_OPT_OUT_FMT = '/api/v1/customer/%s/opt-out';
+
 	private string $api_key;
 	private string $base_url;
 
@@ -79,7 +107,7 @@ class Client {
 	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
 	 */
 	public function ping(): array {
-		return $this->request( 'GET', '/api/v1/ingest/ping' );
+		return $this->request( 'GET', self::PATH_PING );
 	}
 
 	// ---------------------------------------------------------------
