@@ -156,10 +156,15 @@ export function Step2Subscribers({
             />
             <p className="mt-2 text-xs text-text-secondary">
               {isRunning && `Synced ${progress.processed} of ${progress.total}.`}
-              {isComplete && `Done — ${progress.processed} contacts synced.`}
+              {isComplete && `Done — ${progress.processed} of ${progress.total} contacts synced.`}
               {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
               {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
             </p>
+            {(isComplete || wasCancelled || hasFailed) && progress.completedAt && (
+              <p className="mt-1 text-xs text-text-tertiary">
+                Last run finished {formatLastRun(progress.completedAt)}.
+              </p>
+            )}
             {isRunning && (
               <p className="mt-2 text-xs text-text-tertiary">
                 Backfill runs in the background on your server. You can safely
@@ -193,4 +198,20 @@ const FIELD_LABELS: Record<string, string> = {
 
 function prettyFieldLabel(field: string): string {
   return FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
+}
+
+/**
+ * Render a server-emitted UTC datetime ("2026-05-21 10:42:17") in the
+ * merchant's local timezone. Used by the "Last run finished …" hint
+ * under the backfill progress bar. We deliberately avoid Intl options
+ * the older Node ICU builds in CI choke on — toLocaleString with no
+ * arguments is the broadest path.
+ */
+function formatLastRun(utcDatetime: string): string {
+  const iso = utcDatetime.replace(' ', 'T') + 'Z';
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) {
+    return utcDatetime;
+  }
+  return date.toLocaleString();
 }

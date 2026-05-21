@@ -15,6 +15,8 @@ const idleProgress: BackfillProgress = {
   percent: 0,
   etaSeconds: null,
   error: null,
+  startedAt: null,
+  completedAt: null,
 };
 
 export interface UseBackfillProgressOptions {
@@ -75,6 +77,43 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
     };
   }, []);
 
+  // Pull the persisted backfill row on mount so the panel reflects
+  // prior runs ("Last run: 2026-05-21 …, 142 / 142 synced") even when
+  // the job isn't currently running. Without this the UI started at
+  // idleProgress every page load and merchants couldn't tell whether a
+  // previous backfill had finished or never ran.
+  useEffect(() => {
+    let cancelled = false;
+    if (!enabled) {
+      return undefined;
+    }
+    (async () => {
+      try {
+        const response = await getBackfillStatus(jobType);
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+        setProgress({
+          status: response.status,
+          processed: response.processed,
+          total: response.total,
+          percent: response.percent,
+          etaSeconds: response.eta_seconds,
+          error: null,
+          startedAt: response.started_at,
+          completedAt: response.completed_at,
+        });
+      } catch {
+        // Soft-fail: stay on idleProgress. The Start-backfill button still
+        // works; the user just doesn't see prior-run context until they
+        // press it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobType, enabled]);
+
   const pollOnce = useCallback(async (): Promise<void> => {
     try {
       const response = await getBackfillStatus(jobType);
@@ -88,6 +127,8 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         percent: response.percent,
         etaSeconds: response.eta_seconds,
         error: null,
+        startedAt: response.started_at,
+        completedAt: response.completed_at,
       });
       setPollError(null);
 
@@ -152,6 +193,8 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         percent: 0,
         etaSeconds: null,
         error: null,
+        startedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        completedAt: null,
       });
     } catch (err) {
       if (mountedRef.current) {

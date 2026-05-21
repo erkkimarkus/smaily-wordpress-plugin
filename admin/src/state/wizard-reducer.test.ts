@@ -156,6 +156,8 @@ describe('wizardReducer — Step 2 Subscribers', () => {
           percent: 25,
           etaSeconds: 180,
           error: null,
+          startedAt: '2026-05-21 09:00:00',
+          completedAt: null,
         },
       },
     });

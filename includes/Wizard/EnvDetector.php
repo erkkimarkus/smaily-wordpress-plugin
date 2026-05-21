@@ -268,7 +268,12 @@ class EnvDetector {
 			// Step 2: subscribers.
 			'subscriberSyncEnabled'         => (bool) get_option( 'smaily_connect_subscriber_sync_enabled', true ),
 			'syncFields'                    => (array) get_option( 'smaily_connect_subscriber_sync_fields', array() ),
-			'wordpressSubscriptionCheckbox' => (bool) get_option( 'smaily_connect_wp_subscription_enabled', false ),
+			// Must match the key SettingsEndpoint::save_subscribers() writes
+			// to. Previously read from `smaily_connect_wp_subscription_enabled`
+			// which was never written anywhere — the checkbox flip in Step 2
+			// looked like it didn't persist because the hydrator read a
+			// different option than the saver wrote.
+			'wordpressSubscriptionCheckbox' => (bool) get_option( 'smly_plus_wordpress_subscription_checkbox', false ),
 			'checkoutSubscriptionCheckbox'  => (bool) get_option( 'smaily_connect_checkout_subscription_enabled', false ),
 
 			// Step 3: WooCommerce automations.
@@ -276,6 +281,59 @@ class EnvDetector {
 			'welcomeEnabled'                => (bool) get_option( 'smly_plus_welcome_enabled', false ),
 			'firstOrderEnabled'             => (bool) get_option( 'smly_plus_first_order_enabled', false ),
 			'abandonedCartEnabled'          => (bool) get_option( 'smaily_connect_abandoned_cart_status', false ),
+			'automationMappings'            => $this->automation_mappings(),
 		);
+	}
+
+	/**
+	 * Read persisted automation mappings so the wizard / Settings tabs
+	 * see the user's prior workflow picks on reload. Replaces what was
+	 * previously hard-coded to [] in hydrate.ts — the rows are saved via
+	 * SettingsEndpoint::replace_automation_mappings() but were never
+	 * surfaced back to the React layer, so the dropdown choice looked
+	 * lost after every reload.
+	 *
+	 * @return array<int, array{
+	 *   triggerType: string,
+	 *   language: string,
+	 *   accountKey: string,
+	 *   workflowId: string,
+	 *   isDefaultFallback: bool,
+	 * }>
+	 */
+	private function automation_mappings(): array {
+		/** @var \wpdb|null $wpdb */
+		global $wpdb;
+		// Defensive guard for unit tests where $wpdb isn't seeded — the
+		// real env-bootstrap always sets it.
+		if ( ! ( $wpdb instanceof \wpdb ) ) {
+			return array();
+		}
+		$table = $wpdb->prefix . 'smly_plus_automation_mapping';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			"SELECT trigger_type, language, account_key, workflow_id, is_default_fallback FROM {$table}",
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			$out[] = array(
+				'triggerType'       => isset( $row['trigger_type'] ) ? (string) $row['trigger_type'] : '',
+				'language'          => isset( $row['language'] ) ? (string) $row['language'] : '',
+				'accountKey'        => isset( $row['account_key'] ) ? (string) $row['account_key'] : '',
+				'workflowId'        => isset( $row['workflow_id'] ) ? (string) $row['workflow_id'] : '',
+				'isDefaultFallback' => ! empty( $row['is_default_fallback'] ),
+			);
+		}
+		return $out;
 	}
 }

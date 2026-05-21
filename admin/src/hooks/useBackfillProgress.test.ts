@@ -64,12 +64,25 @@ describe('useBackfillProgress', () => {
     });
     const statusSpy = vi
       .spyOn(api, 'getBackfillStatus')
+      // First call is the on-mount snapshot fetch — reports nothing in
+      // flight so start() drives the running → completed sequence below.
+      .mockResolvedValueOnce({
+        status: 'idle',
+        processed: 0,
+        total: 0,
+        percent: 0,
+        eta_seconds: null,
+        started_at: null,
+        completed_at: null,
+      })
       .mockResolvedValueOnce({
         status: 'running',
         processed: 50,
         total: 100,
         percent: 50,
         eta_seconds: 30,
+        started_at: '2026-05-21 09:00:00',
+        completed_at: null,
       })
       .mockResolvedValueOnce({
         status: 'completed',
@@ -77,6 +90,8 @@ describe('useBackfillProgress', () => {
         total: 100,
         percent: 100,
         eta_seconds: null,
+        started_at: '2026-05-21 09:00:00',
+        completed_at: '2026-05-21 09:01:30',
       });
 
     const { result } = renderHook(() => useBackfillProgress({ intervalMs: 50 }));

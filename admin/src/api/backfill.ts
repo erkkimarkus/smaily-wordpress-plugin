@@ -14,6 +14,10 @@ export interface BackfillStatusResponse {
   total: number;
   percent: number;
   eta_seconds: number | null;
+  /** MySQL DATETIME in UTC, or null when the job has never been started. */
+  started_at: string | null;
+  /** Set once the job reaches a terminal status; null while running/idle. */
+  completed_at: string | null;
 }
 
 export interface BackfillCancelResponse {

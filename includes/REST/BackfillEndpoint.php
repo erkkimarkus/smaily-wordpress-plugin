@@ -196,11 +196,13 @@ class BackfillEndpoint {
 		if ( $row === null ) {
 			return new WP_REST_Response(
 				array(
-					'status'      => 'idle',
-					'processed'   => 0,
-					'total'       => 0,
-					'percent'     => 0,
-					'eta_seconds' => null,
+					'status'       => 'idle',
+					'processed'    => 0,
+					'total'        => 0,
+					'percent'      => 0,
+					'eta_seconds'  => null,
+					'started_at'   => null,
+					'completed_at' => null,
 				),
 				200
 			);
@@ -210,13 +212,20 @@ class BackfillEndpoint {
 		$total     = (int) $row['total_count'];
 		$percent   = $total > 0 ? (int) round( ( $processed / $total ) * 100 ) : 0;
 
+		// Surface started_at + completed_at so the React UI can render
+		// "Last run: 2026-05-21 10:42, 142 / 142" between runs. Previously
+		// the only way to see a completed backfill was to be on the page
+		// when it finished — reload blanked the panel because the boot
+		// payload didn't include this state.
 		return new WP_REST_Response(
 			array(
-				'status'      => (string) $row['status'],
-				'processed'   => $processed,
-				'total'       => $total,
-				'percent'     => min( 100, max( 0, $percent ) ),
-				'eta_seconds' => $this->estimate_eta( $row, $processed, $total ),
+				'status'       => (string) $row['status'],
+				'processed'    => $processed,
+				'total'        => $total,
+				'percent'      => min( 100, max( 0, $percent ) ),
+				'eta_seconds'  => $this->estimate_eta( $row, $processed, $total ),
+				'started_at'   => isset( $row['started_at'] ) ? (string) $row['started_at'] : null,
+				'completed_at' => isset( $row['completed_at'] ) ? (string) $row['completed_at'] : null,
 			),
 			200
 		);
@@ -300,6 +309,7 @@ class BackfillEndpoint {
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT id, status, processed_count, total_count, started_at, completed_at FROM {$table} WHERE job_type = %s AND target = %s",
@@ -310,6 +320,7 @@ class BackfillEndpoint {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
 
 		return is_array( $row ) ? $row : null;
 	}

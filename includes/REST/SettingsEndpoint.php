@@ -211,7 +211,28 @@ class SettingsEndpoint {
 			return $this->error_response( $errors, 400 );
 		}
 
-		$encrypted_password = $this->encrypt_password( $password );
+		// Preserve the stored password when the inbound payload doesn't carry
+		// one. EnvDetector::saved_settings() deliberately omits the password
+		// from the boot payload (security gate), so on second wizard pass
+		// the React state has password=''. Continue on Step 1 would then
+		// overwrite the encrypted secret with an empty string, and every
+		// downstream API call (Workflows fetch, Backfill push) would fail
+		// with "Credentials not configured" the next time the merchant
+		// loaded the wizard. Empty incoming password === "leave as-is";
+		// a non-empty value === "rotate to this".
+		if ( $password === '' ) {
+			$existing = get_option( self::LEGACY_OPTION_API_CREDENTIALS, array() );
+			$stored   = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
+			error_log(
+				sprintf(
+					'[smaily-connect settings.save_connection] empty inbound password — preserving stored secret (stored_len=%d)',
+					strlen( $stored )
+				)
+			);
+			$encrypted_password = $stored;
+		} else {
+			$encrypted_password = $this->encrypt_password( $password );
+		}
 
 		update_option(
 			self::LEGACY_OPTION_API_CREDENTIALS,
@@ -256,12 +277,22 @@ class SettingsEndpoint {
 				continue;
 			}
 
+			$option_key = Credentials::PHASE2_OPTION_PREFIX . $account_key;
+			if ( $acc_password === '' ) {
+				$existing_acc = get_option( $option_key, array() );
+				$encrypted    = is_array( $existing_acc ) && isset( $existing_acc['password'] )
+					? (string) $existing_acc['password']
+					: '';
+			} else {
+				$encrypted = $this->encrypt_password( $acc_password );
+			}
+
 			update_option(
-				Credentials::PHASE2_OPTION_PREFIX . $account_key,
+				$option_key,
 				array(
 					'subdomain' => $acc_subdomain,
 					'username'  => $acc_username,
-					'password'  => $this->encrypt_password( $acc_password ),
+					'password'  => $encrypted,
 				)
 			);
 		}

@@ -38,13 +38,29 @@ describe('Step 1 → Step 2 integration', () => {
       status: 'running',
       total: 1_234,
     });
-    vi.spyOn(backfillApi, 'getBackfillStatus').mockResolvedValue({
-      status: 'running',
-      processed: 0,
-      total: 1_234,
-      percent: 0,
-      eta_seconds: null,
-    });
+    // The hook now fetches initial status on mount (so prior runs surface
+    // without waiting for a Start click). Return 'idle' first so the
+    // Start-backfill button stays clickable; subsequent polls land in
+    // 'running' once start() flips the local state.
+    vi.spyOn(backfillApi, 'getBackfillStatus')
+      .mockResolvedValueOnce({
+        status: 'idle',
+        processed: 0,
+        total: 0,
+        percent: 0,
+        eta_seconds: null,
+        started_at: null,
+        completed_at: null,
+      })
+      .mockResolvedValue({
+        status: 'running',
+        processed: 0,
+        total: 1_234,
+        percent: 0,
+        eta_seconds: null,
+        started_at: null,
+        completed_at: null,
+      });
 
     const seeded = {
       ...wizardInitialState,

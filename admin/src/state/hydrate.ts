@@ -3,6 +3,8 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  type AutomationMapping,
+  type AutomationTrigger,
   type WizardState,
 } from './types';
 
@@ -65,6 +67,20 @@ export interface BootPayload {
     welcomeEnabled: boolean;
     firstOrderEnabled: boolean;
     abandonedCartEnabled: boolean;
+    /**
+     * Saved (trigger, language, accountKey) → workflowId rows.
+     * `automationMappings` was previously hard-zeroed in hydrate; the
+     * server-side SettingsEndpoint persists them but the boot payload
+     * didn't expose them, so reload always blanked the Step 3 dropdowns.
+     * EnvDetector::automation_mappings() now reads the table.
+     */
+    automationMappings?: Array<{
+      triggerType: string;
+      language: string;
+      accountKey: string;
+      workflowId: string;
+      isDefaultFallback: boolean;
+    }>;
   };
 }
 
@@ -167,7 +183,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     defaultFallbackAccountKey: s.defaultFallbackAccountKey || 'default',
     recEngineSetupToken: '',
     recEngineConnection: idleAsync,
-    automationMappings: [],
+    automationMappings: normaliseAutomationMappings(s.automationMappings),
     welcomeEnabled: s.welcomeEnabled,
     firstOrderEnabled: s.firstOrderEnabled,
     abandonedCartEnabled: s.abandonedCartEnabled,
@@ -191,4 +207,31 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     checkoutSubscriptionCheckbox: s.checkoutSubscriptionCheckbox,
     contactsBackfill: idleBackfill,
   };
+}
+
+const VALID_TRIGGERS: readonly AutomationTrigger[] = ['welcome', 'first_order', 'abandoned_cart'];
+
+function normaliseAutomationMappings(
+  raw: BootPayload['savedSettings']['automationMappings'],
+): AutomationMapping[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: AutomationMapping[] = [];
+  for (const row of raw) {
+    if (!(VALID_TRIGGERS as readonly string[]).includes(row.triggerType)) {
+      continue;
+    }
+    if (row.workflowId === '' || row.language === '' || row.accountKey === '') {
+      continue;
+    }
+    out.push({
+      triggerType: row.triggerType as AutomationTrigger,
+      language: row.language,
+      accountKey: row.accountKey,
+      workflowId: row.workflowId,
+      isDefaultFallback: !!row.isDefaultFallback,
+    });
+  }
+  return out;
 }

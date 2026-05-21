@@ -87,8 +87,8 @@ export function Step6Done({
           <Button
             variant="secondary"
             type="button"
-            onClick={onOpenSmailyDashboard}
-            disabled={state.smailyConnection.kind !== 'success'}
+            onClick={() => openSmailyDashboard(state, onOpenSmailyDashboard)}
+            disabled={state.smailyConnection.kind !== 'success' || !smailySubdomain(state)}
           >
             Open Smaily dashboard →
           </Button>
@@ -173,4 +173,33 @@ function computeSummary(state: WizardState): SummaryItem[] {
 
 function countMappings(state: WizardState, trigger: 'welcome' | 'first_order' | 'abandoned_cart'): number {
   return state.automationMappings.filter((m) => m.triggerType === trigger).length;
+}
+
+function smailySubdomain(state: WizardState): string {
+  const sub = state.smailyCredentials.subdomain.trim();
+  if (sub !== '') {
+    return sub;
+  }
+  // Mode A — fall back to the configured default-fallback account's subdomain.
+  const fallback = state.perLanguageAccounts.find(
+    (a) => a.accountKey === state.defaultFallbackAccountKey,
+  );
+  return fallback?.credentials.subdomain.trim() ?? '';
+}
+
+function openSmailyDashboard(
+  state: WizardState,
+  override?: () => void,
+): void {
+  if (override) {
+    override();
+    return;
+  }
+  const sub = smailySubdomain(state);
+  if (sub === '') {
+    return;
+  }
+  if (typeof window !== 'undefined') {
+    window.open(`https://${sub}.sendsmaily.net`, '_blank', 'noopener,noreferrer');
+  }
 }

@@ -70,6 +70,10 @@ export interface BackfillProgress {
   percent: number;
   etaSeconds: number | null;
   error: string | null;
+  /** UTC datetime string from the server, or null when never started. */
+  startedAt: string | null;
+  /** UTC datetime string set on terminal status, else null. */
+  completedAt: string | null;
 }
 
 /**
@@ -219,6 +223,8 @@ export const idleBackfill: BackfillProgress = {
   percent: 0,
   etaSeconds: null,
   error: null,
+  startedAt: null,
+  completedAt: null,
 };
 
 /**

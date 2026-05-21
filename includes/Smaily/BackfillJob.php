@@ -66,6 +66,15 @@ class BackfillJob {
 	/**
 	 * Initialise (or reset) the backfill state row.
 	 *
+	 * Side-effect: clears every `_smaily_synced_at` user_meta so the next
+	 * tick processes the full user list, not just the cohort outside the
+	 * freshness window. Without this a second merchant-initiated "Start
+	 * backfill" would mark itself "completed" after skipping every user
+	 * as still-fresh — the actual POST /api/contact.php calls Erkki was
+	 * waiting for never ran, so data never reached Smaily. The recurring
+	 * background cron still benefits from the freshness optimization;
+	 * only the merchant-driven start path resets it.
+	 *
 	 * @return int The backfill_job row id.
 	 */
 	public function start(): int {
@@ -75,6 +84,26 @@ class BackfillJob {
 		$total  = (int) $counts['total_users'];
 
 		$table = $this->table_name();
+
+		// Defensive against unit-test fakes that don't seed $wpdb->usermeta
+		// (BackfillJobTest's anonymous wpdb only exposes `prefix`). In
+		// production $wpdb is always the WP-bootstrapped instance.
+		if ( $wpdb instanceof \wpdb ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+			$cleared = $wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s",
+					self::META_KEY
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+			error_log(
+				sprintf(
+					'[smaily-connect backfill.start] cleared %d freshness markers',
+					is_numeric( $cleared ) ? (int) $cleared : 0
+				)
+			);
+		}
 
 		// Diagnostic logging — sub-PR 2.H.6. Erkki's staging shows AS
 		// ticks completing with zero work; these lines let us see in
