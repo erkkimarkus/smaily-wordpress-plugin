@@ -8,6 +8,8 @@ export interface PillTab<TValue extends string> {
   /** Optional trailing count or chip ("Failed (3)"). */
   badge?: ReactNode;
   disabled?: boolean;
+  /** Native browser tooltip — used to explain why a disabled tab is locked. */
+  title?: string;
 }
 
 export interface PillTabsProps<TValue extends string> {
@@ -53,6 +55,7 @@ export function PillTabs<TValue extends string>({
             role="tab"
             aria-selected={isActive}
             disabled={tab.disabled}
+            title={tab.title}
             onClick={() => onChange(tab.value)}
             className={cn(
               'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-medium',

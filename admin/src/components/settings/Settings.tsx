@@ -113,6 +113,35 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
 
   const [activeTab, setActiveTab] = useTabRouting('connection');
 
+  // Progressive disclosure (sub-PR 2.I). The wizard-first gate at the PHP
+  // layer makes sure no one reaches Settings before Step 1 has been
+  // completed at least once. But the merchant can still break their
+  // connection from inside Settings (rotate credentials, paste garbage,
+  // etc.); when that happens we lock the dependent tabs so they can't
+  // silently save against an unauthenticated state.
+  //
+  // Locked tabs: Subscribers, WooCommerce, Recommendations.
+  //   Connection is always accessible (that's where you fix the break).
+  //   Integrations is info-only — never locked.
+  //
+  // If the user lands on a locked tab via a #hash deep-link or a
+  // post-broken-state reload, bounce them back to Connection so the
+  // CTA banner makes sense.
+  const isConnected = rawState.smailyConnection.kind === 'success';
+  const lockedTabs = useMemo<ReadonlySet<AnyTab>>(
+    () =>
+      isConnected
+        ? new Set<AnyTab>()
+        : new Set<AnyTab>(['subscribers', 'woocommerce', 'recommendations']),
+    [isConnected],
+  );
+
+  useEffect(() => {
+    if (lockedTabs.has(activeTab)) {
+      setActiveTab('connection');
+    }
+  }, [lockedTabs, activeTab, setActiveTab]);
+
   const { mutate: save, status: saveStatus, error: saveError } = useSaveSettings({
     onSuccess: (_response, request) => {
       rawDispatch({
@@ -157,20 +186,32 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
           </div>
 
           <PillTabs
-            tabs={TABS.map((t) => ({
-              value: t.value,
-              label: t.label,
-              badge:
-                t.value !== 'integrations' && t.value !== 'finish' && rawState.dirtyTabs[t.value]
-                  ? '•'
-                  : undefined,
-            }))}
+            tabs={TABS.map((t) => {
+              const isLocked = lockedTabs.has(t.value);
+              return {
+                value: t.value,
+                label: t.label,
+                badge:
+                  t.value !== 'integrations' && t.value !== 'finish' && rawState.dirtyTabs[t.value]
+                    ? '•'
+                    : undefined,
+                disabled: isLocked,
+                title: isLocked ? 'Connect to Smaily first to unlock this tab.' : undefined,
+              };
+            })}
             value={activeTab}
             onChange={(next) => setActiveTab(next as AnyTab)}
             ariaLabel="Settings tabs"
           />
         </header>
 
+        {!isConnected && (
+          <Banner tone="warning" title="Smaily connection required">
+            Subscribers, WooCommerce, and Recommendations are locked until your
+            Smaily credentials authenticate. Fix the connection on the
+            Connection tab to unlock them.
+          </Banner>
+        )}
         {saveStatus === 'error' && saveError !== null && (
           <Banner tone="danger" title="Save failed">
             {saveError}

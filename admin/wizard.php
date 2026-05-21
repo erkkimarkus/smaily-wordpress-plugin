@@ -82,10 +82,28 @@ function smaily_connect_render_wizard_page(): void {
 
 /**
  * Render the settings mount node. Same React bundle, different data-view.
+ *
+ * Wizard-first gate (sub-PR 2.I): merchants who haven't completed the
+ * setup wizard yet land on the wizard, not Settings. The boot payload's
+ * `setupCompleted` flag flips to true when Step 6 Finish runs
+ * (sub-PR 2.H.18). Until then a Settings menu click bounces here, into
+ * the wizard, so the merchant doesn't see a sea of tabs they can't
+ * meaningfully fill in without first connecting.
+ *
+ * We deliberately keep the Settings menu item registered (rather than
+ * remove_submenu_page on the unfinished setup case) so wp-admin's
+ * breadcrumbs and direct-link bookmarks still resolve. The redirect
+ * fires after the capability check so a perm-denied user still sees
+ * the wp_die() rather than getting bounced.
  */
 function smaily_connect_render_settings_page(): void {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		wp_die( esc_html__( 'You do not have permission to view this page.', 'smaily-connect' ) );
+	}
+
+	if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+		wp_safe_redirect( admin_url( 'admin.php?page=smaily-connect-wizard' ) );
+		exit;
 	}
 
 	smaily_connect_emit_mount( 'settings' );

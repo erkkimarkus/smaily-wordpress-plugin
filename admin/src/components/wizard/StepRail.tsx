@@ -9,6 +9,15 @@ export interface StepRailItem {
   description?: string;
   /** Completed = checkmark; otherwise pending. Active is derived from currentStep. */
   completed: boolean;
+  /**
+   * Locked = unreachable yet. Strict progressive (sub-PR 2.I) marks
+   * every step after Step 1 as locked until smailyConnection ===
+   * success. Locked items render non-clickable + show a browser
+   * tooltip via `title`.
+   */
+  locked?: boolean;
+  /** Optional reason text used as the native browser tooltip on a locked step. */
+  lockedReason?: string;
 }
 
 export interface StepRailProps {
@@ -41,7 +50,11 @@ export function StepRail({ currentStep, steps, onStepClick, className }: StepRai
         {steps.map((step) => {
           const isActive = step.id === currentStep;
           const isCompleted = step.completed;
-          const isClickable = onStepClick !== undefined && (isCompleted || isActive);
+          const isLocked = step.locked === true;
+          // Locked steps are never clickable. Otherwise the previous rule
+          // (completed OR active) still gates back-navigation.
+          const isClickable =
+            onStepClick !== undefined && !isLocked && (isCompleted || isActive);
 
           const indicator = (
             <span
@@ -49,7 +62,8 @@ export function StepRail({ currentStep, steps, onStepClick, className }: StepRai
                 'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
                 isActive && 'bg-brand text-text-white',
                 isCompleted && !isActive && 'bg-brand-soft-bg text-brand-soft-text',
-                !isCompleted && !isActive && 'border border-border-strong bg-surface text-text-tertiary',
+                !isCompleted && !isActive && !isLocked && 'border border-border-strong bg-surface text-text-tertiary',
+                isLocked && !isActive && 'border border-border-subtle bg-surface text-text-tertiary opacity-60',
               )}
               aria-hidden
             >
@@ -68,7 +82,9 @@ export function StepRail({ currentStep, steps, onStepClick, className }: StepRai
               <span
                 className={cn(
                   'block truncate text-sm',
-                  isActive ? 'font-semibold text-text-primary' : 'text-text-secondary',
+                  isActive && 'font-semibold text-text-primary',
+                  !isActive && !isLocked && 'text-text-secondary',
+                  isLocked && !isActive && 'text-text-tertiary',
                 )}
               >
                 {step.label}
@@ -83,6 +99,7 @@ export function StepRail({ currentStep, steps, onStepClick, className }: StepRai
             'flex items-center gap-3 rounded px-2 py-2 transition-colors duration-120',
             isActive && 'bg-surface',
             isClickable && !isActive && 'hover:bg-surface',
+            isLocked && 'cursor-not-allowed',
           );
 
           return (
@@ -106,6 +123,7 @@ export function StepRail({ currentStep, steps, onStepClick, className }: StepRai
                   className={className_}
                   aria-current={isActive ? 'step' : undefined}
                   aria-disabled={!isActive || undefined}
+                  title={isLocked ? step.lockedReason : undefined}
                 >
                   {indicator}
                   {labels}

@@ -51,12 +51,23 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
   const [navStatus, setNavStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [navError, setNavError] = useState<string | null>(null);
 
-  const railItems: StepRailItem[] = STEP_LABELS.map((entry, idx) => ({
-    id: idx + 1,
-    label: entry.label,
-    description: entry.description,
-    completed: state.currentStep > idx + 1,
-  }));
+  // Strict progressive (sub-PR 2.I): Steps 2+ require a verified
+  // Smaily connection. Locked steps render non-clickable in the rail +
+  // show a tooltip explaining why. The StepRail still treats completed
+  // steps as clickable so back-navigation works once the gate clears.
+  const isConnected = state.smailyConnection.kind === 'success';
+  const railItems: StepRailItem[] = STEP_LABELS.map((entry, idx) => {
+    const stepId = idx + 1;
+    const locked = !isConnected && stepId > 1;
+    return {
+      id: stepId,
+      label: entry.label,
+      description: entry.description,
+      completed: state.currentStep > stepId,
+      locked,
+      lockedReason: locked ? 'Complete Step 1 (Connect) first.' : undefined,
+    };
+  });
 
   const canAdvance = computeCanAdvance(state);
   const advanceHint = computeAdvanceHint(state);
@@ -118,8 +129,15 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
     }
   };
 
-  const handleStepClick = (step: number): void =>
+  const handleStepClick = (step: number): void => {
+    // Defensive: StepRail already gates this on isClickable, but if a
+    // future call-site bypasses the rail (deep-link, dev console) we
+    // still refuse to land on a step that's not reachable yet.
+    if (!isConnected && step > 1) {
+      return;
+    }
     dispatch({ type: 'WIZARD_GO_TO_STEP', payload: { step } });
+  };
 
   return (
     <div className="min-h-screen bg-page-bg font-sans text-text-primary">

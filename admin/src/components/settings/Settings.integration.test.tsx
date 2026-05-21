@@ -72,7 +72,11 @@ describe('Settings — tab routing + dirty + save', () => {
   });
 
   it('switches tabs based on a hash change without rerendering everything', async () => {
-    render(<Settings />);
+    // Sub-PR 2.I — Subscribers / WC / Rec are locked until smailyConnection
+    // is success. Seed a connected state so this test exercises routing,
+    // not the lock-and-bounce behaviour (the lock has its own assertion
+    // below).
+    render(<Settings initialEnv={{ smailyConnected: true }} />);
 
     // Initial — connection panel
     expect(screen.getByLabelText(/subdomain/i)).toBeInTheDocument();
@@ -85,6 +89,30 @@ describe('Settings — tab routing + dirty + save', () => {
       expect(screen.getByText(/sync contacts to smaily/i)).toBeInTheDocument();
     });
     expect(screen.queryByLabelText(/subdomain/i)).not.toBeInTheDocument();
+  });
+
+  it('locks Subscribers / WooCommerce / Recommendations until connected and bounces hash deep-links back', async () => {
+    render(<Settings />);
+
+    // Banner explains the lock.
+    expect(screen.getByText(/Smaily connection required/i)).toBeInTheDocument();
+
+    // PillTabs render the locked tabs as disabled buttons.
+    expect(screen.getByRole('tab', { name: /subscribers/i })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: /woocommerce/i })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: /recommendations/i })).toBeDisabled();
+    // Connection + Integrations stay accessible.
+    expect(screen.getByRole('tab', { name: /^connection$/i })).not.toBeDisabled();
+    expect(screen.getByRole('tab', { name: /integrations/i })).not.toBeDisabled();
+
+    // Hash deep-link to a locked tab gets bounced back to Connection.
+    window.location.hash = 'subscribers';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+    await waitFor(() => {
+      // Bounce target — Connection panel still showing subdomain input.
+      expect(screen.getByLabelText(/subdomain/i)).toBeInTheDocument();
+    });
   });
 
   it('hides Save / Discard footer on the Integrations tab', async () => {
