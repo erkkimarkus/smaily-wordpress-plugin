@@ -260,8 +260,8 @@ class Profile_Settings {
 		}
 
 		if ( ! empty( $user_data ) ) {
-			$sanitized_data['ID'] = $user_id;
-			wp_update_user( $sanitized_data );
+			$user_data['ID'] = $user_id;
+			wp_update_user( $user_data );
 		}
 	}
 
