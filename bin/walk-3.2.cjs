@@ -49,6 +49,17 @@ function result( $name, $cond, $detail = '' ) {
 	echo 'RESULT ' . $name . ' ' . ( $cond ? 'PASS' : 'FAIL' ) . ' ' . $detail . "\n";
 }
 
+// Direct POST (bypasses the plugin Client, which always sends per-item) so
+// the W-vs-P diagnostic can control the exact body shape.
+function live_post( $url, $auth, $body ) {
+	$r = wp_remote_post( $url, array( 'timeout' => 20, 'headers' => $auth, 'body' => wp_json_encode( $body ) ) );
+	if ( is_wp_error( $r ) ) {
+		return array( 'err' => $r->get_error_message() );
+	}
+	$decoded = json_decode( (string) wp_remote_retrieve_body( $r ), true );
+	return is_array( $decoded ) ? $decoded : array();
+}
+
 function live_make_simple( $sku, $price ) {
 	$existing = wc_get_product_id_by_sku( $sku );
 	if ( $existing ) {
@@ -123,6 +134,27 @@ try {
 	result( 'resend_first_ok', false, 'EXC ' . $e->getMessage() );
 	result( 'resend_second_idempotent_success', false, 'EXC ' . $e->getMessage() );
 }
+
+// --- 2b. event_id LOCATION diagnostic (wrapper W vs per-item P) ----------
+// Structural guard for the 3.2.4 finding: the engine's Zod accepts event_id
+// only at the WRAPPER level. The plugin currently sends per-item (Variant P),
+// which is silently stripped, so Layer-2 dedup never activates (idempotency
+// still holds via Layer-1 sku UPSERT). If a future engine build honours
+// per-item (Route A), the peritem-stripped check flips and this test fails
+// loudly — signalling the plugin can switch on per-item dedup.
+$ingest_url = $settings->endpoints()['ingest_catalog'];
+$auth       = array( 'Authorization' => 'Bearer ' . $settings->api_key(), 'Content-Type' => 'application/json' );
+$diag_obj   = array( 'sku' => 'LIVE-WP', 'name' => 'WP Diag', 'category_path' => 'food/dry', 'price' => 1.00, 'in_stock' => true, 'product_url' => 'https://x.test/wp' );
+
+$w_body = array( 'event_id' => wp_generate_uuid4(), 'items' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-W' ) ) ) );
+live_post( $ingest_url, $auth, $w_body );
+$w2 = live_post( $ingest_url, $auth, $w_body );
+result( 'dedup_wrapper_event_id_works', ! empty( $w2['deduplicated'] ), json_encode( $w2 ) );
+
+$p_body = array( 'items' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-P', 'event_id' => wp_generate_uuid4() ) ) ) );
+live_post( $ingest_url, $auth, $p_body );
+$p2 = live_post( $ingest_url, $auth, $p_body );
+result( 'dedup_peritem_silently_stripped', empty( $p2['deduplicated'] ) && ! empty( $p2['ok'] ), json_encode( $p2 ) );
 
 // --- 3. batch of 100 products in one engine call -------------------------
 $batch = array();
