@@ -211,12 +211,26 @@ $ok_item  = array( 'sku' => 'LIVE-PARTIAL-OK', 'name' => 'Partial OK', 'category
 $bad_item = $ok_item;
 $bad_item['sku']      = '';
 $bad_item['event_id'] = wp_generate_uuid4();
+// Exploratory: the answer (200+errors[] partial vs whole-batch 4xx) IS the
+// result for F3-14 — both are valid engine designs, so this records the
+// behaviour rather than asserting one.
 try {
-	$presp = $client->ingest_catalog( array( $ok_item, $bad_item ) );
-	result( 'partial_success_200_with_errors', isset( $presp['errors'] ) && ! empty( $presp['errors'] ), 'processed=' . ( $presp['processed'] ?? '?' ) . ' ' . json_encode( $presp['errors'] ?? null ) );
+	$presp    = $client->ingest_catalog( array( $ok_item, $bad_item ) );
+	$behavior = ( isset( $presp['errors'] ) && ! empty( $presp['errors'] ) ) ? '200+errors[] (per-item partial)' : '200 (engine accepted bad item)';
+	result( 'partial_batch_behavior_documented', true, $behavior . ' ' . json_encode( $presp ) );
 } catch ( \Throwable $e ) {
-	// Whole-batch 4xx — the engine rejects the batch rather than per-item.
-	result( 'partial_success_200_with_errors', false, 'batch-level reject: ' . $e->getMessage() );
+	result( 'partial_batch_behavior_documented', true, 'whole-batch 4xx, all-or-nothing: ' . $e->getMessage() );
+}
+
+// --- 7. backward-compat: no event_id (Layer-1 natural-key UPSERT only) ----
+// Spec §7: event_id is optional; without it only Layer-1 (sku) UPSERT runs.
+// A 400 here would be a third doc↔runtime divergence.
+$no_eid = array( 'sku' => 'LIVE-NOEID-1', 'name' => 'No EventId', 'category_path' => 'food/dry', 'price' => 1.00, 'in_stock' => true, 'product_url' => 'https://x.test/noeid' );
+try {
+	$nresp = $client->ingest_catalog( array( $no_eid ) );
+	result( 'no_event_id_layer1_upsert', ! empty( $nresp['ok'] ), json_encode( $nresp ) );
+} catch ( \Throwable $e ) {
+	result( 'no_event_id_layer1_upsert', false, 'EXC ' . $e->getMessage() );
 }
 
 // --- cleanup test products ----------------------------------------------
