@@ -599,9 +599,9 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 | `sku` | string (max 64) | YES | Unique product identifier (natural key for UPSERT) |
 | `name` | string \| `{lang: string}` | YES | Product name |
 | `category_path` | string | YES | Hierarchical category (`food/dry`, `accessories/leashes`) |
-| `price` | number | YES | Customer's current price (NOT regular_price) |
-| `compare_price` | number | NO | For sale items — what they would cost without the discount |
-| `on_sale_until` | ISO 8601 string | NO | End of sale period (if applicable) |
+| `price` | number | YES | Customer's current selling price (NOT regular_price) |
+| `compare_price` | number | NO | Pre-sale ("was") price. A sale exists **iff `compare_price > price`** (Shopify convention). Null / equal to / less than `price` → no sale. See [Sale semantics](#sale-semantics) below. |
+| `on_sale_until` | ISO 8601 string | NO | Informational only — stored but does **not** gate sale display (a sale is driven by `compare_price > price` alone). |
 | `in_stock` | boolean | YES | Whether the product is available |
 | `description` | string \| `{lang: string}` | NO | Short description (max 500 characters) |
 | `image_url` | string (URL) \| `{lang: string}` | NO | Product image URL. **Stored as a representative scalar only** — there is no `image_url_i18n` column, so the `{lang}` form is accepted but not stored per-language. |
@@ -609,6 +609,15 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 | `external_id` | string | NO | Plugin/platform internal ID (for debugging/traceability). |
 | `tags` | object | NO | Best-effort mapping (engine uses immediately) |
 | `raw_attributes` | object | NO | Raw platform data. **Currently stored verbatim and not processed** — the AI mapping wizard / `unmapped_attributes` flow is planned, not yet implemented. |
+
+<a name="sale-semantics"></a>
+**Sale semantics** (D2 Variant 1, Shopify convention):
+- `price` is the current selling price; `compare_price` is the pre-sale ("was") price.
+- A **sale exists iff `compare_price > price`**. Savings amount = `compare_price - price`; savings percentage = `(compare_price - price) / compare_price`.
+- If `compare_price` is **null**, **equal to** `price`, or **less than** `price`, there is **no sale** — no strikethrough price and no negative/zero savings are shown.
+- `on_sale_until` is stored as informational metadata only; it does **not** affect whether a sale is displayed (there is no expiry gating). Send a current `compare_price` to express a live sale.
+
+> The engine has no separate "discount price" field. A discounted product is expressed purely as `price` (the discounted price the customer pays) plus `compare_price` (the higher pre-sale price).
 
 **Response 200 OK**:
 ```json
@@ -1380,6 +1389,27 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - **`compare_price` / `on_sale_until` accepted and stored** (store-only; sale-display math is W3).
 - **`product_url` (required + non-empty) and `in_stock` (required) tightened** to match spec §3, per F3-17 (the plugin always sends both). Empty `product_url` fails loud (400) rather than falling back to `product_base_url + sku`. This brief's commits.
 - §3 response example corrected to the real shape `{ok, processed, deduplicated, errors}` (removed `created`/`updated`/`skipped`/`unmapped_attributes`/`request_id`); documented all-or-nothing validation and the scalar-only `image_url` limitation.
+
+**v1.0.0 — W3 price rationalization** (no breaking changes for the plugin — it already sends `compare_price`/`on_sale_until`):
+- **`discount_price` / `discount_until` removed**; `compare_price` / `on_sale_until` are now the canonical sale fields. Engine commit `2cd7d26` (migration `0028` drops the old columns; `0027` backfilled).
+- **Sale semantics = `compare_price > price`** (D2 Variant 1, Shopify): savings = `compare_price - price`; null / equal / less than `price` → no sale (no strikethrough, no negative savings). Engine commit `3aa5707`.
+- **`on_sale_until` is informational only** — stored, does not gate sale display.
+- **Smaily contact-sync slot renamed** `rec_N_discount_price` → `rec_N_compare_price` (clean rename, no alias; value from `compare_price`). Engine commit `3aa5707`.
+- **Admin/plugin validation aligned (N-4a)**: the admin CSV path now also requires `product_url` (non-empty) + `in_stock`, matching `ProductSchema`. Engine commit `852ea04`.
+- ⚠️ **Migrating legacy `discount_price` is NOT a literal copy** — see [Appendix F: Migration notes](#appendix-f-migration-notes) (N-6 semantic inversion).
+
+---
+
+### Appendix F: Migration notes
+
+**N-6 — `discount_price` → `compare_price` is a semantic inversion, not a literal copy.**
+The legacy `discount_price` was the *lower* (on-sale) price; `compare_price` is the *higher* (pre-sale, "was") price. A literal `compare_price ← discount_price` copy therefore produces `compare_price < price` for genuinely discounted rows, which the new logic reads as **"no sale"** (sale exists only when `compare_price > price`). A simple value-match verification does **not** catch this — the copy succeeds technically while the meaning is wrong.
+
+Correct migration paths:
+- **Preferred:** re-ingest from the plugin, which sends the correct `price` + `compare_price` directly.
+- **Alternatively:** a transform that places the old *regular* price into `compare_price` (not the discounted price), so `compare_price > price` holds for actually-discounted items.
+
+(The W3 backfill, migration `0027`, did the literal copy by design — acceptable there because the data was test-only and 0 rows carried `discount_price`; production data arrives fresh from the plugin.)
 
 ---
 
