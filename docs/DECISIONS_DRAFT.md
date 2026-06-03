@@ -233,6 +233,67 @@ protect.
 
 ---
 
+### CC-10: Upstream sync cadence — quarterly review of fork parent
+
+**Context:** the plugin is a fork of `sendsmaily/smaily-wordpress-plugin`. The
+upstream continues to receive commits — bug fixes, compat updates, occasional
+security patches. The first upstream audit (`docs/UPSTREAM_AUDIT.md`,
+2026-06-03) found 14 commits accumulated since fork point, including 6 bug
+fixes confirmed reproducible in our fork. Without a deliberate sync rhythm,
+upstream fixes accumulate silently and the fork drifts further from a safe
+reference.
+
+**Decision:** review upstream commits on a **quarterly minimum** cadence,
+with ad-hoc reviews triggered by:
+- Security disclosures (CVE on WordPress / WooCommerce / a dependency)
+- Major WordPress or WooCommerce releases (compat-fix likelihood)
+- Pilot-client reports that match an upstream-fixed issue
+
+**Process** (documented in `docs/UPSTREAM_AUDIT.md` as a cumulative log):
+
+1. `git fetch upstream`
+2. List commits since the previous audit's HEAD: `git log <prev-audit-head>..upstream/main --oneline`
+3. Categorize each commit:
+   - 🔴 Security → cherry-pick (P0)
+   - 🟠 Bug fix → cherry-pick if confirmed present in our fork
+   - 🟡 Compat → discuss with project owner (versions, deprecations, etc.)
+   - 🟢 Equivalent already in place → ignore, note in audit
+   - ⚪ Not relevant → ignore, note in audit
+   - 🔵 Style only → ignore (we have our own style)
+4. For each 🟠 candidate, **verify the bug is present in our code** at the
+   line level before recommending cherry-pick. Don't assume file existence
+   means bug presence.
+5. Audit document is committed first (pure audit, no code changes). Project
+   owner reviews. Approved cherry-picks land in subsequent commits, each
+   with `ci:strict` + integration tests passing.
+
+**Rationale:**
+- **Upstream bugs continue to affect our fork** until either (a) the affected
+  legacy code is replaced, or (b) the fix is cherry-picked. Both are valid
+  paths; the choice is per-feature, not blanket.
+- **Audit-before-action** keeps the project owner in control of strategic
+  drift — some upstream changes (PHP/WP minimum version bumps) intentionally
+  conflict with our pilot-compatibility targets and must be rejected even when
+  upstream considers them progress.
+- **Cumulative log** in `UPSTREAM_AUDIT.md` (rather than ephemeral notes)
+  means a new contributor or a future Claude session can read the entire fork
+  history of sync decisions in one place.
+
+**Phase 4 strategic question (deferred):** whether to retire the legacy
+integration layer entirely (eliminates upstream dependency for those files) or
+maintain coexistence (requires continued upstream sync). The Phase 3
+architecture intentionally builds alongside legacy rather than replacing it
+(F1-1); this question gets revisited when the new architecture is feature-
+complete (post-Route-A, post-pilot).
+
+**Consequence:** in the audit log, every cherry-pick decision is traceable to
+a categorization and rationale. If a pilot regression later traces to a
+known-but-unpicked upstream commit, the audit log shows whether that was an
+explicit "ignore" decision or an oversight. Audit-first prevents both blind
+adoption and silent omission.
+
+---
+
 ## Phase 1 — Smaily-side infrastructure
 
 ### F1-1: Coexistence strategy (legacy + new side by side)
