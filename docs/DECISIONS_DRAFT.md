@@ -152,6 +152,87 @@ plugin. **A live test is MANDATORY before ZIP** (not just "if we get to it").
 
 ---
 
+### CC-8: Two-repo contract sync via embedded header note
+
+**Context:** the API contract (`RECENGINE_API_CONTRACT.md`) lives in both the
+plugin repo and the engine repo. The two copies must stay byte-for-byte
+synchronized — and drift between them caused integration bugs in 3.1.2 (path
+prefix) and 3.2.2 (endpoints-map keys). A separate `CONTRACT_SYNC.md` document
+would introduce indirection (someone reads the contract, doesn't know it's
+shared, doesn't think to look for a separate sync doc).
+
+**Decision:** the sync process lives **in the contract document itself** — a
+~10-line header note right after the title, documenting that the file exists
+in two repos and the process for keeping them aligned.
+
+**Rationale:**
+- Information is where the reader is already looking (in the contract file).
+  No need to know that a separate sync doc exists.
+- New contributors on either side see the sync process the first time they
+  open the contract — no tribal-knowledge erosion.
+- Past drifts (`/api` prefix, `event_id` body coverage) are referenced in the
+  note as concrete proof that the process matters.
+
+**Alternatives rejected:**
+- Separate `CONTRACT_SYNC.md` document — adds indirection without adding
+  content. Reader has to know it exists.
+- No formal documentation, "just talk in Slack" — relies on tribal knowledge,
+  which the past drifts proved insufficient.
+- Git submodule or a separate `smaily-recengine-contracts` repo — over-
+  engineering for two consumers. Revisit when a third consumer (Shopify app,
+  Milestone 3 on the plugin roadmap) arrives.
+
+**Consequence:** the header note is implemented in both repos in the same work
+session — first practical demonstration of the sync process. CI check that
+verifies byte-identical content between repos is a backlog item (low priority,
+triggered when a third drift occurs).
+
+---
+
+### CC-9: Single canonical path, not "canonical + legacy"
+
+**Context:** when the engine implements a new contract behavior (e.g. W1
+per-item Layer-2 dedup in Route A), the temptation is to retain the previous
+behavior as "legacy backward-compat" alongside the new canonical path. This
+creates two parallel paths in code, schema, and documentation. During W1
+implementation, the engine team initially kept wrapper-level `event_id` dedup
+as a legacy boolean-shape response alongside the new per-item integer-counts
+path.
+
+**Decision:** if there are **no prior clients** depending on the previous
+behavior, remove it. Single canonical path is the right state.
+
+**Rationale:**
+- Less code to maintain (one Zod schema, one response shape, one dedup
+  mechanism)
+- Less documentation surface (one canonical path, not "canonical vs legacy"
+  split that future readers have to disambiguate)
+- Less test coverage spread (one path to validate end-to-end, not two)
+- Less audit surface (one security and validation model)
+- Less drift risk during ongoing work — when the canonical path evolves across
+  Route A work items, only one path needs to keep up
+- Less confusion for future developers ("why two shapes? what's the
+  difference? when does each apply?")
+
+**Concrete application:** in W1, wrapper-level `event_id` dedup is removed
+entirely. Per-item is the only path. The plugin has always sent per-item
+(`CatalogPayloadBuilder` places `event_id` inside each product object), so
+removing wrapper-level doesn't affect the plugin — plugin is already aligned
+with the canonical path.
+
+**When this rule does NOT apply:** if a previous behavior has actual consumers
+(existing customer integrations, deployed sister services, public API),
+backward-compatibility may justify keeping a legacy path with a documented
+deprecation window. Verify "no consumers" before applying this rule.
+
+**Practical check before removing**: confirm with the human owner that no
+clients depend on the to-be-removed path. The plugin-engine pair here had no
+prior clients of the plugin ingest endpoints (production data flowed through
+admin CSV upload, not plugin ingest), so wrapper-level had no consumer to
+protect.
+
+---
+
 ## Phase 1 — Smaily-side infrastructure
 
 ### F1-1: Coexistence strategy (legacy + new side by side)
@@ -477,59 +558,6 @@ is there but blank).
 
 **Consequence:** the same logic carries into Phase 3 rec-engine PayloadBuilders
 (CatalogPayloadBuilder omits empty `description`/`image_url`).
-
----
-
-### F2-11: New sync is gated until wizard Finish; legacy hooks stripped after
-
-**Context:** the BETA fork loads the legacy Smaily_Connect plugin verbatim
-alongside the new namespaced code (same slug, in-place 1.x → 2.0 upgrade). Both
-the legacy `Subscriber_Synchronization` and the new `HookHandler` bind
-`woocommerce_created_customer` / `woocommerce_save_account_details` /
-`woocommerce_checkout_order_processed`. With the new path's contact-sync default
-on, a single customer event would sync **twice** — two Smaily API calls, risk of
-double automation (backward-compat audit, P1 #1).
-
-**Decision:** make the two **mutually exclusive on `smly_plus_setup_completed`**.
-Before Finish, `HookHandler::gate_closed()` no-ops every sync callback so only the
-legacy service syncs. At Finish, `LegacyHookBridge::deregister_subscriber_sync()`
-strips the legacy service's hooks (matched by class through `$wp_filter`, since its
-instance is private to the legacy plugin) — run on **every `init`**, because hook
-registration is per-request and a one-shot remove in `save_finish()` would lapse on
-the next page load. Attribution-cookie capture stays ungated (order-meta only, not
-a Smaily call). Non-sync legacy hooks (cart cleanup) are left untouched.
-
-**Rationale:** keeps the coexistence strategy (F1-1) clean — exactly one code path
-owns contact sync at any time. Stripping legacy by class match avoids modifying the
-"retained verbatim" legacy code.
-
-**Consequence:** the pilot sees only legacy behaviour until it finishes the wizard,
-then only the new path. Implemented in commit `58e08b2`; feeds `MIGRATION.md`.
-
----
-
-### F2-12: Migrations run on an `admin_init` version-check, not just activation
-
-**Context:** the new tables (`smly_plus_*`, `smly_rec_*`) were created only by
-`register_activation_hook → Activation::run`. That hook does **not** fire on
-`wp plugin update`, `wp plugin install --force` over an active plugin, or
-auto-update — all of which replace files in place. A pilot upgrading that way would
-get the new code with **no tables**, silently breaking the queue + wizard
-(backward-compat audit, P1 #2).
-
-**Decision:** add a cheap `admin_init` version-check (`Bootstrap::maybe_run_upgrade`)
-that runs the idempotent `Activation::run()` whenever the stored
-`smly_plus_plugin_version` trails `SMAILY_CONNECT_VERSION`. `Activation::run` stamps
-the version, so the steady state is a single `get_option()` per admin request.
-
-**Rationale:** `admin_init` (not `init`) keeps the check off front-end requests.
-The migrator is already idempotent (keyed on the schema-version option), so running
-it on a false positive is harmless. This is the upgrade-detect the activation hook
-structurally can't provide.
-
-**Consequence:** every upgrade path now lands the schema. Implemented in commit
-`58e08b2`; feeds `MIGRATION.md`. The legacy lifecycle keeps its own
-`upgrader_process_complete` path for legacy migrations — the two are disjoint.
 
 ---
 
