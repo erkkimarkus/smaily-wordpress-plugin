@@ -711,8 +711,19 @@ UPSERT**, not a replacement. The plugin sends `event_id` → engine uuid-dedup. 
 plugin doesn't send it (old version) → engine natural-key UPSERT. **Both work.
 Backward compat.**
 
-**Per-product location in the body:** `{"products":[{"event_id":"...","sku":...}]}`,
-not top-level. Confirmed by the engine's 6/6 sanity tests (3.2 preparation).
+**Per-item location in the body:** `{"items":[{"event_id":"...","sku":...}]}`,
+not top-level wrapper. **Live-verified** in sub-PR 3.2.4 W/P diagnostic test
+against the deployed engine (Variant P retry returned `{"deduplicated": 1,
+"deduplicated_all": true}`; Variant W still returns the legacy boolean
+`{"deduplicated": true}` until W1 wrapper-level removal completes per CC-9).
+
+**Note on the 6/6 sanity test correction:** the engine team's pre-3.2 "6/6
+sanity tests passed" report was retrospectively found to test wrapper-level
+event_id (which Zod accepted) rather than per-item (which Zod silently
+stripped). The actual per-item Layer-2 implementation arrived in Route A W1
+(after the 3.2.4 plugin live test surfaced the silent-strip behavior). This is
+why 3.2.4 live testing matters and why mock-vs-deployed must be validated for
+spec examples too (LESSONS.md §2.4 applied to specs, not just code).
 
 ---
 
@@ -810,12 +821,151 @@ direct SQL into the DB. Another — use the plugin code itself
 
 ---
 
+### F3-13: Systematic spec drift uncovered in 3.2.4 — Route A selected
+
+**Context:** sub-PR 3.2.4 live testing surfaced a wrapper-key drift
+(`products` → `items`), which triggered a broader engine-team audit. The audit
+discovered the drift was systematic: the contract document was authored
+aspirationally, the engine was scaffolded at commit `4ee73b1` with a narrower
+implementation, and the two never converged. 6 drifts confirmed across catalog
+(items wrapper, category_path non-empty, event_id location, dedup-not-impl)
+and at minimum customers + orders (smaily_contact_id required, single-object
+not batch, multiple silent-dropped fields).
+
+**Decision:** **Route A** — engine grows to match spec; plugin design is
+preserved. Production data for the MiuMjau pilot flows through admin CSV
+upload, not plugin ingest, so engine convergence work doesn't disrupt the
+pilot's existing data. After Route A complete, pilot migrates from CSV to
+plugin sync (D4 in Route A plan v2).
+
+**Rationale:**
+- **Plugin design is built on spec** — variant A idempotency (F3-7), batch
+  IngestQueue + Flusher (F3-8), per-item event_id (F3-7) are all aligned to
+  spec. Route B (spec shrinks to engine reality) would force a plugin-side
+  rewrite of design decisions made carefully across 3.0-3.2.4.
+- **Pilot day-one capability matters** — campaign-link attribution requires
+  `product_url`; sale-aware recommendations require `compare_price`. Route B
+  would strip these from the plugin spec, reducing pilot business value.
+- **Spec is the contract** — the spec was always v1.0.0; the engine never
+  realized it. Route A "realizes" the contract rather than redefining it.
+
+**Alternatives rejected:**
+- **Route B** — spec shrinks to engine — loses pilot business value
+- **Route C** — hybrid (pilot-critical engine builds, nice-to-have spec
+  shrinks) — adds categorization overhead and creates "spec says X, engine
+  does X minus N" ambiguity for future contributors
+
+**Strategic decisions locked** (Route A plan v2):
+- D1: Smaily UID = email (no `smaily_contact_id` required)
+- D2: Variant 1 price semantics (`price` = current, `compare_price` =
+  struck-through reference)
+- D3: No feature-flag for W4 (clean one-way migration)
+- D4: MiuMjau migrates to plugin sync, CSV retired (post-Route-A)
+- D5: No pilot-live deadline pressure (quality before speed)
+
+**Consequence:** plugin pause from 3.3 until W4 + W5 of Route A complete
+(~2-3 weeks engine work). Plugin's 3.2.4 catalog-end ZIP is produced
+independently (W1 already complete). The 6 contract drifts and their
+resolutions become CHANGELOG entries on both repos.
+
+---
+
+### F3-14: Mock-vs-live applies to spec documents, not just code
+
+**Context:** the 3.2.4 audit found that the contract document's example
+payloads had never been validated against the deployed engine. The 6/6 sanity
+test report from the engine team tested wrapper-level event_id (which Zod
+accepted) and read as "Layer-2 works" without verifying per-item (which Zod
+silently stripped) — the same pattern as the 3.1.2 mock-server divergence,
+but applied to specifications rather than code.
+
+**Decision:** specifications must be **live-validated** with the same
+discipline as code. When a spec section is authored or revised:
+1. Each example payload is run as `curl` against the deployed engine
+2. The actual response (status + body) is pasted into the commit message or
+   review report
+3. Only after live-validation does the spec change get committed
+4. Mock servers are then aligned to the live-validated behavior, not to spec
+   text
+
+**Rationale:**
+- The LESSONS.md §2.4 pattern ("mocks reflect your assumptions, not reality")
+  applies to specs too — they're another form of "writing down what you think
+  the system does." Specs can drift from reality the same way mocks can.
+- 4 (now 6) instances of mock-vs-real drift demonstrated the cost; the
+  contract document drift made it 7. Pattern justifies the discipline.
+
+**Consequence:** Route A's cross-cutting process (in plan v2) includes
+"deploy-validate every spec example before commit." Plugin team applies the
+same on its side when documenting plugin-internal APIs.
+
+---
+
+### F3-15: Single canonical event_id path — wrapper-level removed (Route A W1)
+
+**Context:** see CC-9. The W1 implementation initially kept wrapper-level
+`event_id` dedup as a legacy boolean-shape path alongside the new per-item
+integer-counts canonical path. With no prior clients on plugin ingest
+endpoints (production flowed through admin CSV upload), backward-compat is not
+a constraint.
+
+**Decision:** wrapper-level event_id support is removed entirely. Per-item is
+the canonical and only path. Single Zod schema, single response shape, single
+dedup mechanism.
+
+**Rationale:** see CC-9 (less code, less docs, less audit surface, less drift
+risk). The plugin already sends per-item via `CatalogPayloadBuilder`, so
+removing wrapper-level has zero plugin-side impact.
+
+**Live verification (3.2.4 walk):** per-item Variant P retry against deployed
+engine returns `{"deduplicated": 1, "deduplicated_all": true}` (W1 working as
+designed). The W/P diagnostic test stays in `walk-3.2.cjs` as structural drift
+protection — if a future change re-introduces wrapper-only behavior or strips
+per-item, the walk catches it immediately.
+
+---
+
+### F3-16: Catalog-end milestone — sub-PR 3.2.4 complete
+
+**Context:** sub-PR 3.2.4 completes Phase 3 catalog-ingest. Plugin and engine
+are aligned on catalog-end through the canonical per-item Layer-2 dedup, all
+fields the engine accepts are populated correctly by the plugin's
+`CatalogPayloadBuilder`, and the variant-product expansion works end-to-end.
+Catalog ZIP is produced (`smaily-connect-2.0.0-beta.1-a75f096.zip`).
+
+**Decision:** catalog-end is the **canonical reference** for Phase 3 ingest
+implementation. Subsequent ingest sub-PRs (3.3 customers, 3.3 orders, 3.4
+browse, 3.5 backfill) follow the same architectural pattern:
+1. `PayloadBuilder` maps plugin domain → engine wire shape
+2. `Client::ingest_*` sends to the deployed engine endpoint
+3. `IngestQueue` carries `event_uuid` per row, dedup-protected
+4. `IngestFlusher` AS-job sends batches with per-item event_id
+5. Mock server matches deployed engine response shape (after live verification)
+6. Walk script proves end-to-end against deployed engine before ZIP
+
+**Live-verified scenarios (14/14):**
+- Upsert end-to-end (hook → queue → flusher → engine)
+- Resend idempotency (Layer-1 UPSERT + Layer-2 dedup)
+- Batch 100 products → `processed: 100`
+- Variable product → separate event_uuid per variation (2/2 sent)
+- Delete → `catalog.delete` event reaches engine
+- Partial-success → engine returns `400` for whole batch (all-or-nothing)
+- No event_id → Layer-1 natural-key UPSERT (spec §7 backward compat)
+- Wrapper Variant W and per-item Variant P diagnostic (W/P-flip captured)
+
+**Consequence:** 3.3 customers + orders can mechanically follow the catalog
+template once Route A W4 + W5 complete. The architectural decisions are
+proven; the work is "fill in the per-endpoint mappings, apply the same
+pattern, live-verify before ZIP."
+
+---
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
 discovered along the way):
 
-1. Add a **new entry** in the relevant category (F3-13, F3-14, ...)
+1. Add a **new entry** in the relevant category (F3-17, F3-18, ...)
 2. Follow the 5-field form: Context / Decision / Rationale / Alternatives /
    Relationships
 3. Keep it **short** (5-15 lines per decision) — this is a draft, not a full ADR
@@ -824,12 +974,12 @@ discovered along the way):
      (`docs/adr/0001-coexistence.md`, ...)
    - Or keep a single `DECISIONS.md` — depending on the repo's culture
 
-**What's likely to be added in Phase 3:**
-- F3-13: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-14: 3.6 beacon (client side, server proxy, cookie management)
-- F3-15: 3.7 identity-merge (three triggers: post-checkout, login, manual)
-- F3-16: 3.8 GDPR (export/delete, WP Privacy API integration)
-- F3-17: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+**What's likely to be added later in Phase 3:**
+- F3-17: 3.5 backfill architecture (cursor pagination, batch size, retry)
+- F3-18: 3.6 beacon (client side, server proxy, cookie management)
+- F3-19: 3.7 identity-merge (three triggers: post-checkout, login, manual)
+- F3-20: 3.8 GDPR (export/delete, WP Privacy API integration)
+- F3-21: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.
