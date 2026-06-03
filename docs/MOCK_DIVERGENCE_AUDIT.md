@@ -42,7 +42,7 @@ These are properties of the engine's request handling, not of one endpoint.
 | Dimension | Spec / plugin / mock assume | Real engine | Source |
 |-----------|-----------------------------|-------------|--------|
 | **`event_id` location** | per-item (inside each array object) | **per-item is canonical** since Route A W1 (both per-item and wrapper-level dedup; per-item also validated as UUID v4). Before W1 the engine accepted only wrapper-level and silently stripped per-item. | ✅ catalog W/P probe + W1 post-deploy verify |
-| **Batch error semantics** | (unspecified) → assumed per-item `errors[]` | **all-or-nothing**: one bad item → whole-batch HTTP 400, no `errors[{index,...}]` | ✅ catalog partial-success probe |
+| **Batch error semantics** | (unspecified) → assumed per-item `errors[]` | **all-or-nothing today**: one bad item → whole-batch HTTP 400, no `errors[{index,...}]`. **Superseded by D6** (DECISIONS F3-18): per-item `errors[]` is the canonical target for **all four** endpoints — customers (W4) and orders (W5) built to it; catalog + browse retrofitted together (**N-7**). | ✅ catalog partial-success probe |
 | **`event_id` optionality** | optional except browse | optional (Layer-1 natural-key UPSERT works without it) | ✅ catalog no-event_id probe |
 
 The `event_id`-location finding generalises to **all four endpoints** (shared
@@ -107,7 +107,7 @@ Single-object batching change as with customers.
 
 ---
 
-## 4. browse — `POST /api/v1/ingest/browse`  📋 engine-team-reported ("cleanest"), ⏳ to verify
+## 4. browse — `POST /api/v1/ingest/browse`  📋 engine-team-reported ("cleanest" = wrapper-shape only), ⏳ to verify
 
 | Dimension | Spec / mock assumption | Real engine (reported) | Mock fix under Route A |
 |-----------|------------------------|------------------------|------------------------|
@@ -116,8 +116,10 @@ Single-object batching change as with customers.
 | `event_id` | required | **required-ness flips** (TBD) | confirm on probe |
 | `source` | required | **required-ness flips** (TBD) | confirm on probe |
 | `event_id` location | per-item | **per-item canonical** (W1, W6) — matters most here since browse has no natural-key fallback | none — W1 covers browse (plan W6) |
+| Batch error semantics | assumed per-item `errors[]` | **all-or-nothing** (one bad event → whole-batch HTTP 400, no `errors[]`), same as catalog — **not** "already per-item" | per-item `errors[]` retrofit (**N-7**), same as catalog (F3-18 / D6) |
 
-**Note**: browse is the closest to spec (the engine team called it "cleanest").
+**Note**: browse is the closest to spec **on wrapper shape only** (the engine
+team called it "cleanest" — the wrapper key and batch array already match).
 It's also the most dependent on the `event_id`-location decision, because
 browse has **no natural-key UPSERT fallback** (§7) — if per-item `event_id` is
 stripped and the engine only honours wrapper-level, a batch of N browse events
@@ -125,6 +127,14 @@ sharing one wrapper `event_id` would dedup as a single event. That would be a
 **correctness** problem for browse (unlike catalog/customers/orders, where
 Layer-1 covers it). **Resolved**: W1 made per-item canonical (plan W6 folds
 browse into W1), so browse's no-fallback risk is moot — per-item dedup works.
+
+**Batch errors — correction**: "cleanest" refers to wrapper shape only, **not**
+error handling. Browse was earlier read as "already per-item" on batch errors;
+that is wrong. Browse is **also all-or-nothing** (one bad event → whole-batch
+HTTP 400, no `errors[]`), exactly like catalog, and needs the **same N-7
+retrofit** to per-item `errors[]` (DECISIONS F3-18 / D6). The only existing
+partial-success reference is the **admin CSV path** (`commitCatalog →
+import_errors`), not the HTTP endpoints.
 
 ---
 
@@ -144,7 +154,9 @@ browse into W1), so browse's no-fallback risk is moot — per-item dedup works.
 3. **orders** (after W5) — batch `{orders:[...]}` + `status`/`currency`/
    `smaily_rec_ctx` accepted; per-item `event_id`. Re-probe + align mock then.
 4. **browse** — per-item `event_id` already canonical (W1/W6); confirm
-   `event_id`/`source` required-ness when implemented plugin-side.
+   `event_id`/`source` required-ness when implemented plugin-side. **Batch
+   errors: all-or-nothing today → per-item `errors[]` retrofit (N-7), same as
+   catalog (F3-18 / D6).**
 
 **Build the mock from the engine's real responses**, not from the spec — capture
 a real response per endpoint (as done for catalog) or sync against an
