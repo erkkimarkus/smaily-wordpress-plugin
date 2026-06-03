@@ -29,6 +29,7 @@
 /node_modules*
 /coverage*
 /tests*
+/bin*
 /admin/src*
 /admin/dist*
 /dist/client*
