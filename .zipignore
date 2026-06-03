@@ -34,11 +34,15 @@
 /admin/dist*
 /dist/client*
 /spec*
+/docs*
+/.claude*
 /.github*
 /.wp-env.json
 /TESTING.md
 /phpstan.neon.dist
 /phpunit.xml.dist
+/phpunit.integration.xml.dist
+/phpcs.xml.dist
 /tsconfig*.json
 /vite.config.ts
 /vitest.config.ts
