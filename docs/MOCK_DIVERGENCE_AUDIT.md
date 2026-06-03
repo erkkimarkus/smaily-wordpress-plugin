@@ -41,16 +41,16 @@ These are properties of the engine's request handling, not of one endpoint.
 
 | Dimension | Spec / plugin / mock assume | Real engine | Source |
 |-----------|-----------------------------|-------------|--------|
-| **`event_id` location** | per-item (inside each array object) | **wrapper-level only** (top-level, beside the array); per-item is silently stripped by Zod → Layer-2 dedup never fires | ✅ catalog W/P probe |
+| **`event_id` location** | per-item (inside each array object) | **per-item is canonical** since Route A W1 (both per-item and wrapper-level dedup; per-item also validated as UUID v4). Before W1 the engine accepted only wrapper-level and silently stripped per-item. | ✅ catalog W/P probe + W1 post-deploy verify |
 | **Batch error semantics** | (unspecified) → assumed per-item `errors[]` | **all-or-nothing**: one bad item → whole-batch HTTP 400, no `errors[{index,...}]` | ✅ catalog partial-success probe |
 | **`event_id` optionality** | optional except browse | optional (Layer-1 natural-key UPSERT works without it) | ✅ catalog no-event_id probe |
 
-The `event_id`-location finding is the big one: it generalises to **all four
-endpoints**, because they share the same Zod request shape. The plugin's
-per-item design (one `event_uuid` per queue row) only activates the engine's
-Layer-2 dedup if the engine adds per-item support (Route A extension) **or**
-the plugin moves to one `event_id` per batch (a PayloadBuilder + IngestQueue
-redesign). Decision pending; **no plugin change made**.
+The `event_id`-location finding generalises to **all four endpoints** (shared
+Zod shape). **Resolved by W1**: the engine now honours the plugin's per-item
+design directly — per-item is canonical, wrapper-level stays for backward
+compatibility (CC-9). The plugin needed **no change** (it has sent per-item,
+one `event_uuid` per queue row, since F3-7). Live-verified post-deploy: a
+per-item retry returns `{"deduplicated":1,"deduplicated_all":true}`.
 
 ---
 
@@ -60,16 +60,17 @@ redesign). Decision pending; **no plugin change made**.
 |-----------|---------------------|-------------|----------|------------|
 | Wrapper key | `products` | **`items`** | `items` ✅ | `items` ✅ (fix a2ea53c) |
 | Shape | batch array | batch array | batch | batch |
-| `event_id` location | per-item | **wrapper-level** | per-item ⚠️ | per-item ⚠️ |
+| `event_id` location | per-item | **per-item canonical** (W1) | per-item ✅ | per-item ✅ |
 | `category_path` | accepted empty | **required, non-empty** (400 otherwise) | not enforced | variation→parent fix (2f14e88) |
 | Bad item | (n/a) | whole-batch 400 | n/a | flush marks batch failed |
 | No `event_id` | dedup skipped | Layer-1 UPSERT (200) | works | n/a |
 
-**Residual divergence**: the mock dedups on **per-item** `event_id` (matches
-the plugin), but the real engine dedups on **wrapper-level** `event_id`. So the
-mock's dedup test passes while reality differs. This resolves itself when the
-Layer-2 location decision lands (per-item engine support, or wrapper-level
-plugin payloads) — at which point both mock and plugin align to the choice.
+**Fully aligned (W1).** Before W1 the mock dedup'd on per-item (matching the
+plugin) while the engine honoured only wrapper-level — the mock passed but
+reality differed. W1 made per-item canonical on the deployed engine, so mock,
+plugin, and engine now agree. catalog is ✅ live-aligned end to end; the only
+remaining catalog item is the all-or-nothing batch-error edge (F3-14, a later
+refinement, not a blocker).
 
 ---
 
@@ -80,7 +81,7 @@ plugin payloads) — at which point both mock and plugin align to the choice.
 | Shape | batch `{"customers":[...]}` | **single object** (not batch) | drop the array wrapper; accept one object |
 | Wrapper key | `customers` | **unchecked** (Zod doesn't validate the wrapper) | n/a once single-object |
 | Required field | `email` (idempotency `(tenant,email)`) | **`smaily_contact_id` required** | enforce `smaily_contact_id`; plugin must source it |
-| `event_id` | per-item | wrapper-level (cross-cutting) | per Layer-2 decision |
+| `event_id` | per-item | **per-item canonical** (W1, cross-cutting) | none — plugin already per-item |
 | Silent-dropped | (all spec fields stored) | **6 fields silently dropped** (TBD which — to enumerate when probed) | mock should drop them too, or note as no-op |
 
 **Plugin impact (3.3)**: `smaily_contact_id` requirement is the sharp edge —
@@ -97,7 +98,7 @@ work. Single-object vs batch changes the queue/flush batching for customers.
 | Wrapper key | `orders` | **unchecked** | n/a once single-object |
 | Idempotency | `(tenant, external_order_id)` | `external_order_id` (assumed kept) | confirm on probe |
 | Silent-dropped | stored | **`status`, `currency`, `smaily_rec_ctx` dropped** | mock drops them / no-op |
-| `event_id` | per-item | wrapper-level (cross-cutting) | per Layer-2 decision |
+| `event_id` | per-item | **per-item canonical** (W1, cross-cutting) | none — plugin already per-item |
 
 **Plugin impact (3.3)**: the order PayloadBuilder already drafts `status`,
 `currency`, `smaily_rec_ctx` (per spec) — these are sent but silently dropped
@@ -114,7 +115,7 @@ Single-object batching change as with customers.
 | Wrapper key | `events` | `events` (matches) | none |
 | `event_id` | required | **required-ness flips** (TBD) | confirm on probe |
 | `source` | required | **required-ness flips** (TBD) | confirm on probe |
-| `event_id` location | per-item | wrapper-level (cross-cutting) — but browse has no natural key, so this matters most here | per Layer-2 decision |
+| `event_id` location | per-item | **per-item canonical** (W1, W6) — matters most here since browse has no natural-key fallback | none — W1 covers browse (plan W6) |
 
 **Note**: browse is the closest to spec (the engine team called it "cleanest").
 It's also the most dependent on the `event_id`-location decision, because
@@ -122,20 +123,28 @@ browse has **no natural-key UPSERT fallback** (§7) — if per-item `event_id` i
 stripped and the engine only honours wrapper-level, a batch of N browse events
 sharing one wrapper `event_id` would dedup as a single event. That would be a
 **correctness** problem for browse (unlike catalog/customers/orders, where
-Layer-1 covers it). Flag for the Layer-2 decision: browse may force per-item.
+Layer-1 covers it). **Resolved**: W1 made per-item canonical (plan W6 folds
+browse into W1), so browse's no-fallback risk is moot — per-item dedup works.
 
 ---
 
 ## Summary: what the mock needs when Route A lands
 
-1. **catalog** — align dedup to wrapper-level `event_id` (or keep per-item if
-   the engine adds per-item support). Everything else already aligned.
-2. **customers** — single-object (not batch); enforce `smaily_contact_id`;
-   model the 6 silent-dropped fields.
-3. **orders** — single-object; model `status`/`currency`/`smaily_rec_ctx` as
-   dropped.
-4. **browse** — confirm `event_id` / `source` required-ness; resolve the
-   per-item-vs-wrapper question (browse has no Layer-1 fallback).
+> **Important**: the "real engine" columns for customers / orders / browse below
+> describe the **pre-Route-A scaffold**. The locked Route A v2 plan widens the
+> engine **toward the plugin's variant-A design** (batch wrappers, email-key,
+> per-item `event_id`, the rich fields). So the mock's eventual target is the
+> spec/plugin shape, not the current narrow scaffold — each row gets re-probed
+> and aligned when W4/W5 lands.
+
+1. **catalog** — ✅ **done (W1)**. Wrapper key, category_path, per-item dedup all
+   aligned mock ↔ plugin ↔ engine. Residual: F3-14 all-or-nothing batch edge.
+2. **customers** (after W4) — batch `{customers:[...]}` + email-key (W4 drops
+   `smaily_contact_id`, D1); per-item `event_id`. Re-probe + align mock then.
+3. **orders** (after W5) — batch `{orders:[...]}` + `status`/`currency`/
+   `smaily_rec_ctx` accepted; per-item `event_id`. Re-probe + align mock then.
+4. **browse** — per-item `event_id` already canonical (W1/W6); confirm
+   `event_id`/`source` required-ness when implemented plugin-side.
 
 **Build the mock from the engine's real responses**, not from the spec — capture
 a real response per endpoint (as done for catalog) or sync against an
