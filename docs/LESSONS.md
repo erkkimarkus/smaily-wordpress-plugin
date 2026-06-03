@@ -1,215 +1,289 @@
-# LESSONS.md — õppetunnid AI-agendiga ehitamisel
+# LESSONS.md — Lessons from building with an AI agent
 
-Koostatud Smaily Connect WordPress plugin'i Faas 2 lõpu põhjal, kus integration-bugide
-parandamine võttis ~19 iteratsiooni. Suur osa sellest oli välditav. See dokument on
-mõeldud **järgmise projekti algusesse** kaasa võtmiseks ja **Code-agendile** üleandmiseks,
-et samad asjad ei korduks.
-
----
-
-## TL;DR — kolm asja päevast üks
-
-1. **Build-marker** — commit-hash nähtav runtime's (console / footer / `/version`). Tapab "kas bug või cache?" määramatuse.
-2. **Agent näeb päris-keskkonda** — Docker / wp-env / brauser / päris-API agendi käes **enne** kood-tööd, mitte hiljem.
-3. **Integration-test piiridel** — iga "valmis" tükk vajab üht otsast-lõpuni flow-testi päris-keskkonnas, mitte ainult unit-coverage'it.
-
-Pluss kaks mitte-tehnilist:
-- **Domeeni-walkthrough püüab spec-vead**, mida ükski test ei püüa.
-- **Live-probe enne koodimist**, kui leping-detail (väljanimi, payload-asukoht, response-formaat) pole dokumenteeritud — 5-min curl kahe-süsteemi-vahelise eelduse vastu hoiab ära päeva-iteratsiooni hiljem.
+Compiled from the end of Phase 2 of the Smaily Connect WordPress plugin, where fixing
+integration bugs took ~19 iterations. Much of that was avoidable. This document is meant
+to be carried into **the start of the next project** and handed to the **Code agent**
+so the same patterns don't repeat.
 
 ---
 
-## 1. Juurpõhjus: integration-kiht oli süstemaatiliselt testimata
+## TL;DR — three things from day one
 
-Kogu Faas 2 lõpu valu taandub ühele asjale. Backend-loogika oli tugev (95% unit-coverage,
-140 PHPUnit + 96 Vitest testi, kõik rohelised). Aga **komponentide vahelised piirid** olid
-mockitud, mitte päriselt testitud.
+1. **Build marker** — commit hash visible at runtime (console / footer / `/version`).
+   Kills the "is it a bug or stale cache?" ambiguity.
+2. **Agent sees the real environment** — Docker / wp-env / browser / real API in the
+   agent's hands **before** coding starts, not later.
+3. **Integration tests at the boundaries** — every "done" piece needs one end-to-end
+   flow test in a real environment, not just unit coverage.
 
-Iga bug elas **piiril**, mitte komponendi sees:
-
-| Bug | Piir |
-|-----|------|
-| `restRoot` vs `restUrl` field-mismatch | PHP ↔ TypeScript |
-| Wizard ei kutsunud salvestust | Wizard ↔ backend |
-| Legacy hook crash REST-salvestusel | Uus kood ↔ legacy kood |
-| Backfill DB-tabel puudus | Plugin ↔ WP-migration (dbDelta) |
-| Workflows tagastas mock-andmeid | Plugin ↔ Smaily-API |
-| Salvestab võtmega X, loeb võtmega Y | Write ↔ read |
-
-**Üldine reegel: mockid peidavad piire. Integration-bugid elavad piiridel.**
-Mida rohkem komponente süsteemis (siin: React + REST + WP + WC + Polylang + legacy + Smaily-API),
-seda rohkem piire, seda olulisem päris-integration-test.
+Plus two non-technical:
+- **Domain walkthrough catches spec errors** that no test catches.
+- **Live probe before coding** when a contract detail (field name, payload location,
+  response shape) is undocumented — a 5-minute curl against a two-system assumption
+  saves a day of iteration later.
 
 ---
 
-## 2. Suurimad ajaraiskajad, järjestatud
+## 1. Root cause: the integration layer was systematically untested
 
-### 2.1 Cache-määramatus (kõige kallim)
+All the late-Phase-2 pain reduces to one thing. Backend logic was strong (95% unit
+coverage, 140 PHPUnit + 96 Vitest tests, all green). But **boundaries between
+components** were mocked, not actually tested.
 
-**Mis juhtus:** korduvalt "ei salvesta" → reinstall → vahel töötab. Me ei teadnud,
-kas staging jookseb üldse õiget koodi. Iga "ei tööta" oli kahemõtteline: bug või vana kood?
+Every bug lived at a **boundary**, not inside a component:
 
-**Lahendus (leidsime liiga hilja):** `buildHash` boot-payloadis. ~5 rida koodi.
-Console-check `window.appBoot.buildHash === "abc1234"` kinnitab sekundiga, kas õige kood jookseb.
+| Bug | Boundary |
+|-----|----------|
+| `restRoot` vs `restUrl` field mismatch | PHP ↔ TypeScript |
+| Wizard didn't call save | Wizard ↔ backend |
+| Legacy hook crash on REST save | New code ↔ legacy code |
+| Backfill DB table missing | Plugin ↔ WP migration (dbDelta) |
+| Workflows returned mock data | Plugin ↔ Smaily API |
+| Writes with key X, reads with key Y | Write ↔ read |
 
-**Reegel järgmiseks:** iga deploy'tav projekt vajab build-marker'it **päevast üks**.
-Commit-hash (või `-dirty` flag kui working tree muudetud) nähtav runtime's. Ilma selleta
-on kogu staging-debugimine pime.
-
-### 2.2 Agent ei näinud päris-keskkonda (teine kallim)
-
-**Mis juhtus:** agent parandas CSS-i ja integration-loogikat **pimesi** — arvas fix'i,
-inimene testis staging'is, katki, kordasime. Align-bug võttis 5 katset. Backfill-bug
-(puuduv DB-tabel) ei oleks **kunagi** staging-tsükliga lahenenud, sest seda ei näe ilma
-DB-ligipääsuta.
-
-**Lahendus (leidsime liiga hilja):** Docker + wp-env + chromium agendi keskkonnas.
-Pärast seda nägi agent päris-WP-d ise, luges debug.log-i, reprodutseeris bugid.
-Backfill-bug lahenes esimese wp-env-käivitusega (debug.log näitas SQL-viga kohe).
-
-**Reegel järgmiseks:** kui agent ehitab millegi jaoks, mis jookseb keskkonnas X, peab
-agendil olema **ligipääs keskkonnale X päevast üks**. WP plugin → wp-env. React app → brauser.
-API → päris-HTTP-test. Pimesi-parandamine on aeglane ja ebatäpne.
-
-### 2.3 Mock-testid lõid vale turvatunde (juurpõhjus enamiku bugide taga)
-
-**Mis juhtus:** kõik unit-testid rohelised, aga iga integration-bug läks läbi. Mock testib
-funktsiooni **üksinda**, mitte flow'd **otsast-lõpuni**. "Roheline test" ≠ "töötav feature".
-
-**Lahendus:** agent hakkas **brauseris (chromium) täis-flow'd jooksutama** enne iga ZIP-i —
-sama, mida inimene käsitsi teeks (samm 1 → 6, sulge, ava uuesti, kontrolli säilivust).
-Pärast seda: esimene puhas läbimäng.
-
-**Reegel järgmiseks:** roheline unit-test ≠ töötav feature. Iga "valmis" sub-PR vajab
-**üht otsast-lõpuni flow-testi päris-keskkonnas**, mitte ainult unit-coverage'it.
-Unit loogikale (kiire, väärtuslik), integration piiridele (mida algul puudus).
-
-### 2.4 Mock peegeldab su eeldusi, mitte tegelikkust
-
-**Mis juhtus** (Faas 3 sub-PR 3.1.2): plugin kutsus rec-engine'i path'iga `/setup/exchange`,
-mock-server vastas `/setup/exchange`-le rõõmsalt. Mõlemad testid rohelised. Päris-mootor
-nõudis aga `/api/setup/exchange` — niisiis plugin × mootor ühilduvus oli **katki**, kuigi mock
-ütles "kõik OK". Mock oli **ehitatud sama eelduse järgi** kui plugin (vale path), niisiis
-mock kinnitas eeldust, mitte tegelikkust.
-
-**Sama muster kordus 3.2-s** — mootor lisas `event_id` aktseptimise catalog-body's
-(commit 985c488), aga **asukoht body's pole dokumenteeritud** (per-product vs top-level).
-Mock saaks ehitada kummagi variandi peale ja olla roheline, päris-mootor aktsepteerib ainult ühte.
-
-**Lahendus:** kui leping-detail on **dokumenteerimata** või **hiljuti lisatud**, tee **live-probe**
-enne koodimist — 2 curl'i päris-otspunkti vastu, vaata kumb 200 / kumb 4xx. Lukusta päris-mootori
-vastusega, mitte mock-eeldusega. Seejärel ehita mock **vastama** päris-käitumisele.
-
-**Reegel järgmiseks:** mock testib plugin-loogikat **mock-eelduste** vastu. Päris-ühilduvust
-testib AINULT live-päring tegeliku süsteemi vastu. Niisiis **mõlemad on vajalikud**, kuid
-**live-päring on kohustuslik** enne ZIP-i / merge'i, mitte "kui jõuame". Path-bug oleks pidanud
-viie minuti curl'iga lahenema 5 päeva enne, kui live-test selle tabas.
-
-### 2.5 Konteksti-audit uue sessiooni alguses
-
-**Mis juhtus** (Faas 3 sub-PR 3.2): agent võttis sessiooni-konteksti-kokkuvõtte, alustas plaaniga,
-**aga kontrollis kõigepealt päris-koodi vastu**. Leidis 3 lahknevust: (a) plaani kasutatud nimed
-juba hõivatud teises moodulis, (b) DB-skeem juba olemas (migration commit'itud), (c) aegunud
-arhitektuuri-doc kirjeldab vana lähenemist enne hiljutist disain-otsust.
-
-**See on õige käitumine.** Pikade vahede järel (sessioon-vahetus, taasstart, mälu-värskendus)
-on **konteksti-kokkuvõte risk** — see on inimese arusaam, mitte koodi tegelik seis. Pime-koodimine
-selle põhjal viib drift'i, mille avastab alles staging-test (= aeglane + kallis tagasiside-tsükkel).
-
-**Reegel järgmiseks:** uue sessiooni alguses, **enne kui ükski rida koodi kirjutatakse**,
-agent peab:
-1. `git log` — kus oleme tegelikult (commit-hash + sõnumid)
-2. Vaatama olemasolevaid komponente konteksti-plaani vastu (kas nimed vabad? kas tabel olemas?
-   kas doc värske?)
-3. Raporteerima leitud lahknevused **enne** plaani lukustamist
-
-Aus konteksti-koodi audit säästab tunde hilisemat ümberkirjutamist.
+**General rule: mocks hide boundaries. Integration bugs live at boundaries.**
+The more components in the system (here: React + REST + WP + WC + Polylang + legacy +
+Smaily API), the more boundaries, the more important real integration testing.
 
 ---
 
-## 3. Mitte-tehniline õppetund: spec-vead vs bugid
+## 2. Biggest time sinks, ranked
 
-Mitu suurimat parandust **polnud bugid** — need olid **spec-vead** (ebaselgus või väljajätt
-spetsifikatsioonis). Agent implementeeris täpselt seda, mis spec'is kirjas; viga oli spec'is.
+### 2.1 Cache ambiguity (most expensive)
 
-Näited:
-- Mode A "default account" loogika — äriliselt jaburus, mida ainult domeeni-ekspert nägi
-- Wizard-first arhitektuur — UX-loogika otsus
-- Field-naming-standard — cross-platform järjepidevuse vajadus
-- "Continue peaks salvestama" — UX-ootus
+**What happened:** repeatedly "isn't saving" → reinstall → sometimes works. We didn't
+know whether staging was even running the right code. Every "doesn't work" was
+ambiguous: bug or stale code?
 
-**Reegel järgmiseks:** test kontrollib "kas kood teeb, mida spec ütleb". Ainult **domeeni-ekspert**
-kontrollib "kas spec ise on mõttekas". Need on eraldiseisvad kontrollid — mõlemad vajalikud.
-**Staging-walkthrough domeeni-eksperdiga püüab spec-vead, mida tehniline test ei püüa.**
+**Fix (found too late):** `buildHash` in the boot payload. ~5 lines of code. A console
+check `window.appBoot.buildHash === "abc1234"` confirms in a second whether the right
+code is running.
+
+**Rule for next time:** every deployable project needs a build marker **from day one**.
+Commit hash (with `-dirty` flag if the working tree is modified) visible at runtime.
+Without it, all staging debugging is blind.
+
+### 2.2 Agent couldn't see the real environment (second most expensive)
+
+**What happened:** the agent fixed CSS and integration logic **blindly** — guessed a
+fix, the human tested in staging, broke, repeat. The alignment bug took 5 attempts.
+The backfill bug (missing DB table) would **never** have been resolved through the
+staging cycle, because you can't see it without DB access.
+
+**Fix (found too late):** Docker + wp-env + Chromium in the agent's environment. After
+that the agent saw real WP itself, read debug.log, reproduced bugs. The backfill bug
+resolved on the first wp-env run (debug.log showed the SQL error immediately).
+
+**Rule for next time:** if the agent is building something that runs in environment X,
+the agent must have **access to environment X from day one**. WP plugin → wp-env.
+React app → browser. API → real HTTP test. Blind fixing is slow and imprecise.
+
+### 2.3 Mock tests created false confidence (root cause behind most bugs)
+
+**What happened:** all unit tests green, but every integration bug got through. Mocks
+test a function **in isolation**, not the flow **end to end**. "Green test" ≠
+"working feature."
+
+**Fix:** the agent started **running full flows in the browser (Chromium)** before
+every ZIP — the same thing a human would do manually (step 1 → 6, close, reopen, check
+persistence). After that: the first clean walkthrough.
+
+**Rule for next time:** green unit tests ≠ working feature. Every "done" sub-PR needs
+**one end-to-end flow test in a real environment**, not just unit coverage. Units for
+logic (fast, valuable), integration for boundaries (which was missing initially).
+
+### 2.4 Mocks reflect your assumptions, not reality
+
+**What happened** (Phase 3 sub-PR 3.1.2): the plugin called the rec engine with path
+`/setup/exchange`, the mock server cheerfully responded to `/setup/exchange`. Both
+tests green. The real engine, however, required `/api/setup/exchange` — so plugin ×
+engine compatibility was **broken**, even though the mock said "all OK." The mock was
+**built around the same assumption** as the plugin (wrong path), so it confirmed the
+assumption, not reality.
+
+**The same pattern repeated in 3.2** — the engine added `event_id` acceptance in the
+catalog body (commit 985c488), but the **location in the body was undocumented**
+(per-product vs top-level). A mock could be built around either variant and stay
+green; the real engine accepts only one.
+
+**Fix:** when a contract detail is **undocumented** or **recently added**, do a
+**live probe** before coding — two curl calls against the real endpoint, see which
+gets 200 / which gets 4xx. Lock against the real engine's response, not the mock
+assumption. Then build the mock to **match the real behavior**.
+
+**Rule for next time:** mocks test plugin logic **against mock assumptions**. Only a
+**live call against the real system** tests real compatibility. So **both are
+needed**, but **a live call is mandatory** before ZIP/merge, not "if we get to it."
+The path bug should have been resolved with five minutes of curl, five days before
+the live test caught it.
+
+**Third time, same pattern** (sub-PR 3.2.2): the mock engine's setup-exchange
+returned its endpoints map with **unprefixed keys** (`catalog`) and **relative
+paths** — built around the plugin's original assumption. The real engine returns
+`ingest_catalog` keys with **absolute URLs** (verified in the 3.1.2 live exchange).
+A `Client::ingest_catalog` reading `endpoints()['ingest_catalog']` would have passed
+every mock test and resolved a null URL in production. The fix rebuilt the mock to
+the engine's live shape. One way to *enforce* this going forward: seed the mock from
+a captured real setup-response, or periodically sync it against an engine-team
+fixture, so the mock can't drift back toward plugin assumptions.
+
+### 2.5 Context-vs-code audit at the start of a new session
+
+**What happened** (Phase 3 sub-PR 3.2): the agent took the session context summary,
+started with the plan, **but checked it against the real code first**. Found 3
+divergences: (a) names in the plan were already taken in another module, (b) the DB
+schema was already in place (migration committed), (c) an out-of-date architecture
+doc described an old approach predating a recent design decision.
+
+**This is the right behavior.** After long gaps (session switch, restart, memory
+refresh), the **context summary is a risk** — it's a human's understanding, not the
+code's actual state. Blind-coding from it leads to drift that staging tests catch
+(= slow + expensive feedback loop).
+
+**Rule for next time:** at the start of a new session, **before writing a single line
+of code**, the agent must:
+1. `git log` — where are we actually (commit hash + messages)
+2. Look at existing components against the context plan (are the names free? does the
+   table exist? is the doc current?)
+3. Report any divergences **before** locking the plan
+
+An honest context-code audit saves hours of later rewriting.
+
+### 2.6 Test environment state is not persistent
+
+**What happened** (Phase 3 sub-PR 3.2 setup): the plugin ran setup-exchange against
+the real engine (in 3.1.2), and api_key was saved encrypted in `wp_options`. A few
+weeks later, when 3.2 coding started, the agent checked the DB → **all `smly_rec_*`
+keys were gone**. Migration tables were still there (activation hook on every boot),
+but the `wp_options` connection state had been wiped.
+
+The cause: `wp-env` recreates the WordPress DB on certain `start`/`stop` cycles —
+this is **documented behavior**, not a bug. But it means **every sub-PR** that needs
+a "connected" state (setup-exchange result, saved settings, integration test
+fixtures) has to account for the fact that **state can disappear on any restart**.
+
+**Solution** (two layers):
+
+1. **Fixture bootstrap** in the test suite — `EnvSeed.php` (opposite of `EnvScrub`)
+   establishes the required state at test start, using the plugin's own save API with
+   mock data. Gives integration tests a "connected" state **without needing a real
+   API call**.
+2. **Live tests preserve real data** — Chromium walks with the real API key (which a
+   human re-mints if lost) verify real compatibility.
+
+**Rule for next time:** test environment state is not persistent. Any state tests
+depend on must come from a **fixture** (regenerable on every run) or a **persistent
+volume** (DB snapshot that survives restarts). Don't rely on the wp-env DB.
+
+This is a **general rule** for other container-based dev environments too (Docker
+Compose, dev server, Vercel preview) — restart wipes state unless it's been
+explicitly persisted. Design tests to be restart-proof.
 
 ---
 
-## 4. Konkreetne checklist uue projekti algusesse
+## 3. The non-technical lesson: spec errors vs bugs
 
-Päevast üks, enne feature-tööd:
+Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity
+or omission in the specification). The agent implemented exactly what the spec said;
+the error was in the spec.
 
-- [ ] **Build-marker** — commit-hash runtime's nähtav (console / footer / `/version` endpoint)
-- [ ] **Agendi ligipääs päris-keskkonnale** — Docker / wp-env / brauser / päris-API agendi käes
-- [ ] **Integration-test-baas enne feature'eid** — "kas app käivitub, kas endpointid vastavad,
-      kas DB-skeem luuakse, kas salvestus round-trip'ib" päris-keskkonnas (mitte mock)
-- [ ] **Read/write sümmeetria reegel** — kui salvestad võtmega X, test loeb sama võtmega X tagasi
-- [ ] **Endpoint-registreerimine ühest kohast** (array-loop / EndpointRegistry deklaratiivne list),
-      mitte igaüks käsitsi — vältab copy-paste-lünga 404-e
-- [ ] **Plugin/app täielik kustutus + reinstall** test-protokollis (mitte peale-upload) — vältab jäänuk/cache-segadust
-- [ ] **Path-konstandid ühest kohast** — kõik välise süsteemi URL-id (`Client::PATH_*` vol sarnane),
-      mitte inline-stringid eri failides. Vältab "mõni `/api`-ga, mõni ilma" lahknevust.
-- [ ] **Tundlikud credentialid env-muutujates** — setup-token / api-key / parool **ei tohi sattuda**
-      vestlusesse, raportisse, commit-message'i ega koodi. Viita "env-muutuja", ära kunagi pane väärtust.
+Examples:
+- Mode A "default account" logic — commercial absurdity that only a domain expert saw
+- Wizard-first architecture — UX logic decision
+- Field-naming standard — cross-platform consistency need
+- "Continue should save" — UX expectation
 
-Iga sub-PR / feature kohta:
-
-- [ ] **Üks otsast-lõpuni flow-test päris-keskkonnas** (mitte ainult unit-coverage)
-- [ ] **Agent näitab raportis "jooksutasin flow läbi, kinnitan"**, mitte ainult "unit-testid rohelised"
-- [ ] **Live-probe enne koodimist**, kui leping-detail (väljanimi, payload-asukoht, response-formaat)
-      dokumenteerimata või hiljuti lisatud — 5-min curl enne 5-päeva-iteratsiooni
-
-Iga uue sessiooni alguses (pärast vahet):
-
-- [ ] **Konteksti-koodi audit** — `git log`, kontrolli komponentide nimed/olemasolu vastu konteksti-plaani,
-      raporteeri lahknevused **enne** plaani lukustamist
-- [ ] **Keskkonna-kontroll** — Docker / wp-env / chromium / deps töötavad? Kui mitte, paranda enne feature-tööd
+**Rule for next time:** tests check "does the code do what the spec says?". Only a
+**domain expert** checks "does the spec itself make sense?". These are separate
+checks — both are needed. **A staging walkthrough with a domain expert catches spec
+errors that technical tests don't catch.**
 
 ---
 
-## 5. Mis töötas hästi (säilita)
+## 4. Concrete checklist for the start of a new project
 
-Mitte kõik polnud valesti — need asjad olid head ja tasub korrata:
+From day one, before feature work:
 
-- **Sub-PR-haaval ehitus + review iga sammu järel** — hoidis tempot ja kvaliteeti
-- **Tugev unit-test-distsipliin loogikale** — kiire areng, puhas backend. Probleem polnud
-  "liiga vähe teste", vaid "vale tüüpi testid integration-kihis"
-- **Aus piirangute tunnistus** — agent ütles, mida ta EI saanud testida (näit "päris-API vajab
-  inimese credentiale"), mitte ei teeselnud
-- **Turvateadlikkus** — agent tuvastas prompt-injection'i tööriista-väljundis + küsis luba enne
-  piiri ületamist (binary-download)
-- **Shared single-source komponendid** — `SubscriberPayloadBuilder`, `buildTabPayload`,
-  `Client::PATH_*` konstandid jagatud ühe tõe-allikana, mitte duplikaadid (vältab drift'i)
-- **EndpointRegistry deklaratiivne route-list** — üks list, kaks tarbijat (Bootstrap + test).
-  Route-404 muutus struktuurselt võimatuks, mitte ainult "testitud". Parim
-  arhitektuuriline samm Faas 3-s.
-- **Mootori = path'ide tõe-allikas** (Faas 3 3.1.2 lihv) — plugin eelistab mootori-tagastatud
-  endpoints-map'i hardcoded-konstantide ees. Mootori path-migrate ei vaja plugin-uuendust.
-  Konstandid fallback. Õige sõltuvuse-suund kahe-süsteemi-disainis.
-- **Koordineeritud disain-otsused mõlemalt poolt enne koodimist** — Faas 3 sub-PR 3.2
-  idempotentsus-mudel (variant A) kinnitati neljal punktil mootori-tiimi poolt **enne**
-  plugin-koodimist. Mootor implementeeris ette. Niisiis live-test pidi töötama esimesel
-  kõnel, mitte avastama lahknevust. Vastand path-bug'i mustrile (eeldus → implementeeri →
-  avasta erinevus). Lukusta leping enne koodi.
+- [ ] **Build marker** — commit hash visible at runtime (console / footer / `/version`
+      endpoint)
+- [ ] **Agent access to the real environment** — Docker / wp-env / browser / real API
+      in the agent's hands
+- [ ] **Integration test baseline before features** — "does the app start, do
+      endpoints respond, does the DB schema get created, does saving round-trip" in a
+      real environment (not mocks)
+- [ ] **Read/write symmetry rule** — if you save with key X, a test reads back with
+      key X
+- [ ] **Endpoint registration from one place** (array loop / `EndpointRegistry`
+      declarative list), not each one by hand — avoids copy-paste-gap 404s
+- [ ] **Full uninstall + reinstall** in the test protocol (not upload-over) — avoids
+      leftover/cache confusion
+- [ ] **Path constants from one place** — all external system URLs (`Client::PATH_*`
+      or similar), not inline strings across files. Avoids "some with `/api`, some
+      without" divergence.
+- [ ] **Sensitive credentials in env variables** — setup token / api key / password
+      **must not** end up in chat, reports, commit messages, or code. Refer to "env
+      variable", never paste the value.
+
+For every sub-PR / feature:
+
+- [ ] **One end-to-end flow test in a real environment** (not just unit coverage)
+- [ ] **The agent shows "I ran the flow through, confirmed" in the report**, not just
+      "unit tests green"
+- [ ] **Live probe before coding** when a contract detail (field name, payload
+      location, response shape) is undocumented or recently added — 5 minutes of curl
+      vs 5 days of iteration
+- [ ] **Fixture bootstrap in the test suite** — all state tests assume must come from
+      a fixture (regenerable), not from a persisted DB. Container restart wipes state.
+
+At the start of every new session (after a gap):
+
+- [ ] **Context-code audit** — `git log`, check component names/existence against the
+      context plan, report divergences **before** locking the plan
+- [ ] **Environment check** — Docker / wp-env / Chromium / deps working? If not, fix
+      before feature work
 
 ---
 
-## 6. Tasakaalustav mõte
+## 5. What worked well (keep doing)
 
-Mitte kõik iteratsioonid polnud välditavad. Faas 2 lõpp oli **esimene päris-keskkonna kokkupuude**,
-mis paljastab alati eeldusi. Ja agendi kiirus (sub-PR päevas, puhas backend) tuli **just** sellest
-unit-test-distsipliinist.
+Not everything was wrong — these were good and worth repeating:
 
-Kompromiss pole "rohkem teste vs vähem", vaid **õiget tüüpi testid õiges kohas**:
-unit loogikale (kiire), integration piiridele (mida algul puudus).
+- **Sub-PR-by-sub-PR build + review at each step** — kept tempo and quality
+- **Strong unit-test discipline for logic** — fast development, clean backend. The
+  problem wasn't "too few tests," it was "the wrong kind of tests at the integration
+  layer."
+- **Honest acknowledgment of limits** — the agent said what it could NOT test
+  (e.g. "real API requires the human's credentials") instead of pretending
+- **Security awareness** — the agent detected prompt injection in tool output and
+  asked permission before crossing a boundary (binary download)
+- **Shared single-source components** — `SubscriberPayloadBuilder`, `buildTabPayload`,
+  `Client::PATH_*` constants shared as one source of truth, not duplicated (prevents
+  drift)
+- **EndpointRegistry declarative route list** — one list, two consumers (Bootstrap +
+  tests). Route 404s became structurally impossible, not just "tested for." The best
+  architectural step in Phase 3.
+- **Engine = source of truth for paths** (Phase 3 3.1.2 polish) — the plugin prefers
+  the engine-returned endpoints map over hardcoded constants. Engine path migrations
+  don't require plugin updates. Constants are fallback. The right direction of
+  dependency in a two-system design.
+- **Coordinated design decisions from both sides before coding** — the Phase 3 sub-PR
+  3.2 idempotency model (variant A) was confirmed on four points by the engine team
+  **before** plugin coding began. The engine implemented in advance. So the live test
+  had to work on the first call, not discover a mismatch. The opposite of the
+  path-bug pattern (assume → implement → discover the difference). Lock the contract
+  before coding.
 
-Ülaltoodud checklist oleks Faas 2 lõpu ~19 iteratsioonist teinud hinnanguliselt ~5.
+---
+
+## 6. A balancing thought
+
+Not all iterations were avoidable. The end of Phase 2 was the **first real-environment
+contact**, which always exposes assumptions. And the agent's speed (a sub-PR a day,
+clean backend) came **precisely** from that unit-test discipline.
+
+The trade-off isn't "more tests vs fewer," it's **the right kind of tests in the right
+place**: units for logic (fast), integration at boundaries (which was missing
+initially).
+
+The checklist above would have reduced the ~19 late-Phase-2 iterations to an
+estimated ~5.

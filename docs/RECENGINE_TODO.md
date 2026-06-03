@@ -1,178 +1,219 @@
-# Rec-engine — mootori-poole nõuded ja soovitused
+# Rec engine — engine-side requirements and recommendations
 
-Koostatud Smaily Connect WP plugin'i Faas 3 ettevalmistuse põhjal. Plugin (ja tulevased
-Shopify-app + muud kanalid) eeldavad, et mootor täidab need nõuded. Jaotatud prioriteedi
-järgi: **P0 = blokeerib pilootkliendi live'i**, **P1 = vajalik enne laiemat levikut**,
-**P2 = hea tava / tulevik**.
+Compiled in preparation for Phase 3 of the Smaily Connect WordPress plugin. The
+plugin (and the future Shopify app and other channels) assumes the engine meets
+these requirements. Sorted by priority: **P0 = blocks the pilot client going live**,
+**P1 = required before broader rollout**, **P2 = good practice / future**.
 
-Autoritatiivne API-leping: `RECENGINE_API_CONTRACT.md`. See dokument on **mootori-poole
-to-do**, mitte lepingu asendus.
-
----
-
-## Seis (uuendatud Faas 3 sub-PR 3.1.2 + 3.2 ettevalmistuse järel)
-
-**P0 — kõik valmis ✅** Pilootkliendi live pole enam mootori-blokeeritud.
-- P0 #1 ✅ Production avalik (Vercel No Protection)
-- P0 #2 ✅ Api-key-auth jõustatud igal endpointil (verifitseeritud `401` ilma key'ta)
-- P0 #3 ✅ Setup-exchange töötab + one-time jõustatud (plugin 3.1.2 live-test tõestas: HTTP 200 päris-mootor, tenant + api_key + round-trip; teine kõne sama token'iga keeldub)
-- P0 #4 ✅ Stabiilne vastuse-formaat (`X-Engine-Version: 1.0.0` header kohal, JSON-struktuur lepingus)
-
-**P1 — pooleli / tegemata** (vajalik enne teist klienti)
-- P1 #5 api-key revoke — staatus tundmatu
-- P1 #6 rate-limiting — mootor ütles "100 req/sec sisenev" (3.2 raport), jõustamise-staatus tundmatu
-- P1 #7 multi-tenant isolatsioon — eeldatakse implementatsioonist, vaja kinnitust
-- P1 #8 GDPR — Faas 3 sub-PR 3.8 vajab
-
-**P2 — osaliselt tehtud**
-- P2 #9 ✅ Idempotentsus IMPLEMENTEERITUD (mootori commit 985c488, migration 0025 `ingest_event_log`,
-  unique `(tenant_id, event_id)` + 90-päeva retention, 22/22 dedup-test PASS, `{"deduplicated": true}` response)
-- P2 #10 versioonimine — `X-Engine-Version` olemas (vt P0 #4), URL-versioon `/v1/` kasutusel
-- P2 #11 🟡 ping-endpoint ROUTE olemas (`GET /api/v1/ingest/ping`, 401 ilma key'ta verifitseeritud),
-  AGA setup-response endpoints-map'is ei sisaldu — audit pooleli mootori-poolel (1-2 päeva)
-- P2 #12 batch-tugi — mootor talub kuni 25000 objekti/päring, plugin jääb spec-konservatiivseks (100)
-
-**Uus / mitte-kategoriseeritud** (avastatud Faas 3 sub-PR 3.2 plaani auditil)
-- 🆕 `event_id` asukoht catalog-body's pole spec-docis dokumenteeritud — mootor lisas commit 985c488-s,
-  aga **per-product vs top-level on lahtine**. Plugin teeb live-probe enne koodimist. **Mootori-tiim:
-  palun dokumenteeri ametlikult RECENGINE_API_CONTRACT.md-s §3-5 (catalog/customers/orders body-struktuur).**
+Authoritative API contract: `RECENGINE_API_CONTRACT.md`. This document is the
+**engine-side to-do**, not a replacement for the contract.
 
 ---
 
-## P0 — blokeerib pilootkliendi live'i
+## Status (updated after Phase 3 sub-PR 3.1.2 and 3.2 preparation)
 
-### 1. Production avalikult jõataav, ilma Vercel SSO-ta ✅ TEHTUD
-Vercel Deployment Protection (SSO wall) peab olema **production'ilt eemaldatud**
-("No Protection"). Põhjus: plugin on masin-klient, mitte inimene — ta ei saa Vercel-SSO-login'i
-läbida. Pilootkliendi WP-server peab mootorile pääsema internetist.
+**P0 — all done ✅** The pilot client going live is no longer engine-blocked.
+- P0 #1 ✅ Production publicly reachable (Vercel No Protection)
+- P0 #2 ✅ API key auth enforced on every endpoint (verified `401` without a key)
+- P0 #3 ✅ Setup exchange works and one-time use is enforced (plugin 3.1.2 live test
+  proved it: HTTP 200 against the real engine, tenant + api_key + round-trip; a
+  second call with the same token is rejected)
+- P0 #4 ✅ Stable response format (`X-Engine-Version: 1.0.0` header present, JSON
+  structure per the contract)
+
+**P1 — in progress / not done** (required before a second client)
+- P1 #5 API key revoke — status unknown
+- P1 #6 Rate limiting — engine reports "100 req/sec inbound" (3.2 report), enforcement
+  status unknown
+- P1 #7 Multi-tenant isolation — presumed from implementation, needs confirmation
+- P1 #8 GDPR — required by Phase 3 sub-PR 3.8
+
+**P2 — partly done**
+- P2 #9 ✅ Idempotency IMPLEMENTED (engine commit 985c488, migration 0025
+  `ingest_event_log`, unique `(tenant_id, event_id)` + 90-day retention, 22/22
+  dedup tests pass, `{"deduplicated": true}` response)
+- P2 #10 Versioning — `X-Engine-Version` present (see P0 #4), URL versioning `/v1/`
+  in use
+- P2 #11 ✅ Ping endpoint COMPLETE — route exists and `ingest_ping` is in the
+  endpoints map (all 11 endpoints visible, confirmed during plugin 3.2.0
+  preparation, commit e3acd85)
+- P2 #12 Batch support — engine tolerates up to 25,000 objects/request, the plugin
+  stays spec-conservative (100)
+
+**New / uncategorized** (discovered in the Phase 3 sub-PR 3.2 plan audit)
+- 🆕 The `event_id` location in the catalog body isn't documented in the spec —
+  the engine added it in commit 985c488, but **per-product vs top-level is open**.
+  The plugin will do a live probe before coding. **Engine team: please officially
+  document this in `RECENGINE_API_CONTRACT.md` §3-5 (catalog/customers/orders body
+  structure).**
+
+---
+
+## P0 — blocks the pilot client going live
+
+### 1. Production publicly reachable, no Vercel SSO ✅ DONE
+Vercel Deployment Protection (SSO wall) must be **removed from production**
+("No Protection"). Reason: the plugin is a machine client, not a human — it can't
+get through Vercel SSO login. The pilot client's WP server must reach the engine
+over the internet.
 
 - Vercel → Project Settings → Deployment Protection → Production = No Protection
-- Turvalisus liigub SSO-lt **api-key-auth'ile** (vt punkt 2). Mootor ei jää kaitseta — kaitse
-  on lihtsalt õiges kihis (masin-auth, mitte inimese-login).
-- Dev/preview-keskkonnad **võivad** SSO taha jääda; ainult production peab avalik olema.
+- Security shifts from SSO to **api-key auth** (see point 2). The engine isn't left
+  exposed — protection just moves to the right layer (machine auth, not human login).
+- Dev/preview environments **may** stay behind SSO; only production needs to be public.
 
-### 2. Iga endpoint jõustab api-key auth'i ✅ TEHTUD
-Avalik mootor ilma auth'ita = kõik andmed lahti. Iga endpoint (välja arvatud setup-exchange,
-vt punkt 3) peab nõudma kehtivat api-key'd.
+### 2. Every endpoint enforces api-key auth ✅ DONE
+A public engine without auth = all data exposed. Every endpoint (except setup
+exchange, see point 3) must require a valid api-key.
 
-- Päring ilma kehtiva api-key'ta → **HTTP 401**
-- Api-key edastatakse päringus (Bearer header või lepingus määratud viis)
-- Kehtib KÕIGILE andme-endpointidele: events, recommendations, identity-merge, GDPR, backfill-ingest
-- Ainus erand: `POST /setup/exchange` (kasutab setup-token'it, mitte api-key'd)
+- Request without a valid api-key → **HTTP 401**
+- API key sent in the request (Bearer header or whatever the contract specifies)
+- Applies to ALL data endpoints: events, recommendations, identity-merge, GDPR,
+  backfill ingest
+- Only exception: `POST /setup/exchange` (uses the setup token, not the api-key)
 
-### 3. Setup-token exchange (`POST /api/setup/exchange`) ✅ TEHTUD
-Plugin saab merchant'ilt one-time setup-token'i, vahetab selle püsiva api-key vastu.
-**Verifitseeritud plugin 3.1.2 live-testis** (HTTP 200, tenant_id + api_key + endpoints-map).
+### 3. Setup-token exchange (`POST /api/setup/exchange`) ✅ DONE
+The plugin gets a one-time setup token from the merchant and exchanges it for a
+persistent api-key. **Verified in plugin 3.1.2 live test** (HTTP 200, tenant_id +
+api_key + endpoints map).
 
-- ✅ **Setup-token on tõesti one-time** — pärast edukat exchange'i ei tohi sama token'iga
-  teist api-key'd saada. Plugin live-test tõestas (token "burned" pärast esimest kasutust).
-- ✅ Exchange tagastab api-key, mille plugin salvestab krüpteeritult oma poolel
-- ✅ Path: `/api/setup/exchange` (mitte `/setup/exchange` — `/api` prefiks kohustuslik)
-- Vajalik vastuse-formaat ja staatuskoodid peavad vastama lepingule, et plugin-Client neid parse'iks
+- ✅ **Setup tokens are truly one-time** — after a successful exchange the same
+  token must not produce a second api-key. Plugin live test proved it (token
+  "burned" after the first use).
+- ✅ Exchange returns an api-key that the plugin stores encrypted on its side
+- ✅ Path: `/api/setup/exchange` (not `/setup/exchange` — the `/api` prefix is
+  mandatory)
+- Response format and status codes must match the contract so the plugin Client can
+  parse them
 
-### 4. Stabiilne, dokumenteeritud vastuse-formaat ✅ TEHTUD
-Plugin parse'ib vastuseid. Iga endpoint peab tagastama **järjepideva** struktuuri.
+### 4. Stable, documented response format ✅ DONE
+The plugin parses responses. Every endpoint must return a **consistent** structure.
 
-- ✅ JSON, lepingus määratud kujul
-- ✅ `X-Engine-Version: 1.0.0` header kohal (verifitseeritud)
-- ✅ Vea-vastused struktureeritud (kood + sõnum), mitte HTML-leht ega tühi body
-- ✅ 4xx vs 5xx eristus tähenduslik (4xx = kliendi-viga, ära retry; 5xx = mootori-viga, võib retry)
-
----
-
-## P1 — vajalik enne laiemat levikut
-
-### 5. Api-key revoke / rotatsioon
-Kui pilootkliendi api-key lekib (näit. plugin-andmebaas kompromiteeritud), peab olema viis
-see **tühistada** ilma teisi kliente mõjutamata.
-
-- Endpoint või admin-võimalus api-key revoke'imiseks
-- Revoke'itud key → 401, plugin peab suutma uue setup-token'iga uue key saada
-- Soovituslik: api-key seotud konkreetse merchant/shop-id-ga (multi-tenant isolatsioon)
-
-### 6. Rate-limiting
-Avalik endpoint = DDoS / kuritarvituse risk. Iga api-key (või IP) peaks olema rate-limited.
-
-- Mõistlik piir per api-key (event-ingest võib olla kõrgem, recommendations madalam)
-- Üle piiri → **HTTP 429** + `Retry-After` header
-- Plugin peaks 429 graatsiliselt käsitlema (event-queue retry hiljem) — aga mootor peab limiidi **jõustama**
-
-### 7. Multi-tenant isolatsioon
-Iga merchant'i andmed (events, visitors, recommendations) peavad olema **rangelt eraldatud**.
-
-- Merchant A api-key ei tohi KUNAGI näha merchant B andmeid
-- Api-key → shop-id mapping jõustatud igal päringul
-- Kriitiline GDPR + ärisaladuse jaoks (üks merchant ei näe teise kliendibaasi)
-
-### 8. GDPR-endpointide tugi
-Plugin pakub WP Privacy API integratsiooni (Faas 3 sub-PR 3.8). Mootor peab toetama:
-
-- Kasutaja-andmete **eksport** (mida mootor selle kontakti kohta hoiab)
-- Kasutaja-andmete **kustutus** (right to be forgotten)
-- Endpointid + formaat lepingus; mootor peab tegelikult andmed kustutama, mitte ainult märkima
+- ✅ JSON, in the shape defined by the contract
+- ✅ `X-Engine-Version: 1.0.0` header present (verified)
+- ✅ Error responses structured (code + message), not an HTML page or empty body
+- ✅ 4xx vs 5xx distinction meaningful (4xx = client error, don't retry; 5xx =
+  engine error, may retry)
 
 ---
 
-## P2 — hea tava / tulevik
+## P1 — required before broader rollout
 
-### 9. Idempotentsus event-ingest'is ✅ IMPLEMENTEERITUD
-Plugin event-queue võib retry'da (võrgu-katkestus, 5xx). Mootor **välistab duplikaate**.
+### 5. API key revoke / rotation
+If a pilot client's api-key leaks (e.g. plugin DB compromised), there must be a way
+to **revoke** it without affecting other clients.
 
-**Implementatsioon** (mootori commit 985c488, migration 0025):
-- ✅ Event kannab unikaalset id-d (`event_id` wire-väljanimi, plugin saadab kõigil ingest-endpointidel)
-- ✅ Unique `(tenant_id, event_id)` `ingest_event_log` tabelis, 90-päeva permanent retention
-- ✅ Sama `event_id` kaks korda → `200 {"deduplicated": true}` (no-op)
-- ✅ Backward-compat: kui plugin `event_id` ei saada → natural-key UPSERT (sku / email / external_order_id).
-  `event_id` on **defensive layer** natural-key UPSERT'i peal, mitte asendus
-- ✅ Plugin käsitleb `{"deduplicated": true}` kui edukat töötlust — queue-rida `completed`, mitte retry
-- 22/22 dedup-test PASS (mootori-pool)
+- Endpoint or admin capability for revoking an api-key
+- Revoked key → 401, and the plugin must be able to obtain a new key with a new
+  setup token
+- Recommended: tie the api-key to a specific merchant/shop id (multi-tenant
+  isolation)
 
-**Lahtine** (vt seis-kokkuvõte ülal): `event_id` **asukoht body's** spec-doc'is dokumenteerimata
-(per-product vs top-level). Plugin teeb live-probe enne 3.2 koodimist; pärast probe-tulemust
-mootori-tiim peaks **dokumenteerima** RECENGINE_API_CONTRACT.md §3-5-s.
+### 6. Rate limiting
+A public endpoint = a DDoS / abuse risk. Every api-key (or IP) should be
+rate-limited.
 
-### 10. Versioonimine
-Api muutub ajas (Shopify, muud kanalid lisanduvad). Versioon-strateegia hoiab vanad kliendid töös.
+- Sensible limit per api-key (event ingest can be higher, recommendations lower)
+- Over the limit → **HTTP 429** + `Retry-After` header
+- The plugin should handle 429 gracefully (event queue retry later) — but the
+  engine must **enforce** the limit
 
-- `X-Engine-Version` (juba P0 punkt 4) + kaalu URL-versioonimist (`/v1/...`) või header-versioonimist
-- Breaking-change → uus versioon, vana säilib mõnda aega (plugin-update pole hetkeline kõigil merchant'idel)
+### 7. Multi-tenant isolation
+Each merchant's data (events, visitors, recommendations) must be **strictly
+separated**.
 
-### 11. Observability / health-endpoint 🟡 OSALISELT
-Plugin (+ sina) peab teadma, kas mootor on töökorras.
+- Merchant A's api-key must NEVER see merchant B's data
+- api-key → shop-id mapping enforced on every request
+- Critical for GDPR and trade secrecy (one merchant must not see another's customer
+  base)
 
-**Implementatsioon** (mootori commit 668d463):
-- ✅ Route OLEMAS: `GET /api/v1/ingest/ping`, verifitseeritud `401` ilma api-key'ta
-- 🟡 **Endpoints-map'is ei sisaldu** setup-response'is — audit pooleli mootori-poolel (1-2 päeva).
-  Pärast kinnitust plugin RecEngineConnectivityTest lülitub sisse automaatselt.
-- Logimine mootori-poolel: kes/millal/mis endpoint (debug + abuse-detect) — staatus tundmatu
+### 8. GDPR endpoint support
+The plugin integrates with the WP Privacy API (Phase 3 sub-PR 3.8). The engine must
+support:
 
-### 12. Backfill-maht ja batch-tugi
-Plugin teeb rec-engine backfilli (orders/customers/products, batch 100 — Faas 3 sub-PR 3.5).
-Suur merchant = palju andmeid.
-
-- Mootor peab taluma batch-ingest'i (sadu/tuhandeid event'e järjest)
-- Kaalu bulk-endpoint (üks päring, N event'i) vs üksik-päringud (jõudlus suure backfill'i puhul)
-- Rate-limit (punkt 6) ei tohi backfilli liiga aeglaseks teha — kaalu kõrgem limiit ingest'ile
+- User data **export** (what the engine holds about a contact)
+- User data **deletion** (right to be forgotten)
+- Endpoints and format in the contract; the engine must actually delete data, not
+  just flag it
 
 ---
 
-## Märkus turvalisuse kohta üldiselt
+## P2 — good practice / future
 
-P0 #1-4 on **tehtud õiges järjekorras** — api-key-auth jõustati enne kui Vercel SSO eemaldati,
-niisiis pole olnud "avalik + lahti" akent. ✓
+### 9. Idempotency in event ingest ✅ IMPLEMENTED
+The plugin's event queue may retry (network outage, 5xx). The engine **prevents
+duplicates**.
 
-Edaspidi: P1 (revoke, rate-limit, multi-tenant isolatsioon) peavad olema valmis **enne teist klienti**.
-Pilootklient võib live'i minna P1-ta (üks merchant, kontrollitud keskkond), aga laiem levik vajab P1.
+**Implementation** (engine commit 985c488, migration 0025):
+- ✅ Events carry a unique id (`event_id` wire field name, the plugin sends it on
+  every ingest endpoint)
+- ✅ Unique `(tenant_id, event_id)` in the `ingest_event_log` table, 90-day
+  permanent retention
+- ✅ Same `event_id` twice → `200 {"deduplicated": true}` (no-op)
+- ✅ Backward compat: if the plugin doesn't send `event_id` → natural-key UPSERT
+  (sku / email / external_order_id). `event_id` is a **defensive layer** on top of
+  natural-key UPSERT, not a replacement.
+- ✅ The plugin treats `{"deduplicated": true}` as a successful processing —
+  queue row `completed`, not retried
+- 22/22 dedup tests pass (engine side)
+
+**Open** (see status summary above): the `event_id` **location in the body** is
+undocumented in the spec (per-product vs top-level). The plugin will do a live
+probe before 3.2 coding; once that's resolved, the engine team should **document
+it** in `RECENGINE_API_CONTRACT.md` §3-5.
+
+### 10. Versioning
+The API will change over time (Shopify and other channels are coming). A versioning
+strategy keeps old clients working.
+
+- `X-Engine-Version` (already P0 #4) plus consider URL versioning (`/v1/...`) or
+  header versioning
+- Breaking change → new version, the old one persists for a while (plugin updates
+  aren't instant across all merchants)
+
+### 11. Observability / health endpoint ✅ COMPLETE
+The plugin (and you) needs to know whether the engine is working.
+
+**Implementation** (engine commit 668d463 + endpoints-map fix e3acd85):
+- ✅ Route EXISTS: `GET /api/v1/ingest/ping`, verified `401` without an api-key
+- ✅ Endpoints map includes `ingest_ping` (all 11 endpoints visible in the setup
+  response, confirmed in plugin 3.2.0 preparation)
+- ✅ Plugin `RecEngineConnectivityTest` ping turns on in 3.2.0 — a full
+  connectivity check live test
+- Engine-side logging: who/when/what endpoint (debug + abuse detect) — status
+  unknown
+
+### 12. Backfill volume and batch support
+The plugin runs rec-engine backfill (orders/customers/products, batch 100 — Phase 3
+sub-PR 3.5). A large merchant = a lot of data.
+
+- The engine must tolerate batch ingest (hundreds/thousands of events in a row)
+- Consider a bulk endpoint (one request, N events) vs single requests (throughput
+  for large backfills)
+- The rate limit (point 6) must not make backfill too slow — consider a higher
+  limit for ingest
 
 ---
 
-## Seos plugin-arendusega
+## Note on security in general
 
-Plugin Faas 3 sub-PR-id eeldavad neid:
-- **3.1** (Client + setup-exchange) → P0 #3, #4
+P0 #1-4 was **done in the right order** — api-key auth was enforced before Vercel
+SSO was removed, so there was no "public + open" window. ✓
+
+Going forward: P1 (revoke, rate-limit, multi-tenant isolation) must be ready
+**before a second client**. The pilot can go live without P1 (a single merchant,
+controlled environment), but broader rollout requires P1.
+
+---
+
+## Relationship to plugin development
+
+Plugin Phase 3 sub-PRs assume:
+- **3.1** (Client + setup exchange) → P0 #3, #4
 - **3.4** (events ingest) → P0 #2, P2 #9
 - **3.5** (backfill) → P2 #12
 - **3.7** (identity-merge) → P0 #2, P1 #7
 - **3.8** (GDPR) → P1 #8
 
-P0 kõik peavad olema valmis enne pilootkliendi live'i. P1 enne teist klienti. P2 jooksvalt.
+All of P0 must be ready before the pilot client goes live. P1 before a second
+client. P2 on a rolling basis.

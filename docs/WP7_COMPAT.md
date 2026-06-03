@@ -1,153 +1,167 @@
-# WP7_COMPAT.md — WordPress 7 ühilduvus + strateegilised võimalused
+# WP7_COMPAT.md — WordPress 7 compatibility and strategic opportunities
 
-WordPress 7.0 "Armstrong" vabastati **20. mail 2026** — suurim core-relise alates 5.0-st (2018).
-See dokument kaardistab, mida Smaily Connect plugin peab tegema **kohe** (ühilduvus) ja
-**strateegiliselt hiljem** (uued AI-API-d, mis sobivad otseselt plugin'i ökosüsteemi).
-
----
-
-## Mida WP 7 toob — kolm peamist asja
-
-**1. PHP 7.4 miinimum** (oli 7.2/7.3). Plugin juba PHP 8.3 peal, niisiis **mitte mure**.
-WP 6.9 jääb branchina alles vanematele PHP-versioonidele.
-
-**2. Real-time collaboration** block editor'is (Yjs-põhine) + esimene päris admin-redesign
-10+ aasta jooksul (uued värvid, tüpograafia, ikoonid). Visuaal-mõju plugin'i Tailwind-stiilitud
-wizard'ile + Settings'ile — vajab auditit.
-
-**3. AI infrastruktuur core'is** — see on **strateegiliselt huvitav**. Kolm seotud API-d:
-- **Connectors API** (Settings → Connectors) — platform-level credential-storage ja
-  provider-haldus välistele teenustele. Built around `php-ai-client`.
-- **Abilities API** — pluginad registreerivad **tüpiseeritud actions**, mida AI-agendid
-  saavad avastada ja kutsuda.
-- **MCP Adapter** — exposes the whole stack to Model Context Protocol tools (Claude Code,
-  Cursor jms).
-
-Märkus: Connectors + Abilities + MCP on **experimental** WP 7-s. Õige strateegia plugin-tiimidele
-on **valikuline omaks-võtt**, mitte kogu toote pärisseismine praeguse UI-lepingu peal.
+WordPress 7.0 "Armstrong" was released **on 20 May 2026** — the largest core release
+since 5.0 (2018). This document maps out what the Smaily Connect plugin needs to do
+**now** (compatibility) and **strategically later** (new AI APIs that fit the plugin's
+ecosystem directly).
 
 ---
 
-## Mida pluginas teha — kohe (Faas 3 katkesta)
+## What WP 7 brings — three main things
 
-Need on **väikesed**, ei pea segama Faas 3 rec-engine tööd:
+**1. PHP 7.4 minimum** (was 7.2/7.3). The plugin is already on PHP 8.3, so **no
+concern here**. WP 6.9 stays as a branch for older PHP versions.
 
-1. **wp-env matrix laienda** — `.wp-env.json` kõrvale (või sees) WP 7.0 test-konfiguratsioon.
-   Code'i integration-suite jookseb mõlemal: WP 6.9.4 (praegune tugi) + WP 7.0 (ühilduvus-test).
-   3.0 integration-baas teeb seda automaatselt — `npm run ci:strict` katab mõlemad.
+**2. Real-time collaboration** in the block editor (Yjs-based) plus the first real
+admin redesign in 10+ years (new colors, typography, icons). Visual impact on the
+plugin's Tailwind-styled wizard and Settings — needs an audit.
 
-2. **Visuaal-audit** — Code chromium walk'iga vaatab wizard'i + Settings'i WP 7 admin-chrome'i
-   taustal. Tõenäoliselt **mõned väikesed nihked** (focus-ring värvid, link-värvid, font-erinevus).
-   Brand-pink + dark navy peaks töötama uue palett peal, aga kontrolli.
+**3. AI infrastructure in core** — this is the **strategically interesting** part.
+Three related APIs:
+- **Connectors API** (Settings → Connectors) — platform-level credential storage and
+  provider management for external services. Built around `php-ai-client`.
+- **Abilities API** — plugins register **typed actions** that AI agents can discover
+  and call.
+- **MCP Adapter** — exposes the whole stack to Model Context Protocol tools (Claude
+  Code, Cursor, etc.).
 
-3. **Plugin-header** — pärast compat-test rohelist:
+Note: Connectors, Abilities, and MCP are **experimental** in WP 7. The right strategy
+for plugin teams is **opt-in adoption**, not staking the whole product on the current
+UI contract.
+
+---
+
+## What to do in the plugin now (don't interrupt Phase 3)
+
+These are **small**, no need to interrupt Phase 3 rec-engine work:
+
+1. **Extend the wp-env matrix** — alongside (or inside) `.wp-env.json`, a WP 7.0 test
+   configuration. The agent's integration suite runs on both: WP 6.9.4 (current
+   support) and WP 7.0 (compatibility check). The 3.0 integration baseline picks this
+   up automatically — `npm run ci:strict` covers both.
+
+2. **Visual audit** — the agent's Chromium walks check the wizard and Settings
+   against the WP 7 admin chrome. There will likely be **small shifts** (focus ring
+   colors, link colors, font differences). Brand pink and dark navy should work on
+   the new palette, but verify.
+
+3. **Plugin header** — once the compat check is green:
    - `Tested up to: 7.0`
-   - `Requires at least: 6.6` (või kus praegune miinimum on)
+   - `Requires at least: 6.6` (or whatever the current minimum is)
    - `Requires PHP: 7.4`
 
-4. **WC HPOS + WP 7** — kontrolli, et HPOS töötab WP 7-l. WC 10.7 peaks olema OK, aga edge-case'id
-   on edge-case'id — chromium-walk WC product-create + order-create katab.
+4. **WC HPOS + WP 7** — verify that HPOS works on WP 7. WC 10.7 should be fine, but
+   edge cases are edge cases — a Chromium walk for WC product creation and order
+   creation covers it.
 
-5. **Smaily Landing Pages Gutenberg-block** — kui plugin sellise pakub, kontrolli, et töötab
-   real-time collab'iga (kaks kasutajat samaaegselt editor'is). Tõenäoliselt OK (block API ei
-   muutunud fundamentaalselt), aga märgi.
+5. **Smaily Landing Pages Gutenberg block** — if the plugin ships one, verify it
+   works with real-time collab (two users in the editor at once). Probably fine
+   (block API didn't change fundamentally), but note it.
 
-**Sub-PR scope**: kõik 5 koos ühte väikesse sub-PR-i (näit. 3.x.x WP7 compat). MITTE Faas 3 sees
-omaette sub-PR — sobib Faas 3 lõppu või Faas 4 algusesse.
-
----
-
-## Strateegiline võimalus — Abilities API + Connectors (Faas 4)
-
-**See on dokumendi tähtsam pool.** WP 7 AI-API-d **sobivad otseselt sinu projekti** — Smaily +
-rec-engine on **täpselt see**, mida need API-d on loodud ühildama.
-
-### Võimalus 1 — Smaily + rec-engine kui Connectors
-
-WP 7 Connectors hub on **tsentraliseeritud credential-haldus** välistele teenustele. Praegune
-plugin omab kogu credential-UI-d (subdomain + username + password Smaily-le, setup-token →
-api_key rec-engine'ile). WP 7 Connectors võib selle koorma **üle võtta**:
-
-- Kasutaja seadistab `Settings → Connectors` all **üks kord**
-- Plugin loeb credentialid Connectors API kaudu, mitte omast wp_options-tabelist
-- UX ühtlustub WP-tervikuga, kasutaja ei pea iga plugina jaoks eraldi credential-UI-d
-  õppima
-
-**Risk**: Connectors API on **experimental** WP 7-s — UI-leping võib muutuda. Õige samm pole
-kohe migrate'da, vaid **valmistuda**: plugin-poolne credential-loogika peab olema **isoleeritud**
-(`Credentials.php`, `RecEngineSettings.php` value-object'id), nii et hiljem
-`WP_Connector::get('smaily')` asendamine on lihtne. **Sa juba ehitad õigesti** — see on
-ettenägelik arhitektuur.
-
-### Võimalus 2 — Abilities API kui rec-engine'i tugiraam ⭐
-
-**See on kõige huvitavam.** Abilities API laseb pluginal registreerida **tüpiseeritud actions**,
-mida AI-agendid (Claude, GPT, kohalik WP-AI) saavad **avastada ja kutsuda** standardse liidese
-kaudu.
-
-Smaily Connect'il oleksid loomulikud abilities:
-- `smaily.subscribe_user` — lisa kontakt nimekirja
-- `smaily.send_email` — saada transactional email
-- `smaily.list_workflows` — kuva automaatikad
-- `recengine.get_recommendations` — hangi soovitused kasutajale
-- `recengine.track_event` — logi browse / ostu-event
-- `recengine.merge_identity` — ühenda anonymous → known user
-
-**Strateegiline mõju**: kui Smaily Connect pakub neid abilities'eid, siis **iga AI-tööriist**
-WordPress-i ökosüsteemis (merchant's AI assistant, Claude doing site automation, kolmandate-osapoolte
-plugins) saab **Smaily-d ja rec-engine'i kutsuda standardse liidese kaudu**. Mitte ainult sinu
-plugin → mootor, vaid **kogu ökosüsteem → Smaily**.
-
-**Konkurents**: Mailchimp, Klaviyo, Brevo jt suuremad email-platvormid pole WP 7 Abilities-tuge
-kiiruga lisanud. **Kui Smaily on esimene Eesti / Põhja-Euroopa email-platvorm Abilities-tugi**,
-on see **eelis võtmiseks** (developer-mind-share, "AI-ready" turundus-positsioneerimine,
-MCP-tööriistade-ühilduvus). Faas 4 strateegiline prioriteet.
-
-### Võimalus 3 — MCP Adapter
-
-Abilities API laiendus AI-tööriistadele (Claude Code, Cursor jms) Model Context Protocol kaudu.
-**Sõltub Abilities olemas** — kui Abilities registreeritud, MCP Adapter eksponeerib need
-automaatselt MCP-tööriistadele. Lisa-investeering väike, väärtus suur (Claude/Cursor saavad
-Smaily-d otse kutsuda).
-
-**Pärast Abilities (Võimalus 2) automaatne järgmine samm.**
+**Sub-PR scope:** all five together in one small sub-PR (e.g. 3.x.x WP 7 compat).
+NOT inside Phase 3 as a standalone sub-PR — fits at the end of Phase 3 or the start
+of Phase 4.
 
 ---
 
-## Mida MITTE muuta praegu
+## Strategic opportunity — Abilities API + Connectors (Phase 4)
 
-- **Wizard'i credential-loogikat** — Connectors API on experimental, oota stabiilset
-- **Admin-UI komponente** — admin-redesign võib värvide-konflikti tekitada, aga oota
-  tegelikku kasutaja-tagasisidet. Tailwind on flex enough — tõenäoliselt nihked, mitte purunemine.
-- **Block editor integratsiooni ümberkirjutust** — block API ei muutunud fundamentaalselt,
-  ainult real-time collab kiht peal
-- **Faas 3 rec-engine tööd Abilities-suunas** — Abilities tuleb peale rec-engine valmis-saamist,
-  mitte selle keskel
+**This is the more important half of the document.** The WP 7 AI APIs **fit your
+project directly** — Smaily and the rec engine are **exactly what these APIs were
+designed to unify**.
+
+### Opportunity 1 — Smaily and rec engine as Connectors
+
+The WP 7 Connectors hub is **centralized credential management** for external
+services. The current plugin owns the whole credential UI (subdomain + username +
+password for Smaily, setup-token → api_key for the rec engine). WP 7 Connectors can
+**take that burden over**:
+
+- The user configures everything under `Settings → Connectors` **once**
+- The plugin reads credentials through the Connectors API, not from its own
+  `wp_options` table
+- The UX aligns with the rest of WP, the user doesn't have to learn a separate
+  credential UI per plugin
+
+**Risk:** the Connectors API is **experimental** in WP 7 — the UI contract may
+change. The right step isn't to migrate now, but to **prepare**: plugin-side
+credential logic should already be **isolated** (`Credentials.php`,
+`RecEngineSettings.php` value objects), so later swapping in
+`WP_Connector::get('smaily')` is easy. **You're already building it right** — this is
+forward-looking architecture.
+
+### Opportunity 2 — Abilities API as a frame for the rec engine ⭐
+
+**This is the most interesting one.** The Abilities API lets a plugin register
+**typed actions** that AI agents (Claude, GPT, a local WP AI) can **discover and
+call** through a standard interface.
+
+Smaily Connect would have natural abilities:
+- `smaily.subscribe_user` — add a contact to a list
+- `smaily.send_email` — send a transactional email
+- `smaily.list_workflows` — list automations
+- `recengine.get_recommendations` — fetch recommendations for a user
+- `recengine.track_event` — log a browse or purchase event
+- `recengine.merge_identity` — merge anonymous → known user
+
+**Strategic impact:** if Smaily Connect offers these abilities, then **any AI tool**
+in the WordPress ecosystem (a merchant's AI assistant, Claude doing site automation,
+third-party plugins) can **call Smaily and the rec engine through a standard
+interface**. Not just your plugin → the engine, but **the whole ecosystem → Smaily**.
+
+**Competition:** Mailchimp, Klaviyo, Brevo, and the other major email platforms
+haven't rushed to add WP 7 Abilities support. **If Smaily is the first Estonian /
+Nordic email platform with Abilities support**, that's a **head start to claim**
+(developer mindshare, "AI-ready" marketing positioning, MCP-tool compatibility).
+A Phase 4 strategic priority.
+
+### Opportunity 3 — MCP Adapter
+
+An extension of the Abilities API to AI tools (Claude Code, Cursor, etc.) via the
+Model Context Protocol. **Depends on Abilities being in place** — once Abilities are
+registered, the MCP Adapter exposes them automatically to MCP tools. Small extra
+investment, large value (Claude/Cursor can call Smaily directly).
+
+**The automatic next step after Abilities (Opportunity 2).**
 
 ---
 
-## Konkreetne ajakava
+## What NOT to change now
 
-| Aeg | Tegevus | Mahukus |
-|-----|---------|---------|
-| Faas 3 kõrval (nüüd) | wp-env matrix WP 7 + visuaal-audit + plugin-header | ~1 päev |
-| Pärast Faas 3 lõppu | WC HPOS + WP 7 sanity-check + block-editor collab-test | ~1 päev |
-| **Faas 4 algus** | **Abilities API + MCP Adapter strateegiline disain** | ~1-2 nädalat |
-| Faas 4 keskel | Connectors API migrate, kui stabiilseks läinud | ~1 nädal |
-
-**Faas 4 strateegiline prioriteet**: Abilities API. Mitte ainult tehniline ühilduvus, vaid
-**positsioneerimine AI-driven WordPress ökosüsteemis**. Smaily kui esimene email-platvorm
-Abilities-toega võib olla **suurim turundus-võit** Smaily-le aastate jooksul — eriti, kui
-WP 7 AI-suund jätkub WP 7.1, 7.2-s (mis tõenäoliselt).
+- **Wizard credential logic** — the Connectors API is experimental, wait for stable
+- **Admin UI components** — the admin redesign may cause color conflicts, but wait
+  for real user feedback. Tailwind is flexible enough — likely shifts, not breakage.
+- **Block editor integration rewrites** — the block API didn't change fundamentally,
+  only a real-time collab layer was added on top
+- **Phase 3 rec-engine work in the Abilities direction** — Abilities come after the
+  rec engine is done, not during
 
 ---
 
-## Allikad
+## Concrete timeline
 
-- WordPress 7.0 "Armstrong" — 20. mai 2026
-- Make WordPress Core dev-note: Connectors API (märts 2026)
-- Make WordPress Core dev-note: Client-Side Abilities API (märts 2026)
-- WordPress 7.0 Developer Guide (Nandann Creative, märts 2026)
+| When | Activity | Size |
+|------|----------|------|
+| Alongside Phase 3 (now) | wp-env matrix WP 7 + visual audit + plugin header | ~1 day |
+| After Phase 3 ends | WC HPOS + WP 7 sanity check + block editor collab test | ~1 day |
+| **Phase 4 start** | **Abilities API + MCP Adapter strategic design** | ~1-2 weeks |
+| Phase 4 mid | Migrate to Connectors API once stable | ~1 week |
 
-Vaata ka: LESSONS.md (üldised AI-agendiga-ehitamise õppetunnid),
-RECENGINE_TODO.md (mootori-poole staatus), RECENGINE_API_CONTRACT.md (plugin↔mootor leping).
+**Phase 4 strategic priority:** the Abilities API. Not just technical compatibility,
+but **positioning in the AI-driven WordPress ecosystem**. Smaily as the first email
+platform with Abilities support could be **the biggest marketing win** for Smaily in
+years — especially if the WP 7 AI direction continues in WP 7.1, 7.2 (which is
+likely).
+
+---
+
+## Sources
+
+- WordPress 7.0 "Armstrong" — 20 May 2026
+- Make WordPress Core dev note: Connectors API (March 2026)
+- Make WordPress Core dev note: Client-Side Abilities API (March 2026)
+- WordPress 7.0 Developer Guide (Nandann Creative, March 2026)
+
+See also: `LESSONS.md` (general lessons on building with an AI agent),
+`RECENGINE_TODO.md` (engine-side status), `RECENGINE_API_CONTRACT.md` (plugin ↔
+engine contract).
