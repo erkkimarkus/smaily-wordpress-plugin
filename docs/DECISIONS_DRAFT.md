@@ -1021,12 +1021,98 @@ pattern, live-verify before ZIP."
 
 ---
 
+### F3-17: Required-if-always-sent principle (W2 application)
+
+**Context:** during Route A W2 (catalog field expansion), the engine team
+flagged that `product_url` and `in_stock` were marked required in spec §3
+but the engine Zod schema was lenient (`optional()` and `default(true)`
+respectively). They asked whether plugin always sends these — if yes, tighten
+the engine to match the spec; if not, loosen the spec to match the engine.
+
+**Decision:** if the plugin can **always** send a field (no conditional skip
+path, no edge case), the engine **should require** it. Defaults hide drift.
+
+**Rationale:**
+- **One truth, no silent fallbacks** — sister principle to CC-9 (single
+  canonical path). A field that's "required in spec, defaulted in engine" is
+  the same anti-pattern as "canonical in spec, legacy in engine": readers
+  see two stories.
+- **Loud failure over silent guess** — if `product_url` is missing for any
+  reason, a 400 surfaces the underlying problem (e.g., a custom plugin broke
+  `get_permalink()`); a silent `product_base_url + sku` fallback hides it
+  until customer-facing email rendering goes wrong.
+- **Plugin verification is cheap** — `CatalogPayloadBuilder` is auditable in
+  seconds (unconditional array-literal block, doc-comment states "REQUIRED
+  fields are always present"). The "always sent" claim is mechanically
+  verifiable, not a hopeful assumption.
+
+**Concrete application (W2):**
+- `product_url`: required + non-empty (mirrors `category_path` strictness)
+- `in_stock`: required (always a real boolean from `is_in_stock()`)
+- Engine commit `967e142` tightened the schema; spec commit `645c4fa` synced
+- Live-validated: missing → 400, empty string → 400 (product_url), both
+  present → 200
+
+**When this rule does NOT apply:** if the plugin has a legitimate conditional
+skip path (e.g., a field that depends on plugin configuration the user can
+disable), keep optional. The rule is "can the plugin always send" not
+"should the plugin always send."
+
+---
+
+### F3-18 (candidate): Batch failure isolation mode
+
+**Context:** with W2's all-or-nothing catalog validation locked in, a single
+invalid product in a 100-row batch fails the whole batch with 400. Current
+plugin behavior (`IngestFlusher::handle_failure`) marks **all** rows in the
+failed batch as `mark_failed` — so 1 bad record fails 100, and the audit log
+conflates the 99 healthy rows with the 1 poison row. Code audit confirmed:
+no `errors[]` parsing, and `ApiException` discards the response body details
+(reads only `request_id` from line 37-46), so per-row identification isn't
+possible without additional work.
+
+**Decision (provisional, not yet implemented):** when first batch-4xx is
+observed in a flush cycle, switch that batch to per-row retry mode. Send
+each product individually; 99 succeed (`mark_sent`), 1 fails (`mark_failed`
+with the actual SKU in the audit log).
+
+**Rationale:**
+- **Audit log truth** — pilot operator sees "1 row failed, 99 sent" instead
+  of "100 failed, retry the batch", which is misleading
+- **No engine-side dependency** — works with current engine response shape
+  (just generic 400), doesn't require engine to add `errors[]` structure
+- **Degraded mode is the exception** — only triggers on first 4xx in a batch,
+  not preemptively. 99% of batches don't hit it.
+
+**Alternatives considered:**
+- **Variant A** — parse `errors[]` from response body. Requires engine-side
+  schema change to return `{fieldErrors: {products: {index: N, sku: ..., error: ...}}}`
+  in 400 responses. More precise but couples plugin to engine schema change.
+  Engine team can revisit if real pilot operations show "regularly bad
+  products" patterns where per-row HTTP cost matters.
+- **Status quo** — accept the audit-log conflation. Acceptable if pilot
+  catalogs don't routinely have validation errors (which is the expected
+  case for clean WC stores).
+
+**Trade-off:** in degraded mode, 100x more HTTP requests per affected batch.
+If pilot catalogs are clean (no routine validation errors), zero impact. If
+catalogs routinely produce bad records, rate-limit pressure grows; switch to
+Variant A at that point.
+
+**Status:** candidate, not implemented. Promote to full F3-18 entry when
+pilot operations show whether this is a real friction point or theoretical
+concern. **Pre-condition for Variant A path**: `ApiException` must preserve
+the response body `details` field (currently discarded at construction in
+`ApiException.php:37-46`).
+
+---
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
 discovered along the way):
 
-1. Add a **new entry** in the relevant category (F3-17, F3-18, ...)
+1. Add a **new entry** in the relevant category (F3-19, F3-20, ...)
 2. Follow the 5-field form: Context / Decision / Rationale / Alternatives /
    Relationships
 3. Keep it **short** (5-15 lines per decision) — this is a draft, not a full ADR
@@ -1036,11 +1122,11 @@ discovered along the way):
    - Or keep a single `DECISIONS.md` — depending on the repo's culture
 
 **What's likely to be added later in Phase 3:**
-- F3-17: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-18: 3.6 beacon (client side, server proxy, cookie management)
-- F3-19: 3.7 identity-merge (three triggers: post-checkout, login, manual)
-- F3-20: 3.8 GDPR (export/delete, WP Privacy API integration)
-- F3-21: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+- F3-19: 3.5 backfill architecture (cursor pagination, batch size, retry)
+- F3-20: 3.6 beacon (client side, server proxy, cookie management)
+- F3-21: 3.7 identity-merge (three triggers: post-checkout, login, manual)
+- F3-22: 3.8 GDPR (export/delete, WP Privacy API integration)
+- F3-23: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.
