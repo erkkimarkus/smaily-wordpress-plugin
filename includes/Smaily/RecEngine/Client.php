@@ -143,6 +143,12 @@ class Client {
 	 * map's "ingest_catalog" key — full absolute URL), falling back to
 	 * base_url + PATH_INGEST_CATALOG when the map isn't available.
 	 *
+	 * Wire wrapper key is `items`. The 3.2.4 live probe caught the engine
+	 * rejecting `{products:[...]}` with 400 validation_failed (fieldErrors:
+	 * items Required) and accepting `{items:[...]}` — RECENGINE_API_CONTRACT.md
+	 * §3 documents `products`, but the live engine is the source of truth
+	 * (LESSONS §2.4). The doc + mock were corrected to match.
+	 *
 	 * @param array<int, array<string, mixed>> $products
 	 *
 	 * @return array<string, mixed>
@@ -151,7 +157,7 @@ class Client {
 	 */
 	public function ingest_catalog( array $products ): array {
 		$url = $this->resolve_url( 'ingest_catalog', self::PATH_INGEST_CATALOG );
-		return $this->request_url( 'POST', $url, array( 'products' => $products ) );
+		return $this->request_url( 'POST', $url, array( 'items' => $products ) );
 	}
 
 	/**

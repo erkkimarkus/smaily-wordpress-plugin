@@ -197,11 +197,23 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		);
 	}
 
-	$raw      = (string) file_get_contents( 'php://input' );
-	$body     = json_decode( $raw, true );
-	$products = ( is_array( $body ) && isset( $body['products'] ) && is_array( $body['products'] ) )
-		? $body['products']
-		: array();
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	// Wire wrapper key is `items` — verified against the live engine in the
+	// 3.2.4 probe (it 400s on `products`). The mock enforces the same so it
+	// can't drift back toward the plugin's old assumption (LESSONS §2.4).
+	if ( ! is_array( $body ) || ! isset( $body['items'] ) || ! is_array( $body['items'] ) ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'items' => array( 'Required' ) ) ),
+			)
+		);
+	}
+
+	$products = $body['items'];
 
 	$first_sku = ( isset( $products[0]['sku'] ) ) ? (string) $products[0]['sku'] : '';
 
