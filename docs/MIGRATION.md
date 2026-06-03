@@ -262,6 +262,27 @@ ZIP **on top of Smaily Connect 2.0**, the resulting state is undefined. The
 new plugin will be overwritten by the legacy one. Always use one or the
 other — not both side by side.
 
+### Your sale-price data is read fresh, not migrated
+
+If your store uses sale prices, you might wonder whether your existing
+discount data carries over to the recommendation engine. It doesn't need to —
+and that's by design.
+
+The plugin reads sale prices **fresh from WooCommerce** every time it syncs a
+product (the regular price and the sale price are both pulled from the product
+at sync time). It does not convert or copy any stored discount values from the
+legacy plugin.
+
+This matters because the recommendation engine's sale model uses a
+"compare-at" convention: it stores the **higher** pre-sale reference price and
+compares it to the **current** price to determine whether a product is on
+sale. The legacy plugin stored the **lower** on-sale price under a different
+name. A literal copy of the old value into the new field would invert the
+meaning — genuinely discounted products would read as "not on sale." Because
+the plugin re-reads live prices from WooCommerce rather than copying old data,
+this inversion never happens. Your sale prices simply work, with no migration
+step on your part.
+
 ---
 
 ## Rollback — if you need to go back to legacy 1.x
