@@ -1060,52 +1060,85 @@ disable), keep optional. The rule is "can the plugin always send" not
 
 ---
 
-### F3-18 (candidate): Batch failure isolation mode
+### F3-18: Per-item `errors[]` batch contract (D6) — decided
 
-**Context:** with W2's all-or-nothing catalog validation locked in, a single
-invalid product in a 100-row batch fails the whole batch with 400. Current
-plugin behavior (`IngestFlusher::handle_failure`) marks **all** rows in the
-failed batch as `mark_failed` — so 1 bad record fails 100, and the audit log
-conflates the 99 healthy rows with the 1 poison row. Code audit confirmed:
-no `errors[]` parsing, and `ApiException` discards the response body details
-(reads only `request_id` from line 37-46), so per-row identification isn't
-possible without additional work.
+**Context:** with W2's all-or-nothing catalog validation, a single invalid
+product in a 100-row batch fails the whole batch with 400, and the plugin
+marks all 100 rows `mark_failed` — conflating 1 poison row with 99 healthy
+ones. When the engine team raised the customers batch-error contract (Q1
+before W4), this became a cross-team decision: should batch ingest be
+all-or-nothing or per-item partial-success?
 
-**Decision (provisional, not yet implemented):** when first batch-4xx is
-observed in a flush cycle, switch that batch to per-row retry mode. Send
-each product individually; 99 succeed (`mark_sent`), 1 fails (`mark_failed`
-with the actual SKU in the audit log).
+**Decision:** **per-item `errors[]` is the canonical batch-ingest contract,
+unified across all batch endpoints** (engine-side decision D6). The engine
+processes the good records, returns 200 with an `errors[]` array listing the
+rejected ones. The plugin's flusher parses `errors[]` and splits the batch:
+healthy rows → `mark_sent`, rejected rows → `mark_failed` / `record_attempt`.
+
+**Canonical D6 response shape:**
+```json
+{
+  "ok": true,
+  "processed": 28,
+  "deduplicated": 1,
+  "errors": [
+    {"index": 3, "email": "bad-email", "field": "email", "message": "Invalid email"}
+  ]
+}
+```
+Invariant: `processed + deduplicated + errors.length == total`. Error object:
+`{index, <natural_key>?, field, message}` — `index` is batch position
+(maps directly to the flusher's index-aligned `batch_rows[index]`), natural
+key (`email`/`sku`/`external_order_id`) included when available, omitted for
+browse (no Layer-1 natural key). Same shape on every endpoint, so the flusher
+logic is identical regardless of endpoint.
 
 **Rationale:**
-- **Audit log truth** — pilot operator sees "1 row failed, 99 sent" instead
-  of "100 failed, retry the batch", which is misleading
-- **No engine-side dependency** — works with current engine response shape
-  (just generic 400), doesn't require engine to add `errors[]` structure
-- **Degraded mode is the exception** — only triggers on first 4xx in a batch,
-  not preemptively. 99% of batches don't hit it.
+- **One mental model, one code path** — a developer learns one error contract,
+  not "catalog behaves one way, customers another." The flusher handles the
+  same `errors[]` shape for every endpoint. Application of CC-9 (single
+  canonical path) to error handling.
+- **Partial-success serves transactional endpoints** — customers and orders
+  are larger, more variable batches (backfill sends thousands; email data has
+  more edge cases than product SKUs). One bad record shouldn't block 99 good
+  ones.
+- **Catalog all-or-nothing was an artefact, not a requirement** — the engine
+  team audited it and confirmed: it came from whole-array `safeParse` + the
+  W1 dedup transaction, not an atomicity need. No reason to keep it.
 
-**Alternatives considered:**
-- **Variant A** — parse `errors[]` from response body. Requires engine-side
-  schema change to return `{fieldErrors: {products: {index: N, sku: ..., error: ...}}}`
-  in 400 responses. More precise but couples plugin to engine schema change.
-  Engine team can revisit if real pilot operations show "regularly bad
-  products" patterns where per-row HTTP cost matters.
-- **Status quo** — accept the audit-log conflation. Acceptable if pilot
-  catalogs don't routinely have validation errors (which is the expected
-  case for clean WC stores).
+**Plugin-side cost (Code audit):**
+- `ApiException`: small (~5-10 lines) — the response body is already
+  JSON-decoded in `Client::request_url` and passed to the constructor; it
+  just discards everything except `request_id`/`error_code`/`message`.
+  Preserving `details`/`errors` is a small getter addition. **This is now a
+  3.3 requirement, not a future candidate.**
+- Flusher: medium — catch the return value, parse `errors[]`, map
+  `index → queue-row`, split `mark_sent` vs `mark_failed`. Favorable fact:
+  the flusher already builds `$products` and `$batch_rows` as index-aligned
+  parallel arrays, so `errors[].index → batch_rows[index]` is a clean mapping.
 
-**Trade-off:** in degraded mode, 100x more HTTP requests per affected batch.
-If pilot catalogs are clean (no routine validation errors), zero impact. If
-catalogs routinely produce bad records, rate-limit pressure grows; switch to
-Variant A at that point.
+**Sequencing (engine-side):**
+- **W4 customers** is built to D6 from the start — the first endpoint to
+  implement per-item `errors[]`, defining the canonical HTTP shape.
+- **W5 orders** built to D6 when it lands.
+- **Catalog + browse retrofitted together** (engine work item N-7) from
+  all-or-nothing → per-item `errors[]` after W4 — proving the shape on a
+  fresh build (customers) before touching the already-synced older endpoints.
 
-**Status:** candidate, not implemented. Promote to full F3-18 entry when
-pilot operations show whether this is a real friction point or theoretical
-concern. **Pre-condition for Variant A path**: `ApiException` must preserve
-the response body `details` field (currently discarded at construction in
-`ApiException.php:37-46`).
+**Correction to earlier framing:** browse was mis-categorized as "cleanest /
+already per-item" in `MOCK_DIVERGENCE_AUDIT.md`; it is also all-or-nothing and
+needs the same retrofit as catalog. The only existing partial-success
+reference is the admin CSV path (`commitCatalog` → `import_errors`), not the
+HTTP endpoints. (Audit doc to be corrected.)
 
----
+**Alternatives rejected:**
+- **All-or-nothing everywhere** (catalog's W2 model) — simpler engine
+  validation, but conflates 1 bad row with N in the audit log, and forces a
+  degraded per-row-retry fallback (100x HTTP) on the plugin to isolate the
+  culprit. Per-item `errors[]` gives precise isolation in one request.
+- **Per-endpoint inconsistency** (catalog all-or-nothing, customers per-item)
+  — rejected after the consistency question: if per-item is better, apply it
+  everywhere; two contracts means two mental models for no benefit.
 
 ## How to keep this document going (during Phase 3)
 
