@@ -114,6 +114,23 @@ final class RecEngineMockServer {
 	}
 
 	/**
+	 * Read the router's shared state file (the same /tmp file the router
+	 * writes during a request). Lets a test assert what the mock engine
+	 * actually received — e.g. the per-product event_ids of the last
+	 * catalog batch — without the response having to echo them back.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function state(): array {
+		$state_file = sys_get_temp_dir() . '/smaily-rec-mock-state.json';
+		if ( ! file_exists( $state_file ) ) {
+			return array();
+		}
+		$decoded = json_decode( (string) file_get_contents( $state_file ), true );
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
 	 * Build a setup URL the same shape the engine renders. Tests pass
 	 * this string straight to the REST setup-exchange endpoint.
 	 */

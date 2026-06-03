@@ -100,24 +100,34 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 	$state[ 'tenant_name' ]      = 'Mock Tenant';
 	save_state( $state_file, $state );
 
+	// Endpoints map MIRRORS the live engine response verified in 3.1.2:
+	// keys carry the `ingest_` prefix (NOT bare "catalog") and values are
+	// ABSOLUTE URLs (NOT relative paths). The plugin reads
+	// endpoints()['ingest_catalog']; a mock serving the old unprefixed/
+	// relative shape would pass while production got a null URL — exactly
+	// the mock↔engine divergence the path-bug taught us to close. All 11
+	// endpoints present (resolves the endpoints-map audit, P2 #11).
+	$engine_base = sprintf( 'http://%s', $_SERVER['HTTP_HOST'] ?? 'localhost:9876' );
 	reply(
 		200,
 		array(
 			'tenant_id'       => $state['tenant_id'],
 			'tenant_name'     => $state['tenant_name'],
 			'api_key'         => $state['api_key'],
-			'engine_base_url' => sprintf( 'http://%s', $_SERVER['HTTP_HOST'] ?? 'localhost:9876' ),
+			'engine_base_url' => $engine_base,
 			'engine_version'  => '1.0.0',
 			'endpoints'       => array(
-				'ping'             => '/api/v1/ingest/ping',
-				'catalog'          => '/api/v1/ingest/catalog',
-				'customers'        => '/api/v1/ingest/customers',
-				'orders'           => '/api/v1/ingest/orders',
-				'browse'           => '/api/v1/ingest/browse',
-				'identity_merge'   => '/api/v1/identity/merge',
-				'customer_export'  => '/api/v1/customer/{email}/export',
-				'customer_delete'  => '/api/v1/customer/{email}',
-				'customer_opt_out' => '/api/v1/customer/{email}/opt-out',
+				'ingest_ping'             => $engine_base . '/api/v1/ingest/ping',
+				'ingest_catalog'          => $engine_base . '/api/v1/ingest/catalog',
+				'ingest_customers'        => $engine_base . '/api/v1/ingest/customers',
+				'ingest_orders'           => $engine_base . '/api/v1/ingest/orders',
+				'ingest_browse'           => $engine_base . '/api/v1/ingest/browse',
+				'identity_merge'          => $engine_base . '/api/v1/identity/merge',
+				'customer_export'         => $engine_base . '/api/v1/customer/%s/export',
+				'customer_delete'         => $engine_base . '/api/v1/customer/%s',
+				'customer_opt_out'        => $engine_base . '/api/v1/customer/%s/opt-out',
+				'recommendations_preview' => $engine_base . '/api/v1/recommendations/preview',
+				'recommendations_issue'   => $engine_base . '/api/v1/recommendations/issue',
 			),
 			'config'          => array(
 				'tracking_cookie_name' => 'smaily_rec_uid',
@@ -163,6 +173,126 @@ if ( $method === 'GET' && $path === '/api/v1/ingest/ping' ) {
 			'tenant_status'       => 'active',
 			'endpoints_available' => array( 'catalog', 'customers', 'orders', 'browse', 'identity_merge' ),
 			'server_time'         => gmdate( 'c' ),
+		)
+	);
+}
+
+// Catalog ingest. Mirrors RECENGINE_API_CONTRACT.md §3 + the engine
+// team's catalog sanity (6/6): Bearer auth, per-product event_id dedup
+// keyed on (tenant, event_id), and a 200 {"deduplicated": true} body when
+// the whole batch is a resend. Scenario triggers (by SKU prefix on the
+// first product) let a test force transient failures + a revoked key to
+// exercise the Client's retry policy deterministically.
+if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply(
+			401,
+			array(
+				'error'      => 'unauthorized',
+				'message'    => 'Authorization header missing or malformed.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	$raw      = (string) file_get_contents( 'php://input' );
+	$body     = json_decode( $raw, true );
+	$products = ( is_array( $body ) && isset( $body['products'] ) && is_array( $body['products'] ) )
+		? $body['products']
+		: array();
+
+	$first_sku = ( isset( $products[0]['sku'] ) ) ? (string) $products[0]['sku'] : '';
+
+	// Revoked / invalid key — terminal 4xx, the Client must NOT retry.
+	if ( strpos( $first_sku, 'AUTH-401' ) === 0 ) {
+		reply(
+			401,
+			array(
+				'error'      => 'api_key_revoked',
+				'message'    => 'This api_key has been revoked.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	// Transient failure on the FIRST attempt only, then succeed on retry.
+	// The per-sku counter survives across the Client's retry HTTP calls via
+	// the state file.
+	if ( strpos( $first_sku, 'RETRY-429' ) === 0 || strpos( $first_sku, 'RETRY-500' ) === 0 ) {
+		$counter_key = 'attempts_' . $first_sku;
+		$seen_count  = isset( $state[ $counter_key ] ) ? (int) $state[ $counter_key ] : 0;
+		$state[ $counter_key ] = $seen_count + 1;
+		save_state( $state_file, $state );
+
+		if ( $seen_count === 0 ) {
+			if ( strpos( $first_sku, 'RETRY-429' ) === 0 ) {
+				header( 'Retry-After: 1' );
+				reply(
+					429,
+					array(
+						'error'      => 'rate_limited',
+						'message'    => 'Too many requests — slow down.',
+						'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+						'timestamp'  => gmdate( 'c' ),
+					)
+				);
+			}
+			reply(
+				500,
+				array(
+					'error'      => 'internal_error',
+					'message'    => 'Transient engine error.',
+					'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+					'timestamp'  => gmdate( 'c' ),
+				)
+			);
+		}
+		// seen_count >= 1 → fall through to the success path on retry.
+	}
+
+	// Per-product idempotency: unique (tenant_id, event_id). A resent
+	// event_id is skipped; a whole-batch resend returns deduplicated:true.
+	$seen     = ( isset( $state['catalog_event_ids'] ) && is_array( $state['catalog_event_ids'] ) )
+		? $state['catalog_event_ids']
+		: array();
+	$received = array();
+	$created  = 0;
+	$skipped  = 0;
+	foreach ( $products as $product ) {
+		$event_id   = isset( $product['event_id'] ) ? (string) $product['event_id'] : '';
+		$received[] = $event_id;
+		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
+			++$skipped;
+			continue;
+		}
+		if ( $event_id !== '' ) {
+			$seen[] = $event_id;
+		}
+		++$created;
+	}
+	$state['catalog_event_ids']    = $seen;
+	$state['last_catalog_received'] = $received;
+	save_state( $state_file, $state );
+
+	// Whole batch was a duplicate → the engine's deduplicated short-circuit.
+	if ( $created === 0 && $skipped > 0 ) {
+		reply( 200, array( 'deduplicated' => true ) );
+	}
+
+	reply(
+		200,
+		array(
+			'ok'                  => true,
+			'processed'           => count( $products ),
+			'created'             => $created,
+			'updated'             => 0,
+			'skipped'             => $skipped,
+			'errors'              => array(),
+			'unmapped_attributes' => array(),
+			'request_id'          => 'req_' . bin2hex( random_bytes( 4 ) ),
 		)
 	);
 }

@@ -80,13 +80,20 @@ class Client {
 	private string $api_key;
 	private string $base_url;
 
+	/** @var array<string, string> Engine-returned endpoint URL map (keys like "ingest_catalog"). */
+	private array $endpoints;
+
 	/**
-	 * @param string $api_key  Bearer key, e.g. "sk_8f3k2a...".
-	 * @param string $base_url Engine origin, e.g. "https://re-example.vercel.app".
+	 * @param string                $api_key   Bearer key, e.g. "sk_8f3k2a...".
+	 * @param string                $base_url  Engine origin, e.g. "https://re-example.vercel.app".
+	 * @param array<string, string> $endpoints RecEngineSettings::endpoints() — the engine's own
+	 *                                         URL map (source of truth for paths). Empty when a
+	 *                                         caller only needs base_url + PATH_* constants (ping).
 	 */
-	public function __construct( string $api_key, string $base_url ) {
-		$this->api_key  = $api_key;
-		$this->base_url = rtrim( $base_url, '/' );
+	public function __construct( string $api_key, string $base_url, array $endpoints = array() ) {
+		$this->api_key   = $api_key;
+		$this->base_url  = rtrim( $base_url, '/' );
+		$this->endpoints = $endpoints;
 	}
 
 	/**
@@ -115,12 +122,26 @@ class Client {
 	// ---------------------------------------------------------------
 
 	/**
+	 * Batch-upsert catalog products. The engine UPSERTs per SKU and
+	 * deduplicates per-product on (tenant_id, event_id), so a row resent
+	 * by a flush-job retry — same products[].event_id — comes back 200
+	 * {"deduplicated": true} rather than double-applied. That body is a
+	 * SUCCESS to the caller (the flush job marks the row sent, never
+	 * retries); request() only throws on real 4xx/5xx failures.
+	 *
+	 * URL comes from the engine's endpoints map (PATH preferred from the
+	 * map's "ingest_catalog" key — full absolute URL), falling back to
+	 * base_url + PATH_INGEST_CATALOG when the map isn't available.
+	 *
 	 * @param array<int, array<string, mixed>> $products
 	 *
 	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
 	 */
 	public function ingest_catalog( array $products ): array {
-		throw new \RuntimeException( 'ingest_catalog: not implemented in sub-PR 3.1 (lands in 3.2).' );
+		$url = $this->resolve_url( 'ingest_catalog', self::PATH_INGEST_CATALOG );
+		return $this->request_url( 'POST', $url, array( 'products' => $products ) );
 	}
 
 	/**
@@ -155,6 +176,29 @@ class Client {
 	// ---------------------------------------------------------------
 
 	/**
+	 * Resolve a wire endpoint URL. The engine-returned endpoints map is the
+	 * source of truth — its values are full absolute URLs keyed like
+	 * "ingest_catalog" (the engine's own naming; the plugin once read the
+	 * unprefixed "catalog" and got a null URL, the 3.1.2-class bug). The
+	 * PATH_* constant is the fallback for the rare pre-setup-exchange call
+	 * where no map is stored. A relative map value (legacy shape) is
+	 * defensively re-based on base_url.
+	 */
+	private function resolve_url( string $endpoint_key, string $fallback_path ): string {
+		$mapped = isset( $this->endpoints[ $endpoint_key ] ) ? trim( (string) $this->endpoints[ $endpoint_key ] ) : '';
+		if ( $mapped !== '' ) {
+			if ( preg_match( '#^https?://#i', $mapped ) === 1 ) {
+				return $mapped;
+			}
+			return $this->base_url . '/' . ltrim( $mapped, '/' );
+		}
+		return $this->base_url . $fallback_path;
+	}
+
+	/**
+	 * Issue a request against a path relative to base_url. Thin wrapper over
+	 * request_url() for the constant-path callers (ping).
+	 *
 	 * @param array<string, mixed>|null $body Request body for non-GET methods.
 	 *
 	 * @return array<string, mixed>
@@ -162,7 +206,19 @@ class Client {
 	 * @throws ApiException
 	 */
 	protected function request( string $method, string $path, ?array $body = null ): array {
-		$url      = $this->base_url . $path;
+		return $this->request_url( $method, $this->base_url . $path, $body );
+	}
+
+	/**
+	 * Issue a request against a fully-resolved URL, with the retry policy.
+	 *
+	 * @param array<string, mixed>|null $body Request body for non-GET methods.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException
+	 */
+	protected function request_url( string $method, string $url, ?array $body = null ): array {
 		$attempts = 0;
 		$backoff  = 1;
 
