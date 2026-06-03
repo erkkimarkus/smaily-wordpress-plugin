@@ -1,0 +1,268 @@
+<?php
+/**
+ * IngestFlusher tests — queue row → catalog object → engine, and the
+ * sent / deduplicated / terminal-4xx / transient-retry / exhausted /
+ * delete / product-gone response handling.
+ *
+ * @package Smaily\Connect\Tests
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Unit\Smaily\RecEngine;
+
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
+use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\RecEngine\ApiException;
+use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
+use Smaily\Connect\Smaily\RecEngine\Client;
+use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
+use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+
+final class IngestFlusherTest extends TestCase {
+
+	public function test_returns_early_when_not_connected(): void {
+		$queue = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$flush = $this->fake_flusher( $queue, $this->success_client(), false );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 0, $stats['processed'], 'A disconnected tenant must not drain the queue.' );
+		self::assertSame( array(), $queue->sent );
+	}
+
+	public function test_upsert_batch_all_marked_sent_and_carries_event_ids(): void {
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ), $this->upsert_row( 2, 101, 'u2' ) ) );
+		$client = $this->success_client();
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true, 101 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 2, $stats['sent'] );
+		self::assertSame( array( 1, 2 ), $queue->sent );
+		self::assertCount( 2, $client->sent_products );
+		self::assertSame( 'u1', $client->sent_products[0]['event_id'] );
+		self::assertSame( 'u2', $client->sent_products[1]['event_id'] );
+	}
+
+	public function test_deduplicated_response_is_treated_as_sent_not_retried(): void {
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$client = $this->success_client( array( 'deduplicated' => true ) );
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( array( 1 ), $queue->sent, 'A 200 {"deduplicated":true} is success — mark sent, never retry.' );
+		self::assertSame( array(), $queue->attempts );
+	}
+
+	public function test_terminal_4xx_marks_failed_without_retry(): void {
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$client = $this->throwing_client( new ApiException( 401, 'api_key_revoked', 'revoked' ) );
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertSame( array(), $queue->attempts, 'A terminal 4xx must not schedule a row-level retry.' );
+		self::assertStringContainsString( 'api_key_revoked', $queue->failed[0]['error'] );
+	}
+
+	public function test_transient_5xx_records_a_retry_with_backoff(): void {
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1', 0, 5 ) ) );
+		$client = $this->throwing_client( new ApiException( 503, 'unavailable', 'down' ) );
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 1, $stats['retried'] );
+		self::assertSame( array(), $queue->failed );
+		self::assertSame( 1, $queue->attempts[0]['id'] );
+		self::assertSame( 60, $queue->attempts[0]['retry'], 'First retry parks the row 60s out.' );
+	}
+
+	public function test_transient_failure_at_attempt_ceiling_marks_failed(): void {
+		// attempts=4, max=5 → this attempt (5th) exhausts the budget.
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1', 4, 5 ) ) );
+		$client = $this->throwing_client( new ApiException( 503, 'unavailable', 'down' ) );
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertSame( array(), $queue->attempts, 'No retry once max_attempts is reached.' );
+	}
+
+	public function test_delete_row_sends_stored_object_with_in_stock_false(): void {
+		$row            = $this->upsert_row( 7, 0, 'del-uuid' );
+		$row['event_type'] = CatalogHookHandler::EVENT_CATALOG_DELETE;
+		$row['payload']    = (string) json_encode( array( 'object' => array( 'sku' => 'GONE-1', 'in_stock' => true, 'event_id' => '' ) ) );
+
+		$queue  = $this->fake_queue( array( $row ) );
+		$client = $this->success_client();
+		$flush  = $this->fake_flusher( $queue, $client, true );
+
+		$flush->flush();
+
+		self::assertSame( array( 7 ), $queue->sent );
+		self::assertSame( 'GONE-1', $client->sent_products[0]['sku'] );
+		self::assertFalse( $client->sent_products[0]['in_stock'], 'A delete must force in_stock=false.' );
+		self::assertSame( 'del-uuid', $client->sent_products[0]['event_id'], 'event_uuid → event_id on the captured object.' );
+	}
+
+	public function test_upsert_for_a_deleted_product_is_skipped_not_sent(): void {
+		// get_product returns null (product gone since enqueue) → terminal skip.
+		$queue  = $this->fake_queue( array( $this->upsert_row( 9, 999, 'u9' ) ) );
+		$client = $this->success_client();
+		$flush  = $this->fake_flusher( $queue, $client, true, array() ); // no product registered for 999
+
+		$stats = $flush->flush();
+
+		self::assertSame( 1, $stats['skipped'] );
+		self::assertSame( array( 9 ), $queue->sent, 'A vanished product is marked sent so the row leaves the queue.' );
+		self::assertSame( array(), $client->sent_products, 'Nothing to POST when the only row was skipped.' );
+	}
+
+	// --- doubles -------------------------------------------------------------
+
+	/**
+	 * @param array<int, array<string, mixed>> $rows
+	 */
+	private function fake_queue( array $rows ): IngestQueue {
+		return new class( $rows ) extends IngestQueue {
+			/** @var array<int, array<string, mixed>> */
+			public array $pending_rows;
+			/** @var array<int, int> */
+			public array $sent = array();
+			/** @var array<int, array<string, mixed>> */
+			public array $failed = array();
+			/** @var array<int, array<string, mixed>> */
+			public array $attempts = array();
+
+			/** @param array<int, array<string, mixed>> $rows */
+			public function __construct( array $rows ) {
+				$this->pending_rows = $rows;
+			}
+
+			public function pending( int $limit = 100 ): array {
+				return $this->pending_rows;
+			}
+			public function mark_sent( int $id ): void {
+				$this->sent[] = $id;
+			}
+			public function mark_failed( int $id, string $error ): void {
+				$this->failed[] = array( 'id' => $id, 'error' => $error );
+			}
+			public function record_attempt( int $id, string $error, int $retry_in_seconds = 60 ): void {
+				$this->attempts[] = array( 'id' => $id, 'error' => $error, 'retry' => $retry_in_seconds );
+			}
+		};
+	}
+
+	/**
+	 * @param array<string, mixed> $response
+	 */
+	private function success_client( array $response = array( 'ok' => true ) ): Client {
+		return new class( $response ) extends Client {
+			/** @var array<int, array<string, mixed>> */
+			public array $sent_products = array();
+			/** @var array<string, mixed> */
+			private array $response;
+
+			/** @param array<string, mixed> $response */
+			public function __construct( array $response ) {
+				parent::__construct( 'sk_test', 'https://e.test' );
+				$this->response = $response;
+			}
+
+			public function ingest_catalog( array $products ): array {
+				$this->sent_products = $products;
+				return $this->response;
+			}
+		};
+	}
+
+	private function throwing_client( ApiException $e ): Client {
+		return new class( $e ) extends Client {
+			/** @var array<int, array<string, mixed>> */
+			public array $sent_products = array();
+			private ApiException $e;
+
+			public function __construct( ApiException $e ) {
+				parent::__construct( 'sk_test', 'https://e.test' );
+				$this->e = $e;
+			}
+
+			public function ingest_catalog( array $products ): array {
+				$this->sent_products = $products;
+				throw $this->e;
+			}
+		};
+	}
+
+	/**
+	 * @param array<int, true> $products_by_id Entity ids that resolve to a (stub) product.
+	 */
+	private function fake_flusher( IngestQueue $queue, Client $client, bool $connected, array $products_by_id = array() ): IngestFlusher {
+		$settings = new class( $connected ) extends RecEngineSettings {
+			private bool $connected;
+			public function __construct( bool $connected ) {
+				$this->connected = $connected;
+			}
+			public function is_connected(): bool {
+				return $this->connected;
+			}
+		};
+
+		$builder = new class() extends CatalogPayloadBuilder {
+			public function build( \WC_Product $product, string $event_uuid ): array {
+				return array( 'sku' => 'SKU-' . $event_uuid, 'event_id' => $event_uuid, 'in_stock' => true );
+			}
+		};
+
+		$factory = static function () use ( $client ): Client {
+			return $client;
+		};
+
+		return new class( $queue, $builder, $settings, $factory, $products_by_id ) extends IngestFlusher {
+			/** @var array<int, true> */
+			private array $products_by_id;
+
+			/**
+			 * @param callable(): Client $factory
+			 * @param array<int, true>   $products_by_id
+			 */
+			public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, callable $factory, array $products_by_id ) {
+				parent::__construct( $queue, $builder, $settings, $factory );
+				$this->products_by_id = $products_by_id;
+			}
+
+			protected function get_product( int $product_id ): ?\WC_Product {
+				return isset( $this->products_by_id[ $product_id ] ) ? new \WC_Product() : null;
+			}
+		};
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function upsert_row( int $id, int $entity_id, string $uuid, int $attempts = 0, int $max = 5 ): array {
+		return array(
+			'id'           => $id,
+			'event_type'   => CatalogHookHandler::EVENT_CATALOG_UPSERT,
+			'entity_id'    => (string) $entity_id,
+			'event_uuid'   => $uuid,
+			'payload'      => '',
+			'attempts'     => $attempts,
+			'max_attempts' => $max,
+		);
+	}
+}
+
+// Minimal WC_Product shim the flusher's get_product() returns; the doubled
+// CatalogPayloadBuilder ignores it, so no methods are needed.
+if ( ! class_exists( \WC_Product::class ) ) {
+	// phpcs:ignore Squiz.Commenting.ClassComment.Missing -- test shim.
+	eval( 'class WC_Product {}' );
+}

@@ -77,23 +77,33 @@ class Client {
 	public const PATH_CUSTOMER_DELETE_FMT  = '/api/v1/customer/%s';
 	public const PATH_CUSTOMER_OPT_OUT_FMT = '/api/v1/customer/%s/opt-out';
 
+	/** Default in-request retry ceiling — generous for one-shot calls (ping, setup). */
+	public const DEFAULT_MAX_ATTEMPTS = 5;
+
 	private string $api_key;
 	private string $base_url;
 
 	/** @var array<string, string> Engine-returned endpoint URL map (keys like "ingest_catalog"). */
 	private array $endpoints;
 
+	private int $max_attempts;
+
 	/**
-	 * @param string                $api_key   Bearer key, e.g. "sk_8f3k2a...".
-	 * @param string                $base_url  Engine origin, e.g. "https://re-example.vercel.app".
-	 * @param array<string, string> $endpoints RecEngineSettings::endpoints() — the engine's own
-	 *                                         URL map (source of truth for paths). Empty when a
-	 *                                         caller only needs base_url + PATH_* constants (ping).
+	 * @param string                $api_key      Bearer key, e.g. "sk_8f3k2a...".
+	 * @param string                $base_url     Engine origin, e.g. "https://re-example.vercel.app".
+	 * @param array<string, string> $endpoints    RecEngineSettings::endpoints() — the engine's own
+	 *                                            URL map (source of truth for paths). Empty when a
+	 *                                            caller only needs base_url + PATH_* constants (ping).
+	 * @param int                   $max_attempts In-request retry ceiling. The flush job passes a
+	 *                                            small value (1-2): a long sleep-backoff would block
+	 *                                            the Action Scheduler worker, and the durable queue
+	 *                                            already retries at the row level via next_retry_at.
 	 */
-	public function __construct( string $api_key, string $base_url, array $endpoints = array() ) {
-		$this->api_key   = $api_key;
-		$this->base_url  = rtrim( $base_url, '/' );
-		$this->endpoints = $endpoints;
+	public function __construct( string $api_key, string $base_url, array $endpoints = array(), int $max_attempts = self::DEFAULT_MAX_ATTEMPTS ) {
+		$this->api_key      = $api_key;
+		$this->base_url     = rtrim( $base_url, '/' );
+		$this->endpoints    = $endpoints;
+		$this->max_attempts = max( 1, $max_attempts );
 	}
 
 	/**
@@ -243,7 +253,7 @@ class Client {
 
 			$response = wp_remote_request( $url, $args );
 			if ( is_wp_error( $response ) ) {
-				if ( $attempts >= 5 ) {
+				if ( $attempts >= $this->max_attempts ) {
 					throw new ApiException(
 						0,
 						'network_error',
@@ -267,7 +277,7 @@ class Client {
 			}
 
 			$is_retryable = ( $status === 429 || ( $status >= 500 && $status < 600 ) );
-			if ( $is_retryable && $attempts < 5 ) {
+			if ( $is_retryable && $attempts < $this->max_attempts ) {
 				$retry_after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
 				$sleep_for   = $retry_after > 0 ? $retry_after : $backoff;
 				$this->sleep_with_backoff( $sleep_for );

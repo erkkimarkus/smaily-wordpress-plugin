@@ -12,10 +12,12 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
 use Smaily\Connect\Smaily\RecEngine\Client;
+use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Tests\Integration\Fixtures\RecEngineMockServer;
 use Smaily\Connect\Tests\Integration\Support\EnvScrub;
@@ -155,6 +157,54 @@ final class RecEngineCatalogTest extends TestCase {
 			self::assertSame( 401, $e->getCode(), 'ApiException carries the HTTP status as its code.' );
 			self::assertSame( 'api_key_revoked', $e->error_code() );
 		}
+	}
+
+	public function test_product_save_through_flusher_reaches_engine_end_to_end(): void {
+		// The whole 3.2.3 chain with NO doubles: a real product save enqueues
+		// a real row, the real flusher drains it to the mock engine.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+		$builder  = new CatalogPayloadBuilder();
+
+		$product    = $this->make_product( 'CAT-E2E-1', '9.99' );
+		$product_id = (int) $product->get_id();
+
+		// Hook layer.
+		( new CatalogHookHandler( $queue, $builder, $settings ) )->on_save_product( $product_id );
+
+		$pending = $queue->pending( 10 );
+		self::assertCount( 1, $pending, 'save_post_product must enqueue exactly one catalog row.' );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_UPSERT, $pending[0]['event_type'] );
+		$uuid = (string) $pending[0]['event_uuid'];
+
+		// Flush layer.
+		$flusher = new IngestFlusher(
+			$queue,
+			$builder,
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		$stats = $flusher->flush();
+
+		self::assertSame( 1, $stats['sent'] );
+		self::assertSame( array(), $queue->pending( 10 ), 'The row is sent and no longer pending.' );
+
+		$received = self::$engine->state()['last_catalog_received'] ?? null;
+		self::assertSame(
+			array( $uuid ),
+			$received,
+			'End-to-end: the engine received products[].event_id == the queue row event_uuid.'
+		);
 	}
 
 	/**

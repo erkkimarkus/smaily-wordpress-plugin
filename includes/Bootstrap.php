@@ -12,6 +12,7 @@ namespace Smaily\Connect;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
@@ -19,11 +20,16 @@ use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\REST\EndpointRegistry;
 use Smaily\Connect\Settings\Credentials;
+use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
+use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
+use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
+use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
+use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
 
 /**
@@ -62,6 +68,11 @@ final class Bootstrap {
 	private ?Credentials $credentials            = null;
 	private ?AutomationRouter $automation_router = null;
 	private ?Flusher $flusher                    = null;
+
+	private ?IngestQueue $ingest_queue              = null;
+	private ?CatalogPayloadBuilder $catalog_builder = null;
+	private ?RecEngineSettings $rec_settings        = null;
+	private ?IngestFlusher $ingest_flusher          = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -109,6 +120,11 @@ final class Bootstrap {
 		// when Action Scheduler's runner cycle fires.
 		add_action( EventQueue::FLUSH_HOOK, array( $this, 'on_flush_event_queue' ) );
 		add_action( 'smly_plus_retry_failed_events', array( $this, 'on_flush_event_queue' ) );
+
+		// Rec-engine ingest flush (catalog/customers/orders). IngestQueue
+		// enqueues a one-off flush per change; the recurring schedule below
+		// re-ticks for row-level retries (next_retry_at).
+		add_action( IngestQueue::FLUSH_HOOK, array( $this, 'on_flush_ingest_queue' ) );
 
 		// Bridges from new AS hook names → legacy WP-Cron hook names.
 		// The legacy Smaily_Connect\Integrations\WooCommerce\Cron class
@@ -244,6 +260,20 @@ final class Bootstrap {
 	public function register_woocommerce_hooks(): void {
 		WooHooks::register( new WooHookHandler( $this->event_queue() ) );
 
+		// Rec-engine catalog ingest (Phase 3.2.3). The handler self-gates on
+		// RecEngineSettings::is_connected(), so registering unconditionally is
+		// safe — the callbacks no-op until a tenant is connected.
+		$catalog = new CatalogHookHandler(
+			$this->ingest_queue(),
+			$this->catalog_payload_builder(),
+			$this->rec_engine_settings()
+		);
+		add_action( 'save_post_product', array( $catalog, 'on_save_product' ), 10, 1 );
+		add_action( 'woocommerce_product_set_stock_status', array( $catalog, 'on_stock_change' ), 10, 3 );
+		// before_delete_post (not delete_post): the product is still loadable,
+		// so the handler can capture its catalog object before it's gone.
+		add_action( 'before_delete_post', array( $catalog, 'on_delete_product' ), 10, 1 );
+
 		// P1 #1: once the wizard is finished the new path owns contact sync,
 		// so strip the legacy subscriber-sync hooks (the legacy service
 		// re-registers them at every plugin load, so this must run every
@@ -301,6 +331,12 @@ final class Bootstrap {
 		if ( ! as_has_scheduled_action( 'smly_plus_retry_failed_events', array(), EventQueue::AS_GROUP ) ) {
 			as_schedule_recurring_action( time(), 300, 'smly_plus_retry_failed_events', array(), EventQueue::AS_GROUP );
 		}
+
+		// Rec-engine ingest flush — re-ticks every 60s so a row parked with a
+		// future next_retry_at is picked up without a fresh product change.
+		if ( ! as_has_scheduled_action( IngestQueue::FLUSH_HOOK, array(), IngestQueue::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, IngestQueue::FLUSH_HOOK, array(), IngestQueue::AS_GROUP );
+		}
 	}
 
 	/**
@@ -310,6 +346,14 @@ final class Bootstrap {
 	 */
 	public function on_flush_event_queue(): void {
 		$this->flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_rec_flush_ingest — drains the
+	 * rec-engine ingest queue (catalog in 3.2.3; customers/orders later).
+	 */
+	public function on_flush_ingest_queue(): void {
+		$this->ingest_flusher()->flush();
 	}
 
 	/**
@@ -422,6 +466,63 @@ final class Bootstrap {
 		return $this->flusher;
 	}
 
+	public function ingest_queue(): IngestQueue {
+		if ( $this->ingest_queue === null ) {
+			$this->ingest_queue = new IngestQueue();
+		}
+
+		return $this->ingest_queue;
+	}
+
+	public function catalog_payload_builder(): CatalogPayloadBuilder {
+		if ( $this->catalog_builder === null ) {
+			$this->catalog_builder = new CatalogPayloadBuilder();
+		}
+
+		return $this->catalog_builder;
+	}
+
+	public function rec_engine_settings(): RecEngineSettings {
+		if ( $this->rec_settings === null ) {
+			$this->rec_settings = new RecEngineSettings();
+		}
+
+		return $this->rec_settings;
+	}
+
+	/**
+	 * Build a rec-engine Client from the stored tenant config. Not cached —
+	 * the api_key/endpoints can change on (dis)connect within a request, and
+	 * a small max_attempts keeps the flush job from blocking the AS worker on
+	 * long backoff (durable retry lives in IngestQueue).
+	 */
+	public function rec_client(): RecEngineClient {
+		$settings = $this->rec_engine_settings();
+
+		return new RecEngineClient(
+			$settings->api_key(),
+			$settings->base_url(),
+			$settings->endpoints(),
+			2
+		);
+	}
+
+	public function ingest_flusher(): IngestFlusher {
+		if ( $this->ingest_flusher === null ) {
+			$bootstrap            = $this;
+			$this->ingest_flusher = new IngestFlusher(
+				$this->ingest_queue(),
+				$this->catalog_payload_builder(),
+				$this->rec_engine_settings(),
+				static function () use ( $bootstrap ): RecEngineClient {
+					return $bootstrap->rec_client();
+				}
+			);
+		}
+
+		return $this->ingest_flusher;
+	}
+
 	public function automation_router(): AutomationRouter {
 		if ( $this->automation_router === null ) {
 			$bootstrap               = $this;
@@ -444,6 +545,16 @@ final class Bootstrap {
 
 	public function set_event_queue( EventQueue $queue ): void {
 		$this->event_queue = $queue;
+	}
+
+	public function set_ingest_queue( IngestQueue $queue ): void {
+		$this->ingest_queue   = $queue;
+		$this->ingest_flusher = null; // rebuild with the new queue on next call
+	}
+
+	public function set_rec_engine_settings( RecEngineSettings $settings ): void {
+		$this->rec_settings   = $settings;
+		$this->ingest_flusher = null;
 	}
 
 	public function set_workflow_resolver( WorkflowResolverInterface $resolver ): void {
