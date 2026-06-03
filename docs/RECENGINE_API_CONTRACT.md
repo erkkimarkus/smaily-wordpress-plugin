@@ -585,7 +585,11 @@ Batch upload of the product catalog. The engine UPSERTs each product (same `sku`
 }
 ```
 
-The engine accepts both forms — field type is checked at runtime. A single-language `string` is wrapped internally as `{default: "..."}`.
+The engine accepts both forms — field type is checked at runtime. Storage behavior:
+- A single-language `string` is wrapped as `{default: "..."}` in the field's `*_i18n` JSONB column (`name_i18n`, `description_i18n`, `product_url_i18n`), with the string also kept in the plain text column.
+- An object (`{et: ..., en: ...}`) is stored verbatim in the `*_i18n` column, plus a representative scalar (`default` → tenant default → `en` → first key) in the plain text column for the non-i18n render fallback.
+- `description` is truncated to **500 characters per language** (the row is not rejected).
+- `image_url` has no `*_i18n` column — only a representative scalar is stored.
 
 **Field reference**:
 
@@ -600,30 +604,25 @@ The engine accepts both forms — field type is checked at runtime. A single-lan
 | `on_sale_until` | ISO 8601 string | NO | End of sale period (if applicable) |
 | `in_stock` | boolean | YES | Whether the product is available |
 | `description` | string \| `{lang: string}` | NO | Short description (max 500 characters) |
-| `image_url` | string (URL) \| `{lang: string}` | NO | Product image URL |
-| `product_url` | string (URL) \| `{lang: string}` | YES | Product page URL |
-| `external_id` | string | NO | Plugin/platform internal ID (for debugging) |
+| `image_url` | string (URL) \| `{lang: string}` | NO | Product image URL. **Stored as a representative scalar only** — there is no `image_url_i18n` column, so the `{lang}` form is accepted but not stored per-language. |
+| `product_url` | string (URL) \| `{lang: string}` | YES | Product page URL. **Required, non-empty** — an empty string `""` is rejected (400), mirroring `category_path`. No silent fallback to `product_base_url + sku`. |
+| `external_id` | string | NO | Plugin/platform internal ID (for debugging/traceability). |
 | `tags` | object | NO | Best-effort mapping (engine uses immediately) |
-| `raw_attributes` | object | NO | Raw platform data (for the AI mapping wizard) |
+| `raw_attributes` | object | NO | Raw platform data. **Currently stored verbatim and not processed** — the AI mapping wizard / `unmapped_attributes` flow is planned, not yet implemented. |
 
 **Response 200 OK**:
 ```json
 {
   "ok": true,
   "processed": 47,
-  "created": 12,
-  "updated": 35,
-  "skipped": 0,
-  "errors": [],
-  "unmapped_attributes": [
-    "pa_unknown_thing",
-    "meta_legacy_field"
-  ],
-  "request_id": "req_..."
+  "deduplicated": 0,
+  "errors": []
 }
 ```
 
-`unmapped_attributes` lists `raw_attributes` keys the engine didn't recognize. The plugin can surface this as an admin notice: "5 attributes are unmapped — check mapping settings".
+`processed` = products UPSERTed; `deduplicated` = products whose per-item `event_id` was already seen (see [Idempotency](#idempotency)). `errors` is currently always `[]` on a 200 — catalog validation is **all-or-nothing** (see partial-success note below).
+
+> **Not yet implemented:** the `unmapped_attributes` response array and the AI mapping wizard are planned but not built. `raw_attributes` is currently stored verbatim and not processed, so no `unmapped_attributes` is emitted.
 
 **Response 200 OK (deduplicated retry, all items)**:
 ```json
@@ -638,35 +637,20 @@ The engine accepts both forms — field type is checked at runtime. A single-lan
 
 Returned when every product carrying an `event_id` in the request was already processed (matching `event_id` already in `ingest_event_log`). No catalog row was created or updated. `deduplicated` is the integer count of skipped items, and `deduplicated_all: true` flags a pure no-op retry. Plugin should treat this as a successful no-op — the original request was processed earlier. (A *mixed* batch returns e.g. `{"processed":3,"deduplicated":2,"errors":[]}` with no `deduplicated_all`.)
 
-**Response 200 OK (partial success)**:
+**Validation is all-or-nothing** (no partial success). If **any** product in the batch fails schema validation, the whole request is rejected with `400 validation_failed` and nothing is written — so on a 200 the `errors` array is always empty. The error body keys nested product-field failures under the top-level `products` key:
 ```json
 {
-  "ok": true,
-  "processed": 45,
-  "created": 12,
-  "updated": 33,
-  "skipped": 2,
-  "errors": [
-    {
-      "index": 23,
-      "sku": "BAD-SKU",
-      "error": "validation_failed",
-      "field": "price",
-      "message": "Price must be positive, got -5.99"
-    },
-    {
-      "index": 31,
-      "sku": "MISSING-NAME",
-      "error": "validation_failed",
-      "field": "name",
-      "message": "Name is required"
+  "error": "validation_failed",
+  "details": {
+    "formErrors": [],
+    "fieldErrors": {
+      "products": ["String must contain at least 1 character(s)"]
     }
-  ],
-  "request_id": "req_..."
+  }
 }
 ```
 
-The engine handles **partial success** — valid rows are processed, invalid ones are reported. The plugin can surface this in an admin notice.
+(Example above: a product sent with `product_url: ""`. A missing required field yields `"Required"`; a wrong type yields `"Invalid input"`.)
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1** (always active): `(tenant_id, sku)` natural-key UPSERT. Same SKU sent twice → second call updates.
@@ -1387,6 +1371,15 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - **Integer `processed` / `deduplicated` counts** replace the old boolean `{"deduplicated": true}` retry response, plus an optional `"deduplicated_all": true` flag for a pure no-op retry. §7 and all four endpoints' Layer-2 response examples updated accordingly.
 - **Wrapper-level `event_id` removed** (no consumers — plugin ingest had no prior clients; MiuMjau flows through the admin CSV path). A stray top-level `event_id` is now silently ignored (Zod strips it); there is no whole-request boolean short-circuit. Engine commit `01b7950`.
 - Added **Implementation status** notes to §4 Customers and §5 Orders: the engine currently accepts single-object payloads; `customers[]` / `orders[]` batch arrays are target state for W4 / W5. (The `products` → `items` catalog wrapper-key correction remains a separate tracked item.)
+
+**v1.0.0 — W2 catalog field expansion** (no breaking changes for the plugin — it already sends the full field set):
+- **Catalog ingest expanded to the full §3 field set**, mapped through a shared `ProductSchema` + `toCatalogInsert()` (single source of truth for plugin ingest + admin CSV). Engine commits `b5b1295`, `81b0936`.
+- **Wrapper renamed `items[]` → `products[]`** (clean break; an `items[]`-wrapped payload now fails validation). Engine commit `b5b1295`.
+- **Multilingual** `name` / `description` / `product_url`: `string | {lang: string}`; string wrapped as `{default}`, object stored in the `*_i18n` JSONB column + a representative plain scalar; `description` truncated to 500/language.
+- **`external_id` + `raw_attributes` columns added** (migration `0026`, additive/nullable). `raw_attributes` is raw-store only (the AI wizard / `unmapped_attributes` is not implemented).
+- **`compare_price` / `on_sale_until` accepted and stored** (store-only; sale-display math is W3).
+- **`product_url` (required + non-empty) and `in_stock` (required) tightened** to match spec §3, per F3-17 (the plugin always sends both). Empty `product_url` fails loud (400) rather than falling back to `product_base_url + sku`. This brief's commits.
+- §3 response example corrected to the real shape `{ok, processed, deduplicated, errors}` (removed `created`/`updated`/`skipped`/`unmapped_attributes`/`request_id`); documented all-or-nothing validation and the scalar-only `image_url` limitation.
 
 ---
 
