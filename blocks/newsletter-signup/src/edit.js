@@ -93,29 +93,13 @@ export default function Edit( { attributes, setAttributes } ) {
 		} )();
 	}, [ setAttributes ] );
 
-	const handleRedirect = async () => {
-		if ( settingsURL.current ) {
-			window.location.href = settingsURL.current;
-		}
-	};
-
 	if ( autoresponders === null ) {
 		return <Spinner />;
 	}
 
 	if ( subdomain === '' ) {
 		return (
-			<Notice
-				status="error"
-				isDismissible={ false }
-				actions={ [
-					{
-						label: __( 'Go to plugin settings', 'smaily-connect' ),
-						onClick: handleRedirect,
-						variant: 'primary',
-					},
-				] }
-			>
+			<Notice status="error" isDismissible={ false }>
 				<h3>
 					{ __( 'Plugin setup is not complete!', 'smaily-connect' ) }
 				</h3>
@@ -125,6 +109,14 @@ export default function Edit( { attributes, setAttributes } ) {
 						'smaily-connect'
 					) }
 				</p>
+				<a target="_top" href={ settingsURL.current }>
+					<Button
+						className="smaily-newsletter-block-button-submit"
+						variant="primary"
+					>
+						{ __( 'Go to plugin settings', 'smaily-connect' ) }
+					</Button>
+				</a>
 			</Notice>
 		);
 	}
