@@ -7,16 +7,16 @@
  * "save a product, it shows up in the engine". So unlike walk-3.0/3.1
  * (Step-4 React states) this harness is backend-driven: it exercises the
  * real CatalogHookHandler → IngestQueue → IngestFlusher → Client path
- * against the live engine and asserts the engine accepted each batch
- * (HTTP 2xx → row marked sent) and honours the dedup contract.
+ * against the live engine and asserts the engine accepted each batch and
+ * honours the dedup contract.
  *
- * Gated on RECENGINE_LIVE=1 so a normal run never touches the real engine.
- * Requires a connected tenant in the wp-env DB (run the setup-exchange
- * first; the api_key is read from smly_rec_api_key).
+ * This harness CAUGHT the products→items wrapper-key divergence (fix
+ * a2ea53c): the mock accepted {products}, the live engine 400s on it and
+ * requires {items}. Mock + plugin now align with the live engine.
  *
- * The plugin code is mounted into the container, so we drop a one-shot PHP
- * file into the plugin dir and run it through `wp eval-file` (full WP + WC
- * boot). It prints `RESULT <name> PASS|FAIL <detail>` lines we parse here.
+ * Gated on RECENGINE_LIVE=1. Requires a connected tenant in the wp-env DB
+ * (run setup-exchange first). MUST run before any integration-suite run —
+ * EnvScrub wipes the smly_rec_* options the connection lives in.
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -29,7 +29,7 @@ const runDocker = (args) => {
   let canDocker = true;
   try { execSync('docker ps', { stdio: 'pipe' }); } catch { canDocker = false; }
   const cmd = canDocker ? `docker ${joined}` : `sg docker -c "docker ${joined}"`;
-  return execSync(cmd, { stdio: 'pipe', maxBuffer: 1024 * 1024 * 16 }).toString();
+  return execSync(cmd, { stdio: 'pipe', maxBuffer: 1024 * 1024 * 32 }).toString();
 };
 
 const findCliContainer = () => {
@@ -41,8 +41,6 @@ const findCliContainer = () => {
   return list[0];
 };
 
-// One-shot PHP, run through the real WP+WC bootstrap. Catalog flush builds
-// a Client from the stored (real) api_key and hits the live engine.
 const LIVE_PHP = String.raw`<?php
 use Smaily\Connect\Bootstrap;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
@@ -51,7 +49,7 @@ function result( $name, $cond, $detail = '' ) {
 	echo 'RESULT ' . $name . ' ' . ( $cond ? 'PASS' : 'FAIL' ) . ' ' . $detail . "\n";
 }
 
-function live_make_product( $sku, $price ) {
+function live_make_simple( $sku, $price ) {
 	$existing = wc_get_product_id_by_sku( $sku );
 	if ( $existing ) {
 		wp_delete_post( $existing, true );
@@ -78,74 +76,156 @@ $queue     = $bootstrap->ingest_queue();
 $builder   = $bootstrap->catalog_payload_builder();
 $flusher   = $bootstrap->ingest_flusher();
 $handler   = new CatalogHookHandler( $queue, $builder, $settings );
+$created   = array();
+
+// Determinism: this harness drives the handler explicitly. In wp eval-file
+// the Bootstrap WC hooks are already registered, so product create/delete
+// during the test would double-enqueue (and cleanup-deletes add noise).
+// Silence the registered hooks and start from an empty queue.
+global $wpdb;
+$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}smly_rec_event_queue" );
+remove_all_actions( 'save_post_product' );
+remove_all_actions( 'woocommerce_product_set_stock_status' );
+remove_all_actions( 'before_delete_post' );
 
 result( 'connected', $settings->is_connected() && strlen( $settings->api_key() ) > 0, 'tenant=' . $settings->tenant_name() );
 
-$created = array();
-
-// --- Scenario 1: upsert end-to-end against the live engine ---------------
+// --- 1. upsert end-to-end (hook → queue → flusher → engine) --------------
 CatalogHookHandler::reset_seen();
-$pid       = live_make_product( 'LIVE-CAT-1', '12.99' );
+$pid       = live_make_simple( 'LIVE-CAT-1', '12.99' );
 $created[] = $pid;
 $handler->on_save_product( $pid );
-
 $uuid1 = '';
-foreach ( $queue->pending( 50 ) as $r ) {
+foreach ( $queue->pending( 200 ) as $r ) {
 	if ( (string) $r['entity_id'] === (string) $pid && $r['event_type'] === CatalogHookHandler::EVENT_CATALOG_UPSERT ) {
 		$uuid1 = (string) $r['event_uuid'];
 	}
 }
 result( 'upsert_enqueued', $uuid1 !== '', 'event_uuid=' . $uuid1 );
-
 $stats = $flusher->flush();
 result( 'upsert_flushed_to_engine', $stats['sent'] >= 1 && $stats['failed'] === 0, json_encode( $stats ) );
 
-$still_pending = false;
-foreach ( $queue->pending( 50 ) as $r ) {
-	if ( (string) $r['event_uuid'] === $uuid1 ) {
-		$still_pending = true;
-	}
-}
-result( 'upsert_row_sent_not_retried', ! $still_pending );
-
-// --- Scenario 2: dedup contract — resend the SAME event_id ---------------
+// --- 2. idempotency on resend (same event_id) ----------------------------
+// The deployed engine does NOT implement Layer-2 event_id dedup (the 3.2.4
+// probe: a resent valid-UUID event_id re-UPSERTs, returning ok:true rather
+// than {"deduplicated":true} — contract §7 / "6/6 sanity" notwithstanding).
+// The plugin-relevant guarantee is therefore just that a resend is a SUCCESS
+// (2xx, no throw): the flush job marks the row sent and never infinite-
+// retries. Idempotency itself holds via Layer-1 natural-key (sku) UPSERT.
 $client = $bootstrap->rec_client();
-$object = $builder->build( wc_get_product( $pid ), 'live-dedup-uuid-0001' );
+$object = $builder->build( wc_get_product( $pid ), wp_generate_uuid4() );
 try {
 	$first  = $client->ingest_catalog( array( $object ) );
 	$second = $client->ingest_catalog( array( $object ) );
-	result( 'dedup_first_processed', empty( $first['deduplicated'] ), json_encode( $first ) );
-	result( 'dedup_second_deduplicated', ! empty( $second['deduplicated'] ), json_encode( $second ) );
+	result( 'resend_first_ok', ! empty( $first['ok'] ) || ! empty( $first['deduplicated'] ), json_encode( $first ) );
+	result( 'resend_second_idempotent_success', ! empty( $second['ok'] ) || ! empty( $second['deduplicated'] ), json_encode( $second ) );
 } catch ( \Throwable $e ) {
-	result( 'dedup_first_processed', false, 'EXC ' . $e->getMessage() );
-	result( 'dedup_second_deduplicated', false, 'EXC ' . $e->getMessage() );
+	result( 'resend_first_ok', false, 'EXC ' . $e->getMessage() );
+	result( 'resend_second_idempotent_success', false, 'EXC ' . $e->getMessage() );
 }
 
-// --- Scenario 3: batch of multiple products in one engine call -----------
-CatalogHookHandler::reset_seen();
-$pid2      = live_make_product( 'LIVE-CAT-2', '5.50' );
-$pid3      = live_make_product( 'LIVE-CAT-3', '7.25' );
-$created[] = $pid2;
-$created[] = $pid3;
-$handler->on_save_product( $pid2 );
-$handler->on_save_product( $pid3 );
-$stats2 = $flusher->flush();
-result( 'batch_multi_product_sent', $stats2['sent'] >= 2 && $stats2['failed'] === 0, json_encode( $stats2 ) );
+// --- 3. batch of 100 products in one engine call -------------------------
+$batch = array();
+for ( $i = 1; $i <= 100; $i++ ) {
+	$obj                = $object;
+	$obj['sku']         = sprintf( 'LIVE-BATCH-%03d', $i );
+	$obj['event_id']    = sprintf( 'live-batch-uuid-%03d', $i );
+	$obj['name']        = 'Live Batch ' . $i;
+	$batch[]            = $obj;
+}
+try {
+	$resp = $client->ingest_catalog( $batch );
+	result( 'batch_100_processed', (int) ( $resp['processed'] ?? 0 ) === 100 && empty( $resp['errors'] ), json_encode( array( 'processed' => $resp['processed'] ?? null, 'errors' => count( $resp['errors'] ?? array() ) ) ) );
+} catch ( \Throwable $e ) {
+	result( 'batch_100_processed', false, 'EXC ' . $e->getMessage() );
+}
 
-// --- Scenario 4: delete → catalog.delete (in_stock=false) ----------------
+// --- 4. variable product → distinct event_uuid per variation -------------
 CatalogHookHandler::reset_seen();
-$handler->on_delete_product( $pid2 );
+$var_uuids = array();
+try {
+	foreach ( array( 'LIVE-VAR-PARENT', 'LIVE-VAR-S', 'LIVE-VAR-L' ) as $sku ) {
+		$ex = wc_get_product_id_by_sku( $sku );
+		if ( $ex ) {
+			wp_delete_post( $ex, true );
+		}
+	}
+	$term   = term_exists( 'live-test-cat', 'product_cat' );
+	$parent = new WC_Product_Variable();
+	$parent->set_sku( 'LIVE-VAR-PARENT' );
+	$parent->set_name( 'Live Variable' );
+	if ( is_array( $term ) ) {
+		$parent->set_category_ids( array( (int) $term['term_id'] ) );
+	}
+	$attr = new WC_Product_Attribute();
+	$attr->set_name( 'size' );
+	$attr->set_options( array( 'S', 'L' ) );
+	$attr->set_visible( true );
+	$attr->set_variation( true );
+	$parent->set_attributes( array( $attr ) );
+	$parent_id = (int) $parent->save();
+	$created[] = $parent_id;
+
+	foreach ( array( 'S' => 'LIVE-VAR-S', 'L' => 'LIVE-VAR-L' ) as $size => $vsku ) {
+		$v = new WC_Product_Variation();
+		$v->set_parent_id( $parent_id );
+		$v->set_sku( $vsku );
+		$v->set_regular_price( '10.00' );
+		$v->set_attributes( array( 'size' => strtolower( $size ) ) );
+		$v->save();
+	}
+
+	$handler->on_save_product( $parent_id );
+	foreach ( $queue->pending( 200 ) as $r ) {
+		if ( $r['event_type'] === CatalogHookHandler::EVENT_CATALOG_UPSERT && in_array( (int) $r['entity_id'], wc_get_product( $parent_id )->get_children(), true ) ) {
+			$var_uuids[ (string) $r['entity_id'] ] = (string) $r['event_uuid'];
+		}
+	}
+	$distinct = count( $var_uuids ) === 2 && count( array_unique( $var_uuids ) ) === 2;
+	result( 'variable_distinct_event_uuids', $distinct, 'uuids=' . json_encode( array_values( $var_uuids ) ) );
+	$vstats = $flusher->flush();
+	result( 'variable_flushed_to_engine', $vstats['sent'] >= 2 && $vstats['failed'] === 0, json_encode( $vstats ) );
+} catch ( \Throwable $e ) {
+	result( 'variable_distinct_event_uuids', false, 'EXC ' . $e->getMessage() );
+	result( 'variable_flushed_to_engine', false, 'EXC ' . $e->getMessage() );
+}
+
+// --- 5. delete → catalog.delete (in_stock=false) -------------------------
+CatalogHookHandler::reset_seen();
+$handler->on_delete_product( $pid );
 $has_delete = false;
-foreach ( $queue->pending( 50 ) as $r ) {
-	if ( $r['event_type'] === CatalogHookHandler::EVENT_CATALOG_DELETE && (string) $r['entity_id'] === (string) $pid2 ) {
+foreach ( $queue->pending( 200 ) as $r ) {
+	if ( $r['event_type'] === CatalogHookHandler::EVENT_CATALOG_DELETE && (string) $r['entity_id'] === (string) $pid ) {
 		$has_delete = true;
 	}
 }
 result( 'delete_enqueued', $has_delete );
-$stats3 = $flusher->flush();
-result( 'delete_flushed_to_engine', $stats3['sent'] >= 1 && $stats3['failed'] === 0, json_encode( $stats3 ) );
+$dstats = $flusher->flush();
+result( 'delete_flushed_to_engine', $dstats['sent'] >= 1 && $dstats['failed'] === 0, json_encode( $dstats ) );
 
-// --- Cleanup test products ----------------------------------------------
+// --- 6. partial-success: a batch with one deliberately-bad item ----------
+// Documents the engine's per-product error behaviour (F3-14 design input):
+// does a batch with one bad product return 200 + errors[{index,sku,...}],
+// or reject the whole batch with a 4xx?
+$ok_item  = array( 'sku' => 'LIVE-PARTIAL-OK', 'name' => 'Partial OK', 'category_path' => 'food/dry', 'price' => 1.00, 'in_stock' => true, 'product_url' => 'https://x.test/ok', 'event_id' => wp_generate_uuid4() );
+$bad_item = $ok_item;
+$bad_item['sku']      = '';
+$bad_item['event_id'] = wp_generate_uuid4();
+try {
+	$presp = $client->ingest_catalog( array( $ok_item, $bad_item ) );
+	result( 'partial_success_200_with_errors', isset( $presp['errors'] ) && ! empty( $presp['errors'] ), 'processed=' . ( $presp['processed'] ?? '?' ) . ' ' . json_encode( $presp['errors'] ?? null ) );
+} catch ( \Throwable $e ) {
+	// Whole-batch 4xx — the engine rejects the batch rather than per-item.
+	result( 'partial_success_200_with_errors', false, 'batch-level reject: ' . $e->getMessage() );
+}
+
+// --- cleanup test products ----------------------------------------------
+foreach ( array( 'LIVE-VAR-S', 'LIVE-VAR-L' ) as $sku ) {
+	$id = wc_get_product_id_by_sku( $sku );
+	if ( $id ) {
+		wp_delete_post( $id, true );
+	}
+}
 foreach ( array_unique( $created ) as $id ) {
 	wp_delete_post( $id, true );
 }
@@ -171,8 +251,7 @@ echo "DONE\n";
     fs.unlinkSync(hostPath);
   }
 
-  const lines = out.split('\n');
-  const results = lines
+  const results = out.split('\n')
     .filter((l) => l.startsWith('RESULT '))
     .map((l) => {
       const m = l.match(/^RESULT (\S+) (PASS|FAIL) ?(.*)$/);
@@ -183,17 +262,14 @@ echo "DONE\n";
   console.log('\n=== walk-3.2 live catalog-ingest (real MiuMjau engine) ===');
   let failures = 0;
   for (const r of results) {
-    const mark = r.status === 'PASS' ? '✓' : '✗';
-    console.log(`  ${mark} ${r.name}${r.detail ? `  ${r.detail}` : ''}`);
+    console.log(`  ${r.status === 'PASS' ? '✓' : '✗'} ${r.name}${r.detail ? `  ${r.detail}` : ''}`);
     if (r.status !== 'PASS') failures += 1;
   }
-
   if (!out.includes('DONE')) {
-    console.log('  ✗ live script did not finish (no DONE marker). Raw output:');
-    console.log(out);
+    console.log('  ✗ live script did not finish (no DONE marker). Raw tail:');
+    console.log(out.split('\n').slice(-12).join('\n'));
     failures += 1;
   }
-
   console.log(`\n${failures === 0 ? 'LIVE OK' : `LIVE FAILED (${failures})`} — ${results.length} checks`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((e) => {

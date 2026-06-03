@@ -239,6 +239,21 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( array( 'pa_species' => array( 'dog' ) ), $payload['raw_attributes'] );
 	}
 
+	public function test_variation_inherits_parent_category_path(): void {
+		// Variations carry no product_cat terms; the engine requires a
+		// non-empty category_path, so the builder must fall back to the parent.
+		Functions\when( 'get_the_terms' )->alias(
+			static function ( int $id ) {
+				return 50 === $id ? array( (object) array( 'term_id' => 9, 'slug' => 'food' ) ) : false;
+			}
+		);
+		$variation = $this->fake_product( array( 'id' => 101, 'sku' => 'V-1', 'price' => '1.00', 'parent_id' => 50 ) );
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $variation, 'u' );
+
+		self::assertSame( 'food', $payload['category_path'], 'A variation must inherit its parent product category.' );
+	}
+
 	/**
 	 * @param array<string, mixed> $p
 	 */
@@ -254,6 +269,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 			public function get_id( $context = 'view' ) {
 				return (int) ( $this->p['id'] ?? 0 );
+			}
+			public function get_parent_id( $context = 'view' ) {
+				return (int) ( $this->p['parent_id'] ?? 0 );
 			}
 			public function get_sku( $context = 'view' ) {
 				return (string) ( $this->p['sku'] ?? '' );
@@ -304,6 +322,7 @@ if ( ! class_exists( \WC_Product::class ) ) {
 		<<<'PHP'
 		class WC_Product {
 			public function get_id( $context = 'view' ) { return 0; }
+			public function get_parent_id( $context = 'view' ) { return 0; }
 			public function get_sku( $context = 'view' ) { return ''; }
 			public function get_name( $context = 'view' ) { return ''; }
 			public function get_price( $context = 'view' ) { return ''; }

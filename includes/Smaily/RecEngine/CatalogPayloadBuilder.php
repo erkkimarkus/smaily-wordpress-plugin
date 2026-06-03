@@ -276,7 +276,16 @@ class CatalogPayloadBuilder {
 			return '';
 		}
 
-		$terms = get_the_terms( (int) $product->get_id(), 'product_cat' );
+		// Variations carry no product_cat terms of their own — inherit the
+		// parent's. The engine requires a non-empty category_path (the 3.2.4
+		// live probe: variations with "" 400'd "String must contain at least
+		// 1 character"), so without this every variation would be rejected.
+		$category_source_id = (int) $product->get_id();
+		if ( method_exists( $product, 'get_parent_id' ) && (int) $product->get_parent_id() > 0 ) {
+			$category_source_id = (int) $product->get_parent_id();
+		}
+
+		$terms = get_the_terms( $category_source_id, 'product_cat' );
 		if ( ! is_array( $terms ) || $terms === array() ) {
 			return '';
 		}
