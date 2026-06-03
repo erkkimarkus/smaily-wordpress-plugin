@@ -36,6 +36,14 @@ use Smaily\Connect\Smaily\EventQueue;
 final class Activation {
 
 	/**
+	 * Stamp of the plugin version this routine last ran for. Bootstrap's
+	 * admin_init upgrade-detect compares it to SMAILY_CONNECT_VERSION so a
+	 * file-overwrite upgrade (which never fires register_activation_hook)
+	 * still triggers the migrations exactly once.
+	 */
+	public const OPTION_PLUGIN_VERSION = 'smly_plus_plugin_version';
+
+	/**
 	 * Activation callback. WordPress passes a $network_wide boolean we ignore
 	 * for now — multisite network-wide activation is in the v1.x backlog
 	 * (PLUGIN.md §1 "Selgelt väljas").
@@ -45,6 +53,18 @@ final class Activation {
 		self::run_migrations();
 		self::migrate_wp_cron_to_action_scheduler();
 		self::schedule_recurring_action_scheduler_jobs();
+		self::stamp_plugin_version();
+	}
+
+	/**
+	 * Record the version this run completed for, so the admin_init
+	 * upgrade-detect settles to a single get_option() no-op until the next
+	 * version bump.
+	 */
+	private static function stamp_plugin_version(): void {
+		if ( defined( 'SMAILY_CONNECT_VERSION' ) ) {
+			update_option( self::OPTION_PLUGIN_VERSION, (string) SMAILY_CONNECT_VERSION, false );
+		}
 	}
 
 	private static function set_default_options(): void {

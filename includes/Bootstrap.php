@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
+use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\REST\EndpointRegistry;
@@ -89,6 +90,15 @@ final class Bootstrap {
 
 		register_activation_hook( $plugin_file, array( Activation::class, 'run' ) );
 		register_deactivation_hook( $plugin_file, array( Deactivation::class, 'run' ) );
+
+		// P1 #2: register_activation_hook only fires on an explicit activate.
+		// Common upgrade paths (`wp plugin update`, `wp plugin install
+		// --force` on an active plugin, auto-update) replace files WITHOUT
+		// re-firing it, so the new tables would never be created. A cheap
+		// admin_init version-check runs the (idempotent) migrations whenever
+		// the stored version trails the code — the upgrade-detect the
+		// activation hook can't provide.
+		add_action( 'admin_init', array( $this, 'maybe_run_upgrade' ) );
 
 		add_action( 'before_woocommerce_init', array( $this, 'declare_woocommerce_compatibility' ) );
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
@@ -233,6 +243,35 @@ final class Bootstrap {
 	 */
 	public function register_woocommerce_hooks(): void {
 		WooHooks::register( new WooHookHandler( $this->event_queue() ) );
+
+		// P1 #1: once the wizard is finished the new path owns contact sync,
+		// so strip the legacy subscriber-sync hooks (the legacy service
+		// re-registers them at every plugin load, so this must run every
+		// request — not once at Finish). Before Finish the new HookHandler
+		// gate keeps this path dormant and the legacy hooks stay in place.
+		if ( (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+			LegacyHookBridge::deregister_subscriber_sync();
+		}
+	}
+
+	/**
+	 * Idempotent upgrade-detect. Runs the activation routine (migrations +
+	 * AS scheduling) when the stored schema-owner version trails the running
+	 * code — covering the upgrade paths that never fire
+	 * register_activation_hook. Activation::run stamps the version, so the
+	 * steady state is a single cheap get_option() per admin request.
+	 */
+	public function maybe_run_upgrade(): void {
+		$current = defined( 'SMAILY_CONNECT_VERSION' ) ? (string) SMAILY_CONNECT_VERSION : '';
+		if ( $current === '' ) {
+			return;
+		}
+
+		if ( (string) get_option( Activation::OPTION_PLUGIN_VERSION, '' ) === $current ) {
+			return;
+		}
+
+		Activation::run();
 	}
 
 	/**

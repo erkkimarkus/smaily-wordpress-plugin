@@ -12,6 +12,7 @@ namespace Smaily\Connect\REST;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
+use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Settings\Credentials;
 use WP_Error;
 use WP_REST_Request;
@@ -156,6 +157,15 @@ class SettingsEndpoint {
 	 */
 	private function save_finish(): WP_REST_Response {
 		update_option( 'smly_plus_setup_completed', true );
+
+		// P1 #1: hand contact sync to the new path. The gate (read on every
+		// WooCommerce event) opens the moment the option above flips; strip
+		// the legacy subscriber-sync hooks now so they're gone for the rest
+		// of THIS request too. Bootstrap re-applies the strip on every later
+		// request's `init` — the option, not this call, is what makes it
+		// persist.
+		LegacyHookBridge::deregister_subscriber_sync();
+
 		return $this->success_response();
 	}
 

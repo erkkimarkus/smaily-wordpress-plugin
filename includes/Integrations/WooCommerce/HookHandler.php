@@ -48,6 +48,15 @@ class HookHandler {
 	public const EVENT_AUTOMATION_WELCOME     = 'automation.welcome';
 	public const EVENT_AUTOMATION_FIRST_ORDER = 'automation.first_order';
 
+	/**
+	 * Master gate for the new live-sync path. Until the setup wizard is
+	 * finished, the legacy Smaily_Connect subscriber-sync owns WooCommerce
+	 * events; this handler stays dormant so the two never both fire (P1 #1,
+	 * backward-compat audit). Wizard Finish flips it true and Bootstrap then
+	 * de-registers the legacy hooks — see LegacyHookBridge.
+	 */
+	private const OPTION_SETUP_COMPLETED = 'smly_plus_setup_completed';
+
 	private const OPTION_SUBSCRIBER_SYNC_ENABLED = 'smly_plus_subscriber_sync_enabled';
 	private const OPTION_WELCOME_ENABLED         = 'smly_plus_welcome_enabled';
 	private const OPTION_FIRST_ORDER_ENABLED     = 'smly_plus_first_order_enabled';
@@ -62,6 +71,9 @@ class HookHandler {
 	/** @var array<string, bool> per-request dedupe set keyed by "{event}:{entity_id}". */
 	private static array $seen = array();
 
+	/** @var bool Per-request guard so the closed-gate notice logs at most once. */
+	private static bool $gate_logged = false;
+
 	private EventQueue $queue;
 
 	private ?\Smaily\Connect\Smaily\SubscriberPayloadBuilder $builder = null;
@@ -71,6 +83,10 @@ class HookHandler {
 	}
 
 	public function on_user_register( int $user_id ): void {
+		if ( $this->gate_closed() ) {
+			return;
+		}
+
 		$user = get_userdata( $user_id );
 		if ( $user === false ) {
 			return;
@@ -94,6 +110,10 @@ class HookHandler {
 	}
 
 	public function on_profile_update( int $user_id ): void {
+		if ( $this->gate_closed() ) {
+			return;
+		}
+
 		if ( ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
 			return;
 		}
@@ -128,7 +148,15 @@ class HookHandler {
 			return;
 		}
 
+		// Attribution capture is order-meta only — no Smaily call — so it runs
+		// regardless of the wizard gate; the rec-engine reads these later.
 		$this->save_attribution_cookies_to_order( $order );
+
+		// Gate the sync path (P1 #1): only fire first-order automation once
+		// the wizard is finished, so it never doubles the legacy sync.
+		if ( $this->gate_closed() ) {
+			return;
+		}
 
 		$email = $order->get_billing_email();
 		if ( $email === '' ) {
@@ -164,7 +192,30 @@ class HookHandler {
 	 * PHP discards it at request end.
 	 */
 	public static function reset_seen(): void {
-		self::$seen = array();
+		self::$seen        = array();
+		self::$gate_logged = false;
+	}
+
+	/**
+	 * Master gate (P1 #1). Returns true — callback must no-op — until the
+	 * setup wizard is finished. Before Finish the legacy subscriber-sync
+	 * owns WooCommerce events; this handler firing too would double-send
+	 * the contact (two API calls, risk of double automation). Logs the
+	 * first closed-gate touch per request when WP_DEBUG so the dormancy is
+	 * visible without spamming production debug.log.
+	 */
+	private function gate_closed(): bool {
+		if ( (bool) get_option( self::OPTION_SETUP_COMPLETED, false ) ) {
+			return false;
+		}
+
+		if ( ! self::$gate_logged && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			self::$gate_logged = true;
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[smaily-connect] Live sync deferred: smly_plus_setup_completed is false; legacy Smaily sync owns WooCommerce events until the setup wizard is finished.' );
+		}
+
+		return true;
 	}
 
 	/**

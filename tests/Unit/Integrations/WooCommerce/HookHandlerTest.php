@@ -57,6 +57,9 @@ final class HookHandlerTest extends TestCase {
 		// Default Settings: subscriber sync on, welcome / first_order off.
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
 				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
 					return true;
 				}
@@ -76,6 +79,36 @@ final class HookHandlerTest extends TestCase {
 		Monkey\tearDown();
 		parent::tearDown();
 		$_COOKIE = array();
+	}
+
+	public function test_gate_closed_suppresses_callbacks_until_setup_completed(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return false;
+				}
+				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				return $default;
+			}
+		);
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'gated@example.test', 'G', 'X' ) );
+
+		$handler = new HookHandler( $this->queue );
+		$handler->on_user_register( 7 );
+		$handler->on_profile_update( 7 );
+
+		self::assertSame( array(), $this->enqueued, 'Closed gate (wizard unfinished) must suppress every new callback so legacy owns sync.' );
+	}
+
+	public function test_gate_open_allows_enqueue_after_setup_completed(): void {
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'open@example.test', 'O', 'X' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_register( 7 );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $this->enqueued[0]['type'] );
 	}
 
 	public function test_user_register_enqueues_contact_sync(): void {
@@ -103,6 +136,9 @@ final class HookHandlerTest extends TestCase {
 	public function test_user_register_fires_welcome_only_when_option_on(): void {
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
 				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
 					return true;
 				}
@@ -171,7 +207,9 @@ final class HookHandlerTest extends TestCase {
 	public function test_checkout_order_processed_fires_automation_first_order_on_first_paid_order(): void {
 		Functions\when( 'get_option' )->alias(
 			static fn ( string $key, $default = null ) =>
-				$key === 'smly_plus_first_order_enabled' ? true : $default
+				$key === 'smly_plus_setup_completed'
+					? true
+					: ( $key === 'smly_plus_first_order_enabled' ? true : $default )
 		);
 		Functions\when( 'wc_get_order' )->justReturn( $this->fake_order( 100, 'buyer@example.test', 9, 1 ) );
 		Functions\when( 'wc_get_customer_order_count' )->justReturn( 1 );
@@ -187,7 +225,9 @@ final class HookHandlerTest extends TestCase {
 	public function test_checkout_order_processed_skips_on_second_order(): void {
 		Functions\when( 'get_option' )->alias(
 			static fn ( string $key, $default = null ) =>
-				$key === 'smly_plus_first_order_enabled' ? true : $default
+				$key === 'smly_plus_setup_completed'
+					? true
+					: ( $key === 'smly_plus_first_order_enabled' ? true : $default )
 		);
 		Functions\when( 'wc_get_order' )->justReturn( $this->fake_order( 100, 'buyer@example.test', 9, 1 ) );
 		Functions\when( 'wc_get_customer_order_count' )->justReturn( 2 ); // already had one
