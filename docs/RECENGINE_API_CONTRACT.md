@@ -311,16 +311,19 @@ Each ingest endpoint has a natural business key that uniquely identifies the rec
 
 Sending the same record twice updates (UPSERT) — no duplicates. This protects against any retry, regardless of whether the plugin sends an `event_id`.
 
-### Layer 2: Transport-level deduplication (`event_id`, optional)
+### Layer 2: Transport-level deduplication (`event_id`, optional, per-item)
 
-To handle queue-level retries cleanly, the plugin may send an `event_id` field with each record. The engine records `(tenant_id, event_id)` in the `ingest_event_log` table with a 90-day permanent retention window (cleaned by the daily retention cron).
+To handle queue-level retries cleanly, the plugin may send an `event_id` field **on each item** — every `products[]` / `customers[]` / `orders[]` / `events[]` object may carry its own `event_id` (string, UUID v4). The engine records `(tenant_id, event_id)` in the `ingest_event_log` table with a 90-day permanent retention window (cleaned by the daily retention cron).
 
-**Behavior**:
-- First request with a given `event_id` → record processed, `event_id` logged, normal response returned
-- Subsequent request with the same `event_id` → response is `{"ok": true, "deduplicated": true}`, no further work performed
-- Different `event_id` for the same natural key → Layer 1 UPSERT applies (record updated)
+**Behavior** (per-item, integer counts):
+- Each item carrying a **new** `event_id` → processed, and that `event_id` is logged.
+- Each item whose `event_id` is **already** in `ingest_event_log` → skipped; counted in `deduplicated`.
+- The response returns integer counts: `{"processed": N, "deduplicated": M}`, where `M` is the number of items whose `event_id` was already seen. When `M` equals the total item count (a pure no-op retry), the response also includes `"deduplicated_all": true`.
+- **Intra-batch duplicates** (the same `event_id` twice in one request): the first occurrence is `processed`, the second is `deduplicated`.
+- Items **without** an `event_id` use Layer 1 (natural-key UPSERT) only and count toward `processed` when the row is created/updated.
+- **Wrapper-level `event_id` is not supported.** An `event_id` placed at the top level of the request body (outside the item objects) is **silently ignored** — the request proceeds using per-item semantics only. There is no whole-request boolean short-circuit; the response is always the integer-count shape.
 
-The `event_id` field is **optional** on every endpoint. If the plugin omits it, only Layer 1 (natural-key UPSERT) is used. This guarantees backward compatibility for any client that doesn't implement queue-level event tracking.
+The per-item `event_id` field is **optional** on catalog / customers / orders — if omitted, only Layer 1 (natural-key UPSERT) is used. Browse has no Layer-1 fallback, so `event_id` is effectively required there (see the browse endpoint section).
 
 **Endpoints accepting `event_id`**:
 - `/api/v1/ingest/catalog` — per product (each `products[]` object)
@@ -338,26 +341,26 @@ The `event_id` field is **optional** on every endpoint. If the plugin omits it, 
 ```bash
 # Request 1
 POST /api/v1/ingest/catalog
-{"products":[{"sku":"ACA-001","event_id":"evt_abc","name":"...","price":9.99,...}]}
-# → 200 {"ok":true,"processed":1,"created":1,...}
+{"products":[{"sku":"ACA-001","event_id":"<uuid-1>","name":"...","price":9.99,...}]}
+# → 200 {"ok":true,"processed":1,"deduplicated":0,"errors":[]}
 
-# Request 2 (retry with same event_id)
+# Request 2 (retry with same per-item event_id)
 POST /api/v1/ingest/catalog
-{"products":[{"sku":"ACA-001","event_id":"evt_abc","name":"...","price":9.99,...}]}
-# → 200 {"ok":true,"deduplicated":true,...}
+{"products":[{"sku":"ACA-001","event_id":"<uuid-1>","name":"...","price":9.99,...}]}
+# → 200 {"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}
 ```
 
 **Catalog, two requests with different `event_id` but same SKU**:
 ```bash
 # Request 1
 POST /api/v1/ingest/catalog
-{"products":[{"sku":"ACA-001","event_id":"evt_abc","name":"...","price":9.99,...}]}
-# → 200 {"ok":true,"processed":1,"created":1,...}
+{"products":[{"sku":"ACA-001","event_id":"<uuid-1>","name":"...","price":9.99,...}]}
+# → 200 {"ok":true,"processed":1,"deduplicated":0,"errors":[]}
 
-# Request 2 (legitimate update)
+# Request 2 (legitimate update — different event_id, same SKU)
 POST /api/v1/ingest/catalog
-{"products":[{"sku":"ACA-001","event_id":"evt_xyz","name":"...","price":12.99,...}]}
-# → 200 {"ok":true,"processed":1,"updated":1,...} (Layer 1 UPSERT)
+{"products":[{"sku":"ACA-001","event_id":"<uuid-2>","name":"...","price":12.99,...}]}
+# → 200 {"ok":true,"processed":1,"deduplicated":0,"errors":[]} (Layer 1 UPSERT)
 ```
 
 ---
@@ -622,16 +625,18 @@ The engine accepts both forms — field type is checked at runtime. A single-lan
 
 `unmapped_attributes` lists `raw_attributes` keys the engine didn't recognize. The plugin can surface this as an admin notice: "5 attributes are unmapped — check mapping settings".
 
-**Response 200 OK (deduplicated retry)**:
+**Response 200 OK (deduplicated retry, all items)**:
 ```json
 {
   "ok": true,
-  "deduplicated": true,
-  "request_id": "req_..."
+  "processed": 0,
+  "deduplicated": 5,
+  "errors": [],
+  "deduplicated_all": true
 }
 ```
 
-Returned when every product in the request was already processed (matching `event_id` already in `ingest_event_log`). No catalog row was created or updated. Plugin should treat this as a successful no-op — the original request was processed earlier.
+Returned when every product carrying an `event_id` in the request was already processed (matching `event_id` already in `ingest_event_log`). No catalog row was created or updated. `deduplicated` is the integer count of skipped items, and `deduplicated_all: true` flags a pure no-op retry. Plugin should treat this as a successful no-op — the original request was processed earlier. (A *mixed* batch returns e.g. `{"processed":3,"deduplicated":2,"errors":[]}` with no `deduplicated_all`.)
 
 **Response 200 OK (partial success)**:
 ```json
@@ -665,13 +670,15 @@ The engine handles **partial success** — valid rows are processed, invalid one
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1** (always active): `(tenant_id, sku)` natural-key UPSERT. Same SKU sent twice → second call updates.
-- **Layer 2** (optional, with `event_id`): same `event_id` sent twice → second call returns `{"deduplicated": true}` no-op.
+- **Layer 2** (optional, per-item `event_id`): an item whose `event_id` was already seen is counted in `deduplicated` and not re-UPSERTed (the whole request is a no-op when `deduplicated_all: true`).
 
 ---
 
 ### 4. POST /api/v1/ingest/customers
 
 Batch upload of customers. UPSERT by email.
+
+> **Implementation status (Route A):** The engine currently accepts **single-object** payloads (one customer per POST). Batch array acceptance (the `customers[]` wrapper) lands in W4 / W5 per Route A plan v2. The field reference and examples below describe the target batch contract.
 
 **URL**: `POST /api/v1/ingest/customers`
 
@@ -735,17 +742,19 @@ Batch upload of customers. UPSERT by email.
 }
 ```
 
-**Response 200 OK (deduplicated retry)**: as in catalog (`{"deduplicated": true}`).
+**Response 200 OK (deduplicated retry)**: integer-count shape, as in catalog. A duplicate `event_id` is counted in `deduplicated`; a whole-request no-op returns `{"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}`.
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1**: `(tenant_id, email)` natural-key UPSERT.
-- **Layer 2**: optional `event_id` for retry deduplication.
+- **Layer 2**: optional per-item `event_id` for retry deduplication (integer counts).
 
 ---
 
 ### 5. POST /api/v1/ingest/orders
 
 Batch upload of orders + order items. HPOS-aware payload.
+
+> **Implementation status (Route A):** The engine currently accepts **single-object** payloads (one order per POST; the order's line items are the nested `items[]` array). Batch array acceptance (the `orders[]` wrapper) lands in W4 / W5 per Route A plan v2. The field reference and examples below describe the target batch contract.
 
 **URL**: `POST /api/v1/ingest/orders`
 
@@ -842,11 +851,11 @@ Detailed attribution logic lives in the `lib/engine/attribution/` module (specif
 `attribution_resolved` = orders where the engine matched a recommendation.
 `attribution_control` = orders assigned to the control group (no engine influence).
 
-**Response 200 OK (deduplicated retry)**: as in catalog (`{"deduplicated": true}`).
+**Response 200 OK (deduplicated retry)**: integer-count shape, as in catalog. A duplicate `event_id` is counted in `deduplicated`; a whole-request no-op returns `{"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}`.
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1**: `(tenant_id, external_order_id)` natural-key UPSERT (items are fully replaced on update).
-- **Layer 2**: optional `event_id` for retry deduplication.
+- **Layer 2**: optional per-item `event_id` for retry deduplication (integer counts).
 
 ---
 
@@ -940,16 +949,22 @@ For each event, the engine resolves `customer_id` as follows:
 `duplicates_skipped` = `event_id` values already present in `ingest_event_log` (idempotency).
 `retroactive_bound` = anonymous events bound to a customer_id retroactively.
 
-**Response 200 OK (deduplicated retry)**:
+**Response 200 OK (deduplicated retry, all events)**:
 ```json
 {
   "ok": true,
-  "deduplicated": true,
-  "request_id": "req_..."
+  "processed": 0,
+  "deduplicated": 5,
+  "errors": [],
+  "with_customer_match": 0,
+  "anonymous": 0,
+  "retroactive_bound": 0,
+  "duplicates_skipped": 5,
+  "deduplicated_all": true
 }
 ```
 
-Returned when every event in the request was already processed (matching `event_id` already in `ingest_event_log`).
+Returned when every event in the request was already processed (matching `event_id` already in `ingest_event_log`). `deduplicated` is the integer count of skipped events (and `duplicates_skipped` is a backward-compatible alias of the same count). Because browse has no Layer-1 fallback, per-item `event_id` is what prevents a retry from duplicating events — each event deduplicates independently (a 5-event retry yields `deduplicated: 5`, not a single whole-request hit).
 
 **Idempotency**: `event_id` is **required** for browse (unlike other ingest endpoints where it's optional). Browse events have no natural-key UPSERT to fall back on — the same customer may legitimately view the same SKU repeatedly. The `event_id` is the only protection against retry duplicates. Storage: `(tenant_id, event_id)` in `ingest_event_log`, 90-day permanent retention.
 
@@ -1366,6 +1381,12 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - Renamed setup-response endpoint map keys to use `ingest_*` / `customer_*` / `recommendations_*` prefixes consistently (e.g. `catalog` → `ingest_catalog`) — the plugin can now read `endpoints[ingest_catalog]` rather than constructing paths
 - Added note on engine version consistency (single ENGINE_VERSION env var feeds both HTTP header and Smaily contact-sync payload)
 - Added note on consent (Smaily is source of truth; engine accepts but doesn't gate on consent fields)
+
+**v1.0.0 — W1 idempotency contract sync** (no breaking changes for plugin clients; no prior consumers of the removed path):
+- **Per-item `event_id` dedup on all four ingest endpoints.** Each `products[]` / `customers[]` / `orders[]` / `events[]` object may carry its own `event_id`; dedup is per item, including intra-batch duplicates (first occurrence `processed`, second `deduplicated`). Engine commit `1c9b4e9`.
+- **Integer `processed` / `deduplicated` counts** replace the old boolean `{"deduplicated": true}` retry response, plus an optional `"deduplicated_all": true` flag for a pure no-op retry. §7 and all four endpoints' Layer-2 response examples updated accordingly.
+- **Wrapper-level `event_id` removed** (no consumers — plugin ingest had no prior clients; MiuMjau flows through the admin CSV path). A stray top-level `event_id` is now silently ignored (Zod strips it); there is no whole-request boolean short-circuit. Engine commit `01b7950`.
+- Added **Implementation status** notes to §4 Customers and §5 Orders: the engine currently accepts single-object payloads; `customers[]` / `orders[]` batch arrays are target state for W4 / W5. (The `products` → `items` catalog wrapper-key correction remains a separate tracked item.)
 
 ---
 
