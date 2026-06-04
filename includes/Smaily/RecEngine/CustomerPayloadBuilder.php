@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily\RecEngine;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
+
 /**
  * Translates a WP_User into one entry of the
  * `POST /api/v1/ingest/customers` `customers[]` array
@@ -100,10 +102,11 @@ class CustomerPayloadBuilder {
 	}
 
 	/**
-	 * Registration timestamp as ISO 8601 (UTC). WP stores user_registered as
-	 * a 'Y-m-d H:i:s' string in GMT, so it's parsed as UTC and re-emitted in
-	 * ISO 8601. The engine keeps the earliest value on update (does not
-	 * overwrite), so sending the true registration time is safe to repeat.
+	 * Registration timestamp as ISO 8601 UTC. WP stores user_registered as a
+	 * 'Y-m-d H:i:s' string in GMT, parsed as UTC and emitted via IsoDate
+	 * (the `Z`-suffix form the engine's strict Zod requires). The engine keeps
+	 * the earliest value on update, so sending the true registration time is
+	 * safe to repeat.
 	 */
 	private function first_seen_at( \WP_User $user ): string {
 		$registered = trim( (string) ( $user->user_registered ?? '' ) );
@@ -114,7 +117,7 @@ class CustomerPayloadBuilder {
 		if ( $timestamp === false ) {
 			return '';
 		}
-		return gmdate( 'c', $timestamp );
+		return IsoDate::to_z( $timestamp );
 	}
 
 	/**

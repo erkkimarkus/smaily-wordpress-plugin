@@ -94,12 +94,14 @@ final class CustomerPayloadBuilderTest extends TestCase {
 		self::assertSame( 'Tamm', $payload['last_name'] );
 	}
 
-	public function test_first_seen_at_serialised_iso8601_utc(): void {
+	public function test_first_seen_at_serialised_iso8601_utc_with_z_suffix(): void {
 		$user = $this->fake_user( 5, 'a@example.test', array( 'user_registered' => '2026-01-15 10:30:00' ) );
 
 		$payload = ( new CustomerPayloadBuilder() )->build( $user, 'u' );
 
-		self::assertSame( '2026-01-15T10:30:00+00:00', $payload['first_seen_at'] );
+		// `Z`, not `+00:00` — the engine's strict Zod .datetime() rejects an
+		// offset (3.3.4 live-walk caught this).
+		self::assertSame( '2026-01-15T10:30:00Z', $payload['first_seen_at'] );
 	}
 
 	public function test_first_seen_at_omitted_for_zero_date(): void {

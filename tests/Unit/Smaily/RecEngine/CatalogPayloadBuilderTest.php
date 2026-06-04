@@ -102,10 +102,10 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertArrayNotHasKey( 'compare_price', $builder->build( $full_price, 'u' ) );
 	}
 
-	public function test_on_sale_until_serialised_iso8601(): void {
+	public function test_on_sale_until_serialised_iso8601_with_z_suffix(): void {
 		$date    = new class() {
-			public function format( string $fmt ): string {
-				return '2026-06-01T00:00:00+00:00';
+			public function getTimestamp(): int {
+				return (int) strtotime( '2026-06-01 00:00:00 UTC' );
 			}
 		};
 		$product = $this->fake_product(
@@ -114,7 +114,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
 
-		self::assertSame( '2026-06-01T00:00:00+00:00', $payload['on_sale_until'] );
+		// `Z`, not `+00:00` — the engine's strict Zod .datetime() rejects an
+		// offset (3.3.4 live-walk found the sibling first_seen_at bug).
+		self::assertSame( '2026-06-01T00:00:00Z', $payload['on_sale_until'] );
 	}
 
 	public function test_description_is_stripped_and_capped_at_500(): void {

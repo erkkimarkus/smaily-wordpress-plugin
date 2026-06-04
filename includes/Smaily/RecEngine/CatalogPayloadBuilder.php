@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily\RecEngine;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
+
 /**
  * Translates a WC_Product into one entry of the
  * `POST /api/v1/ingest/catalog` `products[]` array
@@ -150,10 +152,13 @@ class CatalogPayloadBuilder {
 
 	private function on_sale_until( \WC_Product $product ): string {
 		$date = $product->get_date_on_sale_to();
-		if ( ! is_object( $date ) || ! method_exists( $date, 'format' ) ) {
+		if ( ! is_object( $date ) || ! method_exists( $date, 'getTimestamp' ) ) {
 			return '';
 		}
-		return (string) $date->format( 'c' );
+		// IsoDate emits the `Z`-suffix form the engine's strict Zod requires.
+		// Using the timestamp (not format('c')) also keeps it UTC rather than
+		// the WC_DateTime's local offset. (3.3.4 datetime-Z fix.)
+		return IsoDate::to_z( (int) $date->getTimestamp() );
 	}
 
 	private function description( \WC_Product $product ): string {
