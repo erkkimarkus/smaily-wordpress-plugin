@@ -69,7 +69,7 @@ per-item retry returns `{"deduplicated":1,"deduplicated_all":true}`.
 plugin) while the engine honoured only wrapper-level — the mock passed but
 reality differed. W1 made per-item canonical on the deployed engine, so mock,
 plugin, and engine now agree. catalog is ✅ live-aligned end to end; the only
-remaining catalog item is the all-or-nothing batch-error edge (F3-14, a later
+remaining catalog item is the all-or-nothing batch-error edge (F3-18, a later
 refinement, not a blocker).
 
 ---
@@ -148,7 +148,7 @@ import_errors`), not the HTTP endpoints.
 > and aligned when W4/W5 lands.
 
 1. **catalog** — ✅ **done (W1)**. Wrapper key, category_path, per-item dedup all
-   aligned mock ↔ plugin ↔ engine. Residual: F3-14 all-or-nothing batch edge.
+   aligned mock ↔ plugin ↔ engine. Residual: F3-18 all-or-nothing batch edge.
 2. **customers** (after W4) — batch `{customers:[...]}` + email-key (W4 drops
    `smaily_contact_id`, D1); per-item `event_id`. Re-probe + align mock then.
 3. **orders** (after W5) — batch `{orders:[...]}` + `status`/`currency`/
