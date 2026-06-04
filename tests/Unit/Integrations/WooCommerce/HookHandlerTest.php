@@ -349,6 +349,10 @@ class WC_Order {
 	public function get_customer_id( $context = 'view' ): int { return 0; }
 	public function get_total( $context = 'view' ): string { return '0'; }
 	public function get_currency( $context = 'view' ): string { return ''; }
+	public function get_status( $context = 'view' ): string { return ''; }
+	public function get_total_discount( $ex_tax = true ): string { return '0'; }
+	public function get_date_created( $context = 'view' ) { return null; }
+	public function get_items( $types = 'line_item' ): array { return array(); }
 	public function update_meta_data( $key, $value, $unique_id = 0 ): void {}
 	public function get_meta( $key = '', $single = true, $context = 'view' ) { return ''; }
 	public function save() { return 0; }
