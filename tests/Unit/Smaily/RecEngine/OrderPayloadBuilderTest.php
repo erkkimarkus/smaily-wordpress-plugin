@@ -163,6 +163,22 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 'REAL', $payload['items'][0]['sku'] );
 	}
 
+	public function test_skuless_line_items_are_skipped(): void {
+		// §5 requires items[].sku; a SKU-less line would reject the whole order,
+		// and can't be recommendation-keyed — drop it.
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'HAS-SKU', 1, '10.00', '10.00' ), $this->mock_item( '', 1, '5.00', '5.00' ) ),
+			)
+		);
+
+		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+
+		self::assertCount( 1, $payload['items'], 'The SKU-less line is dropped.' );
+		self::assertSame( 'HAS-SKU', $payload['items'][0]['sku'] );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	/**

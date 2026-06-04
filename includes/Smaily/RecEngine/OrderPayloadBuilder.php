@@ -143,9 +143,14 @@ class OrderPayloadBuilder {
 
 	/**
 	 * Order line items → wire `items[]`. Shipping / fee / tax / coupon lines
-	 * are skipped (only product lines). unit_price is the pre-discount
-	 * per-unit price (subtotal / qty); line_total is the post-discount total;
-	 * the per-line discount is subtotal − total (omitted when zero).
+	 * are skipped (only product lines), and so are SKU-less product lines: the
+	 * engine keys order items on SKU (§5 `items[].sku` is required), so a
+	 * SKU-less line would fail per-item validation and reject the whole order.
+	 * Dropping it is safe — items[] already excludes shipping/tax/fees, so the
+	 * engine never sums items to total_amount, and a SKU-less line can't be
+	 * recommendation-keyed anyway. unit_price is the pre-discount per-unit
+	 * price (subtotal / qty); line_total is the post-discount total; the
+	 * per-line discount is subtotal − total (omitted when zero).
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -156,8 +161,12 @@ class OrderPayloadBuilder {
 				continue;
 			}
 
-			$product  = $item->get_product();
-			$sku      = ( $product instanceof \WC_Product ) ? (string) $product->get_sku() : '';
+			$product = $item->get_product();
+			$sku     = ( $product instanceof \WC_Product ) ? (string) $product->get_sku() : '';
+			if ( $sku === '' ) {
+				continue;
+			}
+
 			$qty      = (int) $item->get_quantity();
 			$subtotal = (float) $item->get_subtotal();
 			$total    = (float) $item->get_total();

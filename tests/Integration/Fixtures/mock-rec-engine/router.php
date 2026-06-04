@@ -446,6 +446,135 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/customers' ) {
 	reply( 200, $response );
 }
 
+// Orders ingest — W5 batch + email customer-ref + D6 per-item errors[].
+// Wrapper key `orders`, 1..50 per request. Scenario triggers on the FIRST
+// order's customer_email (auth-401@ / retry-500@); a `d6err-` customer_email
+// on ANY order forces a per-item status error so the partial-success split is
+// testable (external_order_id is the WC post id, not controllable in a test;
+// the billing email is). Attribution is async — no attribution counts here.
+if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply(
+			401,
+			array(
+				'error'      => 'unauthorized',
+				'message'    => 'Authorization header missing or malformed.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	if ( ! is_array( $body ) || ! isset( $body['orders'] ) || ! is_array( $body['orders'] ) ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'orders' => array( 'Required' ) ) ),
+			)
+		);
+	}
+
+	$orders = $body['orders'];
+
+	// Wrapper is all-or-nothing: empty / >50 → 400 (only per-ITEM failures use errors[]).
+	if ( count( $orders ) === 0 || count( $orders ) > 50 ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'orders' => array( 'Array must contain between 1 and 50 element(s)' ) ) ),
+			)
+		);
+	}
+
+	$first_email = isset( $orders[0]['customer_email'] ) ? (string) $orders[0]['customer_email'] : '';
+
+	if ( strpos( $first_email, 'auth-401@' ) === 0 ) {
+		reply(
+			401,
+			array(
+				'error'      => 'api_key_revoked',
+				'message'    => 'This api_key has been revoked.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	if ( strpos( $first_email, 'retry-500@' ) === 0 ) {
+		$counter_key           = 'order_attempts_' . md5( $first_email );
+		$seen_count            = isset( $state[ $counter_key ] ) ? (int) $state[ $counter_key ] : 0;
+		$state[ $counter_key ] = $seen_count + 1;
+		save_state( $state_file, $state );
+		if ( $seen_count === 0 ) {
+			reply(
+				500,
+				array(
+					'error'      => 'internal_error',
+					'message'    => 'Transient engine error.',
+					'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+					'timestamp'  => gmdate( 'c' ),
+				)
+			);
+		}
+	}
+
+	$seen         = ( isset( $state['order_event_ids'] ) && is_array( $state['order_event_ids'] ) )
+		? $state['order_event_ids']
+		: array();
+	$processed    = 0;
+	$deduplicated = 0;
+	$errors       = array();
+	foreach ( $orders as $index => $order ) {
+		$external_id = isset( $order['external_order_id'] ) ? (string) $order['external_order_id'] : '';
+		$email       = isset( $order['customer_email'] ) ? (string) $order['customer_email'] : '';
+		$event_id    = isset( $order['event_id'] ) ? (string) $order['event_id'] : '';
+
+		if ( strpos( $email, 'd6err-' ) === 0 ) {
+			$errors[] = array(
+				'index'             => $index,
+				'external_order_id' => $external_id,
+				'field'             => 'status',
+				'message'           => 'Invalid enum value (mock per-item trigger)',
+			);
+			continue;
+		}
+
+		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
+			++$deduplicated;
+			continue;
+		}
+		if ( $event_id !== '' ) {
+			$seen[] = $event_id;
+		}
+		++$processed;
+	}
+	$state['order_event_ids']     = $seen;
+	$state['last_orders_received'] = array_map(
+		static function ( $order ) {
+			return isset( $order['external_order_id'] ) ? (string) $order['external_order_id'] : '';
+		},
+		$orders
+	);
+	save_state( $state_file, $state );
+
+	$response = array(
+		'ok'           => true,
+		'processed'    => $processed,
+		'deduplicated' => $deduplicated,
+		'errors'       => $errors,
+	);
+	if ( $processed === 0 && $deduplicated > 0 && $errors === array() ) {
+		$response['deduplicated_all'] = true;
+	}
+	reply( 200, $response );
+}
+
 // Fallback.
 reply(
 	404,
