@@ -669,15 +669,13 @@ Returned when every product carrying an `event_id` in the request was already pr
 
 ### 4. POST /api/v1/ingest/customers
 
-Batch upload of customers. UPSERT by email.
-
-> **Implementation status (Route A):** The engine currently accepts **single-object** payloads (one customer per POST). Batch array acceptance (the `customers[]` wrapper) lands in W4 / W5 per Route A plan v2. The field reference and examples below describe the target batch contract.
+Batch upload of customers. **Identity is `email`** (W4 / D1): UPSERT by `(tenant_id, email)`; email is lowercased on ingest and matched case-insensitively. There is no `smaily_contact_id`.
 
 **URL**: `POST /api/v1/ingest/customers`
 
 **Auth**: `Authorization: Bearer sk_...`
 
-**Rate limit**: 100 req/sec, up to 100 customers per request
+**Rate limit**: 100 req/sec, **1..100 customers per request**. The `customers` wrapper must be an array of 1–100 items — a non-array (or empty / >100) `customers` is a `400 validation_failed` (the wrapper is all-or-nothing). Per-**item** validation failures do not fail the batch; they are reported per item in `errors[]` (see the response below).
 
 **Request body**:
 ```json
@@ -692,12 +690,7 @@ Batch upload of customers. UPSERT by email.
       "language": "et",
       "phone": "+372...",
       "first_seen_at": "2026-01-15T10:30:00Z",
-      "external_id": "67",
-      "consent": {
-        "marketing": true,
-        "recommendations": true,
-        "consent_at": "2026-01-15T10:30:00Z"
-      }
+      "external_id": "67"
     }
   ]
 }
@@ -708,34 +701,39 @@ Batch upload of customers. UPSERT by email.
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `event_id` | UUID v4 string | NO | Per-customer transport-level dedup key. See [Idempotency](#idempotency). |
-| `email` | string (valid email) | YES | Primary identifier (natural key for UPSERT). Engine lowercases on ingest. |
+| `email` | string (valid email) | YES | **Identity** — natural key for the `(tenant_id, email)` UPSERT. Lowercased on ingest; matched case-insensitively. |
 | `first_name` | string | NO | |
 | `last_name` | string | NO | |
-| `country` | string (ISO 3166-1 alpha-2) | NO | E.g. "EE", "FI", "US" |
-| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru" — used for template rendering |
+| `country` | string (ISO 3166-1 alpha-2) | NO | E.g. "EE", "FI", "US". Stored **as sent** — not strictly ISO-validated (N-8). |
+| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru" — used for template rendering. Stored **as sent** — not strictly ISO-validated (N-8). |
 | `phone` | string | NO | |
-| `first_seen_at` | ISO 8601 | NO | Registration timestamp (if different from row creation) |
+| `first_seen_at` | ISO 8601 | NO | Registration timestamp (if different from row creation). Not overwritten on update (earliest wins). |
 | `external_id` | string | NO | Platform-internal user_id |
-| `consent.marketing` | boolean | NO | GDPR consent for marketing |
-| `consent.recommendations` | boolean | NO | GDPR consent for the recommendation engine |
-| `consent.consent_at` | ISO 8601 | NO | Consent timestamp |
 
-> **Note on consent**: the engine does **not** filter recommendations based on `consent.marketing`. Smaily is the source of truth for marketing consent — Smaily will not send to contacts without it, regardless of what the engine writes to their contact fields. The engine accepts and stores these consent fields for audit purposes, but it does not gate processing on them.
+> **Note on consent**: consent is **not part of the customers contract**. The engine does not accept, store, or process any `consent.*` fields — Smaily owns consent (it will not send to a contact without marketing consent regardless of engine data). Do not send consent fields; they are ignored.
 
-**Response 200 OK**:
+**Response 200 OK** (per-item partial success — the D6 contract):
 ```json
 {
   "ok": true,
-  "processed": 30,
-  "created": 5,
-  "updated": 25,
-  "skipped": 0,
-  "errors": [],
-  "request_id": "req_..."
+  "processed": 28,
+  "deduplicated": 1,
+  "errors": [
+    {"index": 3, "email": "bad-email", "field": "email", "message": "Invalid email"}
+  ]
 }
 ```
 
-**Response 200 OK (deduplicated retry)**: integer-count shape, as in catalog. A duplicate `event_id` is counted in `deduplicated`; a whole-request no-op returns `{"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}`.
+**Each item has exactly one fate:**
+- **processed** — valid and new → UPSERTed by `(tenant_id, email)`, counted in `processed`.
+- **deduplicated** — valid, but its `event_id` was already seen → counted in `deduplicated`, not re-UPSERTed.
+- **error** — failed per-item validation → an entry in `errors[]`; **not** processed and **not** dedup-registered (so a corrected retry of that item still processes — its `event_id` was never marked seen).
+
+**Invariant:** `processed + deduplicated + errors.length == total items in the batch`.
+
+`deduplicated_all: true` is added when **every** item was deduplicated (a pure no-op retry), e.g. `{"ok":true,"processed":0,"deduplicated":3,"errors":[],"deduplicated_all":true}`.
+
+**Error object shape**: `{index, email?, field, message}` — `index` is the item's position in the batch; `email` is included when present (helps map the error to a row); `field` + `message` describe the failure. (No `request_id` — the engine emits none.)
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1**: `(tenant_id, email)` natural-key UPSERT.
@@ -1397,6 +1395,14 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - **Smaily contact-sync slot renamed** `rec_N_discount_price` → `rec_N_compare_price` (clean rename, no alias; value from `compare_price`). Engine commit `3aa5707`.
 - **Admin/plugin validation aligned (N-4a)**: the admin CSV path now also requires `product_url` (non-empty) + `in_stock`, matching `ProductSchema`. Engine commit `852ea04`.
 - ⚠️ **Migrating legacy `discount_price` is NOT a literal copy** — see [Appendix F: Migration notes](#appendix-f-migration-notes) (N-6 semantic inversion).
+
+**v1.0.0 — W4 customers email-first identity** (plugin sends batch + email; the 3.3 customers contract):
+- **`smaily_contact_id` dropped — `email` is the identity (D1)**. UPSERT by `(tenant_id, email)`; email lowercased on ingest, matched case-insensitively. Engine commits `04ac1ad`, `f8494ea` (migrations `0029` add `(tenant_id,email)` unique + columns; `0030` drops `smaily_contact_id`).
+- **Batch wrapper**: `{ customers: [...] }`, 1..100 per request. Non-array / empty / >100 → 400 (wrapper all-or-nothing). Engine commit `76a7a64`.
+- **D6 per-item `errors[]`**: each item is processed / deduplicated / error; partial success (valid items written when others fail); a rejected item's `event_id` is not registered (corrected retry processes); response `{ok, processed, deduplicated, errors:[{index,email?,field,message}]}` (+ `deduplicated_all`); invariant `processed + deduplicated + errors.length == total`. Engine commit `76a7a64`. (This is the canonical D6 shape; catalog/browse retrofit is N-7.)
+- **Consent removed entirely** — `consent.*` is no longer accepted, stored, or processed (Smaily owns consent).
+- **N-8**: `country` / `language` stored as-sent, not strictly ISO-validated.
+- This sync commit reconciles §4 with the above.
 
 ---
 
