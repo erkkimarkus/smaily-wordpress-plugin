@@ -1140,12 +1140,99 @@ HTTP endpoints. (Audit doc to be corrected.)
   — rejected after the consistency question: if per-item is better, apply it
   everywhere; two contracts means two mental models for no benefit.
 
+---
+
+### F3-19: Customers-end milestone — sub-PR 3.3 complete
+
+**Context:** 3.3 customers ingest completes the second Phase-3 ingest endpoint,
+following the F3-16 canonical 6-step pattern (PayloadBuilder → Client →
+IngestQueue → Flusher → mock → live-walk). It is the first endpoint built to
+the D6 per-item contract (F3-18) from the start.
+
+**Decision:** customers-end is the **canonical D6 reference** for orders (W5)
+and the catalog + browse N-7 retrofit. The `errors[].index → batch_rows[index]`
+split in CustomerFlusher is the pattern those endpoints copy.
+
+**Live-verified (walk-3.3, 10/10 against the real MiuMjau engine):** connected,
+upsert end-to-end, Layer-2 `event_id` dedup (`deduplicated_all` on resend), D6
+partial success (`{processed:1, errors:[{index:1, field:email}]}`), the
+`processed+deduplicated+errors==total` invariant, batch all-sent, the
+`customers` wrapper, and the builder's absent-not-empty omission (no nulls on
+the wire). The walk caught a real datetime bug (→ F3-21).
+
+**Consequence:** orders (W5) mechanically follows. Customers ZIP produced. The
+chain is live-wired (hooks enqueue, AS schedules the flusher). **ZIP ≠
+pilot-go-live** — like catalog-end, it's a proven artefact; the pilot installs
+after W5.
+
+**Known follow-ups (plugin-side N-7 + housekeeping):**
+- **🔒 Catalog-flusher D6 consolidation — LOCK on pilot catalog go-live.** The
+  engine moved catalog to D6 (N-7), but IngestFlusher (catalog) is still
+  all-or-nothing: on a 200+`errors[]` it would mark a rejected product *sent*
+  (silent loss). Not active (pilot not live). **This fix is a hard
+  precondition for the pilot's catalog ever going live** — consolidate catalog
+  (+ browse) onto the shared D6 flusher (CustomerFlusher is the reference)
+  before any pilot sends catalog to the engine.
+- **EVENT_* constant unification (N-7).** Catalog event constants live on
+  CatalogHookHandler, customer's on CustomerFlusher (asymmetric, accepted
+  because the flusher precedes the hook). Unify when consolidating to the
+  shared D6 dispatcher-flusher.
+- **Flaky test.** `admin/src/hooks/useBackfillProgress.test.ts` (fake-timers
+  race) flakes ~1 in several full ci:strict runs; passes in isolation. Fix
+  with deterministic timer mocking.
+
+---
+
+### F3-20: Customer ingest enqueues every registered user (A-filter)
+
+**Context:** which WP users should the customer hooks (`user_register`,
+`profile_update`, `woocommerce_created_customer`,
+`woocommerce_save_account_details`) enqueue as rec-engine customers?
+
+**Decision:** **A-filter** — every registered user, no role check.
+
+**Rationale:** both existing sync paths are broader than a role filter — the
+legacy subscriber-sync keys on the newsletter opt-in, and the new email
+HookHandler syncs every registered user — so a `customer`-only filter would be
+narrower than both AND would drop custom-role shoppers (VIP, wholesale,
+member). Guest buyers (no WP user) are captured by the W5 order path. Admin
+"noise" is small and self-resolving (a user with no purchase history gets no
+recommendations).
+
+**Alternatives rejected:** B-strict (`customer` role only — misses custom
+roles); B-broad (staff-role blacklist — a maintenance burden as new staff
+roles appear).
+
+---
+
+### F3-21: Datetime on the wire — `Z` form via a shared IsoDate helper
+
+**Context:** the engine validates every timestamp with a strict Zod
+`.datetime()` that **rejects a numeric offset** — `2026-01-15T10:30:00+00:00`
+(PHP's `'c'` format) fails as "Invalid datetime"; only the `Z`-suffix form
+(`...Z`, contract §base) passes.
+
+**Decision:** one `IsoDate::to_z(int $timestamp)` helper is the single source
+for wire datetime formatting; every PayloadBuilder routes its datetime fields
+through it.
+
+**Rationale:** F3-1 single-source applied to datetime. Two builders formatted
+independently (`first_seen_at`, `on_sale_until`) and both hit the `+00:00`
+bug; orders (W5) adds several more datetime fields. One helper means the bug
+cannot recur.
+
+**Found via:** the 3.3.4 customers live-walk — the mock didn't validate the
+datetime format, so integration was green and only the live engine surfaced it
+(LESSONS §2.4, the same shape as the catalog products→items divergence).
+`first_seen_at` was an active bug; `on_sale_until` a latent sibling — both
+fixed.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
 discovered along the way):
 
-1. Add a **new entry** in the relevant category (F3-19, F3-20, ...)
+1. Add a **new entry** in the relevant category (F3-22, F3-23, ...)
 2. Follow the 5-field form: Context / Decision / Rationale / Alternatives /
    Relationships
 3. Keep it **short** (5-15 lines per decision) — this is a draft, not a full ADR
@@ -1154,12 +1241,14 @@ discovered along the way):
      (`docs/adr/0001-coexistence.md`, ...)
    - Or keep a single `DECISIONS.md` — depending on the repo's culture
 
-**What's likely to be added later in Phase 3:**
-- F3-19: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-20: 3.6 beacon (client side, server proxy, cookie management)
-- F3-21: 3.7 identity-merge (three triggers: post-checkout, login, manual)
-- F3-22: 3.8 GDPR (export/delete, WP Privacy API integration)
-- F3-23: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+**What's likely to be added later in Phase 3** (F3-19/20/21 are now taken by
+the 3.3 customers milestone, A-filter, and datetime decisions above):
+- F3-22: W5 orders (customer dependency, guest-customer payload path, attribution)
+- F3-23: 3.5 backfill architecture (cursor pagination, batch size, retry)
+- F3-24: 3.6 beacon (client side, server proxy, cookie management)
+- F3-25: 3.7 identity-merge (three triggers: post-checkout, login, manual)
+- F3-26: 3.8 GDPR (export/delete, WP Privacy API integration)
+- F3-27: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.
