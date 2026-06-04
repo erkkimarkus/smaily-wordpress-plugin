@@ -210,12 +210,11 @@ Every error response contains JSON:
     "field": "Optional context (validation errors)",
     "valid_values": ["array of valid values if applicable"]
   },
-  "request_id": "req_uuid_v4",
   "timestamp": "2026-05-19T10:15:23Z"
 }
 ```
 
-`request_id` is for debugging — when the plugin sees an error, it surfaces this in the admin notice so Erkki can file a support request referencing the request_id.
+> **`request_id` scope**: a `request_id` (`req_…` UUID, useful for support tickets) is currently emitted **only by `/api/setup/exchange`** responses — see §1. The v1 ingest, customer/GDPR, and identity endpoints do **not** emit `request_id`; their error bodies are `{error, message?, details?}` only. Do not depend on `request_id` outside setup/exchange.
 
 ### Validation error example
 
@@ -240,7 +239,6 @@ HTTP 400 Bad Request
       }
     ]
   },
-  "request_id": "req_8f3k2a-...",
   "timestamp": "2026-05-19T10:15:23Z"
 }
 ```
@@ -279,7 +277,6 @@ X-RateLimit-Reset: 2026-05-19T10:15:28Z
   "error": "rate_limit_exceeded",
   "message": "Rate limit exceeded. Retry after 5 seconds.",
   "retry_after_seconds": 5,
-  "request_id": "req_...",
   "timestamp": "2026-05-19T10:15:23Z"
 }
 ```
@@ -1048,8 +1045,7 @@ At least **one** of `anon_session_id` or `smaily_visitor_token` must be present 
     "browse_events_already_bound": 3,
     "visitor_tokens_bound": 1,
     "session_history_days": 22
-  },
-  "request_id": "req_..."
+  }
 }
 ```
 
@@ -1060,8 +1056,7 @@ At least **one** of `anon_session_id` or `smaily_visitor_token` must be present 
 ```json
 {
   "error": "customer_not_found",
-  "message": "No customer found with email mari@example.com. Send via POST /api/v1/ingest/customers first.",
-  "request_id": "req_..."
+  "message": "No customer found with email mari@example.com. Send via POST /api/v1/ingest/customers first."
 }
 ```
 
@@ -1086,11 +1081,13 @@ GDPR data export. Returns all engine-held data for the customer.
 - `format` — optional, `json` (default) or `ndjson` (for large datasets)
 - `since` — optional, ISO 8601 — filter events from this timestamp forward
 
-**Response 200 OK** (`format=json`):
+> **Consent is not exported.** The engine does not store consent (see §4) — Smaily owns it. The export contains **no `consent` object**; a reader must not assume consent state is recoverable from this endpoint. Identity is **email-only** (no `smaily_contact_id`, dropped in W4).
+
+**Response 200 OK** (`format=json`) — the example below is the **real deployed body** (curl-verified). `customer`, `orders`, and `order_items` are full table rows; the event arrays (`browse_events`, `email_events`, `recommendations`, `visitor_tokens`) are returned as `[]` when empty and otherwise carry the full rows of the respective table:
 ```json
 {
   "export_metadata": {
-    "exported_at": "2026-05-19T10:15:23Z",
+    "exported_at": "2026-06-04T09:43:37.540Z",
     "tenant_id": "550e8400-...",
     "customer_email": "mari@example.com",
     "customer_id": "660f9500-...",
@@ -1098,72 +1095,84 @@ GDPR data export. Returns all engine-held data for the customer.
       "browse_events": "90 days",
       "email_events": "365 days",
       "recommendations": "730 days",
-      "rec_attribution": "730 days",
       "orders": "indefinite"
     }
   },
   "customer": {
+    "customer_id": "660f9500-...",
+    "tenant_id": "550e8400-...",
     "email": "mari@example.com",
-    "first_name": "Mari",
-    "last_name": "Tamm",
-    "country": "EE",
-    "language": "et",
     "first_seen_at": "2026-01-15T10:30:00Z",
-    "cold_start_tier": 3,
-    "engagement_state": "warm",
-    "inferred_species": "dog",
-    "consent": {
-      "marketing": true,
-      "recommendations": true,
-      "consent_at": "2026-01-15T10:30:00Z"
-    }
+    "last_purchase_at": "2026-05-15T14:30:00.000Z",
+    "last_email_open_at": null,
+    "last_email_click_at": null,
+    "last_session_at": null,
+    "rfm_recency": null,
+    "rfm_frequency": null,
+    "rfm_monetary": null,
+    "segment": null,
+    "segment_confidence": null,
+    "engagement_state": null,
+    "engagement_state_since": null,
+    "engagement_score": null,
+    "engagement_trajectory": null,
+    "loyalty_signals": {},
+    "discount_sensitivity": "0.50",
+    "preferred_send_window": null,
+    "exploration_credits": 0,
+    "exploration_credits_at": null,
+    "cold_start_tier": 0,
+    "inferred_species": null,
+    "inferred_attributes": {},
+    "custom_fields": {},
+    "first_name": "Mari",
+    "opted_out": false,
+    "opted_out_at": null,
+    "external_id": null,
+    "country": "EE",
+    "last_name": "Tamm",
+    "language": "et",
+    "phone": null
   },
   "orders": [
     {
+      "order_id": "82f231e1-...",
+      "tenant_id": "550e8400-...",
+      "customer_id": "660f9500-...",
       "external_order_id": "WC-12345",
-      "ordered_at": "2026-05-15T14:30:00Z",
-      "total_amount": 67.50,
-      "items": []
+      "ordered_at": "2026-05-15T14:30:00.000Z",
+      "total_amount": "67.50",
+      "discount_amount": "0.00",
+      "currency": "EUR",
+      "status": "completed",
+      "smaily_rec_id": null,
+      "smaily_visitor_token": null,
+      "session_id": null,
+      "smaily_rec_ctx": null
     }
   ],
-  "browse_events": [
+  "order_items": [
     {
-      "event_ts": "2026-05-19T10:15:23Z",
-      "event_type": "product_view",
+      "item_id": 36857,
+      "order_id": "82f231e1-...",
+      "tenant_id": "550e8400-...",
       "sku": "ACA-DOG-3KG",
-      "dwell_seconds": 45
+      "qty": 1,
+      "unit_price": "67.50",
+      "discount_amount": "0.00",
+      "line_total": "67.50",
+      "returned_at": null,
+      "source_rec_id": null
     }
   ],
-  "email_events": [
-    {
-      "event_ts": "2026-05-18T09:00:00Z",
-      "event_type": "click",
-      "campaign_id": "welcome_series",
-      "rec_id": "rec_abc123"
-    }
-  ],
-  "recommendations": [
-    {
-      "rec_id": "rec_abc123",
-      "issued_at": "2026-05-17T05:00:00Z",
-      "sku": "ACA-DOG-3KG",
-      "intent_type": "complement",
-      "status": "closed_win",
-      "outcome_score": 1.0
-    }
-  ],
-  "rec_attribution": [
-    {
-      "rec_id": "rec_abc123",
-      "order_id": "WC-12345",
-      "attribution_type": "direct",
-      "outcome_score": 1.0,
-      "click_ts": "2026-05-18T09:05:00Z",
-      "purchase_ts": "2026-05-18T09:12:00Z"
-    }
-  ]
+  "browse_events": [],
+  "email_events": [],
+  "recommendations": [],
+  "visitor_tokens": []
 }
 ```
+
+> **Note**: `order_items` is a **top-level** array (not nested under `orders`); join on `order_id`. The export does **not** include a `rec_attribution` array (the engine's export omits attribution rows) — if the plugin needs attribution data for a subject-access request, request it separately; it is not part of this endpoint's payload today.
 
 **Response 404 Not Found** if the customer doesn't exist.
 
@@ -1173,10 +1182,11 @@ GDPR data export. Returns all engine-held data for the customer.
   "export_metadata": { },
   "customer": { },
   "orders": [],
+  "order_items": [],
   "browse_events": [],
   "email_events": [],
   "recommendations": [],
-  "rec_attribution": []
+  "visitor_tokens": []
 }
 ```
 
@@ -1227,8 +1237,7 @@ GDPR full data deletion.
     "trigger_candidates": 4
   },
   "audit_log_id": "audit_uuid_...",
-  "deleted_at": "2026-05-19T10:15:23Z",
-  "request_id": "req_..."
+  "deleted_at": "2026-05-19T10:15:23Z"
 }
 ```
 
@@ -1288,8 +1297,7 @@ GDPR opt-out: data is retained, but the customer is excluded from future recomme
   "opt_out_status": true,
   "previous_status": false,
   "effective_at": "2026-05-19T10:15:23Z",
-  "next_recommendations_cron": "2026-05-20T05:00:00Z",
-  "request_id": "req_..."
+  "next_recommendations_cron": "2026-05-20T05:00:00Z"
 }
 ```
 
@@ -1458,6 +1466,12 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - **Attribution is async** (N-10): the ingest route stores attribution signals; the `process-order-attributions` cron computes `rec_attribution` afterward via the unchanged 4-step matching. **No attribution counts in the ingest response** (the old inline `attribution_resolved`/`attribution_control` were aspirational). `smaily_rec_ctx` stored + available, not yet consumed by matching. Engine commit `e06a002`.
 - **Customer-UPSERT fixes** (plugin path aligned to admin): Bug 1 — sparse guest UPSERT now `COALESCE(EXCLUDED.x, existing)` so it **preserves** the registered profile (was NULL-wiping it); `first_seen_at` → `LEAST`. Bug 2 — orders auto-create uses `ON CONFLICT (tenant_id,email) DO NOTHING` (was select-then-insert → concurrent-first-order 500). Engine commit `984dab0`.
 - This sync commit reconciles §5 with the above.
+
+**v1.0.0 — final spec cleanup: `request_id` + GDPR consent** (documentation-only; no code/schema change):
+- **`request_id` removed from every response example where the engine does not emit it** — §7 merge (200 + 404), §9 delete, §10 opt-out, and the generic error / 429 / validation examples. Curl-verified: only `/api/setup/exchange` emits a `request_id` (a `req_…` UUID); §1's examples keep it and a scope note now states the v1 ingest/customer/identity endpoints do not. (§3/§4/§5 were already cleaned during their syncs.)
+- **§8 GDPR export `consent.*` removed** — the engine does not store consent (W4 dropped it; Smaily owns it); a `consent` object in the export example was misleading for a compliance reader. Added an explicit "consent is not exported" note.
+- **§8 export example replaced with the real curl-verified body** — confirmed **email-only identity** (no `smaily_contact_id`); dropped the non-existent `rec_attribution` array and its retention-policy line (the engine's export omits attribution); `order_items` documented as a **top-level** array (not nested under `orders`); added `visitor_tokens`; `customer` shown as the full row. Empty-data example aligned to the real top-level keys.
+- After this pass the spec is reconciled doc-wide: no response example shows `request_id` as emitted outside setup/exchange, and no `consent.*` / `smaily_contact_id` survives where it would mislead.
 
 ---
 
