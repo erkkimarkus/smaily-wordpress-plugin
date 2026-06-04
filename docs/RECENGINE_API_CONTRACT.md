@@ -757,13 +757,13 @@ Batch upload of customers. **Identity is `email`** (W4 / D1): UPSERT by `(tenant
 
 Batch upload of orders + order items. HPOS-aware payload.
 
-> **Implementation status (Route A):** The engine currently accepts **single-object** payloads (one order per POST; the order's line items are the nested `items[]` array). Batch array acceptance (the `orders[]` wrapper) lands in W4 / W5 per Route A plan v2. The field reference and examples below describe the target batch contract.
+Batch upload of orders + line items. **Order natural key is `(tenant_id, external_order_id)`**; the customer is referenced by `customer_email` (lowercased, auto-created if absent — W4 email identity).
 
 **URL**: `POST /api/v1/ingest/orders`
 
 **Auth**: `Authorization: Bearer sk_...`
 
-**Rate limit**: 100 req/sec, up to 50 orders per request (orders + items can be sizable together)
+**Rate limit**: 100 req/sec, **1..50 orders per request** (orders + items can be sizable together). The `orders` wrapper must be an array of 1–50 items — a non-array (or empty / >50) `orders` is a `400 validation_failed` (the wrapper is all-or-nothing). Per-**order** validation failures do not fail the batch; they are reported per item in `errors[]` (see the response below).
 
 **Request body**:
 ```json
@@ -813,11 +813,11 @@ Batch upload of orders + order items. HPOS-aware payload.
 | `ordered_at` | ISO 8601 | YES | Order placement timestamp |
 | `total_amount` | number | YES | Total after discounts |
 | `discount_amount` | number | NO | Total discount (default 0) |
-| `currency` | string (ISO 4217) | NO | Default "EUR" |
-| `status` | enum | YES | `completed`, `processing`, `cancelled`, `refunded` |
-| `smaily_rec_id` | string | NO | Attribution: which recommendation was clicked pre-purchase (from cookie) |
-| `smaily_visitor_token` | string | NO | Attribution: visitor token (from cookie) |
-| `smaily_rec_ctx` | string | NO | Attribution: context (from cookie) |
+| `currency` | string (ISO 4217) | NO | Default `EUR`. Stored **as sent** — not strictly ISO-validated. |
+| `status` | enum | YES | `completed` / `processing` / `cancelled` / `refunded`. **Required** — a missing or out-of-enum `status` is a per-item `errors[]` entry. |
+| `smaily_rec_id` | string | NO | Attribution: which recommendation was clicked pre-purchase (from cookie). Stored; consumed by the async attribution cron (see below). |
+| `smaily_visitor_token` | string | NO | Attribution: visitor token (from cookie). Stored; async. |
+| `smaily_rec_ctx` | string | NO | Attribution: context (from cookie). **Stored and available to the attribution flow, but not yet consumed by matching** (future feature). |
 | `session_id` | string | NO | Session ID — used for retroactive attribution |
 | `items[]` | array | YES | Order line items |
 | `items[].sku` | string | YES | |
@@ -826,39 +826,38 @@ Batch upload of orders + order items. HPOS-aware payload.
 | `items[].line_total` | number | YES | Line total (qty × unit_price − discount) |
 | `items[].discount_amount` | number | NO | Line-specific discount |
 
-**Attribution flow** (engine-side):
+**Items are fully replaced on update.** Re-ingesting an existing `external_order_id` UPSERTs the order and **fully replaces its line items** (the previous `order_items` are deleted and the new set inserted) — the order is the unit, not the line item. Send the complete item set on every order.
 
-For each order, the engine performs attribution matching as follows:
-1. If `smaily_rec_id` is present → look up `recommendations` table, verify customer match → INSERT `rec_attribution` with `attribution_type='direct'`, `'exact_later'`, or `'indirect_*'` depending on SKU match and time gap
-2. Else if `smaily_visitor_token` is present → look up `visitor_tokens` → find recent recommendations → match
-3. Else if `session_id` is present → check `browse_events` within the last 7 days for a rec_id link → match
-4. If no match → INSERT `rec_attribution` with `attribution_type='control_purchase'`, `outcome_score=0.0`
-
-Detailed attribution logic lives in the `lib/engine/attribution/` module (specified in the Faas 2.5 brief).
-
-**Response 200 OK**:
+**Response 200 OK** (per-order partial success — the D6 contract):
 ```json
 {
   "ok": true,
-  "processed": 10,
-  "created": 7,
-  "updated": 3,
-  "skipped": 0,
-  "attribution_resolved": 6,
-  "attribution_control": 4,
-  "errors": [],
-  "request_id": "req_..."
+  "processed": 8,
+  "deduplicated": 1,
+  "errors": [
+    {"index": 4, "external_order_id": "WC-99", "field": "status", "message": "Invalid enum value. Expected 'completed' | 'processing' | 'cancelled' | 'refunded', received 'shipped'"}
+  ]
 }
 ```
 
-`attribution_resolved` = orders where the engine matched a recommendation.
-`attribution_control` = orders assigned to the control group (no engine influence).
+- `processed` = orders UPSERTed; `deduplicated` = orders whose `event_id` was already seen; `errors` = orders that failed per-item validation, as `{index, external_order_id?, field, message}` (`index` is position in `orders[]`). Each order is validated independently — an invalid order goes to `errors[]` and is not written, while valid orders in the same batch still process. A rejected order's `event_id` is not registered (a corrected retry processes).
+- **Invariant:** `processed + deduplicated + errors.length == total orders`.
+- `deduplicated_all: true` is added when every order was deduplicated (pure no-op retry), e.g. `{"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}`.
+- The response carries **no** `created`/`updated`/`skipped`, no `request_id`, and **no attribution counts** — attribution is computed asynchronously (below).
 
-**Response 200 OK (deduplicated retry)**: integer-count shape, as in catalog. A duplicate `event_id` is counted in `deduplicated`; a whole-request no-op returns `{"ok":true,"processed":0,"deduplicated":1,"errors":[],"deduplicated_all":true}`.
+**Attribution is asynchronous.** The orders ingest route only **stores** the attribution signals (`smaily_rec_id` / `smaily_visitor_token` / `session_id` / `smaily_rec_ctx`) on the order. A separate cron (`process-order-attributions`, ~every 30 min) then computes `rec_attribution` rows via the 4-step matching below — **after** ingest, once browse events and recommendations have settled. Attribution counts are therefore **not** in the ingest response.
+
+Matching steps (run by the cron, unchanged):
+1. If `smaily_rec_id` is present → look up `recommendations`, verify customer match → `rec_attribution` with `attribution_type` `direct` / `exact_later` / `indirect_*` (by SKU match + time gap).
+2. Else if `smaily_visitor_token` is present → `visitor_tokens` → recent recommendations → match.
+3. Else if `session_id` is present → `browse_events` within the last 7 days with a rec_id link → match.
+4. No match → `rec_attribution` with `attribution_type='control_purchase'`, `outcome_score=0.0`.
+
+`smaily_rec_ctx` is stored and made available to the attribution flow but **not yet consumed by matching** (future feature). Detailed logic lives in `lib/engine/attribution/`.
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1**: `(tenant_id, external_order_id)` natural-key UPSERT (items are fully replaced on update).
-- **Layer 2**: optional per-item `event_id` for retry deduplication (integer counts).
+- **Layer 2**: optional per-order `event_id` for retry deduplication (integer counts).
 
 ---
 
@@ -1449,6 +1448,16 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 **v1.0.0 — §6 browse event-type extension** (additive; no breaking change):
 - **`checkout_start` + `checkout_complete` added to the browse `event_type` enum** (Zod + the DB CHECK constraint, migration `0031`). **Accept + store only** — persisted as ordinary browse events; no checkout-specific logic (abandonment detection, checkout-driven recommendations) yet. Unknown event types are still rejected per-item.
 - **`source` documented as optional, default `web`** (the engine schema has `.default('web')` — the spec previously marked it required). Doc aligned to the lenient engine.
+
+**v1.0.0 — W5 orders batch + D6 + async attribution** (the 3.3 orders contract):
+- **Orders single-object → batch**: `{ orders: [...] }`, 1..50 per request; non-array / empty / >50 → 400 (wrapper all-or-nothing). Engine commit `343773f`.
+- **Email customer reference** (W4 identity): `customer_email` required, lowercased, auto-creates the customer (race-safe). Order natural key is `(tenant_id, external_order_id)`.
+- **Rich fields**: `status` (required enum), `currency` (default EUR), `smaily_rec_ctx`, per-line `discount_amount` — migration `0032`. Engine commit `328bccb`.
+- **D6 per-item `errors[]`** `{index, external_order_id?, field, message}`; response `{ok, processed, deduplicated, errors}` (+ `deduplicated_all`); invariant `processed + deduplicated + errors.length == total`. Removed the stale `created`/`updated`/`skipped`/`request_id`/`{deduplicated:true}` boolean.
+- **Items fully replaced** on re-ingest of an existing `external_order_id` (order is the dedup unit).
+- **Attribution is async** (N-10): the ingest route stores attribution signals; the `process-order-attributions` cron computes `rec_attribution` afterward via the unchanged 4-step matching. **No attribution counts in the ingest response** (the old inline `attribution_resolved`/`attribution_control` were aspirational). `smaily_rec_ctx` stored + available, not yet consumed by matching. Engine commit `e06a002`.
+- **Customer-UPSERT fixes** (plugin path aligned to admin): Bug 1 — sparse guest UPSERT now `COALESCE(EXCLUDED.x, existing)` so it **preserves** the registered profile (was NULL-wiping it); `first_seen_at` → `LEAST`. Bug 2 — orders auto-create uses `ON CONFLICT (tenant_id,email) DO NOTHING` (was select-then-insert → concurrent-first-order 500). Engine commit `984dab0`.
+- This sync commit reconciles §5 with the above.
 
 ---
 
