@@ -161,12 +161,29 @@ class Client {
 	}
 
 	/**
-	 * @param array<int, array<string, mixed>> $customers
+	 * Batch-upload customers to POST /api/v1/ingest/customers.
 	 *
-	 * @return array<string, mixed>
+	 * Wrapper key is `customers` (W4 §4 email-first contract), live-verified
+	 * against the deployed engine in the 3.3.1 wrapper probe: a single
+	 * {customers:[...]} item returned 200 processed:1 — no products→items-style
+	 * surprise like catalog had (LESSONS §2.4). Identity is email; the engine
+	 * UPSERTs on (tenant_id, email), case-insensitive.
+	 *
+	 * Per-item D6 partial success: a 2xx body carries
+	 * {ok, processed, deduplicated, errors:[{index, email?, field, message}]};
+	 * the customer flusher (3.3.2) reads errors[] from this return value and
+	 * splits the batch. A wrapper-level failure (non-array / empty / >100) is a
+	 * 400 and throws ApiException carrying the body's `details` (F3-18).
+	 *
+	 * @param array<int, array<string, mixed>> $customers 1..100 customer objects.
+	 *
+	 * @return array<string, mixed> The decoded engine response (D6 shape).
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
 	 */
 	public function ingest_customers( array $customers ): array {
-		throw new \RuntimeException( 'ingest_customers: not implemented in sub-PR 3.1 (lands in 3.2).' );
+		$url = $this->resolve_url( 'ingest_customers', self::PATH_INGEST_CUSTOMERS );
+		return $this->request_url( 'POST', $url, array( 'customers' => $customers ) );
 	}
 
 	/**

@@ -85,6 +85,66 @@ final class ClientTest extends TestCase {
 		);
 	}
 
+	public function test_ingest_customers_posts_customers_wrapper_to_engine_map_url(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'ingest_customers' => 'https://engine.test/api/v1/ingest/customers' )
+		);
+
+		$client->ingest_customers( array( array( 'email' => 'a@x.test', 'event_id' => 'u1' ) ) );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/ingest/customers', $client->captured['url'] );
+		self::assertSame(
+			array( 'customers' => array( array( 'email' => 'a@x.test', 'event_id' => 'u1' ) ) ),
+			$client->captured['body'],
+			'Customers wire wrapper key is `customers` (W4 §4; live-verified — engine returned 200 processed:1).'
+		);
+	}
+
+	public function test_ingest_customers_falls_back_to_constant_path_without_map(): void {
+		$client = $this->capturing_client( 'sk_live', 'https://base.test' );
+
+		$client->ingest_customers( array( array( 'email' => 'a@x.test' ) ) );
+
+		self::assertSame(
+			'https://base.test' . Client::PATH_INGEST_CUSTOMERS,
+			$client->captured['url'],
+			'With no endpoints map, ingest_customers falls back to base_url + PATH_INGEST_CUSTOMERS.'
+		);
+	}
+
+	public function test_ingest_customers_returns_d6_partial_success_body_verbatim(): void {
+		// D6: a 2xx carries {processed, deduplicated, errors:[{index,...}]}.
+		// ingest_customers returns it as-is — the flusher (3.3.2) splits the
+		// batch from errors[]; the Client never interprets it.
+		$d6 = array(
+			'ok'           => true,
+			'processed'    => 2,
+			'deduplicated' => 0,
+			'errors'       => array(
+				array( 'index' => 2, 'email' => 'bad', 'field' => 'email', 'message' => 'Invalid email' ),
+			),
+		);
+		$client = new class( 'sk_live', 'https://base.test', $d6 ) extends Client {
+			/** @var array<string, mixed> */
+			private array $d6;
+
+			/** @param array<string, mixed> $d6 */
+			public function __construct( string $api_key, string $base_url, array $d6 ) {
+				parent::__construct( $api_key, $base_url );
+				$this->d6 = $d6;
+			}
+
+			protected function request_url( string $method, string $url, ?array $body = null ): array {
+				return $this->d6;
+			}
+		};
+
+		self::assertSame( $d6, $client->ingest_customers( array( array( 'email' => 'a@x.test' ) ) ) );
+	}
+
 	/**
 	 * Client double that captures the resolved (method, url, body) instead
 	 * of hitting the network, and returns a canned 200 body.
