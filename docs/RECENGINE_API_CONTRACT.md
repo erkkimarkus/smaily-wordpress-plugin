@@ -619,7 +619,7 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 
 > The engine has no separate "discount price" field. A discounted product is expressed purely as `price` (the discounted price the customer pays) plus `compare_price` (the higher pre-sale price).
 
-**Response 200 OK**:
+**Response 200 OK** (all products valid):
 ```json
 {
   "ok": true,
@@ -629,7 +629,21 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 }
 ```
 
-`processed` = products UPSERTed; `deduplicated` = products whose per-item `event_id` was already seen (see [Idempotency](#idempotency)). `errors` is currently always `[]` on a 200 — catalog validation is **all-or-nothing** (see partial-success note below).
+`processed` = products UPSERTed; `deduplicated` = products whose per-item `event_id` was already seen (see [Idempotency](#idempotency)); `errors` = products that failed per-item validation (see partial success below). **Invariant:** `processed + deduplicated + errors.length == total products`.
+
+**Response 200 OK (partial success — the D6 contract)**:
+```json
+{
+  "ok": true,
+  "processed": 1,
+  "deduplicated": 0,
+  "errors": [
+    {"index": 1, "sku": "ACA-BAD", "field": "product_url", "message": "Invalid input"}
+  ]
+}
+```
+
+Each product is validated **independently**: a product that fails validation goes to `errors[]` as `{index, sku?, field, message}` (`index` is its position in `products[]`; `sku` is included when present) and is **not** written; valid products in the same batch are still processed. A rejected product's `event_id` is **not** registered, so a corrected retry of that product still processes.
 
 > **Not yet implemented:** the `unmapped_attributes` response array and the AI mapping wizard are planned but not built. `raw_attributes` is currently stored verbatim and not processed, so no `unmapped_attributes` is emitted.
 
@@ -646,20 +660,18 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 
 Returned when every product carrying an `event_id` in the request was already processed (matching `event_id` already in `ingest_event_log`). No catalog row was created or updated. `deduplicated` is the integer count of skipped items, and `deduplicated_all: true` flags a pure no-op retry. Plugin should treat this as a successful no-op — the original request was processed earlier. (A *mixed* batch returns e.g. `{"processed":3,"deduplicated":2,"errors":[]}` with no `deduplicated_all`.)
 
-**Validation is all-or-nothing** (no partial success). If **any** product in the batch fails schema validation, the whole request is rejected with `400 validation_failed` and nothing is written — so on a 200 the `errors` array is always empty. The error body keys nested product-field failures under the top-level `products` key:
+**Wrapper is all-or-nothing; products are per-item.** Per-product validation failures go to `errors[]` (above) — they do not reject the batch. Only a malformed **wrapper** (a non-array / empty / >1000 `products`) is a hard `400 validation_failed`:
 ```json
 {
   "error": "validation_failed",
   "details": {
     "formErrors": [],
     "fieldErrors": {
-      "products": ["String must contain at least 1 character(s)"]
+      "products": ["Expected array, received object"]
     }
   }
 }
 ```
-
-(Example above: a product sent with `product_url: ""`. A missing required field yields `"Required"`; a wrong type yields `"Invalid input"`.)
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1** (always active): `(tenant_id, sku)` natural-key UPSERT. Same SKU sent twice → second call updates.
@@ -860,15 +872,18 @@ Browse events batch. The highest-volume endpoint.
 
 **Rate limit**: 500 req/sec (higher than other endpoints), up to 100 events per request
 
-**Event types**:
+**Event types** (the full `event_type` enum — exactly these 9; any other value → a per-item `errors[{field: event_type}]`):
 - `product_view` — customer opened a product page
 - `category_view` — customer opened a category page
 - `search` — customer searched
 - `cart_add` — customer added to cart
 - `cart_remove` — customer removed from cart
+- `wishlist_add` — customer added to wishlist (if the platform supports it)
+- `wishlist_remove` — customer removed from wishlist
 - `checkout_start` — customer began checkout
 - `checkout_complete` — checkout completed (order created) — **in addition to the orders endpoint**
-- `wishlist_add` — customer added to wishlist (if the platform supports it)
+
+> `checkout_start` / `checkout_complete` are currently **accept + store only** — persisted as ordinary browse events; no checkout-specific logic (abandonment detection, checkout-driven recommendations) is implemented yet.
 
 **Request body**:
 ```json
@@ -906,7 +921,7 @@ Browse events batch. The highest-volume endpoint.
 | `search_query` | string | NO | Required for `search` |
 | `dwell_seconds` | integer | NO | Time on page (for `product_view`) |
 | `event_ts` | ISO 8601 | YES | Event occurrence timestamp |
-| `source` | string | YES | Constant: `plugin_woo`, `plugin_shopify`, `make`, `custom` |
+| `source` | string | NO | Defaults to `web` if omitted. Constant: `web`, `plugin_woo`, `plugin_shopify`, `make`, `custom` |
 | `customer_email` | string | NO | Identity hint (if user is logged in) |
 | `smaily_visitor_token` | string | NO | Identity hint (from cookie) |
 | `smaily_rec_id` | string | NO | Attribution (from cookie) |
@@ -928,17 +943,38 @@ For each event, the engine resolves `customer_id` as follows:
 {
   "ok": true,
   "processed": 23,
+  "deduplicated": 0,
+  "errors": [],
   "with_customer_match": 18,
   "anonymous": 5,
   "retroactive_bound": 3,
-  "duplicates_skipped": 0,
-  "errors": [],
-  "request_id": "req_..."
+  "duplicates_skipped": 0
 }
 ```
 
-`duplicates_skipped` = `event_id` values already present in `ingest_event_log` (idempotency).
-`retroactive_bound` = anonymous events bound to a customer_id retroactively.
+- `processed` = events INSERTed (`= with_customer_match + anonymous`).
+- `deduplicated` = events whose `event_id` was already in `ingest_event_log`. `duplicates_skipped` is a **backward-compatible alias** of the same count (both fields are always present).
+- `with_customer_match` / `anonymous` / `retroactive_bound` = informational sub-counts of `processed`.
+- `errors` = events that failed per-item validation (see partial success below).
+- **Invariant:** `processed + deduplicated + errors.length == total events`.
+
+**Per-item partial success (D6).** Each event is validated **independently**: an invalid event goes to `errors[]` as `{index, field, message}` (no natural key — browse events aren't natural-key identifiable) and is not INSERTed; valid events in the same batch are still processed. Because browse has **no Layer-1 natural-key fallback**, a **missing `event_id` is a per-item error** (not a silent no-dedup insert). Example — one invalid `event_type`, one missing `event_id`:
+```json
+{
+  "ok": true,
+  "processed": 1,
+  "deduplicated": 0,
+  "errors": [
+    {"index": 1, "field": "event_type", "message": "Invalid enum value..."},
+    {"index": 2, "field": "event_id", "message": "Required"}
+  ],
+  "with_customer_match": 0,
+  "anonymous": 1,
+  "retroactive_bound": 0,
+  "duplicates_skipped": 0
+}
+```
+The **wrapper stays all-or-nothing**: a non-array / empty / >1000 `events` → `400 validation_failed`.
 
 **Response 200 OK (deduplicated retry, all events)**:
 ```json
@@ -1403,6 +1439,16 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
 - **Consent removed entirely** — `consent.*` is no longer accepted, stored, or processed (Smaily owns consent).
 - **N-8**: `country` / `language` stored as-sent, not strictly ISO-validated.
 - This sync commit reconciles §4 with the above.
+
+**v1.0.0 — N-7 catalog + browse D6 retrofit** (catalog: no behavior change beyond per-item errors; browse: `event_id` now required):
+- **Catalog + browse converted from all-or-nothing to D6 per-item `errors[]`** — an invalid item goes to `errors[]` (`{index, sku?, field, message}` for catalog; `{index, field, message}` for browse) and the valid items in the same batch still process. The wrapper stays all-or-nothing (non-array → 400). Engine commits `63d0332` (catalog), `731510a` (browse).
+- **Browse `event_id` optional → required** — browse has no Layer-1 natural-key fallback, so a missing `event_id` is now a per-item error (was a silent no-dedup insert). The one behavior change in N-7.
+- **All four ingest endpoints now share the D6 contract** (`{ok, processed, deduplicated, errors[]}` + `deduplicated_all`, invariant `processed + deduplicated + errors.length == total`). The plugin can consolidate to a single shared D6 flusher.
+- This sync commit reconciles §3 + §6 with the above.
+
+**v1.0.0 — §6 browse event-type extension** (additive; no breaking change):
+- **`checkout_start` + `checkout_complete` added to the browse `event_type` enum** (Zod + the DB CHECK constraint, migration `0031`). **Accept + store only** — persisted as ordinary browse events; no checkout-specific logic (abandonment detection, checkout-driven recommendations) yet. Unknown event types are still rejected per-item.
+- **`source` documented as optional, default `web`** (the engine schema has `.default('web')` — the spec previously marked it required). Doc aligned to the lenient engine.
 
 ---
 
