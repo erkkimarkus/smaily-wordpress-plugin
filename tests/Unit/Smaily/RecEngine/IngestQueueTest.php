@@ -168,6 +168,36 @@ final class IngestQueueTest extends TestCase {
 		self::assertStringContainsString( 'next_retry_at IS NULL OR next_retry_at <=', $wpdb->prepare_calls[0]['sql'] );
 		self::assertSame( IngestQueue::STATUS_PENDING, $wpdb->prepare_calls[0]['args'][0] );
 		self::assertSame( 100, $wpdb->prepare_calls[0]['args'][2] );
+		self::assertStringNotContainsString( 'event_type IN', $wpdb->prepare_calls[0]['sql'], 'No event_type filter when none requested.' );
+	}
+
+	public function test_pending_scopes_to_event_types_when_requested(): void {
+		$wpdb            = $this->fake_wpdb( 1, 0 );
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new IngestQueue() )->pending( 50, array( 'customer.upsert', 'customer.delete' ) );
+
+		$sql  = $wpdb->prepare_calls[0]['sql'];
+		$args = $wpdb->prepare_calls[0]['args'];
+
+		self::assertStringContainsString( 'event_type IN ( %s, %s )', $sql );
+		// Arg order: status, time, <event types...>, limit.
+		self::assertSame(
+			array( IngestQueue::STATUS_PENDING, $args[1], 'customer.upsert', 'customer.delete', 50 ),
+			$args,
+			'Event types are bound between the retry-window time and the LIMIT.'
+		);
+	}
+
+	public function test_pending_ignores_empty_event_types_filter(): void {
+		$wpdb            = $this->fake_wpdb( 1, 0 );
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new IngestQueue() )->pending( 100, array() );
+
+		// Empty array behaves like null — no filter, limit stays at index 2.
+		self::assertStringNotContainsString( 'event_type IN', $wpdb->prepare_calls[0]['sql'] );
+		self::assertSame( 100, $wpdb->prepare_calls[0]['args'][2] );
 	}
 
 	public function test_pending_returns_empty_array_on_non_array_result(): void {

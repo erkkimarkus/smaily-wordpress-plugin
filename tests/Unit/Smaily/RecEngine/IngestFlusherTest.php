@@ -46,6 +46,21 @@ final class IngestFlusherTest extends TestCase {
 		self::assertSame( 'u2', $client->sent_products[1]['event_id'] );
 	}
 
+	public function test_flush_scopes_drain_to_catalog_event_types(): void {
+		// The queue is shared with customers; the catalog flusher must drain
+		// only catalog.* rows so it never silently consumes a customer row.
+		$queue = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$flush = $this->fake_flusher( $queue, $this->success_client(), true, array( 100 => true ) );
+
+		$flush->flush();
+
+		self::assertSame(
+			array( CatalogHookHandler::EVENT_CATALOG_UPSERT, CatalogHookHandler::EVENT_CATALOG_DELETE ),
+			$queue->pending_event_types,
+			'Catalog flusher must scope pending() to catalog event types.'
+		);
+	}
+
 	public function test_deduplicated_response_is_treated_as_sent_not_retried(): void {
 		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
 		$client = $this->success_client( array( 'deduplicated' => true ) );
@@ -139,13 +154,16 @@ final class IngestFlusherTest extends TestCase {
 			public array $failed = array();
 			/** @var array<int, array<string, mixed>> */
 			public array $attempts = array();
+			/** @var array<int, string>|null Event types the flusher scoped the drain to. */
+			public ?array $pending_event_types = null;
 
 			/** @param array<int, array<string, mixed>> $rows */
 			public function __construct( array $rows ) {
 				$this->pending_rows = $rows;
 			}
 
-			public function pending( int $limit = 100 ): array {
+			public function pending( int $limit = 100, ?array $event_types = null ): array {
+				$this->pending_event_types = $event_types;
 				return $this->pending_rows;
 			}
 			public function mark_sent( int $id ): void {

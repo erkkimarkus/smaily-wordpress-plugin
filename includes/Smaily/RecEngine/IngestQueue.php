@@ -124,28 +124,56 @@ class IngestQueue {
 	 * SKU. The flush job processes the batch and advances each row with
 	 * mark_sent() / record_attempt() / mark_failed().
 	 *
+	 * The queue is shared across ingest endpoints (catalog, customers,
+	 * orders — see the class doc). $event_types scopes a drain to one
+	 * endpoint's rows so each flusher only sees rows it can build: the
+	 * catalog flusher passes catalog.* and the customer flusher passes
+	 * customer.*, and neither silently consumes the other's rows. null (the
+	 * default) keeps the original unscoped behaviour — backward compatible.
+	 *
+	 * @param array<int, string>|null $event_types Restrict to these event
+	 *        types; null/empty = every pending row regardless of type.
+	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function pending( int $limit = 100 ): array {
+	public function pending( int $limit = 100, ?array $event_types = null ): array {
 		global $wpdb;
 
 		$table = $this->table_name();
 
+		// Build the optional event_type filter as a placeholder list so the
+		// values stay parameterised (never interpolated into the SQL).
+		$type_clause = '';
+		$type_args   = array();
+		if ( is_array( $event_types ) && $event_types !== array() ) {
+			$placeholders = implode( ', ', array_fill( 0, count( $event_types ), '%s' ) );
+			$type_clause  = " AND event_type IN ( {$placeholders} )";
+			$type_args    = array_values( array_map( 'strval', $event_types ) );
+		}
+
+		$args = array_merge(
+			array( self::STATUS_PENDING, current_time( 'mysql', true ) ),
+			$type_args,
+			array( $limit )
+		);
+
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+		// The placeholder count is dynamic (optional event_type IN-list), so the
+		// args are spread; the static replacement-count sniff can't follow that.
+		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT id, event_type, entity_id, event_uuid, payload, created_at, attempts, max_attempts
 					FROM {$table}
-					WHERE status = %s AND ( next_retry_at IS NULL OR next_retry_at <= %s )
+					WHERE status = %s AND ( next_retry_at IS NULL OR next_retry_at <= %s ){$type_clause}
 					ORDER BY created_at ASC
 					LIMIT %d",
-				self::STATUS_PENDING,
-				current_time( 'mysql', true ),
-				$limit
+				...$args
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 

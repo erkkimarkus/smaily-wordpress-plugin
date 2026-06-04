@@ -106,7 +106,15 @@ class IngestFlusher {
 			return $stats;
 		}
 
-		$rows = $this->queue->pending( $batch_size );
+		// Scope the drain to catalog rows only. The queue is shared across
+		// ingest endpoints (customers reuse the same table); without this
+		// filter the catalog flusher would pull a customer.* row, fail to
+		// load it as a product, and silently drop it. The customer flusher
+		// drains customer.* on its own.
+		$rows = $this->queue->pending(
+			$batch_size,
+			array( CatalogHookHandler::EVENT_CATALOG_UPSERT, CatalogHookHandler::EVENT_CATALOG_DELETE )
+		);
 		if ( $rows === array() ) {
 			return $stats;
 		}
