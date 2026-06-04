@@ -13,6 +13,7 @@ namespace Smaily\Connect;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
@@ -28,6 +29,8 @@ use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
+use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
+use Smaily\Connect\Smaily\RecEngine\CustomerPayloadBuilder;
 use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
@@ -69,10 +72,12 @@ final class Bootstrap {
 	private ?AutomationRouter $automation_router = null;
 	private ?Flusher $flusher                    = null;
 
-	private ?IngestQueue $ingest_queue              = null;
-	private ?CatalogPayloadBuilder $catalog_builder = null;
-	private ?RecEngineSettings $rec_settings        = null;
-	private ?IngestFlusher $ingest_flusher          = null;
+	private ?IngestQueue $ingest_queue                = null;
+	private ?CatalogPayloadBuilder $catalog_builder   = null;
+	private ?RecEngineSettings $rec_settings          = null;
+	private ?IngestFlusher $ingest_flusher            = null;
+	private ?CustomerPayloadBuilder $customer_builder = null;
+	private ?CustomerFlusher $customer_flusher        = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -125,6 +130,9 @@ final class Bootstrap {
 		// enqueues a one-off flush per change; the recurring schedule below
 		// re-ticks for row-level retries (next_retry_at).
 		add_action( IngestQueue::FLUSH_HOOK, array( $this, 'on_flush_ingest_queue' ) );
+		// Customers drain on their own hook — the shared queue routes catalog.*
+		// and customer.* rows to separate flushers (3.3.3).
+		add_action( CustomerFlusher::FLUSH_HOOK, array( $this, 'on_flush_customer_queue' ) );
 
 		// Bridges from new AS hook names → legacy WP-Cron hook names.
 		// The legacy Smaily_Connect\Integrations\WooCommerce\Cron class
@@ -274,6 +282,18 @@ final class Bootstrap {
 		// so the handler can capture its catalog object before it's gone.
 		add_action( 'before_delete_post', array( $catalog, 'on_delete_product' ), 10, 1 );
 
+		// Rec-engine customer ingest (Phase 3.3.3). Self-gates on
+		// is_connected() like catalog; enqueues every registered user
+		// (A-filter) on the §488 hook set, routed to the customer flusher.
+		$customer = new CustomerHookHandler(
+			$this->ingest_queue(),
+			$this->rec_engine_settings()
+		);
+		add_action( 'user_register', array( $customer, 'on_user_register' ), 10, 1 );
+		add_action( 'profile_update', array( $customer, 'on_profile_update' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $customer, 'on_woocommerce_created_customer' ), 10, 1 );
+		add_action( 'woocommerce_save_account_details', array( $customer, 'on_save_account_details' ), 10, 1 );
+
 		// P1 #1: once the wizard is finished the new path owns contact sync,
 		// so strip the legacy subscriber-sync hooks (the legacy service
 		// re-registers them at every plugin load, so this must run every
@@ -337,6 +357,12 @@ final class Bootstrap {
 		if ( ! as_has_scheduled_action( IngestQueue::FLUSH_HOOK, array(), IngestQueue::AS_GROUP ) ) {
 			as_schedule_recurring_action( time(), 60, IngestQueue::FLUSH_HOOK, array(), IngestQueue::AS_GROUP );
 		}
+
+		// Customer ingest flush — its own recurring tick (separate hook/group),
+		// so customer retries drain independently of the catalog cycle.
+		if ( ! as_has_scheduled_action( CustomerFlusher::FLUSH_HOOK, array(), CustomerFlusher::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, CustomerFlusher::FLUSH_HOOK, array(), CustomerFlusher::AS_GROUP );
+		}
 	}
 
 	/**
@@ -354,6 +380,14 @@ final class Bootstrap {
 	 */
 	public function on_flush_ingest_queue(): void {
 		$this->ingest_flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_rec_flush_customers — drains the
+	 * rec-engine ingest queue's customer.* rows through the D6 flusher.
+	 */
+	public function on_flush_customer_queue(): void {
+		$this->customer_flusher()->flush();
 	}
 
 	/**
@@ -521,6 +555,30 @@ final class Bootstrap {
 		}
 
 		return $this->ingest_flusher;
+	}
+
+	public function customer_payload_builder(): CustomerPayloadBuilder {
+		if ( $this->customer_builder === null ) {
+			$this->customer_builder = new CustomerPayloadBuilder();
+		}
+
+		return $this->customer_builder;
+	}
+
+	public function customer_flusher(): CustomerFlusher {
+		if ( $this->customer_flusher === null ) {
+			$bootstrap              = $this;
+			$this->customer_flusher = new CustomerFlusher(
+				$this->ingest_queue(),
+				$this->customer_payload_builder(),
+				$this->rec_engine_settings(),
+				static function () use ( $bootstrap ): RecEngineClient {
+					return $bootstrap->rec_client();
+				}
+			);
+		}
+
+		return $this->customer_flusher;
 	}
 
 	public function automation_router(): AutomationRouter {

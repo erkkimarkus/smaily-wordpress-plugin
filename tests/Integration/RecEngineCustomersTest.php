@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
@@ -48,6 +49,7 @@ final class RecEngineCustomersTest extends TestCase {
 		parent::setUp();
 		EnvScrub::reset();
 		RecEngineMockServer::reset();
+		CustomerHookHandler::reset_seen();
 		$this->connect();
 	}
 
@@ -63,16 +65,22 @@ final class RecEngineCustomersTest extends TestCase {
 		$queue = new IngestQueue();
 
 		// Two valid customers + one whose email triggers a per-item error in
-		// the mock (`d6err-` prefix). All three are valid WP users.
-		$this->enqueue_user( $queue, 'valid-a@example.test' );
-		$this->enqueue_user( $queue, 'valid-b@example.test' );
-		$this->enqueue_user( $queue, 'd6err-bad@example.test' );
+		// the mock (`d6err-` prefix). Creating each user fires the registered
+		// user_register hook, which enqueues the customer.upsert row — the
+		// real wiring, no manual enqueue.
+		$this->register_customer( 'valid-a@example.test' );
+		$this->register_customer( 'valid-b@example.test' );
+		$this->register_customer( 'd6err-bad@example.test' );
 
 		$stats = $this->flusher()->flush();
 
 		self::assertSame( 2, $stats['sent'], 'The two valid customers are processed → sent.' );
 		self::assertSame( 1, $stats['failed'], 'The errors[] item is marked failed, not the whole batch.' );
-		self::assertSame( array(), $queue->pending( 10 ), 'Every row reached a terminal state (sent or failed).' );
+		self::assertSame(
+			array(),
+			$queue->pending( 10, array( CustomerFlusher::EVENT_CUSTOMER_UPSERT ) ),
+			'Every customer row reached a terminal state (sent or failed).'
+		);
 
 		$received = self::$engine->state()['last_customers_received'] ?? null;
 		self::assertIsArray( $received );
@@ -81,26 +89,47 @@ final class RecEngineCustomersTest extends TestCase {
 
 	public function test_all_valid_customers_are_sent(): void {
 		$queue = new IngestQueue();
-		$this->enqueue_user( $queue, 'all-good-1@example.test' );
-		$this->enqueue_user( $queue, 'all-good-2@example.test' );
+		$this->register_customer( 'all-good-1@example.test' );
+		$this->register_customer( 'all-good-2@example.test' );
 
 		$stats = $this->flusher()->flush();
 
 		self::assertSame( 2, $stats['sent'] );
 		self::assertSame( 0, $stats['failed'] );
-		self::assertSame( array(), $queue->pending( 10 ) );
+		self::assertSame( array(), $queue->pending( 10, array( CustomerFlusher::EVENT_CUSTOMER_UPSERT ) ) );
 	}
 
 	public function test_revoked_key_401_fails_batch_without_retry(): void {
-		$queue = new IngestQueue();
 		// `auth-401@` on the first customer makes the mock return a terminal 401.
-		$this->enqueue_user( $queue, 'auth-401@example.test' );
+		$this->register_customer( 'auth-401@example.test' );
 
 		$stats = $this->flusher()->flush();
 
 		self::assertSame( 0, $stats['sent'] );
 		self::assertSame( 1, $stats['failed'], 'A revoked key is terminal — mark failed, no retry.' );
 		self::assertSame( 0, $stats['retried'] );
+	}
+
+	public function test_user_register_hook_enqueues_one_row_and_flusher_sends_it(): void {
+		// The whole 3.3.3 chain wired: a real user_register fires the
+		// Bootstrap-registered CustomerHookHandler, which enqueues one
+		// customer.upsert row; the real flusher drains it to the mock engine.
+		$queue   = new IngestQueue();
+		$user_id = $this->register_customer( 'hook-e2e@example.test' );
+
+		$pending = $queue->pending( 10, array( CustomerFlusher::EVENT_CUSTOMER_UPSERT ) );
+		self::assertCount( 1, $pending, 'The registered user_register hook enqueues exactly one customer row.' );
+		self::assertSame( CustomerFlusher::EVENT_CUSTOMER_UPSERT, $pending[0]['event_type'] );
+		self::assertSame( (string) $user_id, $pending[0]['entity_id'] );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'] );
+		self::assertSame(
+			array(),
+			$queue->pending( 10, array( CustomerFlusher::EVENT_CUSTOMER_UPSERT ) ),
+			'The row is sent and no longer pending.'
+		);
 	}
 
 	private function flusher(): CustomerFlusher {
@@ -115,9 +144,14 @@ final class RecEngineCustomersTest extends TestCase {
 		);
 	}
 
-	private function enqueue_user( IngestQueue $queue, string $email ): void {
-		$user_id = $this->make_user( $email );
-		$queue->enqueue( CustomerFlusher::EVENT_CUSTOMER_UPSERT, (string) $user_id, array() );
+	/**
+	 * Create a customer user. wp_insert_user fires user_register, which the
+	 * Bootstrap-registered CustomerHookHandler turns into a queued
+	 * customer.upsert row (the gate is open — setUp connected the tenant). No
+	 * manual enqueue: this exercises the real hook wiring.
+	 */
+	private function register_customer( string $email ): int {
+		return $this->make_user( $email );
 	}
 
 	private function make_user( string $email ): int {

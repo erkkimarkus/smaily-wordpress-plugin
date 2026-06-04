@@ -108,7 +108,7 @@ final class CatalogHookHandlerTest extends TestCase {
 			/** @var array<int, array{type:string, entity_id:string, payload:array<string,mixed>}> */
 			public array $enqueued = array();
 
-			public function enqueue( string $event_type, string $entity_id, array $payload, ?string $event_uuid = null ): ?int {
+			public function enqueue( string $event_type, string $entity_id, array $payload, ?string $event_uuid = null, ?string $flush_hook = null, ?string $flush_group = null ): ?int {
 				$this->enqueued[] = array(
 					'type'      => $event_type,
 					'entity_id' => $entity_id,

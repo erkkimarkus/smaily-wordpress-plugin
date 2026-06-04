@@ -60,17 +60,27 @@ class IngestQueue {
 	/**
 	 * Persist an ingest event and ensure a flush is scheduled.
 	 *
-	 * @param string               $event_type e.g. "catalog.upsert", "catalog.delete".
-	 * @param string               $entity_id  Free-form identifier (product_id, user_id, order_id).
-	 * @param array<string, mixed> $payload    JSON-serialisable data the flush job hands to PayloadBuilder.
-	 * @param string|null          $event_uuid Wire idempotency key; auto-generated (UUID v4) when null.
+	 * @param string               $event_type  e.g. "catalog.upsert", "customer.upsert".
+	 * @param string               $entity_id   Free-form identifier (product_id, user_id, order_id).
+	 * @param array<string, mixed> $payload     JSON-serialisable data the flush job hands to PayloadBuilder.
+	 * @param string|null          $event_uuid  Wire idempotency key; auto-generated (UUID v4) when null.
+	 * @param string|null          $flush_hook  Action Scheduler hook to schedule for this row's endpoint;
+	 *                                           null = the catalog flush hook (backward compatible).
+	 * @param string|null          $flush_group AS group for $flush_hook; null = the catalog group.
 	 *
 	 * @return int|null Inserted row id on success; null when the payload can't be
 	 *                  JSON-encoded, the insert errored, or the event_uuid was a
 	 *                  duplicate that INSERT IGNORE skipped. Null is intentionally
 	 *                  silent — callers are hot WP hooks that must not bail.
 	 */
-	public function enqueue( string $event_type, string $entity_id, array $payload, ?string $event_uuid = null ): ?int {
+	public function enqueue(
+		string $event_type,
+		string $entity_id,
+		array $payload,
+		?string $event_uuid = null,
+		?string $flush_hook = null,
+		?string $flush_group = null
+	): ?int {
 		global $wpdb;
 
 		$json = wp_json_encode( $payload );
@@ -110,7 +120,7 @@ class IngestQueue {
 		}
 
 		$id = (int) $wpdb->insert_id;
-		$this->maybe_schedule_flush();
+		$this->maybe_schedule_flush( $flush_hook ?? self::FLUSH_HOOK, $flush_group ?? self::AS_GROUP );
 
 		return $id;
 	}
@@ -237,21 +247,23 @@ class IngestQueue {
 	}
 
 	/**
-	 * Ensure an async flush is queued. Deduplicated so multiple enqueues in
-	 * one request collapse to a single AS row.
+	 * Ensure an async flush is queued for the given endpoint hook. Deduplicated
+	 * so multiple enqueues in one request collapse to a single AS row. The hook
+	 * + group are passed in because the shared queue serves several endpoints
+	 * (catalog, customers, …), each drained by its own flusher on its own hook.
 	 */
-	private function maybe_schedule_flush(): void {
+	private function maybe_schedule_flush( string $flush_hook, string $flush_group ): void {
 		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
 			return;
 		}
 
 		if ( function_exists( 'as_next_scheduled_action' )
-			&& as_next_scheduled_action( self::FLUSH_HOOK, array(), self::AS_GROUP ) !== false
+			&& as_next_scheduled_action( $flush_hook, array(), $flush_group ) !== false
 		) {
 			return;
 		}
 
-		as_enqueue_async_action( self::FLUSH_HOOK, array(), self::AS_GROUP );
+		as_enqueue_async_action( $flush_hook, array(), $flush_group );
 	}
 
 	/**

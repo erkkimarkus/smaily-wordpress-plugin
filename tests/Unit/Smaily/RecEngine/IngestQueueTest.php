@@ -66,6 +66,32 @@ final class IngestQueueTest extends TestCase {
 		self::assertSame( IngestQueue::AS_GROUP, $enqueued[0]['group'] );
 	}
 
+	public function test_enqueue_schedules_the_given_flush_hook_when_provided(): void {
+		$wpdb            = $this->fake_wpdb( 1, 5 );
+		$GLOBALS['wpdb'] = $wpdb;
+
+		$enqueued = array();
+		Functions\when( 'as_enqueue_async_action' )->alias(
+			static function ( string $hook, array $args, string $group ) use ( &$enqueued ): int {
+				$enqueued[] = compact( 'hook', 'group' );
+				return 1;
+			}
+		);
+
+		( new IngestQueue() )->enqueue(
+			'customer.upsert',
+			'67',
+			array(),
+			null,
+			'smly_rec_flush_customers',
+			'smaily-rec-customers'
+		);
+
+		self::assertCount( 1, $enqueued );
+		self::assertSame( 'smly_rec_flush_customers', $enqueued[0]['hook'], 'A customer row schedules the customer flush hook, not catalog.' );
+		self::assertSame( 'smaily-rec-customers', $enqueued[0]['group'] );
+	}
+
 	public function test_enqueue_uses_explicit_event_uuid_when_provided(): void {
 		$wpdb            = $this->fake_wpdb( 1, 5 );
 		$GLOBALS['wpdb'] = $wpdb;
