@@ -187,12 +187,31 @@ class Client {
 	}
 
 	/**
-	 * @param array<int, array<string, mixed>> $orders
+	 * Batch-upload orders to POST /api/v1/ingest/orders.
 	 *
-	 * @return array<string, mixed>
+	 * Wrapper key is `orders` (W5 §5); the batch cap is **50** orders per
+	 * request (lower than the 100 for catalog/customers — orders carry nested
+	 * line items and are heavier). Order natural key is
+	 * `(tenant_id, external_order_id)`; the customer is referenced by
+	 * `customer_email` and auto-created engine-side. Items are fully replaced
+	 * on re-ingest of an existing order.
+	 *
+	 * Per-item D6 partial success: a 2xx body carries
+	 * {ok, processed, deduplicated, errors:[{index, external_order_id?, field,
+	 * message}]}; the order flusher (3.3-orders.2) splits the batch from
+	 * errors[]. Attribution is async — the response carries no attribution
+	 * counts. A wrapper-level failure (non-array / empty / >50) is a 400 and
+	 * throws ApiException carrying the body's `details` (F3-18).
+	 *
+	 * @param array<int, array<string, mixed>> $orders 1..50 order objects.
+	 *
+	 * @return array<string, mixed> The decoded engine response (D6 shape).
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
 	 */
 	public function ingest_orders( array $orders ): array {
-		throw new \RuntimeException( 'ingest_orders: not implemented in sub-PR 3.1 (lands in 3.2).' );
+		$url = $this->resolve_url( 'ingest_orders', self::PATH_INGEST_ORDERS );
+		return $this->request_url( 'POST', $url, array( 'orders' => $orders ) );
 	}
 
 	/**

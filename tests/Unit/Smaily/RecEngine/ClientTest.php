@@ -145,6 +145,66 @@ final class ClientTest extends TestCase {
 		self::assertSame( $d6, $client->ingest_customers( array( array( 'email' => 'a@x.test' ) ) ) );
 	}
 
+	public function test_ingest_orders_posts_orders_wrapper_to_engine_map_url(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'ingest_orders' => 'https://engine.test/api/v1/ingest/orders' )
+		);
+
+		$client->ingest_orders( array( array( 'external_order_id' => 'WC-1', 'event_id' => 'u1' ) ) );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/ingest/orders', $client->captured['url'] );
+		self::assertSame(
+			array( 'orders' => array( array( 'external_order_id' => 'WC-1', 'event_id' => 'u1' ) ) ),
+			$client->captured['body'],
+			'Orders wire wrapper key is `orders` (W5 §5).'
+		);
+	}
+
+	public function test_ingest_orders_falls_back_to_constant_path_without_map(): void {
+		$client = $this->capturing_client( 'sk_live', 'https://base.test' );
+
+		$client->ingest_orders( array( array( 'external_order_id' => 'WC-1' ) ) );
+
+		self::assertSame(
+			'https://base.test' . Client::PATH_INGEST_ORDERS,
+			$client->captured['url'],
+			'With no endpoints map, ingest_orders falls back to base_url + PATH_INGEST_ORDERS.'
+		);
+	}
+
+	public function test_ingest_orders_returns_d6_partial_success_body_verbatim(): void {
+		// D6: a 2xx carries {processed, deduplicated, errors:[{index,...}]}.
+		// ingest_orders returns it as-is — the flusher splits the batch; the
+		// Client never interprets it (and never reads attribution, which is async).
+		$d6 = array(
+			'ok'           => true,
+			'processed'    => 1,
+			'deduplicated' => 0,
+			'errors'       => array(
+				array( 'index' => 1, 'external_order_id' => 'WC-99', 'field' => 'status', 'message' => 'Invalid enum value' ),
+			),
+		);
+		$client = new class( 'sk_live', 'https://base.test', $d6 ) extends Client {
+			/** @var array<string, mixed> */
+			private array $d6;
+
+			/** @param array<string, mixed> $d6 */
+			public function __construct( string $api_key, string $base_url, array $d6 ) {
+				parent::__construct( $api_key, $base_url );
+				$this->d6 = $d6;
+			}
+
+			protected function request_url( string $method, string $url, ?array $body = null ): array {
+				return $this->d6;
+			}
+		};
+
+		self::assertSame( $d6, $client->ingest_orders( array( array( 'external_order_id' => 'WC-1' ) ) ) );
+	}
+
 	/**
 	 * Client double that captures the resolved (method, url, body) instead
 	 * of hitting the network, and returns a canned 200 body.
