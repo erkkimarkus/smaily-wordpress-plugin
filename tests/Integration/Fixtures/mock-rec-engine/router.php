@@ -309,6 +309,143 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 	);
 }
 
+// Customers ingest — W4 email-first + D6 per-item errors[]. Wrapper key is
+// `customers` (live-verified in the 3.3.1 probe: {customers:[...]} → 200; no
+// products→items surprise). Per-item fate: processed / deduplicated / error.
+// Scenario triggers on the FIRST customer's email exercise the flusher's
+// terminal-4xx and transient-retry paths; a `d6err-` email prefix on ANY item
+// forces that item into errors[] so the partial-success split is testable
+// (the plugin can't send a malformed email — WP validates on user create — so
+// the mock triggers the error by prefix, not by real validation).
+if ( $method === 'POST' && $path === '/api/v1/ingest/customers' ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply(
+			401,
+			array(
+				'error'      => 'unauthorized',
+				'message'    => 'Authorization header missing or malformed.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	// Wrapper key is `customers` (W4 §4). Non-array / missing → 400 wrapper-level.
+	if ( ! is_array( $body ) || ! isset( $body['customers'] ) || ! is_array( $body['customers'] ) ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'customers' => array( 'Required' ) ) ),
+			)
+		);
+	}
+
+	$customers = $body['customers'];
+
+	// Empty / >100 → 400 (the wrapper is all-or-nothing; only per-ITEM
+	// failures use errors[]).
+	if ( count( $customers ) === 0 || count( $customers ) > 100 ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'customers' => array( 'Array must contain between 1 and 100 element(s)' ) ) ),
+			)
+		);
+	}
+
+	$first_email = isset( $customers[0]['email'] ) ? (string) $customers[0]['email'] : '';
+
+	// Revoked / invalid key — terminal 4xx, the flusher must NOT retry.
+	if ( strpos( $first_email, 'auth-401@' ) === 0 ) {
+		reply(
+			401,
+			array(
+				'error'      => 'api_key_revoked',
+				'message'    => 'This api_key has been revoked.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	// Transient 500 on the FIRST attempt only, then succeed on retry.
+	if ( strpos( $first_email, 'retry-500@' ) === 0 ) {
+		$counter_key           = 'cust_attempts_' . md5( $first_email );
+		$seen_count            = isset( $state[ $counter_key ] ) ? (int) $state[ $counter_key ] : 0;
+		$state[ $counter_key ] = $seen_count + 1;
+		save_state( $state_file, $state );
+		if ( $seen_count === 0 ) {
+			reply(
+				500,
+				array(
+					'error'      => 'internal_error',
+					'message'    => 'Transient engine error.',
+					'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+					'timestamp'  => gmdate( 'c' ),
+				)
+			);
+		}
+	}
+
+	// Per-item D6: error (by `d6err-` trigger) / deduplicated (event_id seen) /
+	// processed. Natural key is email; transport dedup is per-item event_id.
+	$seen         = ( isset( $state['customer_event_ids'] ) && is_array( $state['customer_event_ids'] ) )
+		? $state['customer_event_ids']
+		: array();
+	$processed    = 0;
+	$deduplicated = 0;
+	$errors       = array();
+	foreach ( $customers as $index => $customer ) {
+		$email    = isset( $customer['email'] ) ? (string) $customer['email'] : '';
+		$event_id = isset( $customer['event_id'] ) ? (string) $customer['event_id'] : '';
+
+		if ( strpos( $email, 'd6err-' ) === 0 ) {
+			$errors[] = array(
+				'index'   => $index,
+				'email'   => $email,
+				'field'   => 'email',
+				'message' => 'Invalid email (mock per-item trigger)',
+			);
+			continue;
+		}
+
+		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
+			++$deduplicated;
+			continue;
+		}
+		if ( $event_id !== '' ) {
+			$seen[] = $event_id;
+		}
+		++$processed;
+	}
+	$state['customer_event_ids']    = $seen;
+	$state['last_customers_received'] = array_map(
+		static function ( $customer ) {
+			return isset( $customer['event_id'] ) ? (string) $customer['event_id'] : '';
+		},
+		$customers
+	);
+	save_state( $state_file, $state );
+
+	$response = array(
+		'ok'           => true,
+		'processed'    => $processed,
+		'deduplicated' => $deduplicated,
+		'errors'       => $errors,
+	);
+	// Pure no-op retry (everything deduplicated, nothing errored).
+	if ( $processed === 0 && $deduplicated > 0 && $errors === array() ) {
+		$response['deduplicated_all'] = true;
+	}
+	reply( 200, $response );
+}
+
 // Fallback.
 reply(
 	404,
