@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
@@ -33,6 +34,8 @@ use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
 use Smaily\Connect\Smaily\RecEngine\CustomerPayloadBuilder;
 use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+use Smaily\Connect\Smaily\RecEngine\OrderFlusher;
+use Smaily\Connect\Smaily\RecEngine\OrderPayloadBuilder;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
 
 /**
@@ -78,6 +81,8 @@ final class Bootstrap {
 	private ?IngestFlusher $ingest_flusher            = null;
 	private ?CustomerPayloadBuilder $customer_builder = null;
 	private ?CustomerFlusher $customer_flusher        = null;
+	private ?OrderPayloadBuilder $order_builder       = null;
+	private ?OrderFlusher $order_flusher              = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -133,6 +138,8 @@ final class Bootstrap {
 		// Customers drain on their own hook — the shared queue routes catalog.*
 		// and customer.* rows to separate flushers (3.3.3).
 		add_action( CustomerFlusher::FLUSH_HOOK, array( $this, 'on_flush_customer_queue' ) );
+		// Orders drain on their own hook too (3.3-orders.3).
+		add_action( OrderFlusher::FLUSH_HOOK, array( $this, 'on_flush_order_queue' ) );
 
 		// Bridges from new AS hook names → legacy WP-Cron hook names.
 		// The legacy Smaily_Connect\Integrations\WooCommerce\Cron class
@@ -294,6 +301,16 @@ final class Bootstrap {
 		add_action( 'woocommerce_created_customer', array( $customer, 'on_woocommerce_created_customer' ), 10, 1 );
 		add_action( 'woocommerce_save_account_details', array( $customer, 'on_save_account_details' ), 10, 1 );
 
+		// Rec-engine order ingest (Phase 3.3-orders.3). Self-gates on
+		// is_connected(); enqueues on order-status changes whose mapped engine
+		// status changes to a confirmed purchase (OrderHookHandler).
+		$order = new OrderHookHandler(
+			$this->ingest_queue(),
+			$this->order_payload_builder(),
+			$this->rec_engine_settings()
+		);
+		add_action( 'woocommerce_order_status_changed', array( $order, 'on_order_status_changed' ), 10, 3 );
+
 		// P1 #1: once the wizard is finished the new path owns contact sync,
 		// so strip the legacy subscriber-sync hooks (the legacy service
 		// re-registers them at every plugin load, so this must run every
@@ -363,6 +380,11 @@ final class Bootstrap {
 		if ( ! as_has_scheduled_action( CustomerFlusher::FLUSH_HOOK, array(), CustomerFlusher::AS_GROUP ) ) {
 			as_schedule_recurring_action( time(), 60, CustomerFlusher::FLUSH_HOOK, array(), CustomerFlusher::AS_GROUP );
 		}
+
+		// Order ingest flush — its own recurring tick.
+		if ( ! as_has_scheduled_action( OrderFlusher::FLUSH_HOOK, array(), OrderFlusher::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, OrderFlusher::FLUSH_HOOK, array(), OrderFlusher::AS_GROUP );
+		}
 	}
 
 	/**
@@ -388,6 +410,14 @@ final class Bootstrap {
 	 */
 	public function on_flush_customer_queue(): void {
 		$this->customer_flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_rec_flush_orders — drains the
+	 * rec-engine ingest queue's order.* rows through the D6 flusher.
+	 */
+	public function on_flush_order_queue(): void {
+		$this->order_flusher()->flush();
 	}
 
 	/**
@@ -579,6 +609,30 @@ final class Bootstrap {
 		}
 
 		return $this->customer_flusher;
+	}
+
+	public function order_payload_builder(): OrderPayloadBuilder {
+		if ( $this->order_builder === null ) {
+			$this->order_builder = new OrderPayloadBuilder();
+		}
+
+		return $this->order_builder;
+	}
+
+	public function order_flusher(): OrderFlusher {
+		if ( $this->order_flusher === null ) {
+			$bootstrap           = $this;
+			$this->order_flusher = new OrderFlusher(
+				$this->ingest_queue(),
+				$this->order_payload_builder(),
+				$this->rec_engine_settings(),
+				static function () use ( $bootstrap ): RecEngineClient {
+					return $bootstrap->rec_client();
+				}
+			);
+		}
+
+		return $this->order_flusher;
 	}
 
 	public function automation_router(): AutomationRouter {

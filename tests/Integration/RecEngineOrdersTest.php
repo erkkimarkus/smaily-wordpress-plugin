@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -45,6 +46,7 @@ final class RecEngineOrdersTest extends TestCase {
 		}
 		EnvScrub::reset();
 		RecEngineMockServer::reset();
+		OrderHookHandler::reset_seen();
 		$this->connect();
 	}
 
@@ -65,10 +67,12 @@ final class RecEngineOrdersTest extends TestCase {
 		$product = $this->make_product( 'ORD-SKU-1', '10.00' );
 
 		// Two valid orders + one whose customer_email triggers a per-item error
-		// in the mock (`d6err-` prefix). All three are real completed orders.
-		$this->enqueue_order( $queue, $this->make_order( 'valid-a@example.test', 'completed', $product ) );
-		$this->enqueue_order( $queue, $this->make_order( 'valid-b@example.test', 'completed', $product ) );
-		$this->enqueue_order( $queue, $this->make_order( 'd6err-bad@example.test', 'completed', $product ) );
+		// in the mock (`d6err-` prefix). Creating a completed order fires
+		// woocommerce_order_status_changed; the registered OrderHookHandler
+		// enqueues the order.upsert row — the real wiring, no manual enqueue.
+		$this->make_order( 'valid-a@example.test', 'completed', $product );
+		$this->make_order( 'valid-b@example.test', 'completed', $product );
+		$this->make_order( 'd6err-bad@example.test', 'completed', $product );
 
 		$stats = $this->flusher()->flush();
 
@@ -86,10 +90,9 @@ final class RecEngineOrdersTest extends TestCase {
 	}
 
 	public function test_all_valid_orders_are_sent(): void {
-		$queue   = new IngestQueue();
 		$product = $this->make_product( 'ORD-SKU-2', '5.00' );
-		$this->enqueue_order( $queue, $this->make_order( 'all-good-1@example.test', 'processing', $product ) );
-		$this->enqueue_order( $queue, $this->make_order( 'all-good-2@example.test', 'completed', $product ) );
+		$this->make_order( 'all-good-1@example.test', 'processing', $product );
+		$this->make_order( 'all-good-2@example.test', 'completed', $product );
 
 		$stats = $this->flusher()->flush();
 
@@ -98,9 +101,8 @@ final class RecEngineOrdersTest extends TestCase {
 	}
 
 	public function test_revoked_key_401_fails_batch_without_retry(): void {
-		$queue   = new IngestQueue();
 		$product = $this->make_product( 'ORD-SKU-3', '5.00' );
-		$this->enqueue_order( $queue, $this->make_order( 'auth-401@example.test', 'completed', $product ) );
+		$this->make_order( 'auth-401@example.test', 'completed', $product );
 
 		$stats = $this->flusher()->flush();
 
@@ -119,10 +121,6 @@ final class RecEngineOrdersTest extends TestCase {
 				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
 			}
 		);
-	}
-
-	private function enqueue_order( IngestQueue $queue, int $order_id ): void {
-		$queue->enqueue( OrderFlusher::EVENT_ORDER_UPSERT, (string) $order_id, array() );
 	}
 
 	private function make_product( string $sku, string $price ): \WC_Product {

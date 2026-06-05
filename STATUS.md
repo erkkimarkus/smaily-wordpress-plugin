@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06 (Route A core complete; orders ingest in progress)_
+_Last updated: 2026-06-05 (orders ingest .0–.3 done, hook-wired; .4 live-walk + ZIP remaining)_
 
 ---
 
@@ -93,12 +93,15 @@ see "Pilot go-live" below.
 
 ### In progress — 3.3 orders
 
+Hook-wired and live as of .3 (orders enqueue on status changes, AS schedules
+the OrderFlusher). Only the live-walk + ZIP (.4) remain.
+
 | Sub-PR | Content | Status |
 |---|---|---|
 | .0 | OrderPayloadBuilder + status-mapping (Variant 2: on-hold->processing) | pushed 29edfe4 |
 | .1 | Client::ingest_orders (batch 50) | pushed 652e16c |
 | .2 | OrderFlusher D6 + SKU-less skip + status-at-flush | pushed 4d036cf |
-| .3 | OrderHookHandler + status-change logic + Bootstrap wiring | plan ready, go-ahead pending |
+| .3 | OrderHookHandler (enqueue iff mapped engine status changes) + Bootstrap wiring | pushed (this commit; hash backfilled at .4) |
 | .4 | live-walk + ZIP | pending (needs fresh setup-token) |
 
 ### Waiting / lock conditions
