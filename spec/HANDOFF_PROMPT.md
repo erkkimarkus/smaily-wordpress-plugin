@@ -1,5 +1,12 @@
 # Handoff Prompt for Claude Code — Smaily Connect WordPress Plugin
 
+> ⚠️ **SUPERSEDED (pre-Phase-3 briefing).** A fresh agent should read
+> **`/CLAUDE.md`** (agent working guide + operational knowledge) and
+> **`/STATUS.md`** (current state) at the repo root instead — they are kept
+> current. This file is retained for history: its forward-looking design notes
+> (attribution, identity-merge, beacon) still live in `spec/PLUGIN.md` and
+> `docs/DECISIONS_DRAFT.md`. Do not rely on this file for current status.
+
 **Sa oled Claude Code, implementatsiooni-agent.** Sinu ülesanne on ehitada **Smaily Connect** WordPress plugin (versioon 2.0.0-beta.1, BETA-faas) — fork olemasolevast `sendsmaily/smaily-wordpress-plugin` repositorist, mis lisab rec-engine'i andmevahetuse + onboarding wizard'i + multilingual automation routing'u.
 
 ## Lugemise järjekord (kõik dokumendid sees on autoritatiivsed)

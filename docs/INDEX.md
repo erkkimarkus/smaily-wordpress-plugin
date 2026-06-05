@@ -24,7 +24,7 @@ where something is.
 
 | Document | Audience | Status | Description |
 |----------|----------|--------|-------------|
-| `README.md` | Anyone evaluating the plugin | **TODO** (Phase 3 end) | First impression. What the plugin does, who it's for, install summary, links to deeper docs. Lives at repo root, also surfaces in marketplace listings. |
+| `README.md` | Anyone evaluating the plugin | **Exists** | First impression. What the plugin does, who it's for, install summary, links to deeper docs. Lives at repo root, also surfaces in marketplace listings. (Refined further at Phase 3 end.) |
 | `INSTALL.md` | New WP-admin installing fresh | **TODO** (Phase 3 end) | Step-by-step install on a clean WordPress. Activation, wizard walkthrough, first sync verification. Screenshots. |
 | `MIGRATION.md` | WP-admin running the legacy `sendsmaily/smaily-wordpress-plugin` | **TODO** (before pilot) | How to migrate from the legacy plugin to this one. What persists, what changes, what to back up first, rollback path. Critical: written **before pilot client install**. |
 | `FAQ.md` / `TROUBLESHOOTING.md` | WP-admin running into problems | **TODO** (after pilot, ~2-4 weeks in) | Real user questions and symptom→cause→fix patterns. Written **after** the pilot is in production and asks real questions. Drafting it earlier would just be guesses. |
@@ -35,6 +35,8 @@ where something is.
 
 | Document | Audience | Status | Description |
 |----------|----------|--------|-------------|
+| `CLAUDE.md` (repo root) | Any agent picking up the repo | **Exists** | Agent working guide — the entry point. Workflow rhythm, operational knowledge (`sg docker`, setup-token, woocommerce-stubs PHPStan-only, IsoDate), do-not-do scars, the architecture pattern. Read first. |
+| `STATUS.md` (repo root) | Any agent/dev, the coordinator | **Active** | Single source of "where we are now": done/in-progress, lock conditions, pilot go-live checklist, roadmap. Kept current in the same commit that changes reality. |
 | `ARCHITECTURE.md` | Future developers, possible upstream reviewers | **TODO** (Phase 3 end) | High-level: layers (UI/REST/Services/Integrations/Storage), how the plugin talks to Smaily, how it talks to the rec engine, where the boundaries are. Diagrams. Key design decisions summarized (full reasoning in `DECISIONS.md`). |
 | `DECISIONS.md` (from `DECISIONS_DRAFT.md`) | Future developers | **Draft exists** (`DECISIONS_DRAFT.md`), refined at Phase 3 end | All significant technical decisions with reasoning. Currently maintained as a draft, refined into a final document (or split into `docs/adr/NNNN-*.md` files) at Phase 3 end. |
 | `DEVELOPER.md` / `CONTRIBUTING.md` | Future contributors | **TODO** (Phase 3 end) | Dev environment setup (wp-env + Chromium + mock server + composer + npm), `npm run` scripts, testing conventions, how to make a sub-PR. |
@@ -52,8 +54,7 @@ where something is.
 | Document | Audience | Status | Description |
 |----------|----------|--------|-------------|
 | `DECISIONS_DRAFT.md` | Erkki, then refined into `DECISIONS.md` | **Active** | Working draft of technical decisions during Phase 3. Each new decision adds an entry. Refined at Phase 3 end. |
-| `RECENGINE_TODO.md` | Engine team (handover) | **Active** | Engine-side requirements and status, sorted by P0/P1/P2 priority. Updated as engine team makes progress. |
-| `HANDOFF_PROMPT.md` | Erkki, for new Claude sessions | **Exists** | Re-briefing template when starting a new Claude session after a long gap. |
+| `HANDOFF_PROMPT.md` (`spec/`) | — | **Superseded** | Old re-briefing template (pre-Phase-3). Replaced by `/CLAUDE.md` + `/STATUS.md`; kept with a banner for history. |
 | `PROJECT_PLAN.md` | Erkki | **Exists** | Original project plan with phases. Some sections superseded by reality (Phase 2 took longer than planned). |
 | `ROADMAP.md` | Erkki, strategic | **Exists** | Long-term roadmap: Milestone 1 (WC plugin), Milestone 2 (npm @smaily/recengine-client), Milestone 3 (Shopify app), Milestone 4 (Magento, TBD). |
 | `SUGGESTION.md` | Erkki | **Exists** | Early-phase product suggestions, mostly historical. |
