@@ -45,7 +45,7 @@ The plugin connects to Smaily's recommendation engine and feeds it product, cust
 | Setup-exchange (engine connection) | ✓ Complete | Live-verified |
 | Catalog ingest (products → engine) | ✓ Complete | Live-verified against deployed engine, 14/14 scenarios |
 | Customers ingest | ✓ Complete | Live-verified 10/10 against deployed engine (customers-end) |
-| Orders ingest | 🔨 In progress | Builder + Client + Flusher done; hooks + live-walk remaining. See `STATUS.md` |
+| Orders ingest | ✓ Complete | Live-verified 12/12 against deployed engine (orders-end) |
 | Browse ingest | ⏳ Pending | Scheduled after customers + orders |
 | Backfill (historical data) | ⏳ Pending | Cursor-paginated sync of pre-existing WC data |
 | Beacon (browse tracking) | ⏳ Pending | Client-side beacon with server-side proxy for cookieless tracking |

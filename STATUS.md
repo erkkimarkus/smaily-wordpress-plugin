@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-05 (orders ingest .0–.3 done, hook-wired; .4 live-walk + ZIP remaining)_
+_Last updated: 2026-06-05 (orders-end complete — .0–.4 done, live-walked 12/12, ZIP'd; next: plugin-side N-7 lock)_
 
 ---
 
@@ -90,19 +90,18 @@ see "Pilot go-live" below.
   CustomerPayloadBuilder + Client::ingest_customers + ApiException D6 +
   CustomerFlusher (D6 reference) + CustomerHookHandler. (F3-19 milestone.)
   Commit chain: 0fcbcd0 -> 9fabcf7 -> db3a0da -> 26a6e44 -> e4dfb91 -> 791c00b.
+- **orders-end** — ZIP'd, live-walked 12/12 against MiuMjau engine. **No format
+  surprises** — ordered_at Z-form (IsoDate F3-21 carried over) and the WC→enum
+  status mapping both validated live (the engine rejects a raw WC status, so the
+  mapping is necessary AND correct). OrderPayloadBuilder + Client::ingest_orders
+  (batch 50) + OrderFlusher (D6) + OrderHookHandler (status-change wiring).
+  Commit chain: 29edfe4 -> 652e16c -> 4d036cf -> a8bde99 (.3) -> this commit (.4,
+  + ZIP; the .4 build-hash is this commit).
 
-### In progress — 3.3 orders
+### Next
 
-Hook-wired and live as of .3 (orders enqueue on status changes, AS schedules
-the OrderFlusher). Only the live-walk + ZIP (.4) remain.
-
-| Sub-PR | Content | Status |
-|---|---|---|
-| .0 | OrderPayloadBuilder + status-mapping (Variant 2: on-hold->processing) | pushed 29edfe4 |
-| .1 | Client::ingest_orders (batch 50) | pushed 652e16c |
-| .2 | OrderFlusher D6 + SKU-less skip + status-at-flush | pushed 4d036cf |
-| .3 | OrderHookHandler (enqueue iff mapped engine status changes) + Bootstrap wiring | pushed (this commit; hash backfilled at .4) |
-| .4 | live-walk + ZIP | pending (needs fresh setup-token) |
+- **plugin-side N-7** — catalog-flusher D6 consolidation (the lock condition
+  below), then Phase 3 remaining (roadmap below). Awaiting go-ahead.
 
 ### Waiting / lock conditions
 
@@ -134,7 +133,7 @@ Pilot does NOT go live until all of these hold. No deadline pressure (D5).
 **Plugin side:**
 - [x] catalog-end ZIP'd + live-walked
 - [x] customers-end ZIP'd + live-walked
-- [ ] orders-end (.3/.4)
+- [x] orders-end ZIP'd + live-walked (12/12)
 - [ ] catalog-flusher N-7 D6-fix (lock condition above)
 
 **Engine side:**
