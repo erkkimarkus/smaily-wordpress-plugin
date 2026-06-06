@@ -63,13 +63,41 @@ final class IngestFlusherTest extends TestCase {
 
 	public function test_deduplicated_response_is_treated_as_sent_not_retried(): void {
 		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
-		$client = $this->success_client( array( 'deduplicated' => true ) );
+		// D6 dedup retry: the row was already seen → deduplicated, not errored.
+		$client = $this->success_client( array( 'ok' => true, 'processed' => 0, 'deduplicated' => 1, 'errors' => array(), 'deduplicated_all' => true ) );
 		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true ) );
 
 		$stats = $flush->flush();
 
-		self::assertSame( array( 1 ), $queue->sent, 'A 200 {"deduplicated":true} is success — mark sent, never retry.' );
+		self::assertSame( array( 1 ), $queue->sent, 'A deduplicated row is success — mark sent, never retry.' );
 		self::assertSame( array(), $queue->attempts );
+	}
+
+	public function test_d6_partial_success_fails_errored_row_and_sends_the_rest(): void {
+		// N-7: catalog is D6 now. A 200 with errors[] must fail exactly that
+		// row and send the rest — this is the lock fix (was: marked all sent).
+		$queue  = $this->fake_queue(
+			array( $this->upsert_row( 1, 100, 'u1' ), $this->upsert_row( 2, 101, 'u2' ), $this->upsert_row( 3, 102, 'u3' ) )
+		);
+		$client = $this->success_client(
+			array(
+				'ok'           => true,
+				'processed'    => 2,
+				'deduplicated' => 0,
+				'errors'       => array(
+					array( 'index' => 1, 'sku' => 'BAD', 'field' => 'product_url', 'message' => 'Invalid input' ),
+				),
+			)
+		);
+		$flush = $this->fake_flusher( $queue, $client, true, array( 100 => true, 101 => true, 102 => true ) );
+
+		$stats = $flush->flush();
+
+		self::assertSame( array( 1, 3 ), $queue->sent );
+		self::assertCount( 1, $queue->failed );
+		self::assertSame( 2, $queue->failed[0]['id'], 'errors[].index 1 → batch_rows[1] (id 2) → failed (not silently sent).' );
+		self::assertSame( 2, $stats['sent'] );
+		self::assertSame( 1, $stats['failed'] );
 	}
 
 	public function test_terminal_4xx_marks_failed_without_retry(): void {
@@ -179,9 +207,9 @@ final class IngestFlusherTest extends TestCase {
 	}
 
 	/**
-	 * @param array<string, mixed> $response
+	 * @param array<string, mixed> $response Override the canned D6 body (e.g. a dedup retry).
 	 */
-	private function success_client( array $response = array( 'ok' => true ) ): Client {
+	private function success_client( array $response = array() ): Client {
 		return new class( $response ) extends Client {
 			/** @var array<int, array<string, mixed>> */
 			public array $sent_products = array();
@@ -196,7 +224,11 @@ final class IngestFlusherTest extends TestCase {
 
 			public function ingest_catalog( array $products ): array {
 				$this->sent_products = $products;
-				return $this->response;
+				// Default to a D6 all-processed body so the invariant holds; a
+				// test may override (e.g. a dedup retry).
+				return $this->response !== array()
+					? $this->response
+					: array( 'ok' => true, 'processed' => count( $products ), 'deduplicated' => 0, 'errors' => array() );
 			}
 		};
 	}

@@ -1166,17 +1166,15 @@ pilot-go-live** — like catalog-end, it's a proven artefact; the pilot installs
 after W5.
 
 **Known follow-ups (plugin-side N-7 + housekeeping):**
-- **🔒 Catalog-flusher D6 consolidation — LOCK on pilot catalog go-live.** The
-  engine moved catalog to D6 (N-7), but IngestFlusher (catalog) is still
-  all-or-nothing: on a 200+`errors[]` it would mark a rejected product *sent*
-  (silent loss). Not active (pilot not live). **This fix is a hard
-  precondition for the pilot's catalog ever going live** — consolidate catalog
-  (+ browse) onto the shared D6 flusher (CustomerFlusher is the reference)
-  before any pilot sends catalog to the engine.
-- **EVENT_* constant unification (N-7).** Catalog event constants live on
-  CatalogHookHandler, customer's on CustomerFlusher (asymmetric, accepted
-  because the flusher precedes the hook). Unify when consolidating to the
-  shared D6 dispatcher-flusher.
+- **✅ Catalog-flusher D6 consolidation — RESOLVED in N-7.1 (see F3-23).** The
+  catalog IngestFlusher now extends `AbstractD6Flusher`; an engine per-item
+  rejection marks that row FAILED, not SENT (silent-loss class closed, lock
+  lifted). Proven live (`flusher_d6_split_lock_proof`).
+- **EVENT_* constant asymmetry (N-7).** Catalog event constants live on
+  CatalogHookHandler, customer/order's on their Flusher. **Intentionally kept**
+  after N-7 — the chosen abstract-base design (not a monolithic dispatcher) gives
+  each flusher its own constants; the "dispatcher" that would have unified them
+  didn't happen (F3-23). Cosmetic; defer or drop.
 - **Flaky test.** `admin/src/hooks/useBackfillProgress.test.ts` (fake-timers
   race) flakes ~1 in several full ci:strict runs; passes in isolation. Fix
   with deterministic timer mocking.
@@ -1227,6 +1225,83 @@ datetime format, so integration was green and only the live engine surfaced it
 `first_seen_at` was an active bug; `on_sale_until` a latent sibling — both
 fixed.
 
+### F3-22: Orders-end milestone — sub-PR 3.3 orders complete (W5)
+
+**Context:** the third ingest domain (orders), built on the F3-16 canonical
+6-step pattern and the D6 per-item contract (F3-18), against the W5 orders
+contract (batch `{orders:[...]}`, `customer_email` identity, required `status`
+enum, `currency` default EUR, per-line `discount_amount`, async attribution).
+
+**Decision:** OrderPayloadBuilder (WC_Order → §5 wire) + Client::ingest_orders
+(batch 50, `orders` wrapper) + OrderFlusher (D6) + OrderHookHandler
+(`woocommerce_order_status_changed` → enqueue iff the mapped status is non-empty
+and actually changed). **WC status → engine enum mapping is Variant 2** (F3-22
+status mapping): completed/processing/cancelled/refunded map direct; on-hold →
+processing; pending/failed/draft/custom → `''` (skip — not ingested). The
+mapping is necessary AND correct: the live engine **rejects a raw WC status**,
+confirmed by the orders live-walk (12/12).
+
+**Rationale:** mirror the customers/catalog ends so the shared queue + flusher
+abstractions hold across all three domains. Status mapping centralizes the
+WC↔engine enum translation in one public `map_status()` (reused by the flusher's
+`row_to_object` skip-decision and the hook handler's change-gate).
+
+**Alternatives:** Variant 1 (pass WC status raw, let the engine map) — rejected,
+the engine's enum is strict and rejects unmapped values. Variant 3 (ingest every
+status incl. pending/failed) — rejected, those are not meaningful orders for
+recommendations.
+
+**Relationships:** F3-16 (pattern), F3-18 (D6), F3-21 (IsoDate ordered_at),
+F3-19 (guest-customer concern, RESOLVED by W5 engine auto-create). No format
+surprises on the live-walk — the Z-form datetime + status mapping both validated
+live on the first call.
+
+### F3-23: Plugin-side N-7 — `AbstractD6Flusher` consolidation + W2 wrapper drift
+
+**Context:** after three ingest domains each grew a near-identical D6 flusher
+(batch flush, `errors[].index → batch_rows[index]` split, invariant check, AS
+job). Catalog's flusher was still **all-or-nothing** — on a 200+errors[] it would
+mark a per-item-rejected product SENT (silent loss). That was a **hard lock
+condition** before pilot catalog go-live (STATUS.md).
+
+**Decision (architecture):** extract a shared **abstract base**
+`AbstractD6Flusher` holding the D6 flush skeleton; each domain subclass provides
+`event_types()`, `batch_size()`, `endpoint_label()`, `send()`, `row_to_object()`
+and keeps its **own** AS hook / group / recurring tick. Catalog's IngestFlusher
+moved onto the base (all-or-nothing → D6), closing the lock. Proven against the
+real engine by the catalog live-walk `flusher_d6_split_lock_proof` (a no-SKU
+product comes back as a D6 per-item error → marked FAILED; the valid one SENT).
+
+**Rationale:** one copy of the D6 logic (less drift surface, CC-9 single-source),
+while preserving per-domain scheduling independence — the queue is event_type
+scoped so each flusher drains only its own rows.
+
+**Alternatives:** (a) three independent D6 copies — rejected, triplicated the
+silent-loss-risk logic. (b) one **monolithic dispatcher-flusher** draining all
+event types — rejected, it couples the domains' scheduling/back-off and loses the
+event_type isolation. (i-b abstract base) was chosen over both (confirmed with
+the human before coding). NOTE: this means the EVENT_* constant asymmetry
+(catalog on its HookHandler, customer/order on their Flusher) is **intentionally
+kept**, not unified — the "dispatcher" premise that would have unified it didn't
+happen (STATUS deferred items).
+
+**The W2 wrapper drift (caught here):** the N-7.1 catalog live-walk — the first
+catalog live-request since W2 — `400`d on `products: Required`. The catalog wire
+wrapper had flip-flopped: doc said `products`; 3.2.4 live probe found the engine
+then wanted `items` (we switched); **W2 (engine `b5b1295`) renamed it back to
+`products`** (clean break). The W2 sync updated the doc **but not the code**
+(`Client::ingest_catalog` kept sending `items`), and the mock — still on `items`
+— hid it for five syncs. Fixed in Client + mock + ClientTest. A full
+drift-audit across all eight syncs confirmed the **wrapper was the only
+plugin-breaking drift**: customers/orders were live-walked right after their
+syncs (so verified), browse/identity/GDPR are not shipped (stub/PATH-consts, no
+drift surface), and removed fields (discount_price, smaily_contact_id, consent)
+are not sent. New lesson class: **a sync updates the doc, not the code** (LESSONS
+§2.7; CLAUDE.md CC-8 note).
+
+**Relationships:** F3-18 (D6 contract), F3-16/F3-19/F3-22 (the three domains
+consolidated), CC-9 (single-source), LESSONS §2.4 + §2.7 (mock-vs-live, sync-vs-code).
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1241,14 +1316,14 @@ discovered along the way):
      (`docs/adr/0001-coexistence.md`, ...)
    - Or keep a single `DECISIONS.md` — depending on the repo's culture
 
-**What's likely to be added later in Phase 3** (F3-19/20/21 are now taken by
-the 3.3 customers milestone, A-filter, and datetime decisions above):
-- F3-22: W5 orders (customer dependency, guest-customer payload path, attribution)
-- F3-23: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-24: 3.6 beacon (client side, server proxy, cookie management)
-- F3-25: 3.7 identity-merge (three triggers: post-checkout, login, manual)
-- F3-26: 3.8 GDPR (export/delete, WP Privacy API integration)
-- F3-27: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+**What's likely to be added later in Phase 3** (F3-19/20/21 are the 3.3 customers
+milestone, A-filter, datetime; F3-22 orders milestone + status mapping; F3-23
+plugin-side N-7 AbstractD6Flusher + W2 wrapper drift — all above):
+- F3-24: 3.5 backfill architecture (cursor pagination, batch size, retry)
+- F3-25: 3.6 beacon (client side, server proxy, cookie management)
+- F3-26: 3.7 identity-merge (three triggers: post-checkout, login, manual)
+- F3-27: 3.8 GDPR (export/delete, WP Privacy API integration)
+- F3-28: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.

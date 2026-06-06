@@ -92,7 +92,7 @@ final class RecEngineCatalogTest extends TestCase {
 		$result = $client->ingest_catalog( array( $payload ) );
 
 		self::assertTrue( (bool) ( $result['ok'] ?? false ), 'Catalog ingest should succeed (200 ok).' );
-		self::assertSame( 1, $result['created'] ?? null );
+		self::assertSame( 1, $result['processed'] ?? null, 'Catalog is D6 now — one product processed.' );
 
 		$received = self::$engine->state()['last_catalog_received'] ?? null;
 		self::assertSame(
@@ -109,14 +109,17 @@ final class RecEngineCatalogTest extends TestCase {
 
 		$first = $client->ingest_catalog( array( $payload ) );
 		self::assertTrue( (bool) ( $first['ok'] ?? false ) );
-		self::assertArrayNotHasKey( 'deduplicated', $first, 'First send is a fresh INSERT, not a duplicate.' );
+		self::assertSame( 1, $first['processed'] ?? null, 'First send is a fresh process.' );
+		self::assertSame( 0, $first['deduplicated'] ?? null, 'Nothing deduplicated on the first send.' );
 
 		// Identical event_id resent (what a flush-job retry does).
 		$second = $client->ingest_catalog( array( $payload ) );
-		self::assertTrue(
-			(bool) ( $second['deduplicated'] ?? false ),
-			'A resent event_id must return 200 {"deduplicated": true} — the flush job marks the row sent, NOT a retry.'
+		self::assertSame(
+			1,
+			$second['deduplicated'] ?? null,
+			'A resent event_id is counted in deduplicated (D6 integer count) — the flush job marks the row sent, NOT a retry.'
 		);
+		self::assertTrue( (bool) ( $second['deduplicated_all'] ?? false ), 'A pure no-op retry flags deduplicated_all.' );
 	}
 
 	public function test_transient_429_then_retry_succeeds(): void {
@@ -205,6 +208,45 @@ final class RecEngineCatalogTest extends TestCase {
 			$received,
 			'End-to-end: the engine received products[].event_id == the queue row event_uuid.'
 		);
+	}
+
+	public function test_catalog_d6_partial_success_marks_errored_product_failed(): void {
+		// N-7 lock fix: catalog is D6 now. A batch with one rejected product
+		// (mock `D6ERR` sku trigger) must mark exactly that row FAILED and the
+		// rest sent — before N-7 the catalog flusher marked the whole batch
+		// sent on any 2xx, silently losing the rejected product.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+		$builder  = new CatalogPayloadBuilder();
+
+		CatalogHookHandler::reset_seen();
+		$good    = $this->make_product( 'CAT-D6-OK', '9.99' );
+		$bad     = $this->make_product( 'D6ERR-CAT-BAD', '9.99' );
+		$handler = new CatalogHookHandler( $queue, $builder, $settings );
+		$handler->on_save_product( (int) $good->get_id() );
+		$handler->on_save_product( (int) $bad->get_id() );
+
+		$flusher = new IngestFlusher(
+			$queue,
+			$builder,
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		$stats = $flusher->flush();
+
+		self::assertSame( 1, $stats['sent'], 'The valid product is processed → sent.' );
+		self::assertSame( 1, $stats['failed'], 'The D6ERR product is marked failed — not silently sent (the lock fix).' );
+		self::assertSame( array(), $queue->pending( 10 ), 'Both rows reached a terminal state.' );
 	}
 
 	/**

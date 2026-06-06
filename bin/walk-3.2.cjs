@@ -10,9 +10,13 @@
  * against the live engine and asserts the engine accepted each batch and
  * honours the dedup contract.
  *
- * This harness CAUGHT the products→items wrapper-key divergence (fix
- * a2ea53c): the mock accepted {products}, the live engine 400s on it and
- * requires {items}. Mock + plugin now align with the live engine.
+ * This harness has CAUGHT the catalog wrapper-key drift TWICE — the key
+ * flip-flopped. First (3.2.4) the live engine wanted {items} while the doc
+ * said {products}. Then W2 (engine b5b1295) renamed it back to {products}
+ * (a clean break — {items} now 400s); the W2 sync updated the doc but not
+ * the plugin code, and the mock (still enforcing {items}) hid it until this
+ * walk's N-7.1 run — the first catalog live-request after W2 — caught it
+ * again. Mock + plugin now send {products}, aligned with the live engine.
  *
  * Gated on RECENGINE_LIVE=1. Requires a connected tenant in the wp-env DB
  * (run setup-exchange first). MUST run before any integration-suite run —
@@ -137,20 +141,27 @@ try {
 
 // --- 2b. event_id LOCATION diagnostic (wrapper W vs per-item P) ----------
 // History: in 3.2.4 the engine's Zod accepted event_id ONLY at the wrapper
-// level — per-item (Variant P, the plugin's design) was silently stripped,
-// so Layer-2 dedup never fired. Route A W1 added per-item acceptance on all
-// 4 endpoints. Both locations now dedup; this keeps both asserted so a
-// regression on either is caught. The plugin sends per-item (P).
+// level. W1 (engine 1c9b4e9/01b7950) INVERTED this: per-item event_id is now
+// the dedup key on all 4 endpoints, and the WRAPPER-level event_id was
+// REMOVED — a stray top-level event_id is silently stripped (Zod), with no
+// whole-request short-circuit. The plugin sends per-item (P), matching the
+// current contract. This asserts BOTH halves of the W1 state: per-item
+// dedups, wrapper is ignored. (Before this N-7.1 fix the wrapper check still
+// asserted the pre-W1 "wrapper dedups" — a stale walk artifact, though never
+// a plugin drift since Client never sent a wrapper event_id.)
 $ingest_url = $settings->endpoints()['ingest_catalog'];
 $auth       = array( 'Authorization' => 'Bearer ' . $settings->api_key(), 'Content-Type' => 'application/json' );
 $diag_obj   = array( 'sku' => 'LIVE-WP', 'name' => 'WP Diag', 'category_path' => 'food/dry', 'price' => 1.00, 'in_stock' => true, 'product_url' => 'https://x.test/wp' );
 
-$w_body = array( 'event_id' => wp_generate_uuid4(), 'items' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-W' ) ) ) );
+// Wrapper event_id + NO per-item event_id, same sku twice: the second send is
+// a plain Layer-1 natural-key re-UPSERT (processed again, NOT deduplicated) —
+// proving the wrapper event_id does nothing (W1 removed it).
+$w_body = array( 'event_id' => wp_generate_uuid4(), 'products' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-W' ) ) ) );
 live_post( $ingest_url, $auth, $w_body );
 $w2 = live_post( $ingest_url, $auth, $w_body );
-result( 'dedup_wrapper_event_id_works', ! empty( $w2['deduplicated'] ), json_encode( $w2 ) );
+result( 'wrapper_event_id_ignored_w1', (int) ( $w2['deduplicated'] ?? 0 ) === 0, json_encode( $w2 ) );
 
-$p_body = array( 'items' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-P', 'event_id' => wp_generate_uuid4() ) ) ) );
+$p_body = array( 'products' => array( array_merge( $diag_obj, array( 'sku' => 'LIVE-WP-P', 'event_id' => wp_generate_uuid4() ) ) ) );
 live_post( $ingest_url, $auth, $p_body );
 $p2 = live_post( $ingest_url, $auth, $p_body );
 result( 'dedup_peritem_event_id_works', ! empty( $p2['deduplicated'] ), json_encode( $p2 ) );
@@ -236,24 +247,49 @@ result( 'delete_enqueued', $has_delete );
 $dstats = $flusher->flush();
 result( 'delete_flushed_to_engine', $dstats['sent'] >= 1 && $dstats['failed'] === 0, json_encode( $dstats ) );
 
-// --- 6. partial-success: a batch with one deliberately-bad item ----------
-// Documents the engine's per-product error behaviour (F3-14 design input):
-// does a batch with one bad product return 200 + errors[{index,sku,...}],
-// or reject the whole batch with a 4xx?
+// --- 6. catalog D6 partial success (N-7): engine returns 200 + errors[] --
+// Catalog is D6 now (was all-or-nothing). A batch with one bad product
+// (empty sku) must return 200 with errors[{index,...}], NOT a whole-batch 4xx.
 $ok_item  = array( 'sku' => 'LIVE-PARTIAL-OK', 'name' => 'Partial OK', 'category_path' => 'food/dry', 'price' => 1.00, 'in_stock' => true, 'product_url' => 'https://x.test/ok', 'event_id' => wp_generate_uuid4() );
 $bad_item = $ok_item;
 $bad_item['sku']      = '';
 $bad_item['event_id'] = wp_generate_uuid4();
-// Exploratory: the answer (200+errors[] partial vs whole-batch 4xx) IS the
-// result for F3-14 — both are valid engine designs, so this records the
-// behaviour rather than asserting one.
 try {
-	$presp    = $client->ingest_catalog( array( $ok_item, $bad_item ) );
-	$behavior = ( isset( $presp['errors'] ) && ! empty( $presp['errors'] ) ) ? '200+errors[] (per-item partial)' : '200 (engine accepted bad item)';
-	result( 'partial_batch_behavior_documented', true, $behavior . ' ' . json_encode( $presp ) );
+	$presp   = $client->ingest_catalog( array( $ok_item, $bad_item ) );
+	$perrors = isset( $presp['errors'] ) && is_array( $presp['errors'] ) ? $presp['errors'] : array();
+	result( 'catalog_d6_partial_success', (int) ( $presp['processed'] ?? 0 ) === 1 && count( $perrors ) === 1, json_encode( array( 'processed' => $presp['processed'] ?? null, 'errors' => $perrors ) ) );
 } catch ( \Throwable $e ) {
-	result( 'partial_batch_behavior_documented', true, 'whole-batch 4xx, all-or-nothing: ' . $e->getMessage() );
+	result( 'catalog_d6_partial_success', false, 'EXC ' . $e->getMessage() );
 }
+
+// --- 6b. FLUSHER D6 split — the N-7 lock proof ---------------------------
+// A valid product + a product the engine genuinely D6-rejects, both through
+// the REAL flusher. The reject lever is an EMPTY sku — the live engine
+// returns it as a per-item error (proved in catalog_d6_partial_success
+// above: sku "" must contain at least 1 character). A no-SKU
+// product is enqueued DIRECTLY (the handler skips SKU-less units, but the
+// proof is about the FLUSHER's split, not the handler): the flusher reloads
+// it by id, the builder sends sku '', the engine errors[] that one row.
+// The flusher must mark THAT row failed and the valid one sent. Before N-7
+// the catalog flusher marked the whole batch sent on any 2xx — silently
+// losing the rejected product. This is the lock condition's actual proof.
+CatalogHookHandler::reset_seen();
+$good_pid  = live_make_simple( 'LIVE-LOCK-OK', '4.00' );
+$created[] = $good_pid;
+$handler->on_save_product( $good_pid );
+
+// No-SKU product → builder emits sku '' → engine per-item reject.
+$badp = new WC_Product_Simple();
+$badp->set_name( 'Lock Bad (no sku)' );
+$badp->set_regular_price( '4.00' );
+$badp->set_price( '4.00' );
+$badp->set_stock_status( 'instock' );
+$bad_pid   = (int) $badp->save();
+$created[] = $bad_pid;
+$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bad_pid, array() );
+
+$lstats = $flusher->flush();
+result( 'flusher_d6_split_lock_proof', $lstats['sent'] >= 1 && $lstats['failed'] >= 1, json_encode( $lstats ) );
 
 // --- 7. backward-compat: no event_id (Layer-1 natural-key UPSERT only) ----
 // Spec §7: event_id is optional; without it only Layer-1 (sku) UPSERT runs.

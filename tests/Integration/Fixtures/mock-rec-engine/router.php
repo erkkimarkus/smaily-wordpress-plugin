@@ -200,20 +200,23 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 	$raw  = (string) file_get_contents( 'php://input' );
 	$body = json_decode( $raw, true );
 
-	// Wire wrapper key is `items` — verified against the live engine in the
-	// 3.2.4 probe (it 400s on `products`). The mock enforces the same so it
-	// can't drift back toward the plugin's old assumption (LESSONS §2.4).
-	if ( ! is_array( $body ) || ! isset( $body['items'] ) || ! is_array( $body['items'] ) ) {
+	// Wire wrapper key is `products` (§5). W2 (engine `b5b1295`) renamed the
+	// catalog wrapper `items` → `products`; the mock must enforce the CURRENT
+	// shape, not the pre-W2 one. The mock previously enforced `items` and so
+	// hid the plugin's stale `items` send until the N-7.1 catalog live-walk
+	// (LESSONS §2.6 — the mock must move to the new shape in the SAME sync,
+	// or it masks the drift it exists to catch).
+	if ( ! is_array( $body ) || ! isset( $body['products'] ) || ! is_array( $body['products'] ) ) {
 		reply(
 			400,
 			array(
 				'error'   => 'validation_failed',
-				'details' => array( 'fieldErrors' => array( 'items' => array( 'Required' ) ) ),
+				'details' => array( 'fieldErrors' => array( 'products' => array( 'Required' ) ) ),
 			)
 		);
 	}
 
-	$products = $body['items'];
+	$products = $body['products'];
 
 	$first_sku = ( isset( $products[0]['sku'] ) ) ? (string) $products[0]['sku'] : '';
 
@@ -265,53 +268,61 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		// seen_count >= 1 → fall through to the success path on retry.
 	}
 
-	// Per-product idempotency: unique (tenant_id, event_id). A resent
-	// event_id is skipped; a whole-batch resend returns deduplicated:true.
-	$seen     = ( isset( $state['catalog_event_ids'] ) && is_array( $state['catalog_event_ids'] ) )
+	// Per-product D6 (N-7 retrofit): error (by `D6ERR` sku trigger) /
+	// deduplicated (event_id seen) / processed. Natural key is sku; transport
+	// dedup is per-item event_id. (The old all-or-nothing + created/updated/
+	// skipped/unmapped_attributes shape is gone — the plugin never consumed it.)
+	$seen         = ( isset( $state['catalog_event_ids'] ) && is_array( $state['catalog_event_ids'] ) )
 		? $state['catalog_event_ids']
 		: array();
-	$received = array();
-	$created  = 0;
-	$skipped  = 0;
-	foreach ( $products as $product ) {
+	$received     = array();
+	$processed    = 0;
+	$deduplicated = 0;
+	$errors       = array();
+	foreach ( $products as $index => $product ) {
+		$sku        = isset( $product['sku'] ) ? (string) $product['sku'] : '';
 		$event_id   = isset( $product['event_id'] ) ? (string) $product['event_id'] : '';
 		$received[] = $event_id;
+
+		if ( strpos( $sku, 'D6ERR' ) === 0 ) {
+			$errors[] = array(
+				'index'   => $index,
+				'sku'     => $sku,
+				'field'   => 'product_url',
+				'message' => 'Invalid input (mock per-item trigger)',
+			);
+			continue;
+		}
+
 		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
-			++$skipped;
+			++$deduplicated;
 			continue;
 		}
 		if ( $event_id !== '' ) {
 			$seen[] = $event_id;
 		}
-		++$created;
+		++$processed;
 	}
-	$state['catalog_event_ids']    = $seen;
+	$state['catalog_event_ids']     = $seen;
 	$state['last_catalog_received'] = $received;
 	save_state( $state_file, $state );
 
-	// Whole batch was a duplicate → the engine's deduplicated short-circuit.
-	if ( $created === 0 && $skipped > 0 ) {
-		reply( 200, array( 'deduplicated' => true ) );
-	}
-
-	reply(
-		200,
-		array(
-			'ok'                  => true,
-			'processed'           => count( $products ),
-			'created'             => $created,
-			'updated'             => 0,
-			'skipped'             => $skipped,
-			'errors'              => array(),
-			'unmapped_attributes' => array(),
-			'request_id'          => 'req_' . bin2hex( random_bytes( 4 ) ),
-		)
+	$response = array(
+		'ok'           => true,
+		'processed'    => $processed,
+		'deduplicated' => $deduplicated,
+		'errors'       => $errors,
 	);
+	if ( $processed === 0 && $deduplicated > 0 && $errors === array() ) {
+		$response['deduplicated_all'] = true;
+	}
+	reply( 200, $response );
 }
 
 // Customers ingest — W4 email-first + D6 per-item errors[]. Wrapper key is
-// `customers` (live-verified in the 3.3.1 probe: {customers:[...]} → 200; no
-// products→items surprise). Per-item fate: processed / deduplicated / error.
+// `customers` (live-verified in the 3.3.1 probe: {customers:[...]} → 200;
+// stable — unlike catalog, which flip-flopped items/products, the customers
+// wrapper has not changed). Per-item fate: processed / deduplicated / error.
 // Scenario triggers on the FIRST customer's email exercise the flusher's
 // terminal-4xx and transient-retry paths; a `d6err-` email prefix on ANY item
 // forces that item into errors[] so the partial-success split is testable

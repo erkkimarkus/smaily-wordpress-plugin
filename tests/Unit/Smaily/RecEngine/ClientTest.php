@@ -37,9 +37,9 @@ final class ClientTest extends TestCase {
 			'The engine endpoints map (key ingest_catalog) is the source of truth for the URL.'
 		);
 		self::assertSame(
-			array( 'items' => array( array( 'sku' => 'A', 'event_id' => 'u1' ) ) ),
+			array( 'products' => array( array( 'sku' => 'A', 'event_id' => 'u1' ) ) ),
 			$client->captured['body'],
-			'Catalog wire wrapper key is `items` (verified against the live engine; it 400s on `products`).'
+			'Catalog wire wrapper key is `products` (W2 renamed it back from `items`; an `items`-wrapped payload now 400s — N-7.1 live-walk caught the stale send).'
 		);
 	}
 

@@ -179,6 +179,43 @@ This is a **general rule** for other container-based dev environments too (Docke
 Compose, dev server, Vercel preview) — restart wipes state unless it's been
 explicitly persisted. Design tests to be restart-proof.
 
+### 2.7 A spec sync updates the doc, not the code
+
+**What happened** (Phase 3 sub-PR N-7.1): the catalog ingest wire wrapper key
+flip-flopped. The doc originally said `products`; a 3.2.4 live probe found the
+deployed engine then wanted `items` (we switched the plugin + mock). Later **W2**
+(engine `b5b1295`) renamed it **back to `products`** — a clean break, an
+`items`-wrapped payload now `400`s. The W2 contract **sync updated the doc**
+(byte-identical, CC-8 discipline) **but not the plugin code**: `Client::ingest_catalog`
+kept sending `{items:[...]}`. The mock — still enforcing `items` from the pre-W2
+shape — **stayed green on every integration run**, so the drift was invisible. It
+sat from W2 through W3/W4/W5/N-6/N-7 until the **first catalog live-request after
+W2** (the N-7.1 catalog live-walk) `400`d on `products: Required`.
+
+**Why the other endpoints were safe:** customers and orders each got a live-walk
+**right after** their contract change (customers after W4, orders after W5), so any
+drift would have surfaced immediately. Catalog was the unique case — its breaking
+change (W2) and its next live-walk (N-7.1) were far apart. **The gap is exactly
+(contract-change → next live-walk of that endpoint); the longer it is, the longer a
+drift hides.**
+
+**Two failure modes a wire-shape change can cause:**
+- **Missing/renamed required field** (wrapper key, a newly-required field) → hard
+  `400`. This is what bit catalog.
+- **Removed field still sent** (W3 `discount_price`, W4 `smaily_contact_id` / `consent`)
+  → Zod **silently strips** it (W1 confirmed: a stray top-level `event_id` is ignored).
+  No `400`, but silent waste / privacy surprise. A full audit must check **both**.
+
+**Fix / rule for next time:** a contract **sync is not code-complete**. Every sync
+that changes a **wire shape** (wrapper key, a required field, an enum value, a removed
+field) must be checked **against the real plugin code in the same pass**, and the
+**mock must move to the new shape in the same sync** — otherwise the mock masks the
+very drift it exists to catch. After any sync touching an endpoint, run that
+endpoint's live-walk (or a single curl) before treating it as done; don't let a
+breaking change wait for an unrelated sub-PR to discover it. When auditing, walk the
+**whole changelog**, not just the most recent sync — drift accumulates silently across
+syncs whenever the endpoint isn't live-exercised between them.
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs

@@ -1,6 +1,7 @@
 <?php
 /**
- * Drains the rec-engine ingest queue and ships each batch to the engine.
+ * Drains the rec-engine ingest queue's catalog rows to POST
+ * /api/v1/ingest/catalog.
  *
  * @package Smaily\Connect\Smaily\RecEngine
  */
@@ -9,70 +10,47 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Smaily\RecEngine;
 
-defined( 'ABSPATH' ) || exit;
-
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
- * Action Scheduler callback for `smly_rec_flush_ingest`. Reads a batch of
- * due rows from IngestQueue, turns each into a catalog wire object, POSTs
- * the whole batch through Client::ingest_catalog, and advances every row
- * to its terminal/retry state.
+ * Action Scheduler callback for `smly_rec_flush_ingest` — the catalog flusher.
+ * The D6 batch machinery lives in AbstractD6Flusher; this subclass supplies the
+ * catalog specifics: the event types, the batch cap (100), the Client call,
+ * and the row → wire object mapping.
  *
  * Per-row → wire object:
- *   - catalog.upsert : load the product FRESH by entity_id and build it, so
- *     the engine always gets the latest state (a product edited several
- *     times before the flush sends one current snapshot per row). A product
- *     that vanished since enqueue is a terminal skip — a catalog.delete row
- *     will follow.
- *   - catalog.delete : the product is already gone, so the full object was
- *     captured at delete time in the row payload; we stamp in_stock=false
+ *   - catalog.upsert : load the product FRESH by entity_id and build it, so the
+ *     engine always gets the latest state. A product that vanished since
+ *     enqueue is a terminal skip — a catalog.delete row will follow.
+ *   - catalog.delete : the product is already gone, so its full object was
+ *     captured at delete time in the row payload; here we stamp in_stock=false
  *     and the row's event_uuid as event_id.
  *
- * event_uuid → event_id is applied on every object (CatalogPayloadBuilder
- * for upserts, here for deletes) so queue.event_uuid == body.event_id holds
- * and the engine can dedup a retried row.
+ * **N-7: catalog is now D6** (was all-or-nothing). The engine returns
+ * `200 {processed, deduplicated, errors:[{index, sku?, field, message}]}` and
+ * the inherited split marks a per-item-rejected product FAILED (it used to mark
+ * the whole batch sent on any 2xx, which after the engine's N-7 retrofit would
+ * have silently lost a rejected product). The catalog-extra fields the old
+ * response carried (created / updated / skipped / unmapped_attributes) were
+ * never consumed plugin-side, so dropping them is lossless.
  *
- * Response handling (the contract the flush job depends on):
- *   - 2xx, including 200 {"deduplicated": true} — the whole batch is SENT.
- *     A deduplicated body means a retry re-sent rows the engine already
- *     has; that's success, never a re-retry.
- *   - ApiException with a terminal 4xx (not 429) — the batch is malformed
- *     or the key is revoked; retrying won't help, so mark_failed.
- *   - ApiException otherwise (429 / 5xx exhausted / network) — row-level
- *     retry via record_attempt + next_retry_at, until max_attempts, then
- *     mark_failed. The Client runs only 1-2 in-request attempts (it must
- *     not block the AS worker on long backoff); durability lives in the
- *     queue.
+ * Kept separate from the customer/order flushers (its own AS hook/group) so the
+ * retry cycles are independent; the D6 logic is inherited, not copied.
  *
- * Not final: tests subclass to stub get_product() (the WC lookup) while
- * driving flush() through doubled queue / builder / client collaborators.
+ * Not final: tests subclass to stub get_product().
  */
-class IngestFlusher {
+class IngestFlusher extends AbstractD6Flusher {
 
 	/** Spec-conservative batch ceiling (engine tolerates far more). */
 	public const DEFAULT_BATCH_SIZE = 100;
 
-	/**
-	 * Row-level retry backoff per attempt number (seconds): 1m, 5m, 15m,
-	 * 1h, 6h. The AS recurring flush re-ticks and pending() only returns
-	 * rows whose next_retry_at has passed.
-	 *
-	 * @var array<int, int>
-	 */
-	private const RETRY_BACKOFF = array( 60, 300, 900, 3600, 21600 );
-
-	private IngestQueue $queue;
 	private CatalogPayloadBuilder $builder;
-	private RecEngineSettings $settings;
-
-	/** @var callable(): Client */
-	private $client_factory;
 
 	/**
-	 * @param callable(): Client $client_factory Builds a rec-engine Client from the stored
-	 *                                          tenant config (with a small max_attempts).
+	 * @param callable(): Client $client_factory Builds a rec-engine Client from the stored config.
 	 */
 	public function __construct(
 		IngestQueue $queue,
@@ -80,113 +58,27 @@ class IngestFlusher {
 		RecEngineSettings $settings,
 		callable $client_factory
 	) {
-		$this->queue          = $queue;
-		$this->builder        = $builder;
-		$this->settings       = $settings;
-		$this->client_factory = $client_factory;
+		parent::__construct( $queue, $settings, $client_factory );
+		$this->builder = $builder;
 	}
 
-	/**
-	 * Process up to $batch_size due rows.
-	 *
-	 * @return array{processed: int, sent: int, failed: int, retried: int, skipped: int}
-	 */
-	public function flush( int $batch_size = self::DEFAULT_BATCH_SIZE ): array {
-		$stats = array(
-			'processed' => 0,
-			'sent'      => 0,
-			'failed'    => 0,
-			'retried'   => 0,
-			'skipped'   => 0,
-		);
-
-		// No tenant → nothing can be authenticated; leave rows pending for
-		// when the merchant (re)connects.
-		if ( ! $this->settings->is_connected() ) {
-			return $stats;
-		}
-
-		// Scope the drain to catalog rows only. The queue is shared across
-		// ingest endpoints (customers reuse the same table); without this
-		// filter the catalog flusher would pull a customer.* row, fail to
-		// load it as a product, and silently drop it. The customer flusher
-		// drains customer.* on its own.
-		$rows = $this->queue->pending(
-			$batch_size,
-			array( CatalogHookHandler::EVENT_CATALOG_UPSERT, CatalogHookHandler::EVENT_CATALOG_DELETE )
-		);
-		if ( $rows === array() ) {
-			return $stats;
-		}
-
-		$products   = array();
-		$batch_rows = array();
-		foreach ( $rows as $row ) {
-			++$stats['processed'];
-			$id      = (int) ( $row['id'] ?? 0 );
-			$product = $this->row_to_object( $row );
-
-			if ( $product === null ) {
-				// Terminal skip (product gone for an upsert, or undecodable
-				// payload). Mark sent so it leaves the queue — a retry can't
-				// recover either case.
-				$this->queue->mark_sent( $id );
-				++$stats['skipped'];
-				continue;
-			}
-
-			$products[]   = $product;
-			$batch_rows[] = $row;
-		}
-
-		if ( $products === array() ) {
-			return $stats;
-		}
-
-		try {
-			( $this->client_factory )()->ingest_catalog( $products );
-			foreach ( $batch_rows as $row ) {
-				$this->queue->mark_sent( (int) ( $row['id'] ?? 0 ) );
-				++$stats['sent'];
-			}
-		} catch ( ApiException $e ) {
-			$terminal = $this->is_terminal( $e );
-			foreach ( $batch_rows as $row ) {
-				$this->handle_failure( $row, $e, $terminal, $stats );
-			}
-		}
-
-		return $stats;
+	protected function event_types(): array {
+		return array( CatalogHookHandler::EVENT_CATALOG_UPSERT, CatalogHookHandler::EVENT_CATALOG_DELETE );
 	}
 
-	/**
-	 * @param array<string, mixed>                                           $row
-	 * @param array{processed:int,sent:int,failed:int,retried:int,skipped:int} $stats
-	 */
-	private function handle_failure( array $row, ApiException $e, bool $terminal, array &$stats ): void {
-		$id       = (int) ( $row['id'] ?? 0 );
-		$attempts = (int) ( $row['attempts'] ?? 0 );
-		$max      = (int) ( $row['max_attempts'] ?? IngestQueue::DEFAULT_MAX_ATTEMPTS );
-		$message  = sprintf( 'http_%d %s', $e->getCode(), $e->error_code() );
-
-		if ( $terminal || $attempts + 1 >= $max ) {
-			$this->queue->mark_failed( $id, $message );
-			++$stats['failed'];
-			return;
-		}
-
-		$this->queue->record_attempt( $id, $message, $this->backoff_seconds( $attempts + 1 ) );
-		++$stats['retried'];
+	protected function batch_size(): int {
+		return self::DEFAULT_BATCH_SIZE;
 	}
 
-	/**
-	 * Map a queue row to its catalog wire object, or null for a terminal skip.
-	 *
-	 * @param array<string, mixed> $row
-	 *
-	 * @return array<string, mixed>|null
-	 */
-	private function row_to_object( array $row ): ?array {
+	protected function endpoint_label(): string {
+		return 'catalog';
+	}
+
+	protected function send( array $batch ): array {
+		return ( $this->client_factory )()->ingest_catalog( $batch );
+	}
+
+	protected function row_to_object( array $row ): ?array {
 		$event_uuid = (string) ( $row['event_uuid'] ?? '' );
 		$event_type = (string) ( $row['event_type'] ?? '' );
 
@@ -207,16 +99,6 @@ class IngestFlusher {
 			return null;
 		}
 		return $this->builder->build( $product, $event_uuid );
-	}
-
-	private function is_terminal( ApiException $e ): bool {
-		$status = $e->getCode();
-		return $status >= 400 && $status < 500 && 429 !== $status;
-	}
-
-	private function backoff_seconds( int $attempt ): int {
-		$index = max( 0, min( $attempt - 1, count( self::RETRY_BACKOFF ) - 1 ) );
-		return self::RETRY_BACKOFF[ $index ];
 	}
 
 	/**

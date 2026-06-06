@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-05 (orders-end complete — .0–.4 done, live-walked 12/12, ZIP'd; next: plugin-side N-7 lock)_
+_Last updated: 2026-06-06 (plugin-side N-7 complete — AbstractD6Flusher + catalog flusher D6; lock RESOLVED; catalog live-walk 15/15 incl. flusher_d6_split_lock_proof against the real engine; W2 `items`->`products` wrapper drift caught + fixed)_
 
 ---
 
@@ -97,22 +97,30 @@ see "Pilot go-live" below.
   (batch 50) + OrderFlusher (D6) + OrderHookHandler (status-change wiring).
   Commit chain: 29edfe4 -> 652e16c -> 4d036cf -> a8bde99 (.3) -> this commit (.4,
   + ZIP; the .4 build-hash is this commit).
+- **plugin-side N-7** — catalog-flusher D6 consolidation (the lock, now RESOLVED).
+  N-7.0 extracted `AbstractD6Flusher` (shared D6 flush + errors[].index split +
+  invariant) and refactored Customer/OrderFlusher onto it (byte-identical
+  behavior, regression green). N-7.1 moved the catalog IngestFlusher onto the base
+  (catalog all-or-nothing -> D6), updated the mock + tests to D6, and live-walked
+  catalog 15/15 against MiuMjau — including `flusher_d6_split_lock_proof` (a no-SKU
+  product is D6-rejected per-item and marked FAILED, the valid one SENT). The
+  N-7.1 live-walk also **caught the W2 `items`->`products` wrapper drift** (the
+  sync had updated the doc, not the code; the mock hid it) — fixed in Client +
+  mock + ClientTest. (DECISIONS F3-22 + N-7; LESSONS §2.7.)
 
 ### Next
 
-- **plugin-side N-7** — catalog-flusher D6 consolidation (the lock condition
-  below), then Phase 3 remaining (roadmap below). Awaiting go-ahead.
+- Phase 3 remaining (roadmap below) — 3.4 browse onward. Awaiting go-ahead.
 
 ### Waiting / lock conditions
 
-- **catalog-flusher N-7 D6 consolidation (LOCK)** — engine catalog is now D6
-  (returns 200 + errors[]), but the plugin's IngestFlusher (catalog) is still
-  all-or-nothing -> it would mark a per-item-rejected product SENT on a
-  200+errors[] response (silent loss). NOT active (pilot not live, dev sends 0
-  products). **Hard lock condition: must be fixed before pilot catalog go-live.**
-  Plugin-side N-7 follow-up, scheduled after 3.3 orders. (DECISIONS F3-19.)
+- **catalog-flusher N-7 D6 consolidation — RESOLVED (N-7.1, 2026-06-06).** The
+  catalog flusher now extends `AbstractD6Flusher`; an engine per-item rejection
+  marks that row FAILED, not SENT (silent-loss class closed). Proven against the
+  real engine by the catalog live-walk (`flusher_d6_split_lock_proof`: sent:1,
+  failed:1). No remaining lock conditions on the plugin side. (DECISIONS F3-22.)
 
-### Roadmap (Phase 3 remaining, after orders + plugin-side N-7)
+### Roadmap (Phase 3 remaining)
 
 - **3.4** browse-beacon (sends events; engine consumes post-MVP per §14.2 — set
   pilot expectation: collects data, improves recommendations later, not now)
@@ -134,7 +142,7 @@ Pilot does NOT go live until all of these hold. No deadline pressure (D5).
 - [x] catalog-end ZIP'd + live-walked
 - [x] customers-end ZIP'd + live-walked
 - [x] orders-end ZIP'd + live-walked (12/12)
-- [ ] catalog-flusher N-7 D6-fix (lock condition above)
+- [x] catalog-flusher N-7 D6-fix (lock RESOLVED — N-7.1, catalog live-walk 15/15)
 
 **Engine side:**
 - [x] backend (90-95%, gaps engine-internal)
@@ -149,8 +157,11 @@ sides ready = go-live.
 
 ## Known deferred items (tracked, not blocking)
 
-- N-7 EVENT_* constant location asymmetry (catalog on HookHandler, customer/
-  order on Flusher) — unify when consolidating to a shared D6 dispatcher-flusher.
+- N-7 EVENT_* constant location asymmetry (catalog `EVENT_CATALOG_*` on
+  CatalogHookHandler, customer/order on their Flusher) — still asymmetric after
+  N-7. N-7 chose an **abstract base** (`AbstractD6Flusher`), NOT a monolithic
+  dispatcher, so each flusher keeps its own constants/hook/group; the "unify under
+  a dispatcher" premise no longer applies. Cosmetic only — defer or drop.
 - Flaky useBackfillProgress test (fake-timers race) — fix with deterministic
   timer mocking.
 - GDPR export omits rec_attribution — engine-side Art 15 legal review (not a

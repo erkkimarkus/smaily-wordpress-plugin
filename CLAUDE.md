@@ -118,6 +118,17 @@ identical, commit with a message naming the engine commit + what changed, push.
 The embedded header note records the sync. This discipline has caught real
 bugs (products->items drift, datetime Z-form, the seam bugs).
 
+**A sync is NOT code-complete.** Syncing the doc byte-for-byte does NOT mean the
+plugin code follows. The W2 catalog wrapper rename (`items`->`products`) synced
+into the doc but the code kept sending `items`; the mock (still on `items`) hid
+it for five syncs until the first catalog live-walk after W2 (N-7.1) caught the
+`400`. So after every sync that changes a **wire shape** (wrapper key, a required
+field, an enum, a removed field): (1) check the real plugin code follows in the
+same pass; (2) move the **mock to the new shape in the same sync** (else it masks
+the drift); (3) run that endpoint's live-walk (or one curl) before calling it
+done. Don't let a breaking change wait for an unrelated sub-PR to surface it.
+(LESSONS §2.7.)
+
 ---
 
 ## Things NOT to do (each is a scar)
@@ -136,10 +147,18 @@ bugs (products->items drift, datetime Z-form, the seam bugs).
   engine's Zod is strict. Every formatted field (wrapper key, datetime, enum) is
   a mock-vs-live divergence risk. Live-walk must cover each formatted field, not
   just happy-path structure. (LESSONS §2.3, §2.4.)
-- **Don't let the catalog-flusher ship to a live pilot while it's still
-  all-or-nothing** — engine catalog is D6 now; the plugin flusher must be
-  consolidated to D6 first or rejected products are marked SENT (silent loss).
-  This is a hard lock condition (STATUS.md).
+- **Catalog-flusher D6 consolidation (lock RESOLVED in N-7.1).** This was a hard
+  lock condition: while the catalog flusher was all-or-nothing it would mark
+  engine-rejected products SENT (silent loss). N-7.1 moved it onto the shared
+  `AbstractD6Flusher`; the catalog live-walk proves the split against the real
+  engine (`flusher_d6_split_lock_proof`: a no-SKU product comes back as a D6
+  per-item error and is marked FAILED, the valid one SENT). Keep it on the D6
+  base — do not reintroduce an all-or-nothing 2xx success path.
+- **Don't trust a sync as code-complete** — see the CC-8 note above. A wire-shape
+  change in a sync (wrapper key, required field, enum, removed field) must be
+  verified against the plugin code AND the mock in the same pass, then live-walked.
+  The W2 `items`->`products` drift hid for five syncs because none of these
+  happened. (LESSONS §2.7.)
 
 ---
 

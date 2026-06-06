@@ -143,11 +143,14 @@ class Client {
 	 * map's "ingest_catalog" key — full absolute URL), falling back to
 	 * base_url + PATH_INGEST_CATALOG when the map isn't available.
 	 *
-	 * Wire wrapper key is `items`. The 3.2.4 live probe caught the engine
-	 * rejecting `{products:[...]}` with 400 validation_failed (fieldErrors:
-	 * items Required) and accepting `{items:[...]}` — RECENGINE_API_CONTRACT.md
-	 * §3 documents `products`, but the live engine is the source of truth
-	 * (LESSONS §2.4). The doc + mock were corrected to match.
+	 * Wire wrapper key is `products` (§5). History is a flip-flop: the doc
+	 * originally said `products`; the 3.2.4 live probe found the deployed
+	 * engine then wanted `items` (we switched); W2 (engine `b5b1295`) renamed
+	 * it back to `products` — a clean break, an `items`-wrapped payload now
+	 * 400s `validation_failed` (fieldErrors: products Required). The W2 sync
+	 * updated the doc but NOT this code; the mock (still enforcing `items`)
+	 * hid the drift until the N-7.1 catalog live-walk — the first catalog
+	 * live-request after W2 — caught it (LESSONS §2.6, the sync-vs-code gap).
 	 *
 	 * @param array<int, array<string, mixed>> $products
 	 *
@@ -157,7 +160,7 @@ class Client {
 	 */
 	public function ingest_catalog( array $products ): array {
 		$url = $this->resolve_url( 'ingest_catalog', self::PATH_INGEST_CATALOG );
-		return $this->request_url( 'POST', $url, array( 'items' => $products ) );
+		return $this->request_url( 'POST', $url, array( 'products' => $products ) );
 	}
 
 	/**
