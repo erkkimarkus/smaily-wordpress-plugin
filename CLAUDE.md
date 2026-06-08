@@ -78,6 +78,14 @@ datetime field goes through IsoDate.
 ### Build / test / walk commands
 - `npm run ci:strict` — PHPCS + PHPStan + PHPUnit unit + JS (eslint/tsc/vitest).
   Must be `exit=0`.
+  **vitest-green ≠ typecheck-green.** vitest runs through esbuild, which STRIPS
+  TS types without checking them — a wrongly-typed test (e.g. a mock object with
+  the wrong field shape) RUNS fine under `npm run test` but fails `npm run
+  typecheck` (tsc). So `npm run test` passing tells you nothing about types.
+  Always run the full `ci:strict` chain (it runs tsc after vitest), never just
+  `npm run test`. (Scar 3.5.3a: a `getBackfillStatus` mock used camelCase
+  `etaSeconds` instead of the API's snake_case `eta_seconds`; vitest green, tsc
+  red, ci:strict exit=2.)
 - `sg docker -c "composer run test:integration"` — real-environment integration.
 - Live-walk scripts live in `bin/` (e.g. `bin/walk-3.3.cjs`). Run against the
   connected engine; needs a setup-token (above).

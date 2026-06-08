@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-08 (3.4 browse-beacon COMPLETE — proxy + abuse model + client transport + cookies + WP-wrapper + WC events; browse live-walk 13/13 against MiuMjau incl. retroactive_bound=2 + the live abuse filter; ZIP'd. Browser render-timing is a manual pilot check. Next: 3.5 backfill)_
+_Last updated: 2026-06-08 (3.5 backfill COMPLETE — catalog/customers/orders, AbstractBackfillJob cursor-resumable + inline-flush bounded, HPOS-aware orders + admin BackfillPanel; backfill live-walk 7/7 against MiuMjau incl. 100% progress + order status-filter on real HPOS data + multi-batch resume; ZIP'd. Legacy order path = pilot precondition. Next: 3.6/3.7)_
 
 ---
 
@@ -174,7 +174,7 @@ see "Pilot go-live" below.
   Browser render-timing (when checkout_start/complete fire) is a manual pilot
   check, NOT live-walk-covered (CLAUDE.md + below).
 
-### In progress
+### Done — 3.5 backfill (complete, live-walked + ZIP'd)
 
 - **3.5 backfill** — traverse EXISTING WC records into the engine (the live
   hooks only ingest CHANGES). One ingest path, two triggers: backfill enqueues
@@ -220,14 +220,23 @@ see "Pilot go-live" below.
   `state.env.storeTotals`) in a new "Import existing data" Card inside
   Step4Recommendations `ConnectedView` (gated on the rec-engine connection, not
   the Smaily-email one). API + hook needed no changes (3.5.0-.2 wired the job
-  types). 3 vitest tests. ci:strict exit=0. Next: 3.5.3b live-walk + ZIP.
+  types). 3 vitest tests. ci:strict exit=0.
+  **3.5.3b DONE** (live-walk + ZIP): `bin/walk-3.5-backfill.cjs` — **7/7 against
+  the real MiuMjau engine**, all three backfill domains. Proven live: products
+  + customers backfill reach **100%** (processed == total); the **order status
+  filter on real HPOS data** (wp-env is WC 10.7 + HPOS) — 4 mapped of 5 orders,
+  the pending one excluded (total=4); **multi-batch resumability** against the
+  real engine (order job driven at batch 2 → 3 batches, cursor monotonic, never
+  restarts); and **bounded queue** (pending empty after every inline flush). ZIP
+  includes the new admin BackfillPanel + the storefront beacon. **3.5 backfill
+  COMPLETE.** NB: the live-walk runs the HPOS order path; the LEGACY path (the
+  pilot's WC 6.9.4 mode) remains unit-tested only — a pilot go-live precondition
+  (above + CLAUDE.md).
 
 ### Next
 
-- **3.5.3b** backfill live-walk (drive all 3 backfill jobs against the real
-  engine — wp-env is HPOS, so it runs the HPOS order path against real wc_orders;
-  assert progress reaches 100% = all mapped sent) + ZIP. Needs a fresh
-  setup-token. Then the roadmap.
+- **3.6 / 3.7 onward** (roadmap below). Note: 3.4 already shipped the browse
+  beacon; reconcile the roadmap's "3.6 beacon" line.
 
 ### Waiting / lock conditions
 
@@ -242,7 +251,9 @@ see "Pilot go-live" below.
 - ~~**3.4** browse-beacon~~ — DONE (above). NB §14.2: the engine consumes browse
   post-MVP — pilot expectation is "collects data, improves recommendations
   later, not now".
-- **3.5** backfill (cursor pagination)
+- ~~**3.5** backfill~~ — DONE (above): catalog/customers/orders backfill,
+  cursor-resumable, inline-flush bounded, live-walked 7/7. (Legacy order path =
+  pilot precondition.)
 - **3.6** beacon (note: checkout_complete browse event is NOT engine-coupled to
   the orders endpoint — don't assume linkage; attribution is future work)
 - **3.7** identity-merge (reconciles email-split: same person, two emails -> two
