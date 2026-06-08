@@ -1,0 +1,137 @@
+/**
+ * WordPress storefront wrapper logic around the platform-agnostic
+ * RecEngineClient — the testable core of the beacon.
+ *
+ * The PHP side (StorefrontBeacon) enqueues the `beacon.ts` ENTRY (which just
+ * calls init() from here) and prints `window.smailyConnectBeacon =
+ * { config, context, consent }` just before it. This module wires consent
+ * against the WP Consent API, then on consent: ensures the anon-session
+ * cookie, captures any campaign URL params, and fires the page-view event.
+ *
+ * Kept separate from the entry so it exports only functions for vitest; the
+ * entry (beacon.ts) holds the auto-boot side effect, so the built bundle has
+ * no top-level export and loads as a classic storefront script.
+ *
+ * 3.4.3a: init + consent + page-view events. Cart events (the WC jQuery
+ * `added_to_cart` / `removed_from_cart` listeners) land in 3.4.3b.
+ */
+
+import {
+  RecEngineClient,
+  type EventType,
+  type RecEngineClientConfig,
+  type TrackingEvent,
+} from './lib/rec-engine-client';
+
+interface PageContext {
+  pageType: string;
+  sku?: string;
+  categoryPath?: string;
+  searchQuery?: string;
+}
+
+interface BeaconBoot {
+  config: RecEngineClientConfig;
+  context: PageContext;
+  consent: { category: string };
+  /** Escape-hatch for non-WP-Consent-API plugins (e.g. Cookiebot). */
+  consentOverride?: () => boolean;
+}
+
+declare global {
+  interface Window {
+    smailyConnectBeacon?: BeaconBoot;
+    /** WP Consent API JS global (CookieYes / Complianz / Real Cookie Banner). */
+    wp_has_consent?: (category: string) => boolean | undefined;
+  }
+}
+
+/**
+ * Resolve marketing consent. Order: site override → WP Consent API → fail-safe
+ * DENY. No consent signal means no tracking — matching the admin promise that a
+ * site without a consent banner collects no events.
+ */
+export function detectConsent(boot: BeaconBoot): boolean {
+  const override = window.smailyConnectBeacon?.consentOverride;
+  if (typeof override === 'function') {
+    return override() === true;
+  }
+  if (typeof window.wp_has_consent === 'function') {
+    return window.wp_has_consent(boot.consent.category) === true;
+  }
+  return false;
+}
+
+/** Map a storefront page type to its §6 event_type (null = no page-view event). */
+export function pageViewEvent(pageType: string): EventType | null {
+  switch (pageType) {
+    case 'product':
+      return 'product_view';
+    case 'category':
+      return 'category_view';
+    case 'search':
+      return 'search';
+    case 'checkout':
+      return 'checkout_start';
+    case 'order-received':
+      return 'checkout_complete';
+    default:
+      return null;
+  }
+}
+
+/** Build the TrackingEvent for a page-view, carrying only the §6-relevant fields. */
+export function buildPageEvent(evt: EventType, context: PageContext): TrackingEvent {
+  const event: TrackingEvent = { event_type: evt };
+  if ((evt === 'product_view' || evt === 'category_view') && context.categoryPath !== undefined) {
+    event.category_path = context.categoryPath;
+  }
+  if (evt === 'product_view' && context.sku !== undefined) {
+    event.sku = context.sku;
+  }
+  if (evt === 'search' && context.searchQuery !== undefined) {
+    event.search_query = context.searchQuery;
+  }
+  return event;
+}
+
+/**
+ * Boot the beacon from `window.smailyConnectBeacon`. Returns the client (or null
+ * when there is no boot blob) so tests can drive it.
+ */
+export function init(): RecEngineClient | null {
+  const boot = window.smailyConnectBeacon;
+  if (!boot || !boot.config || !boot.config.beaconUrl) {
+    return null;
+  }
+
+  const client = new RecEngineClient({
+    ...boot.config,
+    consentChecker: (): boolean => detectConsent(boot),
+  });
+
+  let started = false;
+  const start = (): void => {
+    if (started || !detectConsent(boot)) {
+      return;
+    }
+    started = true;
+    client.ensureSession();
+    client.captureUrlParams();
+    const evt = pageViewEvent(boot.context.pageType);
+    if (evt !== null) {
+      client.track(buildPageEvent(evt, boot.context));
+    }
+    // The page-view is sent on the 30s batch window or, more usually, on
+    // pagehide via sendBeacon — no explicit flush needed.
+  };
+
+  // Fire now if consent is already granted; otherwise wait for the visitor to
+  // grant it. The WP Consent API dispatches a native CustomEvent on document.
+  start();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('wp_listen_for_consent_change', start);
+  }
+
+  return client;
+}

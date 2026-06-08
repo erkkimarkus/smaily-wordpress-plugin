@@ -137,14 +137,28 @@ see "Pilot go-live" below.
   Secure on https, Path=/. **Cookie writes are consent-gated** (no tracking
   cookie without consent — same principle as 3.4.1 no-send; the WP Consent API
   *wiring* is 3.4.3). 7 more vitest tests (18 total). `mergeIdentity` (3.7)
-  still throws. Next: 3.4.3 WP-wrapper.
+  still throws.
+  **3.4.3a DONE** (WP-wrapper + storefront wiring, first PHP+JS sub-PR): PHP
+  `StorefrontBeacon` (wp_enqueue_scripts, gated on connected + track_browsing +
+  WC active) enqueues the beacon + prints `window.smailyConnectBeacon` (config
+  from engine config + page context from WC conditional tags); `beacon.ts` entry
+  + `beacon-core.ts` logic wire consent to the **WP Consent API** (CookieYes etc.;
+  fail-safe DENY; native `wp_listen_for_consent_change` re-run) with an
+  escape-hatch (`smaily_connect_beacon_consent` PHP filter +
+  `consentOverride` JS, documented in README) for non-compatible plugins, then
+  on consent: ensureSession + captureUrlParams + page-view track
+  (product_view/category_view/search/checkout_start/checkout_complete). Build:
+  beacon bundles RecEngineClient inline → self-contained classic-loadable
+  `dist/public/js/beacon.js` (no top-level import/export; vite entry swap +
+  beacon-core/entry split). category_path reuses `CatalogPayloadBuilder::
+  primary_category_path` (made public) so browse↔catalog correlate. Tooling
+  globs broadened lib→public/js. 10 vitest + 6 integration. Gates green. Next:
+  3.4.3b cart events.
 
 ### Next
 
-- 3.4.3 WP-wrapper beacon.js (consent-checker wiring against WP Consent API,
-  config from engine, init: ensureSession + captureUrlParams) + vite entry +
-  storefront `wp_enqueue_scripts` (gated on connected + track_browsing) + WC
-  event hooks (product_view/cart_add/... → track) → .4 mock+live-walk+ZIP. Then
+- 3.4.3b WC cart events (jQuery `added_to_cart`/`removed_from_cart` → cart_add/
+  cart_remove, SKU from `data-product_sku`) → 3.4.4 mock+live-walk+ZIP. Then
   roadmap below.
 
 ### Waiting / lock conditions
@@ -204,3 +218,24 @@ sides ready = go-live.
 - F3-19 guest-customer flusher concern: RESOLVED by W5 — engine auto-creates the
   customer from the order's customer_email; OrderFlusher is order_id-based (guest
   orders have an order_id), so no payload-carried path needed.
+
+---
+
+## Future / backlog (not scheduled)
+
+Feature ideas worth keeping, distinct from "Known deferred items" above (those
+are tracked technical debt). These are NOT scheduled — build only when a real
+need arrives (YAGNI).
+
+- **Consent-bridge extension (future).** The beacon supports non-WP-Consent-API
+  consent plugins (Cookiebot, custom) today via the **escape-hatch** — the
+  `smaily_connect_beacon_consent` PHP filter + `window.smailyConnectBeacon.consentOverride`
+  JS override — a developer-level adapter that requires writing code. Future: a
+  **user-level consent-bridge**, modelled on the existing plugin-integration pages
+  (Elementor, Contact Form), so a non-technical client on a non-WP-Consent-API
+  plugin can map their cookie-consent signal without code — e.g. a guide, a
+  "select your consent plugin" activation, or a settings panel that maps an
+  incompatible plugin's consent state. MiuMjau (CookieYes) does NOT need this
+  (WP-Consent-API-native); this is for future clients on Cookiebot or custom
+  solutions. The escape-hatch covers it technically in the meantime. Build only
+  when a real Cookiebot/custom client lands.

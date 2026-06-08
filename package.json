@@ -11,7 +11,7 @@
     "build:client": "vite build --mode client",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint admin/src public/js/lib --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint admin/src public/js --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

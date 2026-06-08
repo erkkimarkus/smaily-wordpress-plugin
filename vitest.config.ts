@@ -14,14 +14,15 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: [resolve(__dirname, 'admin/src/test-setup.ts')],
-    include: ['admin/src/**/*.test.{ts,tsx}', 'public/js/lib/**/*.test.ts'],
+    include: ['admin/src/**/*.test.{ts,tsx}', 'public/js/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['admin/src/**/*.{ts,tsx}', 'public/js/lib/**/*.ts'],
+      include: ['admin/src/**/*.{ts,tsx}', 'public/js/**/*.ts'],
       exclude: [
         'admin/src/test-setup.ts',
         'admin/src/**/*.test.{ts,tsx}',
         'admin/src/index.tsx', // mount-only, covered by manual sanity test
+        'public/js/beacon.ts', // thin auto-boot entry, logic lives in beacon-core.ts
       ],
       reporter: ['text', 'html'],
 

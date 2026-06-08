@@ -16,6 +16,7 @@ use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
@@ -153,6 +154,11 @@ final class Bootstrap {
 		// REST endpoints + the AS callback that drives the backfill loop.
 		add_action( 'rest_api_init', array( $this, 'register_rest_endpoints' ) );
 		add_action( BackfillEndpoint::TICK_HOOK, array( $this, 'on_backfill_tick' ), 10, 1 );
+
+		// Storefront browse-beacon enqueue (3.4.3). wp_enqueue_scripts is a
+		// front-end-only hook; StorefrontBeacon::enqueue() self-gates on
+		// connected + browse-tracking + WooCommerce active.
+		( new StorefrontBeacon( new RecEngineSettings() ) )->register();
 
 		// Admin UI (wizard + settings React mount). The two helpers in
 		// admin/wizard.php are intentionally loaded only on admin requests

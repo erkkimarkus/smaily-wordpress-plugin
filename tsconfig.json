@@ -34,7 +34,7 @@
   "include": [
     "admin/src/**/*.ts",
     "admin/src/**/*.tsx",
-    "public/js/lib/**/*.ts",
+    "public/js/**/*.ts",
     "vite.config.ts"
   ],
   "exclude": [

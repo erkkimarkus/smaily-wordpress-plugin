@@ -159,6 +159,35 @@ RECENGINE_LIVE=1 node bin/walk-3.2.cjs
 
 `bin/walk-3.2.cjs` is the live-walk script that drives the catalog-end end-to-end scenarios; without `RECENGINE_LIVE=1` it skips cleanly.
 
+### Browse-beacon consent integration
+
+The storefront browse beacon never sends an event (and never sets a tracking cookie) without marketing consent. Consent is resolved in this order:
+
+1. A site-provided JS override, if present.
+2. The **WP Consent API** (`window.wp_has_consent('marketing')`) — implemented by CookieYes, Complianz, Real Cookie Banner, and others. This is the supported path and needs no configuration.
+3. Fail-safe **deny** — no consent signal means no tracking.
+
+If your consent plugin is **not** WP-Consent-API-compatible (e.g. Cookiebot, or a custom solution), adapt it through the escape-hatch — no plugin code changes needed:
+
+**Change the consent category** (PHP filter), if your setup categorises tracking under something other than `marketing`:
+
+```php
+add_filter( 'smaily_connect_beacon_consent_category', fn() => 'statistics' );
+```
+
+**Provide a custom consent check** (JS override) — point it at your plugin's own consent state. Define it before the beacon script runs (e.g. via `wp_add_inline_script` on a higher-priority handle, or a theme header script):
+
+```js
+window.smailyConnectBeacon = window.smailyConnectBeacon || {};
+window.smailyConnectBeacon.consentOverride = function () {
+  // Return true only when the visitor has granted marketing/tracking consent.
+  // Example for Cookiebot:
+  return !!(window.Cookiebot && window.Cookiebot.consent && window.Cookiebot.consent.marketing);
+};
+```
+
+The override takes precedence over the WP Consent API. A future release may add a no-code consent-bridge UI for common non-compatible plugins; until then this escape-hatch covers them.
+
 ---
 
 ## Relationship to upstream

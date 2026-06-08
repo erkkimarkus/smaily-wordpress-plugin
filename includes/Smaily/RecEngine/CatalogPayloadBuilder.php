@@ -275,8 +275,12 @@ class CatalogPayloadBuilder {
 	 * the engine may reject, but surfacing the merchant's missing-category
 	 * data via the engine's error response (handled in the flush job) is
 	 * better than the builder inventing a value.
+	 *
+	 * Public so the storefront browse beacon (3.4.3) emits the SAME
+	 * category_path for a product_view as catalog ingest does for the product
+	 * — one source, so the engine can correlate browse against catalog.
 	 */
-	protected function primary_category_path( \WC_Product $product ): string {
+	public function primary_category_path( \WC_Product $product ): string {
 		if ( ! function_exists( 'get_the_terms' ) ) {
 			return '';
 		}

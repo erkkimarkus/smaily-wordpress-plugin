@@ -34,15 +34,20 @@ export default defineConfig({
     sourcemap: true,
 
     rollupOptions: {
-      // Keep RecEngineClient exports visible in the client bundle even
-      // though the build has no consumer yet (Phase 3 sub-PR 6 adds the
-      // beacon.js wrapper). Without strict signature preservation
-      // tree-shaking deletes the entire class.
-      preserveEntrySignatures: 'strict',
+      // Both entries are side-effect apps (admin renders React; beacon boots
+      // the storefront tracker). Neither is consumed as a library, so let
+      // Rollup drop unused exports — the built bundles then carry no top-level
+      // `export`, which is what lets beacon.js load as a classic <script>
+      // (StorefrontBeacon enqueues it without type="module").
+      preserveEntrySignatures: false,
 
       input: {
         'admin/admin': resolve(__dirname, 'admin/src/index.tsx'),
-        'client/rec-engine-client': resolve(__dirname, 'public/js/lib/rec-engine-client.ts'),
+        // beacon.ts inlines RecEngineClient (rec-engine-client.ts is NOT a
+        // separate entry, so there is no shared chunk and beacon.js has no
+        // top-level `import`). The lib stays as source for the Milestone-2
+        // npm extraction.
+        'public/js/beacon': resolve(__dirname, 'public/js/beacon.ts'),
       },
       output: {
         entryFileNames: '[name].js',
