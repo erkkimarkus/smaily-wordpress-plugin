@@ -37,6 +37,8 @@
 /dist/client*
 /spec*
 /docs*
+/CLAUDE.md
+/STATUS.md
 /.claude*
 /.github*
 /.wp-env.json

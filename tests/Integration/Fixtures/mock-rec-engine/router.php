@@ -123,9 +123,13 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 				'ingest_orders'           => $engine_base . '/api/v1/ingest/orders',
 				'ingest_browse'           => $engine_base . '/api/v1/ingest/browse',
 				'identity_merge'          => $engine_base . '/api/v1/identity/merge',
-				'customer_export'         => $engine_base . '/api/v1/customer/%s/export',
-				'customer_delete'         => $engine_base . '/api/v1/customer/%s',
-				'customer_opt_out'        => $engine_base . '/api/v1/customer/%s/opt-out',
+				// `{email}` placeholder mirrors the LIVE engine endpoints map. A
+				// `%s` here would mask a client that fails to substitute `{email}`
+				// (the substitution bug a live-walk caught). The customer routes
+				// below 404 on a literal-placeholder email to keep this honest.
+				'customer_export'         => $engine_base . '/api/v1/customer/{email}/export',
+				'customer_delete'         => $engine_base . '/api/v1/customer/{email}',
+				'customer_opt_out'        => $engine_base . '/api/v1/customer/{email}/opt-out',
 				'recommendations_preview' => $engine_base . '/api/v1/recommendations/preview',
 				'recommendations_issue'   => $engine_base . '/api/v1/recommendations/issue',
 			),
@@ -821,6 +825,13 @@ if ( $method === 'GET' && preg_match( '#^/api/v1/customer/([^/]+)/export$#', $pa
 		reply( 401, array( 'error' => 'unauthorized' ) );
 	}
 	$email = urldecode( $m[1] );
+	// A client that fails to substitute the `{email}` placeholder (e.g. sprintf
+	// on a `{email}` URL) sends the literal token. The live engine then looks up
+	// the literal string; here we make that an explicit 422 so the integration
+	// suite fails loudly instead of silently "finding" a placeholder customer.
+	if ( $email === '{email}' || strpos( $email, '%s' ) !== false ) {
+		reply( 422, array( 'error' => 'unsubstituted_placeholder', 'message' => 'Email path param was not substituted: ' . $email ) );
+	}
 	if ( strpos( $email, 'notfound' ) === 0 ) {
 		reply( 404, array( 'error' => 'not_found', 'message' => 'No customer with email ' . $email ) );
 	}
@@ -857,6 +868,9 @@ if ( $method === 'DELETE' && preg_match( '#^/api/v1/customer/([^/]+)$#', $path, 
 		reply( 401, array( 'error' => 'unauthorized' ) );
 	}
 	$email = urldecode( $m[1] );
+	if ( $email === '{email}' || strpos( $email, '%s' ) !== false ) {
+		reply( 422, array( 'error' => 'unsubstituted_placeholder', 'message' => 'Email path param was not substituted: ' . $email ) );
+	}
 	$key   = 'gdpr_deleted_' . md5( $email );
 	if ( isset( $state[ $key ] ) ) {
 		reply( 404, array( 'error' => 'not_found', 'message' => 'Customer already deleted.' ) );
@@ -883,6 +897,9 @@ if ( $method === 'POST' && preg_match( '#^/api/v1/customer/([^/]+)/opt-out$#', $
 		reply( 401, array( 'error' => 'unauthorized' ) );
 	}
 	$email = urldecode( $m[1] );
+	if ( $email === '{email}' || strpos( $email, '%s' ) !== false ) {
+		reply( 422, array( 'error' => 'unsubstituted_placeholder', 'message' => 'Email path param was not substituted: ' . $email ) );
+	}
 	$raw   = (string) file_get_contents( 'php://input' );
 	$body  = json_decode( $raw, true );
 	$flag  = is_array( $body ) && ! empty( $body['opt_out'] );

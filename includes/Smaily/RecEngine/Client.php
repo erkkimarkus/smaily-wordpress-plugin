@@ -73,9 +73,16 @@ class Client {
 	public const PATH_INGEST_ORDERS        = '/api/v1/ingest/orders';
 	public const PATH_INGEST_BROWSE        = '/api/v1/ingest/browse';
 	public const PATH_IDENTITY_MERGE       = '/api/v1/identity/merge';
-	public const PATH_CUSTOMER_EXPORT_FMT  = '/api/v1/customer/%s/export';
-	public const PATH_CUSTOMER_DELETE_FMT  = '/api/v1/customer/%s';
-	public const PATH_CUSTOMER_OPT_OUT_FMT = '/api/v1/customer/%s/opt-out';
+	// GDPR customer endpoints carry the email in the URL PATH. The engine's
+	// endpoints-map advertises these with a literal `{email}` placeholder (see
+	// the contract endpoints map), so the substitution convention is `{email}`,
+	// NOT sprintf `%s` — feeding a `{email}` URL through sprintf leaves it
+	// unchanged and the engine receives the literal string `{email}`. These
+	// fallbacks use the same `{email}` placeholder so map-path and fallback-path
+	// substitute identically via customer_url().
+	public const PATH_CUSTOMER_EXPORT_TMPL  = '/api/v1/customer/{email}/export';
+	public const PATH_CUSTOMER_DELETE_TMPL  = '/api/v1/customer/{email}';
+	public const PATH_CUSTOMER_OPT_OUT_TMPL = '/api/v1/customer/{email}/opt-out';
 
 	/** Default in-request retry ceiling — generous for one-shot calls (ping, setup). */
 	public const DEFAULT_MAX_ATTEMPTS = 5;
@@ -286,7 +293,7 @@ class Client {
 	 * @throws ApiException On 4xx (incl. 404 not_found) or network failure.
 	 */
 	public function customer_export( string $email, array $query = array() ): array {
-		$url = sprintf( $this->resolve_url( 'customer_export', self::PATH_CUSTOMER_EXPORT_FMT ), rawurlencode( $email ) );
+		$url = $this->customer_url( 'customer_export', self::PATH_CUSTOMER_EXPORT_TMPL, $email );
 		if ( $query !== array() ) {
 			$url .= '?' . http_build_query( $query );
 		}
@@ -305,7 +312,7 @@ class Client {
 	 * @throws ApiException On 4xx (incl. 404) or network failure.
 	 */
 	public function customer_delete( string $email, array $body = array() ): array {
-		$url = sprintf( $this->resolve_url( 'customer_delete', self::PATH_CUSTOMER_DELETE_FMT ), rawurlencode( $email ) );
+		$url = $this->customer_url( 'customer_delete', self::PATH_CUSTOMER_DELETE_TMPL, $email );
 		return $this->request_url( 'DELETE', $url, $body !== array() ? $body : null );
 	}
 
@@ -321,7 +328,7 @@ class Client {
 	 * @throws ApiException On 4xx or network failure.
 	 */
 	public function customer_opt_out( string $email, array $body ): array {
-		$url = sprintf( $this->resolve_url( 'customer_opt_out', self::PATH_CUSTOMER_OPT_OUT_FMT ), rawurlencode( $email ) );
+		$url = $this->customer_url( 'customer_opt_out', self::PATH_CUSTOMER_OPT_OUT_TMPL, $email );
 		return $this->request_url( 'POST', $url, $body );
 	}
 
@@ -347,6 +354,28 @@ class Client {
 			return $this->base_url . '/' . ltrim( $mapped, '/' );
 		}
 		return $this->base_url . $fallback_path;
+	}
+
+	/**
+	 * Build a GDPR customer-endpoint URL by substituting the `{email}`
+	 * placeholder. The engine advertises these URLs with a literal `{email}`
+	 * token (in both the endpoints-map value and our fallback template), so the
+	 * substitution is a str_replace — NOT sprintf, which would silently leave a
+	 * `{email}`-style URL unchanged and send the literal placeholder to the
+	 * engine. The email is rawurlencoded for the path segment. As a defensive
+	 * fallback, a resolved URL that carries no `{email}` token but still has a
+	 * legacy `%s` is handled too.
+	 */
+	private function customer_url( string $endpoint_key, string $fallback_template, string $email ): string {
+		$url = $this->resolve_url( $endpoint_key, $fallback_template );
+		$enc = rawurlencode( $email );
+		if ( strpos( $url, '{email}' ) !== false ) {
+			return str_replace( '{email}', $enc, $url );
+		}
+		if ( strpos( $url, '%s' ) !== false ) {
+			return sprintf( $url, $enc );
+		}
+		return $url;
 	}
 
 	/**

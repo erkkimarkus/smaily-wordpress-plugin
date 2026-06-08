@@ -263,7 +263,11 @@ final class ClientTest extends TestCase {
 		$client = $this->capturing_client(
 			'sk_live',
 			'https://base.test',
-			array( 'customer_export' => 'https://engine.test/api/v1/customer/%s/export' )
+			// The live engine advertises the GDPR endpoints with a literal
+			// `{email}` placeholder (NOT sprintf `%s`); the client must substitute
+			// it. A `%s` map here would have validated the substitution bug that a
+			// live-walk caught — the engine received the literal `{email}`.
+			array( 'customer_export' => 'https://engine.test/api/v1/customer/{email}/export' )
 		);
 
 		$client->customer_export( 'mari@example.com' );
@@ -277,7 +281,7 @@ final class ClientTest extends TestCase {
 		$client = $this->capturing_client(
 			'sk_live',
 			'https://base.test',
-			array( 'customer_delete' => 'https://engine.test/api/v1/customer/%s' )
+			array( 'customer_delete' => 'https://engine.test/api/v1/customer/{email}' )
 		);
 
 		$client->customer_delete( 'mari@example.com', array( 'confirm' => true, 'reason' => 'user_request' ) );
@@ -291,7 +295,7 @@ final class ClientTest extends TestCase {
 		$client = $this->capturing_client(
 			'sk_live',
 			'https://base.test',
-			array( 'customer_opt_out' => 'https://engine.test/api/v1/customer/%s/opt-out' )
+			array( 'customer_opt_out' => 'https://engine.test/api/v1/customer/{email}/opt-out' )
 		);
 
 		$client->customer_opt_out( 'mari@example.com', array( 'opt_out' => true, 'reason' => 'user_preference' ) );
@@ -299,6 +303,17 @@ final class ClientTest extends TestCase {
 		self::assertSame( 'POST', $client->captured['method'] );
 		self::assertSame( 'https://engine.test/api/v1/customer/mari%40example.com/opt-out', $client->captured['url'] );
 		self::assertSame( array( 'opt_out' => true, 'reason' => 'user_preference' ), $client->captured['body'] );
+	}
+
+	public function test_customer_url_substitutes_email_in_the_no_map_fallback(): void {
+		// With no endpoints map, the GDPR call falls back to base_url + the
+		// PATH_CUSTOMER_*_TMPL constant — which also carries the `{email}` token,
+		// so the same str_replace substitution must apply (not sprintf).
+		$client = $this->capturing_client( 'sk_live', 'https://base.test' );
+
+		$client->customer_export( 'mari@example.com' );
+
+		self::assertSame( 'https://base.test/api/v1/customer/mari%40example.com/export', $client->captured['url'] );
 	}
 
 	/**

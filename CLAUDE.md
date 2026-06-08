@@ -134,6 +134,21 @@ same shape, table_spec-verified), but if a legacy-storage order-backfill issue
 surfaces, reproduce it against a LEGACY WC env — the HPOS-mode wp-env won't show
 it. Do NOT assume "integration green" covers the legacy order path.
 
+### Endpoints-map URL placeholder is `{email}`, not `%s` — substitute, don't sprintf
+The engine's endpoints-map advertises the GDPR customer URLs (§8/§9/§10) with a
+literal `{email}` token: `…/customer/{email}/export`. The email goes in the URL
+**path** (rawurlencoded) and the substitution convention is `{email}`. 3.8.0
+shipped `sprintf(resolve_url(…), rawurlencode($email))` — a silent no-op on a
+`{email}` URL, so the literal `{email}` was sent and the engine 404'd (`No
+customer with email '{email}'`). The unit + mock endpoints maps had used `%s`,
+mirroring the bug → all gates green; only the LIVE engine used `{email}`, so only
+the 3.8.1 live-walk caught it. Use `Client::customer_url()` (`str_replace`), keep
+fallback `PATH_CUSTOMER_*_TMPL` constants on `{email}`, and seed mock/unit maps
+with `{email}` (the mock 422s on a literal-placeholder email). General rule: a
+URL from the endpoints-map carries the engine's placeholder syntax — confirm it
+(`{name}` vs `%s`) before picking a substitution function; a 404 echoing an
+un-interpolated token is YOUR request, not an engine bug. (LESSONS §2.9.)
+
 ---
 
 ## How we work (the rhythm)

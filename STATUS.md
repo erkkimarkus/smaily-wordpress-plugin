@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-08 (3.7 identity-merge COMPLETE — anon-session → known-customer binding on wp_login, server-side, complementary to §6 retroactive binding; live-walk 6/6 against MiuMjau incl. browse_events_updated=2 + idempotency + merge-noop-when-retroactively-bound + 404; ZIP'd. Roadmap reconciled: "3.6 beacon" was a 3.4 duplicate, removed. Next: 3.8 GDPR, 3.9 activation)_
+_Last updated: 2026-06-08 (3.8 GDPR COMPLETE — WP Privacy API exporter/eraser + §8/§9/§10 Client methods; live-walk 10/10 against MiuMjau. The 3.8.1 live-walk caught a latent 3.8.0 bug: the GDPR customer-endpoint URLs use a `{email}` path placeholder, but the Client substituted with `sprintf`/`%s` → the literal `{email}` was sent to the engine (404). Unit + mock maps had mirrored the wrong `%s` assumption, so all gates were green; only the live engine used `{email}`. Fixed to `str_replace('{email}',…)`; mock/unit switched to `{email}` + a 422 placeholder-guard so a regression fails integration. LESSONS §2.9. ZIP'd. Next: 3.9 activation)_
 
 ---
 
@@ -278,14 +278,24 @@ see "Pilot go-live" below.
   §10 Client method only (the Smaily profiling-consent trigger + beacon two-gate
   stop is a separate later piece). Mock §8/§9/§10 routes + 3 Client unit tests +
   5 integration (incl. the WC-boundary test: `_smaily_rec_id` exported,
-  `total_amount`/`line_total` NOT). ci:strict exit=0; integration OK 75 (+5).
-  Next: 3.8.1 live-walk + ZIP.
+  `total_amount`/`line_total` NOT). **3.8.1 DONE** (live-walk + ZIP):
+  `bin/walk-3.8-gdpr.cjs` — **10/10 against MiuMjau**: export surfaces engine
+  browse-activity + the order `_smaily_rec_id` read from **real `wc_orders_meta`
+  (HPOS)**, excludes Woo totals + decision fields + rec_attribution; opt-out
+  toggles true→false; erase removes engine records + the HPOS order-meta; a
+  second erase is 404-idempotent-success. The walk **caught a latent 3.8.0 bug**:
+  the GDPR endpoint URLs use a `{email}` path placeholder but `Client` substituted
+  via `sprintf`/`%s`, sending the literal `{email}` to the engine (404). Unit +
+  mock endpoints maps had mirrored the wrong `%s`, hiding it through all green
+  gates. Fixed to `str_replace('{email}',…)` (fallback templates → `{email}` too);
+  mock/unit maps switched to `{email}` + the mock customer routes now **422 on a
+  literal-placeholder email** so a regression fails integration. LESSONS §2.9.
+  ci:strict exit=0; unit 285; integration OK 75. ZIP'd. **3.8 GDPR COMPLETE.**
 
 ### Next
 
-- **3.8.1** GDPR live-walk (export/erase/opt-out against the real engine) + ZIP →
-  **3.9** Step 4 (4a) activation. Then Phase 3 is done. (Separate, after 3.8:
-  Smaily profiling-consent wiring + beacon two-gate stop.)
+- **3.9** Step 4 (4a) activation (mode-A → mode-B). Then Phase 3 is done.
+  (Separate, after 3.8: Smaily profiling-consent wiring + beacon two-gate stop.)
 
 ### Waiting / lock conditions
 
@@ -312,7 +322,10 @@ see "Pilot go-live" below.
 - ~~**3.7** identity-merge~~ — DONE (above): anon-session → known-customer
   binding on login (NOT a customer↔customer merge — v1 has none); live-walked
   6/6. (DECISIONS F3-27.)
-- **3.8** GDPR (WP Privacy API)
+- ~~**3.8** GDPR (WP Privacy API)~~ — DONE (above): exporter (Art 15) + eraser
+  (Art 17) + opt-out (§10), HPOS-safe order-meta; live-walked 10/10. The 3.8.1
+  walk caught a latent `{email}`-placeholder substitution bug (DECISIONS F3-28.6,
+  LESSONS §2.9).
 - **3.9** Step 4 (4a) activation
 
 ---

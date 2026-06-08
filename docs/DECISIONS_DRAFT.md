@@ -1505,10 +1505,25 @@ fixes, as applied in 3.8:
    — is a SEPARATE later piece, because it depends on the Smaily profiling-consent
    parameter API. 3.8 ships the mechanism the consent wiring will call.
 
+6. **GDPR endpoint URLs use a `{email}` path placeholder — substitute with
+   `str_replace`, never `sprintf`** (3.8.1, caught by the live-walk). The engine's
+   endpoints-map advertises §8/§9/§10 as `…/customer/{email}/export` etc. The
+   email goes in the URL *path* (rawurlencoded), and the substitution token is
+   `{email}`, NOT `%s`. 3.8.0 shipped `sprintf(resolve_url(…), rawurlencode($email))`,
+   which is a no-op on a `{email}` URL → the literal `{email}` reached the engine
+   (404 `No customer with email '{email}'`). The unit + mock endpoints maps had
+   used `%s`, mirroring the bug, so every gate was green; only the live engine
+   used `{email}`. Fix: `Client::customer_url()` does `str_replace('{email}', …)`
+   (fallback `PATH_CUSTOMER_*_TMPL` constants carry `{email}` too); the mock + unit
+   maps now use `{email}` and the mock customer routes 422 on a literal-placeholder
+   email so a regression fails integration. This is the placeholder-syntax-as-wire-
+   shape lesson (LESSONS §2.9), a sibling of the `items`/`products` wrapper drift.
+
 **Relationships:** DATA_MODEL_GDPR.md (the scope authority), F3-20 (the A-filter
 customer the export/erase keys on by email), F3-27 (the merge-marker user-meta
-the eraser also clears), §8/§9/§10 contract. 3.8.0 ships the handler; 3.8.1 the
-live-walk + ZIP. Smaily profiling-consent wiring + beacon-stop follow separately.
+the eraser also clears), §8/§9/§10 contract, LESSONS §2.9 (placeholder drift).
+3.8.0 ships the handler; 3.8.1 the live-walk (10/10) that caught the placeholder
+bug, + ZIP. Smaily profiling-consent wiring + beacon-stop follow separately.
 
 ## How to keep this document going (during Phase 3)
 

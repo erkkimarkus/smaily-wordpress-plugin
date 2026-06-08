@@ -216,6 +216,87 @@ breaking change wait for an unrelated sub-PR to discover it. When auditing, walk
 **whole changelog**, not just the most recent sync — drift accumulates silently across
 syncs whenever the endpoint isn't live-exercised between them.
 
+### 2.8 PHPStan as a storage-assumption (HPOS) bug detector
+
+**What happened** (3.8.0 GDPR): the GDPR exporter/eraser read order rec-meta with
+`get_post_meta( $order_id, '_smaily_rec_id' )`. PHPStan flagged an unrelated line
+— casting `wc_get_orders( [ 'return' => 'ids' ] )` results to int ("Cannot cast
+WC_Order to int", because the stub types the return as `WC_Order[]`). Chasing
+*why* the types didn't line up — instead of mechanically silencing it — surfaced
+a real bug: **`get_post_meta` / `delete_post_meta` only work under legacy
+(posts) order storage.** Under **HPOS** (High-Performance Order Storage — the
+wp-env + WC-10.7 mode, and a store can enable it at WC 8.2+) order meta lives in
+`wc_orders_meta`, so the post-meta calls would silently read/erase **nothing** —
+a partial GDPR export and an incomplete erase, both failing *quietly*.
+
+The fix is storage-agnostic WooCommerce APIs: `$order->get_meta( $key )`,
+`$order->delete_meta_data( $key )` + `$order->save()` — they resolve to whichever
+backend is active.
+
+**Why it nearly slipped:** the unit/integration tests run on the HPOS wp-env, but
+a test that only checks "export returns *something*" wouldn't notice that the
+order-meta section was empty; and the GDPR live-walk could have missed it too
+(the engine side would pass). The static analyzer caught it *before* any runtime
+test — because the type mismatch was a symptom of the storage assumption.
+
+**Rules for next time:**
+- Treat a PHPStan complaint as a question ("why don't these types agree?"), not a
+  nuisance to cast away. The cast that doesn't typecheck is often a storage /
+  shape assumption that's wrong.
+- For ORDER data, prefer the WooCommerce object API over WP core post/meta
+  functions: `$order->get_meta()` not `get_post_meta()`, `wc_get_orders()` not
+  `WP_Query( post_type=shop_order )`. Post/meta functions are legacy-storage-only;
+  the WC API is HPOS-safe. (Sibling to 3.5.2: read meta via the WC API, but
+  ENUMERATE with direct SQL when you need a stable id-cursor `wc_get_orders`
+  can't give — pick the storage-correct tool for each job.)
+
+---
+
+### 2.9 A URL placeholder convention is a wire shape — the live-walk caught it, the mock hid it
+
+**What happened** (3.8.1 GDPR live-walk): the GDPR customer endpoints carry the
+email in the URL **path**. The engine's endpoints-map advertises them with a
+literal `{email}` token: `…/customer/{email}/export`. The plugin's `Client`
+built the URL with `sprintf( resolve_url(…), rawurlencode($email) )` — i.e. it
+assumed a `%s` placeholder. `sprintf` on a string that contains `{email}` (and
+no `%s`) returns it **unchanged**, so every GDPR request went to the literal
+`…/customer/{email}/export`. The engine received the literal string `{email}`
+as the email and answered `No customer with email '{email}'` — a 404 that looked
+like an engine bug (the un-interpolated `{email}` in the message reinforced the
+illusion). A raw request to the *same* URL with the email substituted returned
+`200`, proving the fault was entirely plugin-side.
+
+**Why every test was green anyway:** the unit ClientTest seeded its endpoints map
+with `…/customer/%s/export`, and the integration mock's endpoints map did too.
+Both mirrored the plugin's *wrong* assumption, so `sprintf` substituted happily
+and the assertions passed. The live engine is the only place that used `{email}`
+— so only the live-walk could surface it. This is §2.3/§2.4 again, in a new
+costume: **the placeholder syntax in an endpoints-map value is itself a wire
+shape**, and a mock built to the same assumption as the code validates the bug
+instead of catching it.
+
+The fix: substitute via `str_replace( '{email}', rawurlencode($email), $url )`,
+not `sprintf` — unifying on the engine's `{email}` convention (fallback path
+templates now use `{email}` too). The mock + unit map were switched to `{email}`
+to mirror live, and the mock's customer routes now **422 on a literal-placeholder
+email**, so a future `sprintf`-style regression fails the integration suite loudly.
+
+**Rules for next time:**
+- When a URL comes from the engine's endpoints-map, **the placeholder syntax is
+  part of the contract** — confirm it (`{name}` vs `%s` vs `:name`) before
+  choosing a substitution function. `sprintf` silently no-ops on a non-`%`
+  template; `str_replace` silently no-ops on a missing token. Either can ship a
+  literal placeholder to the wire.
+- Seed unit/mock endpoints maps with the **engine's real placeholder form**, not
+  a form convenient for your substitution code. A mock map that matches your code
+  proves nothing.
+- A 404 whose message echoes an un-interpolated placeholder (`'{email}'`,
+  `':id'`) is almost always *your* request sending the literal token — look at
+  the outgoing URL before blaming the engine.
+- 3.8.0 shipped (committed) with this latent bug and full green gates; 3.8.1's
+  live-walk is what caught it. A formatted-field feature is not done until a
+  live-walk has exercised it against the real engine (CLAUDE.md scar).
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs
