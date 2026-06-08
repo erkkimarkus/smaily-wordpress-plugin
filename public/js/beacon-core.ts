@@ -38,11 +38,24 @@ interface BeaconBoot {
   consentOverride?: () => boolean;
 }
 
+/** A WooCommerce add-to-cart / remove button as jQuery hands it to us. */
+interface JQueryButton {
+  data: (key: string) => unknown;
+}
+
+/** The slice of jQuery the cart listeners need (no @types/jquery dependency). */
+interface JQueryCollection {
+  on: (event: string, handler: (...args: unknown[]) => void) => void;
+}
+type JQueryStatic = (selector: unknown) => JQueryCollection;
+
 declare global {
   interface Window {
     smailyConnectBeacon?: BeaconBoot;
     /** WP Consent API JS global (CookieYes / Complianz / Real Cookie Banner). */
     wp_has_consent?: (category: string) => boolean | undefined;
+    /** WooCommerce ships jQuery on storefront pages; absent ⇒ no cart events. */
+    jQuery?: JQueryStatic;
   }
 }
 
@@ -96,6 +109,38 @@ export function buildPageEvent(evt: EventType, context: PageContext): TrackingEv
 }
 
 /**
+ * Wire WooCommerce's AJAX cart jQuery events to cart_add / cart_remove. WC
+ * fires `added_to_cart` / `removed_from_cart` on document.body with the clicked
+ * button as the last arg; that button carries `data-product_sku`. §6 requires
+ * a sku for cart events, so an event WITHOUT one is skipped (the single-product
+ * form-POST add-to-cart fires no JS event at all — an accepted best-effort gap,
+ * §14.2). No-op when jQuery isn't present.
+ */
+export function attachCartListeners(client: RecEngineClient): void {
+  const jq = window.jQuery;
+  if (typeof jq !== 'function' || typeof document === 'undefined') {
+    return;
+  }
+
+  const handler = (eventType: EventType) => (...args: unknown[]): void => {
+    const button = args[3] as JQueryButton | undefined;
+    if (button === undefined || typeof button.data !== 'function') {
+      return;
+    }
+    const raw = button.data('product_sku');
+    const sku = typeof raw === 'string' ? raw : '';
+    if (sku === '') {
+      return; // sku is required for cart events — skip rather than send a reject.
+    }
+    client.track({ event_type: eventType, sku });
+  };
+
+  const body = jq(document.body);
+  body.on('added_to_cart', handler('cart_add'));
+  body.on('removed_from_cart', handler('cart_remove'));
+}
+
+/**
  * Boot the beacon from `window.smailyConnectBeacon`. Returns the client (or null
  * when there is no boot blob) so tests can drive it.
  */
@@ -122,6 +167,9 @@ export function init(): RecEngineClient | null {
     if (evt !== null) {
       client.track(buildPageEvent(evt, boot.context));
     }
+    // Cart events fire throughout the session, not just at load — attach the
+    // listeners once consent is granted (so cart tracking is consent-gated too).
+    attachCartListeners(client);
     // The page-view is sent on the 30s batch window or, more usually, on
     // pagehide via sendBeacon — no explicit flush needed.
   };

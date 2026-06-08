@@ -170,3 +170,82 @@ describe('beacon-core: init', () => {
     expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'product_view' });
   });
 });
+
+describe('beacon-core: WC cart events (3.4.3b)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let handlers: Record<string, (...args: unknown[]) => void>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => Promise.resolve({ ok: true } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+    handlers = {};
+    window.jQuery = ((_selector: unknown): { on: (e: string, h: (...a: unknown[]) => void) => void } => ({
+      on: (event: string, handler: (...args: unknown[]) => void): void => {
+        handlers[event] = handler;
+      },
+    })) as Window['jQuery'];
+  });
+
+  afterEach(() => {
+    delete window.smailyConnectBeacon;
+    delete window.jQuery;
+    vi.unstubAllGlobals();
+    document.cookie = 'smaily_anon_sid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
+  /** A jQuery button stub carrying (or not) a data-product_sku. */
+  function button(sku: string | undefined): { data: (key: string) => unknown } {
+    return { data: (key: string): unknown => (key === 'product_sku' ? sku : undefined) };
+  }
+
+  /** Invoke a registered WC jQuery handler (asserting it exists). */
+  function fire(event: string, ...args: unknown[]): void {
+    const handler = handlers[event];
+    if (handler === undefined) {
+      throw new Error(`no handler registered for ${event}`);
+    }
+    handler(...args);
+  }
+
+  function startBeacon(): ReturnType<typeof init> {
+    window.smailyConnectBeacon = makeBoot({ consentOverride: () => true, context: { pageType: 'other' } });
+    return init();
+  }
+
+  it('tracks cart_add with the button SKU on added_to_cart', async () => {
+    const client = startBeacon();
+    fire('added_to_cart', {}, {}, 'hash', button('ACA-1'));
+
+    await client?.flush();
+    const events = lastEvents(fetchMock);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ event_type: 'cart_add', sku: 'ACA-1' });
+  });
+
+  it('tracks cart_remove on removed_from_cart', async () => {
+    const client = startBeacon();
+    fire('removed_from_cart', {}, {}, 'hash', button('ACA-9'));
+
+    await client?.flush();
+    expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'cart_remove', sku: 'ACA-9' });
+  });
+
+  it('skips a cart event with no SKU (single-product form-POST gap)', async () => {
+    const client = startBeacon();
+    fire('added_to_cart', {}, {}, 'hash', button(undefined));
+
+    await client?.flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not attach cart listeners before consent', () => {
+    window.smailyConnectBeacon = makeBoot({ consentOverride: () => false, context: { pageType: 'other' } });
+    init();
+    expect(handlers['added_to_cart']).toBeUndefined();
+  });
+
+  it('is a no-op when jQuery is absent', () => {
+    delete window.jQuery;
+    expect(() => startBeacon()).not.toThrow();
+  });
+});

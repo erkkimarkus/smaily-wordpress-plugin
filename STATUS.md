@@ -152,14 +152,23 @@ see "Pilot go-live" below.
   `dist/public/js/beacon.js` (no top-level import/export; vite entry swap +
   beacon-core/entry split). category_path reuses `CatalogPayloadBuilder::
   primary_category_path` (made public) so browse↔catalog correlate. Tooling
-  globs broadened lib→public/js. 10 vitest + 6 integration. Gates green. Next:
-  3.4.3b cart events.
+  globs broadened lib→public/js. 10 vitest + 6 integration. Gates green.
+  **3.4.3b DONE** (WC cart events, JS-only): `attachCartListeners()` wires
+  WC's jQuery `added_to_cart` → `cart_add` and `removed_from_cart` →
+  `cart_remove`, SKU from the button's `data-product_sku`. Attached in start()
+  so cart tracking is consent-gated too; no-op when jQuery is absent. Known gap:
+  the single-product form-POST add-to-cart fires no JS event, so its cart_add
+  isn't tracked, and a SKU-less event is skipped (best-effort, §14.2). 5 more
+  vitest tests (33 client + beacon-core total). Gates green. **3.4.3 complete.**
+  Next: 3.4.4.
 
 ### Next
 
-- 3.4.3b WC cart events (jQuery `added_to_cart`/`removed_from_cart` → cart_add/
-  cart_remove, SKU from `data-product_sku`) → 3.4.4 mock+live-walk+ZIP. Then
-  roadmap below.
+- **3.4.4** — mock browse route already exists (3.4.0); add the storefront/JS
+  pieces to the live-walk + ZIP. Confirm in the live-walk that checkout_start
+  (checkout page) and checkout_complete (order-received) fire at the right
+  moments (per Erkki — page-view mapping hits the right instants). Then roadmap
+  below.
 
 ### Waiting / lock conditions
 
