@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-09 (3.9 Step-4 activation COMPLETE — locked design: connecting the rec-engine syncs ALL domains (system-decides), the four per-domain sync toggles (orders/customers/products/cart) were cosmetic/write-only and are REMOVED; browse-tracking is the only Step-4 toggle (legal-consent gate, opt-in default-off). Disconnect clears only the connection options and PRESERVES `smly_plus_rec_track_browsing`, so re-connect restores the toggle — which required a mandatory hydration fix (EnvDetector emits the saved value, hydrate reads it instead of hardcoding false; also fixes a plain-reload blanking bug). Dead option keys cleaned up idempotently on upgrade-detect. PLUGIN.md §Step-4-4a/§6 revised to match the vision; DECISIONS F3-29. Then a pre-3.9 task: PLUGIN.md translated ET→EN. Next: Phase 3 done; Smaily profiling-consent wiring + beacon two-gate stop is the remaining separate piece.)_
+_Last updated: 2026-06-09 (3.9 Step-4 activation COMPLETE — locked design: connecting the rec-engine syncs ALL domains (system-decides), the four per-domain sync toggles (orders/customers/products/cart) were cosmetic/write-only and are REMOVED; browse-tracking is the only Step-4 toggle (legal-consent gate, opt-in default-off). Disconnect clears only the connection options and PRESERVES `smly_plus_rec_track_browsing`, so re-connect restores the toggle — which required a mandatory hydration fix (EnvDetector emits the saved value, hydrate reads it instead of hardcoding false; also fixes a plain-reload blanking bug). Dead option keys cleaned up idempotently on upgrade-detect. PLUGIN.md §Step-4-4a/§6 revised to match the vision; DECISIONS F3-29. Then a pre-3.9 task: PLUGIN.md translated ET→EN. Next: Phase 3 done; Smaily profiling-consent wiring + beacon two-gate stop is the remaining separate piece. POST-3.9: (i) **legacy-WC order-backfill verified** — WC 6.9.4 + PHP 8.1 env, real `wp_posts` traversal, full integration 75/75 on legacy (pilot precondition RESOLVED, see go-live checklist); (ii) a production-readiness audit surfaced two NEW pilot-blockers beyond features — failed-queue-row invisibility/no-re-drive (P1) and no surfaced diagnostic trail (P2) — plus a WC-version-header mismatch (header says 7.0, pilot is 6.9.4) and a missing pilot-onboarding doc; tracked for prioritisation.)_
 
 ---
 
@@ -359,15 +359,19 @@ Pilot does NOT go live until all of these hold. No deadline pressure (D5).
 - [x] customers-end ZIP'd + live-walked
 - [x] orders-end ZIP'd + live-walked (12/12)
 - [x] catalog-flusher N-7 D6-fix (lock RESOLVED — N-7.1, catalog live-walk 15/15)
-- [ ] **order-backfill LEGACY path verified against a legacy WC env** (WC 6.x,
-  HPOS off). The pilot is WC 6.9.4 = legacy storage, but the wp-env integration
-  runs WC 10.7 + HPOS — so the integration green covers the HPOS order-backfill
-  path, NOT the pilot's legacy path (unit-tested via `table_spec` only, 3.5.2).
-  Low risk (same SQL shape), but a real legacy-DB run (does
-  `WHERE post_type='shop_order' AND post_status IN ('wc-completed'…) AND ID >
-  cursor` behave on a real WC 6.x posts schema?) must happen before the pilot
-  backfills orders. Not a blocker for 3.5.x dev (HPOS env proves the logic);
-  schedule before pilot go-live. (CLAUDE.md "OrderBackfill".)
+- [x] **order-backfill LEGACY path verified against a real legacy WC env**
+  (RESOLVED 2026-06-09). Stood up a `.wp-env.override.json` pinning **WC 6.9.4 +
+  PHP 8.1** (WP core 6.9.4); reset the carried-over HPOS options so
+  `is_hpos()=false`, `wc_orders` absent → a faithful WC 6.9.4 legacy store
+  (orders in `wp_posts`). `RecEngineOrderBackfillTest` ran the legacy
+  `table_spec(false)` path — `WHERE post_type='shop_order' AND post_status IN(…)
+  AND ID > cursor` against the real WC 6.x posts schema (4 tests, 14 assertions),
+  and the **FULL integration suite passed 75/75 on legacy** (no other path has a
+  hidden HPOS assumption). PHP pin to 8.1 was used (WC 6.9.4 on PHP 8.3 risks
+  deprecations); `OrderBackfillJob::is_hpos()` is correctly guarded with
+  `class_exists(OrderUtil)` so it can't fatal on a pre-HPOS WC. (Harness note: the
+  mock-server teardown uses the `SIGTERM` constant, undefined without `pcntl` on
+  the PHP 8.1 image → the documented exit-255 wrapper quirk; tests pass.)
 
 **Engine side:**
 - [x] backend (90-95%, gaps engine-internal)
