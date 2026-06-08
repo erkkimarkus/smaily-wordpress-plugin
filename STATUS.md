@@ -212,12 +212,22 @@ see "Pilot go-live" below.
   not run against real wp_posts orders here** (CLAUDE.md "OrderBackfill"). Tests:
   resumability + bounded + status-filter (unmapped excluded) + full. ci:strict
   exit=0; integration OK 64 (+4 order backfill). **3.5.0-.2 backend complete.**
-  Next: 3.5.3 admin UI panels + live-walk.
+  **3.5.3a DONE** (admin UI, JS-only): reusable `BackfillPanel` (Import-now
+  button + ProgressBar + status, mirrors Step2's contacts panel) — instantiates
+  the already-generic `useBackfillProgress({jobType})`; progress lives in the
+  hook (no reducer mirror — only contacts feeds the Step6 summary). Three panels
+  (products/customers/orders, each disabled at 0 records via
+  `state.env.storeTotals`) in a new "Import existing data" Card inside
+  Step4Recommendations `ConnectedView` (gated on the rec-engine connection, not
+  the Smaily-email one). API + hook needed no changes (3.5.0-.2 wired the job
+  types). 3 vitest tests. ci:strict exit=0. Next: 3.5.3b live-walk + ZIP.
 
 ### Next
 
-- **3.5.3** admin UI panels (per-domain backfill button + progress, reusing the
-  generic useBackfillProgress) + a backfill live-walk + ZIP. Then the roadmap.
+- **3.5.3b** backfill live-walk (drive all 3 backfill jobs against the real
+  engine — wp-env is HPOS, so it runs the HPOS order path against real wc_orders;
+  assert progress reaches 100% = all mapped sent) + ZIP. Needs a fresh
+  setup-token. Then the roadmap.
 
 ### Waiting / lock conditions
 
@@ -251,6 +261,15 @@ Pilot does NOT go live until all of these hold. No deadline pressure (D5).
 - [x] customers-end ZIP'd + live-walked
 - [x] orders-end ZIP'd + live-walked (12/12)
 - [x] catalog-flusher N-7 D6-fix (lock RESOLVED — N-7.1, catalog live-walk 15/15)
+- [ ] **order-backfill LEGACY path verified against a legacy WC env** (WC 6.x,
+  HPOS off). The pilot is WC 6.9.4 = legacy storage, but the wp-env integration
+  runs WC 10.7 + HPOS — so the integration green covers the HPOS order-backfill
+  path, NOT the pilot's legacy path (unit-tested via `table_spec` only, 3.5.2).
+  Low risk (same SQL shape), but a real legacy-DB run (does
+  `WHERE post_type='shop_order' AND post_status IN ('wc-completed'…) AND ID >
+  cursor` behave on a real WC 6.x posts schema?) must happen before the pilot
+  backfills orders. Not a blocker for 3.5.x dev (HPOS env proves the logic);
+  schedule before pilot go-live. (CLAUDE.md "OrderBackfill".)
 
 **Engine side:**
 - [x] backend (90-95%, gaps engine-internal)

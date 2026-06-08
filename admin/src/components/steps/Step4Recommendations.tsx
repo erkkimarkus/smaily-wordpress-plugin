@@ -8,6 +8,7 @@ import {
 } from '../../api/recEngine';
 import { type WizardAction, type WizardState } from '../../state/types';
 import { Banner, Button, Card, Input, Label, Toggle } from '../primitives';
+import { BackfillPanel } from '../BackfillPanel';
 
 export interface Step4RecommendationsProps {
   state: WizardState;
@@ -288,6 +289,29 @@ function ConnectedView({
             checked={state.recEngineFeatures.trackCartEvents}
             onChange={toggle('trackCartEvents')}
             label="Track cart events in real-time"
+          />
+        </div>
+      </Card>
+
+      <Card
+        title="Import existing data"
+        description="The toggles above sync future changes. Import your existing catalog, customers, and orders into the engine once so recommendations have history to learn from. Runs in the background in batches."
+      >
+        <div className="space-y-3">
+          <BackfillPanel
+            jobType="products"
+            label="Products"
+            recordCount={state.env.storeTotals.products}
+          />
+          <BackfillPanel
+            jobType="customers"
+            label="Customers"
+            recordCount={state.env.storeTotals.customers}
+          />
+          <BackfillPanel
+            jobType="orders"
+            label="Orders"
+            recordCount={state.env.storeTotals.orders}
           />
         </div>
       </Card>
