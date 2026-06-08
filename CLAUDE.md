@@ -86,6 +86,26 @@ datetime field goes through IsoDate.
 (Verify exact paths/scripts against the repo — this list is the working set as
 of orders ingest; update if the build evolves.)
 
+### Browse browser-timing is NOT live-walk-covered (manual pilot check)
+Browse (3.4) is client-originated telemetry, so unlike catalog/customers/orders
+the live-walk (`bin/walk-3.4-browse.cjs`) proves only the server side:
+proxy→engine §6 + the abuse filter + the engine accepting all 9 event types.
+The **browser MOMENT** a page-view fires — `checkout_start` on the checkout
+page, `checkout_complete` on order-received, `product_view` on a product page —
+is NOT observable from a server-side proxy walk. Coverage is split:
+- engine accepts the types → live-walk (9-types check);
+- JS maps `pageType` → event → vitest (`beacon-core.test.ts`);
+- PHP picks the `pageType` from WC conditional tags (`StorefrontBeacon::
+  page_context`) → only the `other` default is integration-tested. The harness
+  is plain `TestCase` (no `WP_UnitTestCase`/`go_to()`), so `is_checkout()` /
+  `is_product()` can't be driven to exercise the branches — writing a test that
+  faked them would prove nothing. The conditional-tag branching is trivial; the
+  real "does it fire on the right page" check is **manual pilot verification**
+  (or a future Chromium E2E — not built, YAGNI, low risk).
+
+Do NOT claim the live-walk validates checkout/page-view timing — it validates
+the engine contract, not the browser render moment.
+
 ---
 
 ## How we work (the rhythm)

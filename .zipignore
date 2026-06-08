@@ -23,8 +23,10 @@
 # BETA-fork additions — Phase 2 sub-PR 2.H drove a 49MB ZIP because
 # the upstream .zipignore predates these directories. Each line below
 # was bundled into the artifact by accident and serves no purpose at
-# runtime (WordPress only needs dist/admin/*, the PHP tree, and
-# blocks/*/build/*). Order matches the on-disk size of the offender —
+# runtime (WordPress needs dist/admin/*, dist/public/js/* (the storefront
+# browse beacon, 3.4), the PHP tree, and blocks/*/build/*; dist/client/* is
+# the unused npm-extraction stub). Order matches the on-disk size of the
+# offender —
 # node_modules dominates everything else by two orders of magnitude.
 /node_modules*
 /coverage*

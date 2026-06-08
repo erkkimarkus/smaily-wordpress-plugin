@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-06 (plugin-side N-7 complete — AbstractD6Flusher + catalog flusher D6; lock RESOLVED; catalog live-walk 15/15 incl. flusher_d6_split_lock_proof against the real engine; W2 `items`->`products` wrapper drift caught + fixed)_
+_Last updated: 2026-06-08 (3.4 browse-beacon COMPLETE — proxy + abuse model + client transport + cookies + WP-wrapper + WC events; browse live-walk 13/13 against MiuMjau incl. retroactive_bound=2 + the live abuse filter; ZIP'd. Browser render-timing is a manual pilot check. Next: 3.5 backfill)_
 
 ---
 
@@ -108,7 +108,7 @@ see "Pilot go-live" below.
   sync had updated the doc, not the code; the mock hid it) — fixed in Client +
   mock + ClientTest. (DECISIONS F3-22 + N-7; LESSONS §2.7.)
 
-### In progress
+### Done — 3.4 browse-beacon (complete, live-walked + ZIP'd)
 
 - **3.4 browse-beacon** — storefront telemetry → server proxy → engine
   `/api/v1/ingest/browse`. Differs from the ingest domains: client-buffered
@@ -160,15 +160,23 @@ see "Pilot go-live" below.
   the single-product form-POST add-to-cart fires no JS event, so its cart_add
   isn't tracked, and a SKU-less event is skipped (best-effort, §14.2). 5 more
   vitest tests (33 client + beacon-core total). Gates green. **3.4.3 complete.**
-  Next: 3.4.4.
+  **3.4.4 DONE** (live-walk + ZIP): `bin/walk-3.4-browse.cjs` — **13/13 against
+  the real MiuMjau engine**. Two paths: in-process REST dispatch to `/beacon`
+  (full proxy→engine chain + the abuse filter on the live endpoint) + direct
+  `Client::ingest_browse` (the §6 per-item behaviours the proxy 400s first).
+  Proven live: all **9 event types processed** (EventType 8→9 §2.7 fix confirmed
+  against the engine), anonymous vs `with_customer_match`, missing-event_id +
+  invalid-event_type → engine per-item `errors[]`, dedup, and **`retroactive_bound=2`**
+  (anon session events rebound to a customer once an email resolves — browse's
+  hardest engine behaviour, end-to-end). Abuse on the live `/beacon`:
+  101-events→400, bad-type→400, missing-id→400, rate-limit→429. ZIP includes
+  `dist/public/js/beacon.js` (self-contained). **3.4 browse-beacon COMPLETE.**
+  Browser render-timing (when checkout_start/complete fire) is a manual pilot
+  check, NOT live-walk-covered (CLAUDE.md + below).
 
 ### Next
 
-- **3.4.4** — mock browse route already exists (3.4.0); add the storefront/JS
-  pieces to the live-walk + ZIP. Confirm in the live-walk that checkout_start
-  (checkout page) and checkout_complete (order-received) fire at the right
-  moments (per Erkki — page-view mapping hits the right instants). Then roadmap
-  below.
+- **3.5** backfill (cursor pagination). Then the roadmap below.
 
 ### Waiting / lock conditions
 
@@ -180,8 +188,9 @@ see "Pilot go-live" below.
 
 ### Roadmap (Phase 3 remaining)
 
-- **3.4** browse-beacon (sends events; engine consumes post-MVP per §14.2 — set
-  pilot expectation: collects data, improves recommendations later, not now)
+- ~~**3.4** browse-beacon~~ — DONE (above). NB §14.2: the engine consumes browse
+  post-MVP — pilot expectation is "collects data, improves recommendations
+  later, not now".
 - **3.5** backfill (cursor pagination)
 - **3.6** beacon (note: checkout_complete browse event is NOT engine-coupled to
   the orders endpoint — don't assume linkage; attribution is future work)
@@ -222,6 +231,15 @@ sides ready = go-live.
   a dispatcher" premise no longer applies. Cosmetic only — defer or drop.
 - Flaky useBackfillProgress test (fake-timers race) — fix with deterministic
   timer mocking.
+- **Browse browser-timing — manual pilot verification (not live-walk-covered).**
+  The 3.4 live-walk proves the engine contract (proxy→engine + abuse + all 9
+  types) but a server-side walk can't observe the browser MOMENT a page-view
+  fires (checkout_start on the checkout page, checkout_complete on
+  order-received, product_view on a product page). The PHP page-type detection
+  (`StorefrontBeacon::page_context`) can't be driven in the integration harness
+  (no `WP_UnitTestCase`/`go_to()`); JS mapping is vitest-tested. So confirm the
+  render moment manually during the pilot (or a future Chromium E2E — not built,
+  YAGNI, low risk). See CLAUDE.md "Browse browser-timing".
 - GDPR export omits rec_attribution — engine-side Art 15 legal review (not a
   contract issue for the plugin).
 - F3-19 guest-customer flusher concern: RESOLVED by W5 — engine auto-creates the
