@@ -46,9 +46,9 @@ The plugin connects to Smaily's recommendation engine and feeds it product, cust
 | Catalog ingest (products → engine) | ✓ Complete | Live-verified against deployed engine, 14/14 scenarios |
 | Customers ingest | ✓ Complete | Live-verified 10/10 against deployed engine (customers-end) |
 | Orders ingest | ✓ Complete | Live-verified 12/12 against deployed engine (orders-end) |
-| Browse ingest | ⏳ Pending | Scheduled after customers + orders |
-| Backfill (historical data) | ⏳ Pending | Cursor-paginated sync of pre-existing WC data |
-| Beacon (browse tracking) | ⏳ Pending | Client-side beacon with server-side proxy for cookieless tracking |
+| Browse ingest | ✓ Complete | `ingest_browse` + the public `/beacon` proxy; live-walked 13/13 (browse-beacon 3.4.0) |
+| Backfill (historical data) | ✓ Complete | Cursor-paginated catalog/customers/orders backfill; live-walked 7/7 (3.5) |
+| Beacon (browse tracking) | ✓ Complete | Client-side beacon (buffer/sendBeacon, cookies, WP-Consent-API gate, WC events) — shipped within browse-beacon 3.4.1–3.4.3 |
 | Identity merge | ⏳ Pending | Anonymous-to-known visitor merging on checkout, login, or manual mapping |
 | GDPR | ⏳ Pending | WP Privacy API integration for export and erase requests |
 | Step 4 4a activation | ⏳ Pending | Final UI shift from mode-A to mode-B |

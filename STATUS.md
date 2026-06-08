@@ -254,8 +254,12 @@ see "Pilot go-live" below.
 - ~~**3.5** backfill~~ — DONE (above): catalog/customers/orders backfill,
   cursor-resumable, inline-flush bounded, live-walked 7/7. (Legacy order path =
   pilot precondition.)
-- **3.6** beacon (note: checkout_complete browse event is NOT engine-coupled to
-  the orders endpoint — don't assume linkage; attribution is future work)
+- ~~**3.6** beacon~~ — REMOVED (not a separate sub-PR). The README feature table
+  split "Browse ingest" + "Beacon (browse tracking)" as two items; 3.4
+  browse-beacon shipped BOTH (3.4.0 = Client::ingest_browse + /beacon proxy =
+  browse ingest; 3.4.1-.3 = the client beacon track/flush/cookies/consent/WC
+  events = beacon tracking). So "3.6 beacon" duplicated 3.4. (A storefront
+  recommendation-render widget is a separate FUTURE epic — never numbered here.)
 - **3.7** identity-merge (reconciles email-split: same person, two emails -> two
   customer records until merge)
 - **3.8** GDPR (WP Privacy API)
