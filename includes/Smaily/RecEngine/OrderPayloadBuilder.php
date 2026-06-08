@@ -128,6 +128,18 @@ class OrderPayloadBuilder {
 		return self::STATUS_MAP[ $key ] ?? '';
 	}
 
+	/**
+	 * The un-prefixed WC statuses that map to a non-empty engine status — the
+	 * orders worth ingesting. Single source (CC-9) for the order backfill's SQL
+	 * status filter (3.5.2): the enumeration filters on exactly the statuses
+	 * map_status() accepts, so the two can't drift (no duplicated status list).
+	 *
+	 * @return string[] e.g. ['completed', 'processing', 'on-hold', 'cancelled', 'refunded'].
+	 */
+	public static function mapped_wc_statuses(): array {
+		return array_keys( self::STATUS_MAP );
+	}
+
 	private function ordered_at( \WC_Order $order ): string {
 		$date = $order->get_date_created();
 		if ( ! is_object( $date ) || ! method_exists( $date, 'getTimestamp' ) ) {

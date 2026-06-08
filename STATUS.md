@@ -198,13 +198,26 @@ see "Pilot go-live" below.
   neither side sends a different cohort. Test proves a subscriber/editor (non-
   customer role) is backfilled, plus resumability + bounded. Wired:
   make_backfill_job 'customers', SUPPORTED += customers, backfill.ts union.
-  ci:strict exit=0; integration OK 60 (+4). Next: 3.5.2 orders.
+  ci:strict exit=0; integration OK 60 (+4).
+  **3.5.2 DONE** (orders, HPOS-aware): `OrderBackfillJob` — direct
+  `WHERE id > cursor` against the active order table (`wc_orders` HPOS /
+  `wp_posts` legacy, detected via OrderUtil; `wc_get_orders` only offers
+  offset/paged, which shifts under inserts → would break the cursor). **Status
+  filter matches the hook**: enumerates only mapped (sale) statuses via SQL
+  `status IN (...)`, using `OrderPayloadBuilder::mapped_wc_statuses()` as the
+  single source (CC-9 — can't drift from map_status). Progress denominator =
+  mapped orders, not all. Test storage split: **wp-env runs WC 10.7 + HPOS, so
+  the HPOS path is integration-tested; the legacy path (the pilot's WC 6.9.4
+  mode) is unit-tested via the pure `table_spec` — structurally identical but
+  not run against real wp_posts orders here** (CLAUDE.md "OrderBackfill"). Tests:
+  resumability + bounded + status-filter (unmapped excluded) + full. ci:strict
+  exit=0; integration OK 64 (+4 order backfill). **3.5.0-.2 backend complete.**
+  Next: 3.5.3 admin UI panels + live-walk.
 
 ### Next
 
-- 3.5.2 OrderBackfillJob (HPOS-aware enumeration — orders are in wc_orders OR
-  wp_posts depending on storage mode) → 3.5.3 admin UI panels + live-walk. Then
-  the roadmap below.
+- **3.5.3** admin UI panels (per-domain backfill button + progress, reusing the
+  generic useBackfillProgress) + a backfill live-walk + ZIP. Then the roadmap.
 
 ### Waiting / lock conditions
 

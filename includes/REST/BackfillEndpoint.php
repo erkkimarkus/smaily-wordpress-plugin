@@ -57,12 +57,11 @@ class BackfillEndpoint {
 
 	/**
 	 * Job types this endpoint accepts. `contacts` is the legacy Smaily backfill;
-	 * `products` / `customers` are the 3.5 rec-engine backfills (orders follows
-	 * in 3.5.2).
+	 * `products` / `customers` / `orders` are the 3.5 rec-engine backfills.
 	 *
 	 * @var string[]
 	 */
-	private const SUPPORTED_JOB_TYPES = array( 'contacts', 'products', 'customers' );
+	private const SUPPORTED_JOB_TYPES = array( 'contacts', 'products', 'customers', 'orders' );
 
 	/**
 	 * Factory that constructs the right backfill job for a job_type on demand.

@@ -29,6 +29,7 @@ use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CatalogBackfillJob;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CustomerBackfillJob;
+use Smaily\Connect\Smaily\RecEngine\Backfill\OrderBackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
@@ -254,6 +255,11 @@ final class Bootstrap {
 				return new CustomerBackfillJob(
 					$this->ingest_queue(),
 					$this->customer_flusher()
+				);
+			case 'orders': // 3.5.2 rec-engine order backfill (HPOS-aware, sale states).
+				return new OrderBackfillJob(
+					$this->ingest_queue(),
+					$this->order_flusher()
 				);
 			default:
 				return null;

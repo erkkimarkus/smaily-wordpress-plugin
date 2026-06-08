@@ -1,6 +1,6 @@
 import { apiRequest } from './client';
 
-export type BackfillJobType = 'contacts' | 'products' | 'customers';
+export type BackfillJobType = 'contacts' | 'products' | 'customers' | 'orders';
 
 export interface BackfillStartResponse {
   job_id: number;

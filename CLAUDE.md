@@ -106,6 +106,26 @@ is NOT observable from a server-side proxy walk. Coverage is split:
 Do NOT claim the live-walk validates checkout/page-view timing — it validates
 the engine contract, not the browser render moment.
 
+### OrderBackfill — which storage path the tests actually cover (HPOS vs legacy)
+OrderBackfillJob (3.5.2) reads orders with a direct `WHERE id > cursor` query
+against whichever table is active — `wc_orders` (HPOS) or `wp_posts` (legacy) —
+detected via `OrderUtil::custom_orders_table_usage_is_enabled()`. The table +
+column mapping is a pure method (`OrderBackfillJob::table_spec`).
+
+**The wp-env test env runs WC 10.7 with HPOS ENABLED** (orders in `wc_orders`,
+zero in `wp_posts`). So:
+- the **HPOS path is INTEGRATION-tested** (RecEngineOrderBackfillTest runs
+  against real `wc_orders`);
+- the **legacy path is UNIT-tested only** (`OrderBackfillJobTest::table_spec`) —
+  it is structurally identical (same WHERE shape, different table/columns) but
+  is NOT exercised against real `wp_posts` orders in this env.
+
+The PILOT is WC 6.9.4 → **legacy storage** (HPOS only defaults at WC 8.2+). So
+the pilot's actual path is the unit-tested-only one. Low risk (the SQL is the
+same shape, table_spec-verified), but if a legacy-storage order-backfill issue
+surfaces, reproduce it against a LEGACY WC env — the HPOS-mode wp-env won't show
+it. Do NOT assume "integration green" covers the legacy order path.
+
 ---
 
 ## How we work (the rhythm)
