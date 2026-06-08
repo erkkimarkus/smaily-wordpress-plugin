@@ -89,6 +89,12 @@ final class EndpointRegistry {
 					return new RecEngineClient( $api_key, $base_url );
 				}
 			),
+			new BeaconEndpoint(
+				new RecEngineSettings(),
+				static function ( string $api_key, string $base_url ): RecEngineClient {
+					return new RecEngineClient( $api_key, $base_url );
+				}
+			),
 		);
 	}
 
@@ -143,6 +149,13 @@ final class EndpointRegistry {
 			array(
 				'method' => 'POST',
 				'path'   => '/rec-engine/disconnect',
+			),
+			// The public browse-beacon proxy. Registered unconditionally; the
+			// gate (connected + browse-tracking on) lives in the handler, which
+			// 404s when disabled (BeaconEndpoint hard-gates before any work).
+			array(
+				'method' => 'POST',
+				'path'   => '/beacon',
 			),
 		);
 	}

@@ -108,9 +108,26 @@ see "Pilot go-live" below.
   sync had updated the doc, not the code; the mock hid it) — fixed in Client +
   mock + ClientTest. (DECISIONS F3-22 + N-7; LESSONS §2.7.)
 
+### In progress
+
+- **3.4 browse-beacon** — storefront telemetry → server proxy → engine
+  `/api/v1/ingest/browse`. Differs from the ingest domains: client-buffered
+  best-effort telemetry, NOT the Queue/Flusher pattern (intentional, F3-16
+  deviation). **3.4.0 DONE** (server side): `Client::ingest_browse` (`events`
+  wrapper), public `POST /beacon` proxy (`BeaconEndpoint`) with the abuse model
+  — hard-404 gate (connected + `track_browsing`), per-IP + per-session
+  rate-limit, server-side §6 event_type/event_id validation + field-whitelist.
+  Mock browse route (D6) + unit (validate_batch, ingest_browse) + integration
+  (7 proxy tests). Gates green. **NOTE/deviation to confirm:** the route is
+  registered *unconditionally* and the handler 404s when disabled (not
+  conditional registration) — same attack surface, but testable without
+  rebuilding the REST server (which segfaults wp-env). Next: 3.4.1 client
+  track/flush.
+
 ### Next
 
-- Phase 3 remaining (roadmap below) — 3.4 browse onward. Awaiting go-ahead.
+- 3.4.1 client (track/flush/sendBeacon) → .2 cookies/consent → .3 WP-wrapper +
+  vite + storefront hooks → .4 mock+live-walk+ZIP. Then roadmap below.
 
 ### Waiting / lock conditions
 

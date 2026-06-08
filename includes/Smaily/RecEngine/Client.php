@@ -218,12 +218,34 @@ class Client {
 	}
 
 	/**
-	 * @param array<int, array<string, mixed>> $events
+	 * Batch-upload browse events to POST /api/v1/ingest/browse.
 	 *
-	 * @return array<string, mixed>
+	 * Wrapper key is `events` (§6); the batch cap is **100** events per
+	 * request and the engine rate limit is higher (500 req/sec — browse is the
+	 * highest-volume endpoint). Browse has **no Layer-1 natural key**, so a
+	 * **missing `event_id` is a per-item error** (not a silent no-dedup insert);
+	 * the plugin-side beacon proxy already rejects event_id-less events before
+	 * they reach here, but the engine is the strict validator (D6).
+	 *
+	 * Per-item D6 partial success: a 2xx body carries
+	 * {ok, processed, deduplicated, errors:[{index, field, message}]} plus the
+	 * informational sub-counts {with_customer_match, anonymous, retroactive_bound,
+	 * duplicates_skipped}. Unlike the server-originated ingest domains
+	 * (catalog/customers/orders), browse is NOT drained through the
+	 * IngestQueue/Flusher — it is client-buffered telemetry forwarded
+	 * synchronously by the beacon proxy (best-effort; a lost batch is
+	 * acceptable). A wrapper-level failure (non-array / empty / >100) is a 400
+	 * and throws ApiException carrying the body's `details` (F3-18).
+	 *
+	 * @param array<int, array<string, mixed>> $events 1..100 browse-event objects.
+	 *
+	 * @return array<string, mixed> The decoded engine response (D6 shape).
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
 	 */
 	public function ingest_browse( array $events ): array {
-		throw new \RuntimeException( 'ingest_browse: not implemented in sub-PR 3.1 (lands in 3.4).' );
+		$url = $this->resolve_url( 'ingest_browse', self::PATH_INGEST_BROWSE );
+		return $this->request_url( 'POST', $url, array( 'events' => $events ) );
 	}
 
 	// ---------------------------------------------------------------

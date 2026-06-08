@@ -586,6 +586,164 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 	reply( 200, $response );
 }
 
+// Browse ingest — §6 batch + D6 per-item errors[]. Wrapper key `events`,
+// 1..100 per request (rate limit 500 req/sec, the highest-volume endpoint).
+// Browse has NO Layer-1 natural key, so a missing event_id is a per-item
+// error (not a silent no-dedup insert), and an invalid event_type is a
+// per-item error. Sub-counts: an event with a customer_email / visitor_token
+// identity hint is with_customer_match, otherwise anonymous. Scenario
+// triggers ride the FIRST event's event_id prefix (auth-401- / retry-500-).
+// The plugin beacon proxy pre-filters junk (id-less / bad-type → 400 before
+// it reaches here), so this route is the engine's strict D6 validator that
+// a direct Client::ingest_browse call (and the live-walk) exercises.
+if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply(
+			401,
+			array(
+				'error'      => 'unauthorized',
+				'message'    => 'Authorization header missing or malformed.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	// Wrapper key is `events` (§6). Non-array / missing → 400 wrapper-level.
+	if ( ! is_array( $body ) || ! isset( $body['events'] ) || ! is_array( $body['events'] ) ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'events' => array( 'Required' ) ) ),
+			)
+		);
+	}
+
+	$events = $body['events'];
+
+	// Empty / >100 → 400 (wrapper all-or-nothing; per-EVENT failures use errors[]).
+	if ( count( $events ) === 0 || count( $events ) > 100 ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'events' => array( 'Array must contain between 1 and 100 element(s)' ) ) ),
+			)
+		);
+	}
+
+	$first_id = isset( $events[0]['event_id'] ) ? (string) $events[0]['event_id'] : '';
+
+	// Revoked / invalid key — terminal 4xx, no retry.
+	if ( strpos( $first_id, 'auth-401-' ) === 0 ) {
+		reply(
+			401,
+			array(
+				'error'      => 'api_key_revoked',
+				'message'    => 'This api_key has been revoked.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+
+	// Transient 500 on the FIRST attempt only, then succeed on retry.
+	if ( strpos( $first_id, 'retry-500-' ) === 0 ) {
+		$counter_key           = 'browse_attempts_' . md5( $first_id );
+		$seen_count            = isset( $state[ $counter_key ] ) ? (int) $state[ $counter_key ] : 0;
+		$state[ $counter_key ] = $seen_count + 1;
+		save_state( $state_file, $state );
+		if ( $seen_count === 0 ) {
+			reply(
+				500,
+				array(
+					'error'      => 'internal_error',
+					'message'    => 'Transient engine error.',
+					'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+					'timestamp'  => gmdate( 'c' ),
+				)
+			);
+		}
+	}
+
+	$valid_types = array(
+		'product_view',
+		'category_view',
+		'search',
+		'cart_add',
+		'cart_remove',
+		'wishlist_add',
+		'wishlist_remove',
+		'checkout_start',
+		'checkout_complete',
+	);
+
+	// Per-event D6: missing event_id / bad event_type → error; seen event_id →
+	// deduplicated; else processed (with_customer_match vs anonymous by hint).
+	$seen               = ( isset( $state['browse_event_ids'] ) && is_array( $state['browse_event_ids'] ) )
+		? $state['browse_event_ids']
+		: array();
+	$processed          = 0;
+	$deduplicated       = 0;
+	$with_customer      = 0;
+	$anonymous          = 0;
+	$errors             = array();
+	foreach ( $events as $index => $event ) {
+		$event_id   = isset( $event['event_id'] ) ? (string) $event['event_id'] : '';
+		$event_type = isset( $event['event_type'] ) ? (string) $event['event_type'] : '';
+
+		if ( trim( $event_id ) === '' ) {
+			$errors[] = array( 'index' => $index, 'field' => 'event_id', 'message' => 'Required' );
+			continue;
+		}
+		if ( ! in_array( $event_type, $valid_types, true ) ) {
+			$errors[] = array( 'index' => $index, 'field' => 'event_type', 'message' => 'Invalid enum value' );
+			continue;
+		}
+		if ( in_array( $event_id, $seen, true ) ) {
+			++$deduplicated;
+			continue;
+		}
+		$seen[] = $event_id;
+		++$processed;
+		$has_identity = ( isset( $event['customer_email'] ) && (string) $event['customer_email'] !== '' )
+			|| ( isset( $event['smaily_visitor_token'] ) && (string) $event['smaily_visitor_token'] !== '' );
+		if ( $has_identity ) {
+			++$with_customer;
+		} else {
+			++$anonymous;
+		}
+	}
+	$state['browse_event_ids']     = $seen;
+	$state['last_browse_received'] = array_map(
+		static function ( $event ) {
+			return isset( $event['event_id'] ) ? (string) $event['event_id'] : '';
+		},
+		$events
+	);
+	save_state( $state_file, $state );
+
+	$response = array(
+		'ok'                 => true,
+		'processed'          => $processed,
+		'deduplicated'       => $deduplicated,
+		'errors'             => $errors,
+		'with_customer_match' => $with_customer,
+		'anonymous'          => $anonymous,
+		'retroactive_bound'  => 0,
+		'duplicates_skipped' => $deduplicated,
+	);
+	if ( $processed === 0 && $deduplicated > 0 && $errors === array() ) {
+		$response['deduplicated_all'] = true;
+	}
+	reply( 200, $response );
+}
+
 // Fallback.
 reply(
 	404,

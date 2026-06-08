@@ -205,6 +205,36 @@ final class ClientTest extends TestCase {
 		self::assertSame( $d6, $client->ingest_orders( array( array( 'external_order_id' => 'WC-1' ) ) ) );
 	}
 
+	public function test_ingest_browse_posts_events_wrapper_to_engine_map_url(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'ingest_browse' => 'https://engine.test/api/v1/ingest/browse' )
+		);
+
+		$client->ingest_browse( array( array( 'event_id' => 'e1', 'event_type' => 'product_view', 'sku' => 'A' ) ) );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/ingest/browse', $client->captured['url'] );
+		self::assertSame(
+			array( 'events' => array( array( 'event_id' => 'e1', 'event_type' => 'product_view', 'sku' => 'A' ) ) ),
+			$client->captured['body'],
+			'Browse wire wrapper key is `events` (§6).'
+		);
+	}
+
+	public function test_ingest_browse_falls_back_to_constant_path_without_map(): void {
+		$client = $this->capturing_client( 'sk_live', 'https://base.test' );
+
+		$client->ingest_browse( array( array( 'event_id' => 'e1', 'event_type' => 'product_view' ) ) );
+
+		self::assertSame(
+			'https://base.test' . Client::PATH_INGEST_BROWSE,
+			$client->captured['url'],
+			'With no endpoints map, ingest_browse falls back to base_url + PATH_INGEST_BROWSE.'
+		);
+	}
+
 	/**
 	 * Client double that captures the resolved (method, url, body) instead
 	 * of hitting the network, and returns a canned 200 body.
