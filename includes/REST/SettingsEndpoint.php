@@ -425,10 +425,11 @@ class SettingsEndpoint {
 			? $data['recEngineFeatures']
 			: array();
 
-		update_option( 'smly_plus_rec_sync_orders', ! empty( $features['syncOrders'] ) );
-		update_option( 'smly_plus_rec_sync_customers', ! empty( $features['syncCustomers'] ) );
-		update_option( 'smly_plus_rec_sync_products', ! empty( $features['syncProducts'] ) );
-		update_option( 'smly_plus_rec_track_cart_events', ! empty( $features['trackCartEvents'] ) );
+		// 3.9: connecting the rec-engine syncs all domains unconditionally
+		// (products/customers/orders fire while is_connected()). The per-domain
+		// sync toggles were removed — only the browse-tracking preference (a
+		// legal-consent gate, opt-in default-off) is persisted here. The four
+		// removed option keys are cleaned up in Activation::cleanup_removed_rec_feature_options().
 		update_option( 'smly_plus_rec_track_browsing', ! empty( $features['trackBrowsing'] ) );
 
 		return $this->success_response();

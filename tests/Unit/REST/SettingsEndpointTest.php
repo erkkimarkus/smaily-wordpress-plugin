@@ -221,7 +221,11 @@ final class SettingsEndpointTest extends TestCase {
 		self::assertSame( 10, $this->option_writes['smaily_connect_abandoned_cart_cutoff'] );
 	}
 
-	public function test_recommendations_tab_persists_feature_flags(): void {
+	public function test_recommendations_tab_persists_only_browse_preference(): void {
+		// 3.9: the per-domain sync toggles were removed — connecting the engine
+		// syncs all domains unconditionally. The only persisted Step-4 preference
+		// is browse tracking. The four removed keys must NOT be written (a
+		// regression guard so a reintroduced toggle doesn't silently re-persist).
 		$endpoint = new SettingsEndpoint();
 
 		$request = new WP_REST_Request();
@@ -230,11 +234,7 @@ final class SettingsEndpointTest extends TestCase {
 			'data',
 			array(
 				'recEngineFeatures' => array(
-					'syncOrders'      => true,
-					'syncCustomers'   => true,
-					'syncProducts'    => false,
-					'trackCartEvents' => true,
-					'trackBrowsing'   => false,
+					'trackBrowsing' => true,
 				),
 			)
 		);
@@ -242,9 +242,11 @@ final class SettingsEndpointTest extends TestCase {
 		$response = $endpoint->handle( $request );
 
 		self::assertTrue( $response->get_data()['saved'] );
-		self::assertTrue( $this->option_writes['smly_plus_rec_sync_orders'] );
-		self::assertFalse( $this->option_writes['smly_plus_rec_sync_products'] );
-		self::assertFalse( $this->option_writes['smly_plus_rec_track_browsing'] );
+		self::assertTrue( $this->option_writes['smly_plus_rec_track_browsing'] );
+		self::assertArrayNotHasKey( 'smly_plus_rec_sync_orders', $this->option_writes );
+		self::assertArrayNotHasKey( 'smly_plus_rec_sync_customers', $this->option_writes );
+		self::assertArrayNotHasKey( 'smly_plus_rec_sync_products', $this->option_writes );
+		self::assertArrayNotHasKey( 'smly_plus_rec_track_cart_events', $this->option_writes );
 	}
 
 	public function test_permission_check_denies_non_admin(): void {

@@ -370,14 +370,23 @@ describe('wizardReducer — Step 3 WC automations', () => {
 });
 
 describe('wizardReducer — Step 4 rec-engine features', () => {
-  it('toggles a single feature without touching the others', () => {
+  it('toggles the browse-tracking preference (the only Step-4 toggle after 3.9)', () => {
     const next = wizardReducer(baseState, {
       type: 'SET_REC_ENGINE_FEATURE',
       payload: { feature: 'trackBrowsing', enabled: true },
     });
 
     expect(next.recEngineFeatures.trackBrowsing).toBe(true);
-    expect(next.recEngineFeatures.syncOrders).toBe(baseState.recEngineFeatures.syncOrders);
+  });
+
+  it('does not mutate the source state', () => {
+    const next = wizardReducer(baseState, {
+      type: 'SET_REC_ENGINE_FEATURE',
+      payload: { feature: 'trackBrowsing', enabled: true },
+    });
+
+    expect(next).not.toBe(baseState);
+    expect(baseState.recEngineFeatures.trackBrowsing).toBe(false);
   });
 });
 

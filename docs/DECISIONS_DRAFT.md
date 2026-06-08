@@ -1525,6 +1525,56 @@ the eraser also clears), §8/§9/§10 contract, LESSONS §2.9 (placeholder drift
 3.8.0 ships the handler; 3.8.1 the live-walk (10/10) that caught the placeholder
 bug, + ZIP. Smaily profiling-consent wiring + beacon-stop follow separately.
 
+### F3-29: Step 4 activation (3.9) — connect ⇒ sync all (system-decides); per-domain sync toggles removed
+
+**Context:** Step-4 4a (the connected state) shipped five `recEngineFeatures`
+checkboxes built faithfully to PLUGIN.md §Step-4-4a (sync orders/customers/products
++ track cart events, default-on; track browsing, default-off). But the backend
+**never enforced** four of them — the Catalog/Customer/Order HookHandlers gate on
+`is_connected()` alone, and the four option keys (`smly_plus_rec_sync_*`,
+`…_track_cart_events`) were write-only with no consumer. Only `track_browsing` was
+read (by the beacon). So the toggles were cosmetic, and `hydrate.ts` even hardcoded
+them rather than reading the saved values. A spec/vision audit (the research that
+preceded 3.9) surfaced the contradiction: PLUGIN.md specced toggles, but Erkki's
+product vision had evolved to "activating the engine syncs everything — the system
+decides; partial sync just makes a worse engine."
+
+**Decision:** Adopt the vision. Connecting the rec-engine **syncs all domains
+unconditionally** (the existing `is_connected()` gate IS the model). Remove the four
+sync toggles from the UI + types/reducers/hydrate, stop persisting their options,
+and clean up the dead keys (`Activation::cleanup_removed_rec_feature_options()`,
+idempotent `delete_option`×4 on upgrade-detect). The **browse-tracking toggle stays**
+— it's a legitimate **legal-consent gate** (opt-in, default-off), not a sync
+preference, and is layered on top of end-user consent (WP Consent API / CookieYes,
+the two-gate model of 3.4.2). Cart events ride the browse beacon (gated by
+`track_browsing`), so there is no separate cart toggle. PLUGIN.md §Step-4-4a + §6
+revised to follow the vision (the authoritative spec now matches).
+
+**Disconnect / re-connect (Erkki-locked):** `disconnect()` clears only the
+connection options (`smly_rec_*`: api_key, base_url, tenant, endpoints, config,
+connected) — it does **NOT** delete `smly_plus_rec_track_browsing`. The ConnectedView
+(and with it the browse toggle) hides because `is_connected()` is false; on
+re-connect the saved browse preference is restored. This **required a hydration
+fix** (no longer optional): `EnvDetector::rec_engine_snapshot()` now emits the saved
+`track_browsing` (read independent of connection state), and `hydrate.ts` reads it
+instead of hardcoding `false`. Without it, re-connect would forget the preference
+(and a plain reload blanked a saved-on toggle) — so the hydration fix is the
+*precondition* for the disconnect/re-connect decision, not a side cleanup.
+
+**Alternatives rejected:** (a) wire the four toggles to actually gate ingest
+(per-domain control) — rejected: contradicts the system-decides vision, and partial
+sync degrades the engine; (b) leave the toggles as cosmetic UI — rejected: a UI that
+promises a gate it doesn't have is a lie. The placeholder "mode-A → mode-B" label in
+the old roadmap stub was never defined in any spec; it is NOT the multilingual
+Mode A/B/C (F2-6, a separate email-account axis) nor "Route A" (the engine-convergence
+plan) — the audit established this from sources.
+
+**Relationships:** F2-6 (multilingual Mode A/B/C — the unrelated same-named axis),
+3.4.2 two-gate consent (browser-cookie consent AND merchant preference), PLUGIN.md
+§Step-4-4a + §6 (revised to match), the `is_connected()` ingest gate the
+HookHandlers already use. Browse end-user consent (CookieYes / WP Consent API) is
+unchanged — remembering the merchant preference does not bypass it.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1542,8 +1592,8 @@ discovered along the way):
 **What's likely to be added later in Phase 3** (F3-19/20/21 the 3.3 customers
 milestone, A-filter, datetime; F3-22 orders + status mapping; F3-23 N-7
 AbstractD6Flusher + W2 drift; F3-24 browse-beacon architecture; F3-25 backfill
-architecture — all above):
-- F3-29: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+architecture — all above). F3-28 (GDPR) and F3-29 (Step-4 activation) are now
+written in full above.
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.

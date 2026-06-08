@@ -94,6 +94,15 @@ export interface BootPayload {
       engineVersion: string;
       baseUrl: string;
       issuedAt: string;
+      /**
+       * The saved browse-tracking merchant preference
+       * (smly_plus_rec_track_browsing). Emitted independent of `connected`
+       * because disconnect() preserves it — so a re-connect restores the
+       * toggle state the merchant last chose. Previously hydrate hardcoded
+       * this to false, which both blanked a saved-on preference on reload and
+       * made re-connect forget it. The only Step-4 toggle after 3.9.
+       */
+      trackBrowsing: boolean;
     };
   };
 }
@@ -140,10 +149,6 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       abandonedCartEnabled: false,
       abandonedCartCutoffMinutes: 30,
       recEngineFeatures: {
-        syncOrders: true,
-        syncCustomers: true,
-        syncProducts: true,
-        trackCartEvents: true,
         trackBrowsing: false,
       },
       dirtyTabs: {
@@ -202,12 +207,10 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     firstOrderEnabled: s.firstOrderEnabled,
     abandonedCartEnabled: s.abandonedCartEnabled,
     abandonedCartCutoffMinutes: s.abandonedCartCutoffMinutes,
+    // Read the saved browse preference so reload AND re-connect restore the
+    // merchant's last choice (disconnect preserves the option server-side).
     recEngineFeatures: {
-      syncOrders: true,
-      syncCustomers: true,
-      syncProducts: true,
-      trackCartEvents: true,
-      trackBrowsing: false,
+      trackBrowsing: s.recEngine?.trackBrowsing ?? false,
     },
     dirtyTabs: {
       connection: false,

@@ -51,7 +51,7 @@ The plugin connects to Smaily's recommendation engine and feeds it product, cust
 | Beacon (browse tracking) | ✓ Complete | Client-side beacon (buffer/sendBeacon, cookies, WP-Consent-API gate, WC events) — shipped within browse-beacon 3.4.1–3.4.3 |
 | Identity merge | ✓ Complete | Anonymous-session → known-customer binding on login (`wp_login` → `/identity/merge`); live-walked 6/6 (3.7) |
 | GDPR | ✓ Complete | WP Privacy API exporter (Art 15) + eraser (Art 17) + opt-out (§10), HPOS-safe order-meta; live-walked 10/10 (3.8) |
-| Step 4 4a activation | ⏳ Pending | Final UI shift from mode-A to mode-B |
+| Step 4 4a activation | ✓ Complete | Connecting the engine syncs all domains (system-decides); per-domain sync toggles removed, browse-tracking is the only Step-4 toggle (consent-gated, preserved across disconnect/re-connect) (3.9) |
 
 ### Phase 4 — Pilot stabilization (planned)
 

@@ -60,10 +60,6 @@ export const wizardInitialState: WizardState = {
   abandonedCartCutoffMinutes: 30,
 
   recEngineFeatures: {
-    syncOrders: true,
-    syncCustomers: true,
-    syncProducts: true,
-    trackCartEvents: true,
     trackBrowsing: false,
   },
 

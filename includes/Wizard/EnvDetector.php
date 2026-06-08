@@ -312,6 +312,13 @@ class EnvDetector {
 			'engineVersion' => $settings->engine_version(),
 			'baseUrl'       => $settings->base_url(),
 			'issuedAt'      => $settings->issued_at(),
+			// Read INDEPENDENT of the connection: disconnect() wipes the
+			// smly_rec_* connection options but deliberately leaves the
+			// merchant's browse-tracking preference (smly_plus_rec_track_browsing)
+			// intact, so a re-connect restores the saved toggle state. hydrate.ts
+			// seeds recEngineFeatures.trackBrowsing from this (the only Step-4
+			// toggle left after 3.9 — sync is now unconditional while connected).
+			'trackBrowsing' => (bool) get_option( 'smly_plus_rec_track_browsing', false ),
 		);
 	}
 

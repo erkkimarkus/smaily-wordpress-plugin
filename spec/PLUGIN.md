@@ -233,14 +233,28 @@ Default: **Mode B** (the most typical).
 
 **Two variants, depending on the Step 1 choice:**
 
-**4a. When the rec-engine is connected:** feature choices
-- Checkbox "Sync orders to recommendations engine" (on by default) + initial backfill panel
-- Checkbox "Sync customers to recommendations engine" (on by default)
-- Checkbox "Sync products to recommendations engine" (on by default)
-- Checkbox "Track cart events in real-time" (on by default) — `cart.item_added`, `cart.item_removed`, `cart.viewed`
-- **Checkbox "Track browsing behavior" (OFF by default)** + a note about the consent requirement
-- A combined backfill panel for orders/customers/products — three progress bars, one "Start" button (the engine learns from the joined data)
-- Browse-event batching toggle (30s batched mode by default, optional single-event mode disabled)
+**4a. When the rec-engine is connected:** sync status + browse opt-in
+
+Connecting the rec-engine activates syncing for **all domains at once** — there
+are **no per-domain on/off toggles** (3.9). The system decides: good
+recommendations need products, customers, and orders together, so "choose what to
+sync" is the wrong question (partial sync = a worse engine). What's shown:
+- An informational note that products, customers, and orders sync automatically
+  while connected (the engine learns from the joined data)
+- A combined backfill panel for orders/customers/products — three progress bars,
+  one "Start" button (seed existing history into the engine)
+- **Checkbox "Track browsing behavior" (OFF by default)** + a note about the
+  consent requirement. This is the **only toggle** in Step 4: browse tracking is
+  opt-in (GDPR-sensitive) and is additionally gated by end-user consent (WP
+  Consent API / CookieYes) on top of this merchant preference. Cart events
+  (`cart_add` / `cart_remove`) ride the same browse beacon and the same consent
+  gate — there is no separate cart toggle.
+- Browse-event batching (30s batched mode by default)
+
+The browse preference is **preserved across a disconnect / re-connect**:
+`disconnect()` clears only the connection options (api_key, base_url, tenant,
+endpoints, config), so re-connecting restores the toggle state the merchant last
+chose.
 
 **4b. When the rec-engine is not connected:** marketing content
 - Hero: a rec-block screenshot from a Smaily email (a static asset in the plugin)
@@ -287,7 +301,7 @@ The tabs after the wizard:
 1. **Connection** — Smaily credentials + rec-engine credentials + multilingual mode + "Change mode" button + "Re-run setup wizard" button
 2. **Subscribers** — selection of fields to sync, subscription checkboxes, backfill re-run
 3. **WooCommerce** — welcome / first_order / abandoned_cart workflow mappings + cutoff time
-4. **Recommendations** — all the sync checkboxes + browsing toggle + backfill re-run per data type
+4. **Recommendations** — the browse-tracking toggle (the only Step-4 toggle) + backfill re-run per data type; products/customers/orders sync automatically while connected
 5. **Integrations** — informational, the same as wizard Step 5
 6. **Event Log** — a separate tab (see §13)
 
@@ -848,7 +862,7 @@ An end-to-end test that must work before the client goes live:
 2. Wizard Step 1 — I enter the Smaily credentials → test connection ✓. The multilingual question opens → I choose **Mode B**. I enter the rec-engine setup-token URL → test connection ✓ → it shows "Connected to tenant: [Pet Shop Name]".
 3. Step 2 — field choices accepted. I start the backfill — 2000–5000 users sync to Smaily within 5–25 min, progress live.
 4. Step 3 — the Welcome / First order / Abandoned cart sections show the Mode B table (ET + EN rows + Default-fallback radio). I choose a workflow for each row. I save.
-5. Step 4 — all 4 first checkboxes on, browsing off. I start all 3 backfills (orders, customers, products) — all reach the rec-engine within 10–30 min, progress live.
+5. Step 4 — products/customers/orders sync automatically (no per-domain toggles), browsing off by default. I start all 3 backfills (orders, customers, products) — all reach the rec-engine within 10–30 min, progress live.
 6. Step 5 — the info cards are shown, the links work in-window (not target=_blank).
 7. Step 6 — the summary shows all activated features.
 8. **Live test 1 — Welcome**: I create a new WP user → in the ET context → the ET welcome workflow fires in Smaily. Repeat with EN.

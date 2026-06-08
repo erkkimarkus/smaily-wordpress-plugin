@@ -263,34 +263,15 @@ function ConnectedView({
 
       <Card
         title="Data synchronisation"
-        description="The engine learns from joined order + customer + product data. Best results when all three are synced."
+        description="While connected, the engine learns from your joined order, customer, and product data — all three sync automatically."
       >
-        <div className="space-y-3">
-          <Toggle
-            name="rec-sync-orders"
-            checked={state.recEngineFeatures.syncOrders}
-            onChange={toggle('syncOrders')}
-            label="Sync orders to recommendations engine"
-          />
-          <Toggle
-            name="rec-sync-customers"
-            checked={state.recEngineFeatures.syncCustomers}
-            onChange={toggle('syncCustomers')}
-            label="Sync customers to recommendations engine"
-          />
-          <Toggle
-            name="rec-sync-products"
-            checked={state.recEngineFeatures.syncProducts}
-            onChange={toggle('syncProducts')}
-            label="Sync products to recommendations engine"
-          />
-          <Toggle
-            name="rec-sync-cart-events"
-            checked={state.recEngineFeatures.trackCartEvents}
-            onChange={toggle('trackCartEvents')}
-            label="Track cart events in real-time"
-          />
-        </div>
+        <p className="text-sm text-text-secondary">
+          Syncing starts as soon as you connect and runs in the background — there&apos;s
+          nothing to switch on per data type. Use <span className="font-medium">Import
+          existing data</span> below to seed history into the engine; future changes sync on
+          their own. Browsing telemetry is the one exception — it&apos;s opt-in and configured
+          separately below.
+        </p>
       </Card>
 
       <Card

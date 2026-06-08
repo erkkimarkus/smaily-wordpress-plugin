@@ -90,12 +90,10 @@ final class DebugLogCleanTest extends TestCase {
 			array(
 				'tab'  => 'recommendations',
 				'data' => array(
+					// 3.9: browse tracking is the only Step-4 preference; the
+					// per-domain sync toggles were removed (connect => sync all).
 					'recEngineFeatures' => array(
-						'syncOrders'      => true,
-						'syncCustomers'   => true,
-						'syncProducts'    => true,
-						'trackCartEvents' => true,
-						'trackBrowsing'   => false,
+						'trackBrowsing' => false,
 					),
 				),
 			)

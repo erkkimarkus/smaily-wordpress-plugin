@@ -51,9 +51,35 @@ final class Activation {
 	public static function run(): void {
 		self::set_default_options();
 		self::run_migrations();
+		self::cleanup_removed_rec_feature_options();
 		self::migrate_wp_cron_to_action_scheduler();
 		self::schedule_recurring_action_scheduler_jobs();
 		self::stamp_plugin_version();
+	}
+
+	/**
+	 * One-time removal of the per-domain rec-engine sync option keys (3.9).
+	 *
+	 * `sync_orders` / `sync_customers` / `sync_products` / `track_cart_events`
+	 * were write-only UI toggles with no consumer — the ingest hook handlers
+	 * always gated on is_connected() alone. 3.9 made that the explicit model
+	 * (connect ⇒ sync all; the system decides) and dropped the toggles, so
+	 * these keys are now dead. delete_option() is idempotent (a no-op when the
+	 * key is absent, as on a fresh install that never saved Step-4 settings),
+	 * so this is safe to run on every upgrade-detect. The browse-tracking key
+	 * (smly_plus_rec_track_browsing) is the surviving Step-4 preference and is
+	 * NOT removed.
+	 */
+	private static function cleanup_removed_rec_feature_options(): void {
+		$dead_keys = array(
+			'smly_plus_rec_sync_orders',
+			'smly_plus_rec_sync_customers',
+			'smly_plus_rec_sync_products',
+			'smly_plus_rec_track_cart_events',
+		);
+		foreach ( $dead_keys as $key ) {
+			delete_option( $key );
+		}
 	}
 
 	/**

@@ -153,13 +153,15 @@ export interface WizardState {
   /** Minutes a cart stays untouched before the abandoned-cart trigger fires. */
   abandonedCartCutoffMinutes: number;
 
-  /** Step 4 — Recommendations. */
+  /**
+   * Step 4 — Recommendations. Connecting the rec-engine syncs all domains
+   * (products/customers/orders) unconditionally — the system decides, there
+   * are no per-domain sync toggles (3.9, PLUGIN.md §Step-4-4a). The one
+   * remaining toggle is browse tracking, which is opt-in (off by default,
+   * GDPR-sensitive) and is additionally gated by end-user consent (WP Consent
+   * API / CookieYes) on top of this merchant preference.
+   */
   recEngineFeatures: {
-    syncOrders: boolean;
-    syncCustomers: boolean;
-    syncProducts: boolean;
-    trackCartEvents: boolean;
-    /** Browse tracking is opt-in (PLUGIN.md §1: "vaikimisi väljas, GDPR-tundlik"). */
     trackBrowsing: boolean;
   };
 
@@ -272,7 +274,7 @@ export type WizardAction =
   | { type: 'SET_AUTOMATION_FALLBACK'; payload: { triggerType: AutomationTrigger; language: string; accountKey: string } }
 
   // Step 4: Recommendations -------------------------------------------------
-  | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'syncOrders' | 'syncCustomers' | 'syncProducts' | 'trackCartEvents' | 'trackBrowsing'; enabled: boolean } }
+  | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'trackBrowsing'; enabled: boolean } }
 
   // Settings dirty-tab tracking ---------------------------------------------
   | { type: 'MARK_TAB_DIRTY'; payload: { tab: SettingsTabKey } }

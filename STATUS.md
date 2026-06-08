@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-08 (3.8 GDPR COMPLETE — WP Privacy API exporter/eraser + §8/§9/§10 Client methods; live-walk 10/10 against MiuMjau. The 3.8.1 live-walk caught a latent 3.8.0 bug: the GDPR customer-endpoint URLs use a `{email}` path placeholder, but the Client substituted with `sprintf`/`%s` → the literal `{email}` was sent to the engine (404). Unit + mock maps had mirrored the wrong `%s` assumption, so all gates were green; only the live engine used `{email}`. Fixed to `str_replace('{email}',…)`; mock/unit switched to `{email}` + a 422 placeholder-guard so a regression fails integration. LESSONS §2.9. ZIP'd. Next: 3.9 activation)_
+_Last updated: 2026-06-09 (3.9 Step-4 activation COMPLETE — locked design: connecting the rec-engine syncs ALL domains (system-decides), the four per-domain sync toggles (orders/customers/products/cart) were cosmetic/write-only and are REMOVED; browse-tracking is the only Step-4 toggle (legal-consent gate, opt-in default-off). Disconnect clears only the connection options and PRESERVES `smly_plus_rec_track_browsing`, so re-connect restores the toggle — which required a mandatory hydration fix (EnvDetector emits the saved value, hydrate reads it instead of hardcoding false; also fixes a plain-reload blanking bug). Dead option keys cleaned up idempotently on upgrade-detect. PLUGIN.md §Step-4-4a/§6 revised to match the vision; DECISIONS F3-29. Then a pre-3.9 task: PLUGIN.md translated ET→EN. Next: Phase 3 done; Smaily profiling-consent wiring + beacon two-gate stop is the remaining separate piece.)_
 
 ---
 
@@ -292,10 +292,27 @@ see "Pilot go-live" below.
   literal-placeholder email** so a regression fails integration. LESSONS §2.9.
   ci:strict exit=0; unit 285; integration OK 75. ZIP'd. **3.8 GDPR COMPLETE.**
 
+### Done — 3.9 Step-4 activation (complete)
+
+- **3.9** Step-4 activation — connect ⇒ sync all (system-decides). The four
+  per-domain sync toggles (orders/customers/products/cart) were cosmetic
+  (write-only options, no consumer — ingest always gated on `is_connected()`
+  alone) and are **removed** from UI + types/reducers/hydrate + the POST writes;
+  dead keys cleaned idempotently in `Activation::cleanup_removed_rec_feature_options()`.
+  **Browse-tracking is the only Step-4 toggle** (legal-consent gate, opt-in
+  default-off). **Disconnect** clears only the `smly_rec_*` connection options and
+  preserves `smly_plus_rec_track_browsing`, so **re-connect restores the toggle** —
+  enabled by the **mandatory hydration fix** (`EnvDetector::rec_engine_snapshot()`
+  emits the saved value independent of connection; `hydrate.ts` reads it, no longer
+  hardcoding `false` — also fixes a plain-reload blanking bug). PLUGIN.md
+  §Step-4-4a/§6 + §15-test-5 revised; DECISIONS F3-29; README row. ci:strict exit=0
+  (unit 285, JS 134); integration OK. **Phase 3 feature work done.**
+
 ### Next
 
-- **3.9** Step 4 (4a) activation (mode-A → mode-B). Then Phase 3 is done.
-  (Separate, after 3.8: Smaily profiling-consent wiring + beacon two-gate stop.)
+- **Smaily profiling-consent wiring + beacon two-gate stop** — the remaining
+  separate piece (depends on the Smaily profiling-consent parameter API). Not a
+  numbered 3.x sub-PR; tracked as the post-Phase-3 consent work.
 
 ### Waiting / lock conditions
 
@@ -326,7 +343,10 @@ see "Pilot go-live" below.
   (Art 17) + opt-out (§10), HPOS-safe order-meta; live-walked 10/10. The 3.8.1
   walk caught a latent `{email}`-placeholder substitution bug (DECISIONS F3-28.6,
   LESSONS §2.9).
-- **3.9** Step 4 (4a) activation
+- ~~**3.9** Step-4 activation~~ — DONE (above): connect ⇒ sync all
+  (system-decides); per-domain sync toggles removed, browse-tracking the only
+  Step-4 toggle (consent-gated, preserved across disconnect/re-connect via the
+  mandatory hydration fix). DECISIONS F3-29. **Phase 3 feature work complete.**
 
 ---
 

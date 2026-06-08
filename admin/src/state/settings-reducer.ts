@@ -101,10 +101,6 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     abandonedCartCutoffMinutes: 30,
 
     recEngineFeatures: {
-      syncOrders: true,
-      syncCustomers: true,
-      syncProducts: true,
-      trackCartEvents: true,
       trackBrowsing: false,
     },
 
