@@ -121,13 +121,20 @@ see "Pilot go-live" below.
   (7 proxy tests). Gates green. **NOTE/deviation to confirm:** the route is
   registered *unconditionally* and the handler 404s when disabled (not
   conditional registration) — same attack surface, but testable without
-  rebuilding the REST server (which segfaults wp-env). Next: 3.4.1 client
-  track/flush.
+  rebuilding the REST server (which segfaults wp-env). (DECISIONS F3-24.)
+  **3.4.1 DONE** (client transport): filled `RecEngineClient.track/flush/destroy`
+  in `rec-engine-client.ts` — in-memory buffer, 30s batch window, consent-gated
+  flush (no consent ⇒ buffer dropped, nothing sent), `navigator.sendBeacon` on
+  pagehide, fetch keepalive otherwise. EventType union 8→9 (added
+  `wishlist_remove`, the §2.7 drift). `captureUrlParams` (3.4.2) + `mergeIdentity`
+  (3.7) still throw. 11 vitest tests. Gates green (ci:strict exit=0). Next:
+  3.4.2 cookies + consent-checker wiring.
 
 ### Next
 
-- 3.4.1 client (track/flush/sendBeacon) → .2 cookies/consent → .3 WP-wrapper +
-  vite + storefront hooks → .4 mock+live-walk+ZIP. Then roadmap below.
+- 3.4.2 cookies/consent (captureUrlParams: URL-param→cookie, anon-session
+  generation, WP Consent API checker) → .3 WP-wrapper beacon.js + vite + storefront
+  enqueue + WC event hooks → .4 mock+live-walk+ZIP. Then roadmap below.
 
 ### Waiting / lock conditions
 

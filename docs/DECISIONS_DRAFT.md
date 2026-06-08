@@ -1302,6 +1302,63 @@ are not sent. New lesson class: **a sync updates the doc, not the code** (LESSON
 **Relationships:** F3-18 (D6 contract), F3-16/F3-19/F3-22 (the three domains
 consolidated), CC-9 (single-source), LESSONS §2.4 + §2.7 (mock-vs-live, sync-vs-code).
 
+### F3-24: Browse-beacon architecture (3.4) — server proxy, no queue, always-register + handler-404
+
+**Context:** browse events are client-originated, anonymous, high-volume
+storefront telemetry — a different shape from the server-originated ingest
+domains (catalog/customers/orders). The contract mandates a server proxy: "the
+API key must never appear in client-side code — a plugin-side server proxy is
+required for browse events" (§ auth).
+
+**Decisions:**
+
+1. **Server proxy, mandated.** The browser POSTs same-origin to
+   `POST /wp-json/smaily-connect/v1/beacon`; `BeaconEndpoint` decrypts the
+   tenant api_key server-side and forwards to `/api/v1/ingest/browse`. Direct
+   browser→engine is ruled out (api_key leak).
+
+2. **No IngestQueue/Flusher — best-effort telemetry.** Browse does NOT use the
+   F3-16 PayloadBuilder→Queue→Flusher pattern. The client buffers in-memory
+   (30s window) and the proxy forwards synchronously (the Client's layered
+   retry covers transient blips). A lost batch is acceptable; durable delivery
+   (AS-backed queue + retry) is over-design for telemetry — unlike an order,
+   which is a durable state-change. Deliberate F3-16 deviation.
+
+3. **Abuse model is part of 3.4.0**, not deferred. The `/beacon` route is
+   public (anonymous visitors) AND spends the tenant's api_key + engine quota,
+   so an unprotected proxy is a real attack surface (spam → polluted engine
+   data + cost on the tenant's account). Three layers: a hard gate (404 before
+   any work when disabled), per-IP + per-session rate limits (REMOTE_ADDR only
+   — XFF is spoofable; the session counter complements IP behind NAT), and
+   server-side validation (event_type allowlist, event_id required,
+   ≤100 cap, §6 field-whitelist). First violation → whole-batch 400 (our own
+   client never emits an invalid event, so a violation is tampering — this is
+   the abuse-filter stance, distinct from the engine's lenient per-item D6).
+
+4. **`/beacon` is registered UNCONDITIONALLY; the handler hard-404s when
+   disabled** (NOT conditional registration). Rationale: proving "route absent
+   when disabled" needs a fresh `WP_REST_Server`, and re-firing `rest_api_init`
+   mid-suite to rebuild it **segfaults wp-env** (bisected: BrowseProxyTest +
+   RestRouteRegistrationTest together → exit 255 with no PHPUnit summary; each
+   alone is green). Conditional registration would therefore be untestable
+   (segfault) or need an isolated bare-server route-table check of low value —
+   because the **security posture is identical**: a disabled `/beacon` runs one
+   `is_enabled()` check then returns 404, doing zero work (no api_key, no engine
+   call, no transient). To a client it is indistinguishable from an absent
+   route. The only difference is the namespace index lists `/beacon` — a trivial
+   info-disclosure (the route name alone, behaving as 404, is not exploitable).
+   This is the standard WP-REST pattern (register unconditionally, gate in the
+   handler). `/beacon` is therefore in `EndpointRegistry::expected_routes()`.
+
+**Alternatives rejected:** conditional registration (§ point 4 — untestable +
+no security gain); a durable browse queue (§ point 2 — over-design); direct
+browser→engine (§ point 1 — api_key leak).
+
+**Relationships:** F3-11 (proxy-ping, the api_key-server-side precedent),
+F3-16 (the ingest pattern this deviates from), F3-18 (D6, which the engine's
+browse response also follows), LESSONS §2.7 (the EventType 8→9 drift caught in
+the 3.4.0 context audit).
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1319,11 +1376,11 @@ discovered along the way):
 **What's likely to be added later in Phase 3** (F3-19/20/21 are the 3.3 customers
 milestone, A-filter, datetime; F3-22 orders milestone + status mapping; F3-23
 plugin-side N-7 AbstractD6Flusher + W2 wrapper drift — all above):
-- F3-24: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-25: 3.6 beacon (client side, server proxy, cookie management)
-- F3-26: 3.7 identity-merge (three triggers: post-checkout, login, manual)
-- F3-27: 3.8 GDPR (export/delete, WP Privacy API integration)
-- F3-28: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
+- F3-25: 3.5 backfill architecture (cursor pagination, batch size, retry)
+- F3-26: 3.6 beacon (client side, server proxy, cookie management)
+- F3-27: 3.7 identity-merge (three triggers: post-checkout, login, manual)
+- F3-28: 3.8 GDPR (export/delete, WP Privacy API integration)
+- F3-29: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"
 Rule of thumb: **if the rationale requires more than one sentence**, add it.
