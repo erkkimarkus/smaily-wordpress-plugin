@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-08 (3.5 backfill COMPLETE — catalog/customers/orders, AbstractBackfillJob cursor-resumable + inline-flush bounded, HPOS-aware orders + admin BackfillPanel; backfill live-walk 7/7 against MiuMjau incl. 100% progress + order status-filter on real HPOS data + multi-batch resume; ZIP'd. Legacy order path = pilot precondition. Next: 3.6/3.7)_
+_Last updated: 2026-06-08 (3.7 identity-merge COMPLETE — anon-session → known-customer binding on wp_login, server-side, complementary to §6 retroactive binding; live-walk 6/6 against MiuMjau incl. browse_events_updated=2 + idempotency + merge-noop-when-retroactively-bound + 404; ZIP'd. Roadmap reconciled: "3.6 beacon" was a 3.4 duplicate, removed. Next: 3.8 GDPR, 3.9 activation)_
 
 ---
 
@@ -233,7 +233,7 @@ see "Pilot go-live" below.
   pilot's WC 6.9.4 mode) remains unit-tested only — a pilot go-live precondition
   (above + CLAUDE.md).
 
-### In progress
+### Done — 3.7 identity-merge (complete, live-walked + ZIP'd)
 
 - **3.7 identity-merge** — bind an anonymous browse session to a known customer
   on login (§7). NOT a customer↔customer merge (the roadmap one-liner was wrong;
@@ -251,13 +251,20 @@ see "Pilot go-live" below.
   → would 404; login timing is sound (A-filter ingested the user already). JS
   `mergeIdentity` stub kept (M2 platform-agnostic). Mock merge route + unit
   (Client) + 6 integration tests. ci:strict exit=0; integration OK 70 (+6).
-  Next: 3.7.1 live-walk + ZIP.
+  **3.7.1 DONE** (live-walk + ZIP): `bin/walk-3.7-identity.cjs` — **6/6 against
+  the real MiuMjau engine**. Proven live: explicit merge binds an anon session
+  (`browse_events_updated=2`); idempotent on repeat (`updated=0` — no
+  double-binding; the engine returns `already_bound=0` on a pure repeat, an
+  informational field the plugin never consumes); and the distinction from
+  retroactive binding — after a browse event with the email retroactively binds
+  (`retroactive_bound=2`, 3.4.4 behaviour reconfirmed), the merge is a no-op
+  (`updated=0`); plus the 404 path (unknown customer → `customer_not_found`).
+  ZIP'd. **3.7 identity-merge COMPLETE.** Next: 3.8 GDPR.
 
 ### Next
 
-- **3.7.1** identity-merge live-walk (anon-session browse → login → merge →
-  browse_events_updated > 0, idempotent 2×, 404 path) + ZIP. Needs a fresh
-  setup-token. Then the roadmap (3.8 GDPR, 3.9 activation).
+- **3.8 GDPR** (WP Privacy API — export/erase) → **3.9** Step 4 (4a) activation.
+  Then Phase 3 is done.
 
 ### Waiting / lock conditions
 
@@ -281,8 +288,9 @@ see "Pilot go-live" below.
   browse ingest; 3.4.1-.3 = the client beacon track/flush/cookies/consent/WC
   events = beacon tracking). So "3.6 beacon" duplicated 3.4. (A storefront
   recommendation-render widget is a separate FUTURE epic — never numbered here.)
-- **3.7** identity-merge (reconciles email-split: same person, two emails -> two
-  customer records until merge)
+- ~~**3.7** identity-merge~~ — DONE (above): anon-session → known-customer
+  binding on login (NOT a customer↔customer merge — v1 has none); live-walked
+  6/6. (DECISIONS F3-27.)
 - **3.8** GDPR (WP Privacy API)
 - **3.9** Step 4 (4a) activation
 

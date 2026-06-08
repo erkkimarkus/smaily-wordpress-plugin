@@ -49,7 +49,7 @@ The plugin connects to Smaily's recommendation engine and feeds it product, cust
 | Browse ingest | ✓ Complete | `ingest_browse` + the public `/beacon` proxy; live-walked 13/13 (browse-beacon 3.4.0) |
 | Backfill (historical data) | ✓ Complete | Cursor-paginated catalog/customers/orders backfill; live-walked 7/7 (3.5) |
 | Beacon (browse tracking) | ✓ Complete | Client-side beacon (buffer/sendBeacon, cookies, WP-Consent-API gate, WC events) — shipped within browse-beacon 3.4.1–3.4.3 |
-| Identity merge | ⏳ Pending | Anonymous-to-known visitor merging on checkout, login, or manual mapping |
+| Identity merge | ✓ Complete | Anonymous-session → known-customer binding on login (`wp_login` → `/identity/merge`); live-walked 6/6 (3.7) |
 | GDPR | ⏳ Pending | WP Privacy API integration for export and erase requests |
 | Step 4 4a activation | ⏳ Pending | Final UI shift from mode-A to mode-B |
 
