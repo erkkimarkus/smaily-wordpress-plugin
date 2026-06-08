@@ -248,6 +248,30 @@ class Client {
 		return $this->request_url( 'POST', $url, array( 'events' => $events ) );
 	}
 
+	/**
+	 * Bind an anonymous session's browse history to a known customer (§7) —
+	 * the explicit login-driven counterpart to the engine's automatic
+	 * browse-event retroactive binding (§6). The body is a single object (NOT a
+	 * batch wrapper): `{ anon_session_id?, smaily_visitor_token?, customer_email
+	 * (required), customer_external_id?, merge_ts (required), merge_reason? }`,
+	 * with at least one of anon_session_id / smaily_visitor_token present.
+	 *
+	 * The customer must already exist (the A-filter ingests every registered
+	 * user) — a 404 `customer_not_found` means it doesn't yet; the caller logs
+	 * + skips, since the next email-carrying browse event binds it retroactively
+	 * anyway. Idempotent: the same merge twice is a no-op engine-side.
+	 *
+	 * @param array<string, mixed> $merge
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (incl. 404 customer_not_found) or network failure.
+	 */
+	public function merge_identity( array $merge ): array {
+		$url = $this->resolve_url( 'identity_merge', self::PATH_IDENTITY_MERGE );
+		return $this->request_url( 'POST', $url, $merge );
+	}
+
 	// ---------------------------------------------------------------
 	// Private request engine.
 	// ---------------------------------------------------------------

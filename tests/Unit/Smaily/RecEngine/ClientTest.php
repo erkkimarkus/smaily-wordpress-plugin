@@ -235,6 +235,30 @@ final class ClientTest extends TestCase {
 		);
 	}
 
+	public function test_merge_identity_posts_the_body_as_a_flat_object(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'identity_merge' => 'https://engine.test/api/v1/identity/merge' )
+		);
+
+		$body = array(
+			'anon_session_id' => 'anon-1',
+			'customer_email'  => 'mari@example.test',
+			'merge_ts'        => '2026-06-08T10:00:00Z',
+			'merge_reason'    => 'user_logged_in',
+		);
+		$client->merge_identity( $body );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/identity/merge', $client->captured['url'] );
+		self::assertSame(
+			$body,
+			$client->captured['body'],
+			'identity/merge is a single object (§7), NOT a batch wrapper.'
+		);
+	}
+
 	/**
 	 * Client double that captures the resolved (method, url, body) instead
 	 * of hitting the network, and returns a canned 200 body.

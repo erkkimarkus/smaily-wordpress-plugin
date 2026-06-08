@@ -744,6 +744,73 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 	reply( 200, $response );
 }
 
+// Identity merge — §7 anon-session → known customer. Triggers on customer_email:
+// a `notfound@` prefix simulates the 404 (customer not ingested yet); a repeated
+// (anon_session_id, email) is the idempotent no-op (already_bound). Records the
+// last merge so a test can assert read/write symmetry.
+if ( $method === 'POST' && $path === '/api/v1/identity/merge' ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply( 401, array( 'error' => 'unauthorized', 'message' => 'Authorization header missing or malformed.' ) );
+	}
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+	if ( ! is_array( $body ) ) {
+		$body = array();
+	}
+
+	$email = isset( $body['customer_email'] ) ? (string) $body['customer_email'] : '';
+	$anon  = isset( $body['anon_session_id'] ) ? (string) $body['anon_session_id'] : '';
+
+	// Required: customer_email + merge_ts; at least one of anon/token.
+	if ( $email === '' || empty( $body['merge_ts'] ) || ( $anon === '' && empty( $body['smaily_visitor_token'] ) ) ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'customer_email' => array( 'Required' ) ) ),
+			)
+		);
+	}
+
+	// Customer not yet ingested → 404 (the caller logs + skips).
+	if ( strpos( $email, 'notfound@' ) === 0 ) {
+		reply(
+			404,
+			array(
+				'error'   => 'customer_not_found',
+				'message' => 'No customer found with email ' . $email . '. Send via POST /api/v1/ingest/customers first.',
+			)
+		);
+	}
+
+	$merge_key   = 'merge_' . md5( $anon . '|' . $email );
+	$already     = isset( $state[ $merge_key ] );
+	$state[ $merge_key ]          = true;
+	$state['last_merge_received'] = array(
+		'anon_session_id'      => $anon,
+		'smaily_visitor_token' => isset( $body['smaily_visitor_token'] ) ? (string) $body['smaily_visitor_token'] : '',
+		'customer_email'       => $email,
+		'merge_reason'         => isset( $body['merge_reason'] ) ? (string) $body['merge_reason'] : '',
+	);
+	save_state( $state_file, $state );
+
+	reply(
+		200,
+		array(
+			'ok'          => true,
+			'customer_id' => '550e8400-' . md5( $email ),
+			'merged'      => array(
+				'browse_events_updated'      => $already ? 0 : 12,
+				'browse_events_already_bound' => $already ? 12 : 0,
+				'visitor_tokens_bound'       => 1,
+				'session_history_days'       => 22,
+			),
+		)
+	);
+}
+
 // Fallback.
 reply(
 	404,

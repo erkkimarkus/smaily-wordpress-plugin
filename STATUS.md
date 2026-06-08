@@ -233,10 +233,31 @@ see "Pilot go-live" below.
   pilot's WC 6.9.4 mode) remains unit-tested only — a pilot go-live precondition
   (above + CLAUDE.md).
 
+### In progress
+
+- **3.7 identity-merge** — bind an anonymous browse session to a known customer
+  on login (§7). NOT a customer↔customer merge (the roadmap one-liner was wrong;
+  v1 has no such thing — DECISIONS F3-27). Complementary to the engine's
+  automatic browse-event retroactive binding (§6): covers "logs in but generates
+  no email-carrying browse event after". **3.7.0 DONE**: `Client::merge_identity`
+  (single §7 object, not a batch) + `IdentityHookHandler` (server-side `wp_login`
+  → reads the anon-session/visitor-token cookies from $_COOKIE → posts the merge;
+  api_key stays server-side, no new proxy). Dedup via user meta
+  (`_smaily_rec_merged_anon_sid` — repeat logins same session don't re-hit the
+  engine; a new session re-merges). 404 customer_not_found → log + skip
+  (retroactive binding is the safety net). **Checkout trigger deferred** — NOT
+  redundant (order ingest only stores attribution, doesn't bind history) but the
+  guest's customer is auto-created by the async order ingest, absent at checkout
+  → would 404; login timing is sound (A-filter ingested the user already). JS
+  `mergeIdentity` stub kept (M2 platform-agnostic). Mock merge route + unit
+  (Client) + 6 integration tests. ci:strict exit=0; integration OK 70 (+6).
+  Next: 3.7.1 live-walk + ZIP.
+
 ### Next
 
-- **3.6 / 3.7 onward** (roadmap below). Note: 3.4 already shipped the browse
-  beacon; reconcile the roadmap's "3.6 beacon" line.
+- **3.7.1** identity-merge live-walk (anon-session browse → login → merge →
+  browse_events_updated > 0, idempotent 2×, 404 path) + ZIP. Needs a fresh
+  setup-token. Then the roadmap (3.8 GDPR, 3.9 activation).
 
 ### Waiting / lock conditions
 

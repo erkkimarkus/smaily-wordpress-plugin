@@ -1412,6 +1412,57 @@ cursor traversal is the plugin's job.
 customers backfill will enumerate by). 3.5.0 ships the base + infra + catalog;
 .1 customers, .2 orders, .3 admin UI + live-walk.
 
+### F3-27: Identity merge (3.7) — anon→known on login, server-side, complementary to retroactive binding
+
+**Scope correction (sourced, not assumed).** The roadmap one-liner read "same
+person, two emails → two customer records until merge", implying a
+customer↔customer merge. Contract §7 + the README say otherwise: identity/merge
+is **anonymous-session → known-customer** binding. v1 has NO customer↔customer
+merge (email is the natural key — two emails are two customers, full stop). So
+3.7 binds an anon session's browse history to a known customer; it does NOT
+reconcile two known emails. (F3-14 discipline against a wrong assumption — this
+time the plan's, caught by checking the contract before building.)
+
+**Decisions:**
+
+1. **Complementary to retroactive binding, not a duplicate.** The engine binds
+   an anon session's earlier browse_events to a customer AUTOMATICALLY when a
+   browse event carries the email/visitor-token (§6 retroactive binding). That
+   covers "browses after being identified". identity/merge (§7) is the EXPLICIT
+   path for "logs in but generates no email-carrying browse event after" — the
+   gap retroactive binding leaves.
+
+2. **Server-side `wp_login`, not the client-side JS mergeIdentity.** Login is a
+   reliable server signal (vs a JS flag), the api_key stays server-side (no new
+   public proxy route — `Client::merge_identity` posts directly), and the
+   anon-session / visitor-token cookies are client-set but NOT HttpOnly, so
+   $_COOKIE has them on the login request. The JS `mergeIdentity` stub is KEPT
+   (still throws) and reserved for the Milestone-2 platform-agnostic client
+   (Shopify) — YAGNI on the M2 path in v1.
+
+3. **Checkout (`email_provided_at_checkout`) is NOT a trigger — timing, not
+   redundancy.** Checked: order ingest does NOT bind the session's browse
+   history — §5 uses `session_id` for attribution matching only ("stores the
+   signals; a cron computes rec_attribution"), and the §6 retroactive binding is
+   browse-endpoint-only. So a checkout merge would NOT be redundant. BUT a
+   guest's customer is auto-created by the ASYNC order ingest, so it isn't in
+   the engine yet at checkout — a synchronous merge then 404s. A registered user
+   logging in already exists (A-filter ingested them at registration/backfill),
+   so login timing is sound. Checkout merge is therefore deferred (the guest's
+   history binds via the next email-carrying browse event anyway).
+
+4. **404 customer_not_found → log + skip** (not ingest-then-retry). Rare (the
+   A-filter ingests every registered user, so by login the customer exists), and
+   retroactive binding is the safety net. Plugin-side **dedup** via user meta
+   (`_smaily_rec_merged_anon_sid` = the last anon session merged for a user):
+   repeat logins on the same session don't re-hit the engine (the merge is
+   idempotent there anyway); a NEW anon session re-merges.
+
+**Relationships:** §6/§7 (retroactive vs explicit binding), F3-20 (the A-filter
+that guarantees the customer exists by login), F3-21 (IsoDate for merge_ts),
+F3-14 (contract-vs-assumption check). 3.7.0 ships the handler; 3.7.1 the
+live-walk + ZIP.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1430,7 +1481,6 @@ discovered along the way):
 milestone, A-filter, datetime; F3-22 orders + status mapping; F3-23 N-7
 AbstractD6Flusher + W2 drift; F3-24 browse-beacon architecture; F3-25 backfill
 architecture — all above):
-- F3-27: 3.7 identity-merge (three triggers: post-checkout, login, manual)
 - F3-28: 3.8 GDPR (export/delete, WP Privacy API integration)
 - F3-29: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 

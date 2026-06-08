@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
@@ -335,6 +336,18 @@ final class Bootstrap {
 			$this->rec_engine_settings()
 		);
 		add_action( 'woocommerce_order_status_changed', array( $order, 'on_order_status_changed' ), 10, 3 );
+
+		// Rec-engine identity merge (3.7). On login, explicitly bind the
+		// anon-session cookies to the now-known customer (§7) — complementary to
+		// the engine's automatic browse-event retroactive binding (§6).
+		$bootstrap = $this;
+		$identity  = new IdentityHookHandler(
+			$this->rec_engine_settings(),
+			static function () use ( $bootstrap ): RecEngineClient {
+				return $bootstrap->rec_client();
+			}
+		);
+		$identity->register();
 
 		// P1 #1: once the wizard is finished the new path owns contact sync,
 		// so strip the legacy subscriber-sync hooks (the legacy service
