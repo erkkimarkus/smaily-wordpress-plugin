@@ -49,6 +49,18 @@ export interface RecEngineClientConfig {
   /** TTL of the anonymous-session cookie in days. Defaults to 30. */
   sessionTtlDays?: number;
 
+  /**
+   * URL-param names a campaign click leaves (engine config `url_param_*`).
+   * Defaults to smaily_vt / smaily_rec / smaily_ctx.
+   */
+  urlParams?: { visitorToken: string; recId: string; context: string };
+
+  /**
+   * Per-cookie TTLs in days (engine config `*_ttl_days`). The session cookie
+   * uses `sessionTtlDays`. Defaults: visitor 365, recId 30, context 30.
+   */
+  cookieTtlDays?: { visitor: number; recId: number; context: number };
+
   /** Batch window in milliseconds before the buffer flushes. Defaults to 30_000. */
   batchWindowMs?: number;
 
@@ -197,15 +209,74 @@ export class RecEngineClient {
   }
 
   /**
-   * Inspect the current URL for `smaily_vt` / `smaily_rec` / `smaily_ctx`
-   * parameters left by a campaign click. When present, the corresponding
-   * cookies are set (using the names from `config.cookieNames`) and the
-   * params are stripped from the URL via `history.replaceState`.
+   * Inspect the current URL for the campaign-click params (smaily_vt /
+   * smaily_rec / smaily_ctx by default) and persist them as cookies, then
+   * strip them from the URL via history.replaceState. Returns true if any
+   * param was captured.
    *
-   * Returns true if any params were captured.
+   * ORDER MATTERS: every captured value is written to its cookie BEFORE the
+   * URL is stripped. Stripping first would lose the attribution silently if a
+   * cookie write threw. The replaceState runs once, after all saves.
+   *
+   * Consent-gated: with no consent nothing is captured and the URL is left
+   * intact, so a re-run after the visitor accepts consent can still capture.
    */
   public captureUrlParams(): boolean {
-    throw new Error('RecEngineClient.captureUrlParams: Not implemented (Phase 3 sub-PR 3.4.2)');
+    if (typeof window === 'undefined' || typeof document === 'undefined' || !window.location) {
+      return false;
+    }
+    if (!this.hasConsent()) {
+      return false;
+    }
+
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    const names = this.urlParamNames();
+    const mapping: Array<{ param: string; cookie: string; ttl: number }> = [
+      { param: names.visitorToken, cookie: this.config.cookieNames.visitor, ttl: this.cookieTtl('visitor') },
+      { param: names.recId, cookie: this.config.cookieNames.recId, ttl: this.cookieTtl('recId') },
+      { param: names.context, cookie: this.config.cookieNames.context, ttl: this.cookieTtl('context') },
+    ];
+
+    let captured = false;
+    let present = false;
+    // 1) SAVE every present value to its cookie first.
+    for (const { param, cookie, ttl } of mapping) {
+      const value = params.get(param);
+      if (value !== null && value !== '') {
+        this.setCookie(cookie, value, ttl);
+        captured = true;
+      }
+      if (params.has(param)) {
+        params.delete(param);
+        present = true;
+      }
+    }
+    // 2) Only now strip the params from the visible URL.
+    if (present) {
+      const search = params.toString();
+      const newUrl = url.pathname + (search ? '?' + search : '') + url.hash;
+      window.history.replaceState(window.history.state, '', newUrl);
+    }
+    return captured;
+  }
+
+  /**
+   * Ensure the anonymous-session cookie exists, generating a v4 UUID when it
+   * doesn't. Returns the session id (empty when consent is absent — a tracking
+   * id is a tracking cookie). The wrapper calls this on init (post-consent).
+   */
+  public ensureSession(): string {
+    const existing = this.readCookie(this.config.cookieNames.session);
+    if (existing !== '') {
+      return existing;
+    }
+    if (!this.hasConsent()) {
+      return '';
+    }
+    const sid = uuidV4();
+    this.setCookie(this.config.cookieNames.session, sid, this.config.sessionTtlDays ?? 30);
+    return sid;
   }
 
   /**
@@ -318,13 +389,39 @@ export class RecEngineClient {
    * URL-param capture is 3.4.2 (captureUrlParams). Empty until then.
    */
   private sessionId(): string {
+    return this.readCookie(this.config.cookieNames.session);
+  }
+
+  private readCookie(name: string): string {
     if (typeof document === 'undefined') {
       return '';
     }
-    const name = this.config.cookieNames.session;
     const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.*+?^${}()|[\]\\])/g, '\\$1') + '=([^;]*)'));
     const value = match?.[1];
     return value !== undefined ? decodeURIComponent(value) : '';
+  }
+
+  /**
+   * First-party cookie write. SameSite=Lax so a campaign param survives the
+   * top-level email-link → shop navigation (Lax allows cookies on top-level
+   * GET); Secure only on https. Path=/ so the whole storefront sees it.
+   */
+  private setCookie(name: string, value: string, ttlDays: number): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const maxAge = Math.max(0, Math.floor(ttlDays * 86400));
+    const secure = typeof window !== 'undefined' && window.location?.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = name + '=' + encodeURIComponent(value) + '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+  }
+
+  private urlParamNames(): { visitorToken: string; recId: string; context: string } {
+    return this.config.urlParams ?? { visitorToken: 'smaily_vt', recId: 'smaily_rec', context: 'smaily_ctx' };
+  }
+
+  private cookieTtl(key: 'visitor' | 'recId' | 'context'): number {
+    const defaults = { visitor: 365, recId: 30, context: 30 };
+    return this.config.cookieTtlDays?.[key] ?? defaults[key];
   }
 
   private hasConsent(): boolean {

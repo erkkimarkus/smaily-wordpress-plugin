@@ -127,14 +127,25 @@ see "Pilot go-live" below.
   flush (no consent ⇒ buffer dropped, nothing sent), `navigator.sendBeacon` on
   pagehide, fetch keepalive otherwise. EventType union 8→9 (added
   `wishlist_remove`, the §2.7 drift). `captureUrlParams` (3.4.2) + `mergeIdentity`
-  (3.7) still throw. 11 vitest tests. Gates green (ci:strict exit=0). Next:
-  3.4.2 cookies + consent-checker wiring.
+  (3.7) still throw. 11 vitest tests. Gates green (ci:strict exit=0).
+  **3.4.2 DONE** (cookies — closes the attribution loop, the cookie PRODUCER
+  the 3.4.0 audit found missing): `captureUrlParams()` (campaign URL params
+  smaily_vt/rec/ctx → first-party cookies, then strip the URL — cookie SAVED
+  before `history.replaceState` strip so attribution can't be lost) +
+  `ensureSession()` (generates the `smaily_anon_sid` v4 cookie). Cookie names +
+  TTLs + URL-param names come from the engine config; cookies are SameSite=Lax,
+  Secure on https, Path=/. **Cookie writes are consent-gated** (no tracking
+  cookie without consent — same principle as 3.4.1 no-send; the WP Consent API
+  *wiring* is 3.4.3). 7 more vitest tests (18 total). `mergeIdentity` (3.7)
+  still throws. Next: 3.4.3 WP-wrapper.
 
 ### Next
 
-- 3.4.2 cookies/consent (captureUrlParams: URL-param→cookie, anon-session
-  generation, WP Consent API checker) → .3 WP-wrapper beacon.js + vite + storefront
-  enqueue + WC event hooks → .4 mock+live-walk+ZIP. Then roadmap below.
+- 3.4.3 WP-wrapper beacon.js (consent-checker wiring against WP Consent API,
+  config from engine, init: ensureSession + captureUrlParams) + vite entry +
+  storefront `wp_enqueue_scripts` (gated on connected + track_browsing) + WC
+  event hooks (product_view/cart_add/... → track) → .4 mock+live-walk+ZIP. Then
+  roadmap below.
 
 ### Waiting / lock conditions
 

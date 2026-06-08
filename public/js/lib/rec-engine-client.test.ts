@@ -179,9 +179,117 @@ describe('RecEngineClient (3.4.1 transport)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('still throws for the not-yet-implemented methods', async () => {
+  it('mergeIdentity still throws (lands in 3.7)', async () => {
     client = new RecEngineClient(makeConfig());
-    expect(() => client?.captureUrlParams()).toThrow(/3\.4\.2/);
     await expect(client.mergeIdentity('a@b.test', 'user_logged_in')).rejects.toThrow(/3\.7/);
+  });
+});
+
+describe('RecEngineClient (3.4.2 cookies + URL-param capture)', () => {
+  let client: RecEngineClient | null = null;
+
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
+  afterEach(() => {
+    client?.destroy();
+    client = null;
+    window.history.replaceState({}, '', '/');
+    for (const name of ['smaily_rec_uid', 'smaily_anon_sid', 'smaily_rec_id', 'smaily_rec_ctx']) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
+  });
+
+  it('captures campaign params into cookies and strips them from the URL', () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt1&smaily_rec=r1&smaily_ctx=welcome&keep=1');
+    client = new RecEngineClient(makeConfig());
+
+    const captured = client.captureUrlParams();
+
+    expect(captured).toBe(true);
+    expect(document.cookie).toContain('smaily_rec_uid=vt1');
+    expect(document.cookie).toContain('smaily_rec_id=r1');
+    expect(document.cookie).toContain('smaily_rec_ctx=welcome');
+    // Campaign params stripped; unrelated params kept.
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('saves the cookie BEFORE stripping the URL (attribution must not be lost)', () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt-order');
+    client = new RecEngineClient(makeConfig());
+
+    let cookieAtStripTime = '';
+    const realReplace = window.history.replaceState.bind(window.history);
+    const spy = vi
+      .spyOn(window.history, 'replaceState')
+      .mockImplementation((data: unknown, unused: string, url?: string | URL | null) => {
+        cookieAtStripTime = document.cookie;
+        realReplace(data, unused, url ?? null);
+      });
+
+    client.captureUrlParams();
+
+    // At the moment the URL was stripped, the cookie was already written.
+    expect(cookieAtStripTime).toContain('smaily_rec_uid=vt-order');
+    spy.mockRestore();
+  });
+
+  it('does nothing when there are no campaign params', () => {
+    window.history.replaceState({}, '', '/page?keep=1');
+    client = new RecEngineClient(makeConfig());
+
+    expect(client.captureUrlParams()).toBe(false);
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('does not capture or strip without consent (so a post-consent re-run still works)', () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt1');
+    client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
+
+    expect(client.captureUrlParams()).toBe(false);
+    expect(document.cookie).not.toContain('smaily_rec_uid');
+    expect(window.location.search).toBe('?smaily_vt=vt1'); // left intact for a re-run
+  });
+
+  it('ensureSession generates a v4 session cookie when absent and reuses it', () => {
+    client = new RecEngineClient(makeConfig());
+
+    const sid = client.ensureSession();
+    expect(sid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(document.cookie).toContain('smaily_anon_sid=' + sid);
+
+    // Second call reuses the existing cookie.
+    expect(client.ensureSession()).toBe(sid);
+  });
+
+  it('ensureSession sets no cookie without consent', () => {
+    client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
+    expect(client.ensureSession()).toBe('');
+    expect(document.cookie).not.toContain('smaily_anon_sid');
+  });
+
+  it('writes cookies with SameSite=Lax and a Max-Age TTL', () => {
+    const writes: string[] = [];
+    const proto = Object.getPrototypeOf(document) as object;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'cookie');
+    Object.defineProperty(document, 'cookie', {
+      configurable: true,
+      get(): string {
+        return desc?.get?.call(document) ?? '';
+      },
+      set(v: string): void {
+        writes.push(v);
+        desc?.set?.call(document, v);
+      },
+    });
+
+    client = new RecEngineClient(makeConfig());
+    client.ensureSession();
+
+    expect(writes.some((w) => /SameSite=Lax/.test(w))).toBe(true);
+    expect(writes.some((w) => /Max-Age=\d+/.test(w))).toBe(true);
+
+    delete (document as unknown as { cookie?: unknown }).cookie;
   });
 });
