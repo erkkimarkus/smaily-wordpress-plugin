@@ -174,9 +174,28 @@ see "Pilot go-live" below.
   Browser render-timing (when checkout_start/complete fire) is a manual pilot
   check, NOT live-walk-covered (CLAUDE.md + below).
 
+### In progress
+
+- **3.5 backfill** — traverse EXISTING WC records into the engine (the live
+  hooks only ingest CHANGES). One ingest path, two triggers: backfill enqueues
+  into the SAME IngestQueue + AbstractD6Flusher the hooks use (DECISIONS F3-25).
+  **3.5.0 DONE** (base + infra + catalog): `AbstractBackfillJob` (cursor/state/
+  AS-tick/progress, resumable `WHERE id > cursor`) + `CatalogBackfillJob`
+  (products → catalog.upsert, variation fan-out mirrors the hook). Enqueue +
+  **inline-flush per batch** (decision (b)): progress = SENT, queue bounded. No
+  freshness marker (decision (i), UPSERT-idempotent). Generalised the shared
+  infra: `BackfillJobInterface` (legacy contacts BackfillJob implements it too),
+  `BackfillEndpoint` SUPPORTED += products + `target_for()` (rec_engine vs
+  smaily, coexist under the (job_type,target) UNIQUE key — no schema change),
+  `Bootstrap::make_backfill_job()` (single dispatch for endpoint + AS tick,
+  contacts gate removed), `backfill.ts` union += products. Tests prove
+  resumability (resumes from cursor, not restart) + bounded queue. ci:strict
+  exit=0; integration OK 56 (+5 backfill). Next: 3.5.1 customers.
+
 ### Next
 
-- **3.5** backfill (cursor pagination). Then the roadmap below.
+- 3.5.1 CustomerBackfillJob (A-filter, F3-20) → 3.5.2 OrderBackfillJob (HPOS-aware
+  enumeration) → 3.5.3 admin UI panels + live-walk. Then the roadmap below.
 
 ### Waiting / lock conditions
 

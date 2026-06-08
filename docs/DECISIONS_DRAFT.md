@@ -1359,6 +1359,59 @@ F3-16 (the ingest pattern this deviates from), F3-18 (D6, which the engine's
 browse response also follows), LESSONS §2.7 (the EventType 8→9 drift caught in
 the 3.4.0 context audit).
 
+### F3-25: Rec-engine backfill (3.5) — one ingest path, two triggers; enqueue + inline-flush
+
+**Context:** the live hooks ingest only CHANGED records. A pilot needs the
+EXISTING catalog/customers/orders backfilled into the engine once at setup —
+traversing thousands of records. The engine has no backfill endpoint or
+pagination (Appendix A): backfill uses the SAME ingest endpoints in batches;
+cursor traversal is the plugin's job.
+
+**Decisions:**
+
+1. **One ingest path, two triggers.** Backfill does NOT get a parallel ingest
+   path — it enqueues into the SAME `IngestQueue` and drains through the SAME
+   `AbstractD6Flusher` (per domain) the live hooks use. So D6 error-split, retry
+   backoff, and engine `event_id` dedup are reused, not reimplemented. A live
+   hook enqueues one changed record; a backfill enqueues every record. Each
+   domain's backfill `enqueue_record()` mirrors its HookHandler (catalog fans a
+   variable product out to variation units, etc.).
+
+2. **`AbstractBackfillJob` + per-domain subclass** (consistent with the N-7
+   `AbstractD6Flusher` shape). The base owns the cursor/state/AS-tick/progress;
+   the subclass owns `count_total()`, `fetch_ids_after()`, `enqueue_record()`.
+   The legacy contacts `BackfillJob` is NOT refactored into it (it's
+   users→Smaily-specific); both implement a shared `BackfillJobInterface` so the
+   REST endpoint + AS tick drive them through one path. The
+   `smly_plus_backfill_job` table's `(job_type, target)` UNIQUE key lets the
+   rec-engine rows (`target = rec_engine`) coexist with the legacy
+   `(contacts, smaily)` row — no schema change.
+
+3. **Enqueue + inline-flush per batch** (decision (b), not enqueue-only).
+   `process_batch()` enqueues a batch then flushes it inline before advancing
+   the cursor. Two reasons: progress reflects records actually SENT (not just
+   queued — enqueue-only would show 100% while the recurring flusher still has
+   ~100 min of work), and the queue stays BOUNDED (each batch drained before the
+   next is enqueued) instead of ballooning to thousands of pending rows. The
+   tradeoff — backfill is batch-synchronous, slower than async enqueue-only — is
+   fine for a one-time mass setup (true progress > speed). Rejected: (a)
+   enqueue-only (misleading progress, unbounded queue); (c) direct Client calls
+   (would duplicate the D6/retry logic).
+
+4. **Resumable cursor, no freshness marker.** The cursor (last-seen id) is a
+   real `WHERE id > cursor ORDER BY id LIMIT batch` (not offset, which shifts
+   under inserts/deletes) saved in the row, so a timed-out/crashed tick resumes
+   from the cursor — never restarts (proven:
+   RecEngineCatalogBackfillTest::test_resumes_from_cursor_and_does_not_restart).
+   No `_smaily_rec_synced_at` freshness skip (decision (i)) — engine ingest is
+   an idempotent UPSERT, so re-sending is harmless; a skip-unchanged marker is a
+   future re-run optimisation, not correctness (YAGNI).
+
+**Relationships:** F3-16 (the ingest pattern reused), N-7 / `AbstractD6Flusher`
+(the abstract-base shape mirrored + the flusher reused), F3-20 (the A-filter the
+customers backfill will enumerate by). 3.5.0 ships the base + infra + catalog;
+.1 customers, .2 orders, .3 admin UI + live-walk.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1373,11 +1426,10 @@ discovered along the way):
      (`docs/adr/0001-coexistence.md`, ...)
    - Or keep a single `DECISIONS.md` — depending on the repo's culture
 
-**What's likely to be added later in Phase 3** (F3-19/20/21 are the 3.3 customers
-milestone, A-filter, datetime; F3-22 orders milestone + status mapping; F3-23
-plugin-side N-7 AbstractD6Flusher + W2 wrapper drift — all above):
-- F3-25: 3.5 backfill architecture (cursor pagination, batch size, retry)
-- F3-26: 3.6 beacon (client side, server proxy, cookie management)
+**What's likely to be added later in Phase 3** (F3-19/20/21 the 3.3 customers
+milestone, A-filter, datetime; F3-22 orders + status mapping; F3-23 N-7
+AbstractD6Flusher + W2 drift; F3-24 browse-beacon architecture; F3-25 backfill
+architecture — all above):
 - F3-27: 3.7 identity-merge (three triggers: post-checkout, login, manual)
 - F3-28: 3.8 GDPR (export/delete, WP Privacy API integration)
 - F3-29: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)

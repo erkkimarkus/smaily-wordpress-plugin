@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Bootstrap;
 use Smaily\Connect\Settings\RecEngineSettings;
-use Smaily\Connect\Smaily\BackfillJob;
+use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\SetupExchange;
@@ -64,13 +64,10 @@ final class EndpointRegistry {
 		return array(
 			new TestConnectionEndpoint(),
 			new BackfillEndpoint(
-				static function () use ( $bootstrap ): ?BackfillJob {
-					try {
-						return new BackfillJob( $bootstrap->smaily_client() );
-					} catch ( \RuntimeException $e ) {
-						// Credentials missing — endpoint returns 503 at runtime.
-						return null;
-					}
+				static function ( string $job_type ) use ( $bootstrap ): ?BackfillJobInterface {
+					// One dispatch for all job types (contacts + rec-engine),
+					// shared with Bootstrap::on_backfill_tick.
+					return $bootstrap->make_backfill_job( $job_type );
 				}
 			),
 			new WorkflowsEndpoint(

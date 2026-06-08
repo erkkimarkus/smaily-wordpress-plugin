@@ -45,7 +45,7 @@ final class BackfillEndpointTest extends TestCase {
 		$response = $endpoint->start( $request );
 
 		self::assertSame( 400, $response->get_status() );
-		self::assertSame( array( 'contacts' ), $response->get_data()['supported_types'] );
+		self::assertSame( array( 'contacts', 'products' ), $response->get_data()['supported_types'] );
 	}
 
 	public function test_start_persists_row_and_schedules_first_tick(): void {
@@ -171,7 +171,7 @@ final class BackfillEndpointTest extends TestCase {
 
 		self::assertSame( 503, $response->get_status() );
 		$data = $response->get_data();
-		self::assertSame( 'smaily_not_configured', $data['error'] );
+		self::assertSame( 'not_configured', $data['error'] );
 	}
 
 	public function test_permission_check_denies_users_without_manage_options(): void {

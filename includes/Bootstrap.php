@@ -26,6 +26,8 @@ use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
+use Smaily\Connect\Smaily\BackfillJobInterface;
+use Smaily\Connect\Smaily\RecEngine\Backfill\CatalogBackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
@@ -208,42 +210,47 @@ final class Bootstrap {
 	 * @param string $job_type Currently only "contacts"; Phase 3 adds more.
 	 */
 	public function on_backfill_tick( string $job_type = 'contacts' ): void {
-		// Diagnostic — sub-PR 2.H.6. Erkki's staging fires three ticks
-		// in the same second with status=idle; this line tells us the
-		// hook is reachable + which job_type WP-Cron passes.
-		error_log( sprintf( '[smaily-connect backfill.tick] fired job_type=%s', $job_type ) );
-
-		if ( $job_type !== 'contacts' ) {
+		$job = $this->make_backfill_job( $job_type );
+		if ( $job === null ) {
+			error_log( sprintf( '[smaily-connect backfill.tick] no job for job_type=%s (unconfigured or unknown)', $job_type ) );
 			return;
 		}
 
-		try {
-			$client = $this->smaily_client();
-		} catch ( \RuntimeException $e ) {
-			error_log( '[smaily-connect backfill.tick] credentials missing: ' . $e->getMessage() );
-			// Credentials gone missing mid-job — bail; the cancel/status
-			// endpoints will surface the stalled state to the UI.
-			return;
-		}
-
-		$job    = new BackfillJob( $client );
 		$result = $job->process_batch();
-		error_log(
-			sprintf(
-				'[smaily-connect backfill.tick] result processed=%d remaining=%d completed=%s',
-				(int) $result['processed'],
-				(int) $result['remaining'],
-				! empty( $result['completed'] ) ? 'true' : 'false'
-			)
-		);
 
-		if ( ! $result['completed'] && function_exists( 'as_schedule_single_action' ) ) {
+		// Reschedule until the job reaches its terminal state — each tick
+		// resumes from the saved cursor (resumable; never restarts).
+		if ( empty( $result['completed'] ) && function_exists( 'as_schedule_single_action' ) ) {
 			as_schedule_single_action(
 				time() + 30,
 				BackfillEndpoint::TICK_HOOK,
 				array( 'job_type' => $job_type ),
 				EventQueue::AS_GROUP
 			);
+		}
+	}
+
+	/**
+	 * Map a job_type to its backfill implementation — the single dispatch
+	 * shared by the REST endpoint factory (EndpointRegistry) and the AS tick.
+	 * Returns null when the job_type is unknown or its connection is absent.
+	 */
+	public function make_backfill_job( string $job_type ): ?BackfillJobInterface {
+		switch ( $job_type ) {
+			case BackfillJob::BACKFILL_TYPE: // 'contacts' — legacy Smaily.
+				try {
+					return new BackfillJob( $this->smaily_client() );
+				} catch ( \RuntimeException $e ) {
+					return null;
+				}
+			case 'products': // 3.5 rec-engine catalog backfill.
+				return new CatalogBackfillJob(
+					$this->ingest_queue(),
+					$this->ingest_flusher(),
+					$this->catalog_payload_builder()
+				);
+			default:
+				return null;
 		}
 	}
 

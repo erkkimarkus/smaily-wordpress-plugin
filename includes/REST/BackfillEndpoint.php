@@ -13,7 +13,9 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
 use Smaily\Connect\Smaily\BackfillJob;
+use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Smaily\RecEngine\Backfill\AbstractBackfillJob;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -54,28 +56,28 @@ class BackfillEndpoint {
 	public const TICK_HOOK = 'smly_plus_backfill_tick';
 
 	/**
-	 * Job types this endpoint accepts. Phase 1 has one; Phase 3 will extend
-	 * this constant when rec-engine backfill lands.
+	 * Job types this endpoint accepts. `contacts` is the legacy Smaily backfill;
+	 * `products` is the 3.5 rec-engine catalog backfill (customers/orders follow
+	 * in 3.5.1 / 3.5.2).
 	 *
 	 * @var string[]
 	 */
-	private const SUPPORTED_JOB_TYPES = array( 'contacts' );
+	private const SUPPORTED_JOB_TYPES = array( 'contacts', 'products' );
 
 	/**
-	 * Factory that constructs a BackfillJob on demand. Lazy because the
-	 * Smaily Client dependency requires credentials, which the merchant
-	 * may not have configured yet — we still need the route registered
-	 * so the UI doesn't 404 before they finish Step 1 of the wizard.
-	 * Returning null from the factory yields a 503 response so the
-	 * caller surfaces "Smaily not connected" instead of an exception.
+	 * Factory that constructs the right backfill job for a job_type on demand.
+	 * Lazy because the dependency (Smaily credentials for contacts, the
+	 * rec-engine connection for products) may not be configured yet — the route
+	 * must still register so the UI doesn't 404 before setup. Returning null
+	 * yields a 503 so the caller surfaces "not connected" instead of throwing.
 	 *
-	 * @var callable(): ?BackfillJob
+	 * @var callable(string $job_type): ?BackfillJobInterface
 	 */
 	private $job_factory;
 
 	/**
-	 * @param callable(): ?BackfillJob $job_factory Factory producing a
-	 *   BackfillJob at request time, or null when credentials are absent.
+	 * @param callable(string $job_type): ?BackfillJobInterface $job_factory
+	 *   Factory producing the job for a job_type, or null when unconfigured.
 	 */
 	public function __construct( callable $job_factory ) {
 		$this->job_factory = $job_factory;
@@ -145,14 +147,14 @@ class BackfillEndpoint {
 			return $this->unsupported_job_type_response();
 		}
 
-		$job = ( $this->job_factory )();
-		if ( ! $job instanceof BackfillJob ) {
-			error_log( '[smaily-connect backfill.endpoint.start] factory returned null — credentials missing' );
+		$job = ( $this->job_factory )( $job_type );
+		if ( ! $job instanceof BackfillJobInterface ) {
+			error_log( '[smaily-connect backfill.endpoint.start] factory returned null — not connected' );
 			return new WP_REST_Response(
 				array(
-					'error'   => 'smaily_not_configured',
+					'error'   => 'not_configured',
 					'message' => __(
-						'Smaily credentials are not configured. Finish Step 1 of the setup wizard first.',
+						'This connection is not configured yet. Finish setup first.',
 						'smaily-connect'
 					),
 				),
@@ -247,7 +249,7 @@ class BackfillEndpoint {
 			),
 			array(
 				'job_type' => $job_type,
-				'target'   => BackfillJob::BACKFILL_TARGET,
+				'target'   => $this->target_for( $job_type ),
 			),
 			array( '%s', '%s' ),
 			array( '%s', '%s' )
@@ -290,6 +292,17 @@ class BackfillEndpoint {
 		return $value;
 	}
 
+	/**
+	 * The `target` column for a job_type — the legacy contacts backfill writes
+	 * `smaily`, the rec-engine backfills write `rec_engine`. Lets both sets of
+	 * rows coexist under the (job_type, target) UNIQUE key.
+	 */
+	private function target_for( string $job_type ): string {
+		return $job_type === BackfillJob::BACKFILL_TYPE
+			? BackfillJob::BACKFILL_TARGET
+			: AbstractBackfillJob::TARGET;
+	}
+
 	private function unsupported_job_type_response(): WP_REST_Response {
 		return new WP_REST_Response(
 			array(
@@ -314,7 +327,7 @@ class BackfillEndpoint {
 			$wpdb->prepare(
 				"SELECT id, status, processed_count, total_count, started_at, completed_at FROM {$table} WHERE job_type = %s AND target = %s",
 				$job_type,
-				BackfillJob::BACKFILL_TARGET
+				$this->target_for( $job_type )
 			),
 			ARRAY_A
 		);

@@ -35,8 +35,12 @@ defined( 'ABSPATH' ) || exit;
  * Not final: REST endpoint + Bootstrap tests subclass with anonymous
  * doubles to short-circuit start() / process_batch() without exercising
  * the WP user-table read path. Same rationale as Smaily\Client.
+ *
+ * Implements BackfillJobInterface so it shares the REST endpoint + AS tick with
+ * the rec-engine backfills (3.5); its process_batch() keeps its own optional
+ * $batch_size, compatible with the no-arg interface method.
  */
-class BackfillJob {
+class BackfillJob implements BackfillJobInterface {
 
 	public const BACKFILL_TARGET = 'smaily';
 	public const BACKFILL_TYPE   = 'contacts';
