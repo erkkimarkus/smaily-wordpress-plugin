@@ -190,12 +190,21 @@ see "Pilot go-live" below.
   `Bootstrap::make_backfill_job()` (single dispatch for endpoint + AS tick,
   contacts gate removed), `backfill.ts` union += products. Tests prove
   resumability (resumes from cursor, not restart) + bounded queue. ci:strict
-  exit=0; integration OK 56 (+5 backfill). Next: 3.5.1 customers.
+  exit=0; integration OK 56 (+5 backfill).
+  **3.5.1 DONE** (customers): `CustomerBackfillJob` — `WHERE ID > cursor` on
+  wp_users → customer.upsert, CustomerFlusher inline-flush. **A-filter (F3-20)
+  consistent with CustomerHookHandler**: every registered user, NO role/email
+  filter — the consistency is the ABSENCE of a predicate (both unfiltered), so
+  neither side sends a different cohort. Test proves a subscriber/editor (non-
+  customer role) is backfilled, plus resumability + bounded. Wired:
+  make_backfill_job 'customers', SUPPORTED += customers, backfill.ts union.
+  ci:strict exit=0; integration OK 60 (+4). Next: 3.5.2 orders.
 
 ### Next
 
-- 3.5.1 CustomerBackfillJob (A-filter, F3-20) → 3.5.2 OrderBackfillJob (HPOS-aware
-  enumeration) → 3.5.3 admin UI panels + live-walk. Then the roadmap below.
+- 3.5.2 OrderBackfillJob (HPOS-aware enumeration — orders are in wc_orders OR
+  wp_posts depending on storage mode) → 3.5.3 admin UI panels + live-walk. Then
+  the roadmap below.
 
 ### Waiting / lock conditions
 

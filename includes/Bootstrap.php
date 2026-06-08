@@ -28,6 +28,7 @@ use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CatalogBackfillJob;
+use Smaily\Connect\Smaily\RecEngine\Backfill\CustomerBackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
@@ -243,11 +244,16 @@ final class Bootstrap {
 				} catch ( \RuntimeException $e ) {
 					return null;
 				}
-			case 'products': // 3.5 rec-engine catalog backfill.
+			case 'products': // 3.5.0 rec-engine catalog backfill.
 				return new CatalogBackfillJob(
 					$this->ingest_queue(),
 					$this->ingest_flusher(),
 					$this->catalog_payload_builder()
+				);
+			case 'customers': // 3.5.1 rec-engine customer backfill (A-filter).
+				return new CustomerBackfillJob(
+					$this->ingest_queue(),
+					$this->customer_flusher()
 				);
 			default:
 				return null;

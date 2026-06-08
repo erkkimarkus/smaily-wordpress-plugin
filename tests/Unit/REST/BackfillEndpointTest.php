@@ -45,7 +45,7 @@ final class BackfillEndpointTest extends TestCase {
 		$response = $endpoint->start( $request );
 
 		self::assertSame( 400, $response->get_status() );
-		self::assertSame( array( 'contacts', 'products' ), $response->get_data()['supported_types'] );
+		self::assertSame( array( 'contacts', 'products', 'customers' ), $response->get_data()['supported_types'] );
 	}
 
 	public function test_start_persists_row_and_schedules_first_tick(): void {
