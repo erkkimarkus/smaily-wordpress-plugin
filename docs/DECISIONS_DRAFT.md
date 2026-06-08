@@ -1463,6 +1463,53 @@ that guarantees the customer exists by login), F3-21 (IsoDate for merge_ts),
 F3-14 (contract-vs-assumption check). 3.7.0 ships the handler; 3.7.1 the
 live-walk + ZIP.
 
+### F3-28: GDPR (3.8) — WP Privacy API, conservative export / complete erase, decision-logic strip
+
+**Scope authority is `docs/DATA_MODEL_GDPR.md`** (a standalone doc) — the code
+references it and does NOT re-derive the boundary. Summary of the decisions it
+fixes, as applied in 3.8:
+
+1. **Native WP Privacy API integration.** Register a
+   `wp_privacy_personal_data_exporters` exporter (Art 15) + a
+   `wp_privacy_personal_data_erasers` eraser (Art 17), so the rec data shows up
+   in WordPress's own Tools → Export / Erase Personal Data — no bespoke UI.
+
+2. **Export is conservative; erase is complete (asymmetric).** EXPORT surfaces
+   only rec-specific PERSONAL data: engine browse_events / visitor_tokens /
+   recommendations / email_events, the engine customer record MINUS its
+   decision-logic fields (segment / RFM / engagement / inferred_* — the engine's
+   classification, a trade secret, like Google/Meta withhold), and the plugin's
+   own `_smaily_*` rec-meta. It does NOT re-export WooCommerce order/purchase
+   data (Woo's own exporter owns that — the plugin reads rec-meta OFF an order,
+   never the order), and NOT `rec_attribution` (the engine omits it from §8 —
+   silently, NOT "request separately", because it's decision logic, not a
+   subject-access right). ERASE is the opposite — engine §9 deletes everything
+   (CASCADE incl. rec_attribution + visitor_tokens) and the plugin removes its
+   `_smaily_*` markers.
+
+3. **The WC boundary is the headline guarantee.** The exporter pulls rec-meta
+   off an order (`$order->get_meta('_smaily_rec_id')`) but never the order's
+   totals / line items. A test proves it: a customer with an order → the export
+   contains `_smaily_rec_id` but NOT `total_amount` / `line_total`.
+
+4. **HPOS-safe meta.** The order rec-meta MUST be read/written via the WC_Order
+   object (`$order->get_meta` / `delete_meta_data` / `save`), NOT
+   `get_post_meta` / `delete_post_meta` — under HPOS (the wp-env + WC-10.7 mode)
+   order meta lives in `wc_orders_meta`, so the post-meta calls would silently
+   read/erase nothing. (Caught by PHPStan flagging the `wc_get_orders('ids')`
+   cast — a real HPOS bug, not just a type nit.)
+
+5. **Opt-out (Art 21) is engine-API only in 3.8.** `Client::customer_opt_out`
+   (§10) ships now; the trigger — Smaily profiling-consent withdrawal + the
+   beacon's two-gate stop (browser-cookie consent AND Smaily profiling consent)
+   — is a SEPARATE later piece, because it depends on the Smaily profiling-consent
+   parameter API. 3.8 ships the mechanism the consent wiring will call.
+
+**Relationships:** DATA_MODEL_GDPR.md (the scope authority), F3-20 (the A-filter
+customer the export/erase keys on by email), F3-27 (the merge-marker user-meta
+the eraser also clears), §8/§9/§10 contract. 3.8.0 ships the handler; 3.8.1 the
+live-walk + ZIP. Smaily profiling-consent wiring + beacon-stop follow separately.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or
@@ -1481,7 +1528,6 @@ discovered along the way):
 milestone, A-filter, datetime; F3-22 orders + status mapping; F3-23 N-7
 AbstractD6Flusher + W2 drift; F3-24 browse-beacon architecture; F3-25 backfill
 architecture — all above):
-- F3-28: 3.8 GDPR (export/delete, WP Privacy API integration)
 - F3-29: 3.9 Step 4 4a activation (UI shift mode-A → mode-B)
 
 In each sub-PR's planning phase: "is this decision worth adding to DECISIONS?"

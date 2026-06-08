@@ -272,6 +272,59 @@ class Client {
 		return $this->request_url( 'POST', $url, $merge );
 	}
 
+	/**
+	 * GDPR Art 15 export (§8) — all engine-held rec data for a customer. The
+	 * caller (the WP exporter) selects which sections are personal data to
+	 * surface (DATA_MODEL_GDPR.md); this just returns the raw §8 body. A 404
+	 * means the customer has no engine record yet — the exporter treats that as
+	 * "no engine data", not an error.
+	 *
+	 * @param array<string, string> $query Optional `format` / `since`.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (incl. 404 not_found) or network failure.
+	 */
+	public function customer_export( string $email, array $query = array() ): array {
+		$url = sprintf( $this->resolve_url( 'customer_export', self::PATH_CUSTOMER_EXPORT_FMT ), rawurlencode( $email ) );
+		if ( $query !== array() ) {
+			$url .= '?' . http_build_query( $query );
+		}
+		return $this->request_url( 'GET', $url );
+	}
+
+	/**
+	 * GDPR Art 17 erase (§9) — full deletion (CASCADE incl. rec_attribution +
+	 * visitor_tokens). Idempotent: a second DELETE returns 404 (already gone),
+	 * which the eraser treats as success.
+	 *
+	 * @param array<string, mixed> $body Optional { confirm, reason }.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (incl. 404) or network failure.
+	 */
+	public function customer_delete( string $email, array $body = array() ): array {
+		$url = sprintf( $this->resolve_url( 'customer_delete', self::PATH_CUSTOMER_DELETE_FMT ), rawurlencode( $email ) );
+		return $this->request_url( 'DELETE', $url, $body !== array() ? $body : null );
+	}
+
+	/**
+	 * GDPR Art 21 opt-out (§10) — exclude the customer from future
+	 * recommendations (data retained, reversible). The body carries
+	 * { opt_out, reason?, opted_out_at? }.
+	 *
+	 * @param array<string, mixed> $body
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx or network failure.
+	 */
+	public function customer_opt_out( string $email, array $body ): array {
+		$url = sprintf( $this->resolve_url( 'customer_opt_out', self::PATH_CUSTOMER_OPT_OUT_FMT ), rawurlencode( $email ) );
+		return $this->request_url( 'POST', $url, $body );
+	}
+
 	// ---------------------------------------------------------------
 	// Private request engine.
 	// ---------------------------------------------------------------

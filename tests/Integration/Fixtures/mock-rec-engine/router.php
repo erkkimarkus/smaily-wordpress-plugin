@@ -811,6 +811,92 @@ if ( $method === 'POST' && $path === '/api/v1/identity/merge' ) {
 	);
 }
 
+// GDPR export (§8). The email is in the path (rawurlencoded). Returns rec
+// activity + a customer record WITH decision-logic fields (so a test can assert
+// the plugin strips them) + orders/order_items (so a test can assert the plugin
+// does NOT re-export Woo data). A `notfound`-prefixed email → 404.
+if ( $method === 'GET' && preg_match( '#^/api/v1/customer/([^/]+)/export$#', $path, $m ) ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply( 401, array( 'error' => 'unauthorized' ) );
+	}
+	$email = urldecode( $m[1] );
+	if ( strpos( $email, 'notfound' ) === 0 ) {
+		reply( 404, array( 'error' => 'not_found', 'message' => 'No customer with email ' . $email ) );
+	}
+	reply(
+		200,
+		array(
+			'export_metadata' => array( 'customer_email' => $email ),
+			'customer'        => array(
+				'email'             => $email,
+				'first_name'        => 'Mari',
+				'country'           => 'EE',
+				'segment'           => 'high_value',   // decision logic — plugin must strip
+				'rfm_recency'       => 5,              // decision logic
+				'engagement_score'  => 0.91,           // decision logic
+				'inferred_species'  => 'dog',          // decision logic
+			),
+			'browse_events'   => array(
+				array( 'event_id' => 'be-1', 'event_type' => 'product_view', 'sku' => 'ACA-1' ),
+				array( 'event_id' => 'be-2', 'event_type' => 'cart_add', 'sku' => 'ACA-1' ),
+			),
+			'recommendations' => array( array( 'rec_id' => 'r-1', 'sku' => 'ACA-2' ) ),
+			'visitor_tokens'  => array( array( 'token' => 'vt_abc' ) ),
+			'email_events'    => array(),
+			'orders'          => array( array( 'external_order_id' => 'WC-1', 'total_amount' => '67.50' ) ), // Woo — plugin must NOT export
+			'order_items'     => array( array( 'sku' => 'ACA-1', 'line_total' => '67.50' ) ),                // Woo
+		)
+	);
+}
+
+// GDPR delete (§9). Idempotent: a second delete for the same email → 404.
+if ( $method === 'DELETE' && preg_match( '#^/api/v1/customer/([^/]+)$#', $path, $m ) ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply( 401, array( 'error' => 'unauthorized' ) );
+	}
+	$email = urldecode( $m[1] );
+	$key   = 'gdpr_deleted_' . md5( $email );
+	if ( isset( $state[ $key ] ) ) {
+		reply( 404, array( 'error' => 'not_found', 'message' => 'Customer already deleted.' ) );
+	}
+	$state[ $key ] = true;
+	save_state( $state_file, $state );
+	reply(
+		200,
+		array(
+			'ok'              => true,
+			'deleted'         => true,
+			'customer_email'  => $email,
+			'records_removed' => array( 'customer' => 1, 'browse_events' => 2, 'rec_attribution' => 3, 'visitor_tokens' => 1 ),
+			'audit_log_id'    => 'audit_' . bin2hex( random_bytes( 4 ) ),
+			'deleted_at'      => gmdate( 'c' ),
+		)
+	);
+}
+
+// GDPR opt-out (§10).
+if ( $method === 'POST' && preg_match( '#^/api/v1/customer/([^/]+)/opt-out$#', $path, $m ) ) {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply( 401, array( 'error' => 'unauthorized' ) );
+	}
+	$email = urldecode( $m[1] );
+	$raw   = (string) file_get_contents( 'php://input' );
+	$body  = json_decode( $raw, true );
+	$flag  = is_array( $body ) && ! empty( $body['opt_out'] );
+	reply(
+		200,
+		array(
+			'ok'              => true,
+			'customer_email'  => $email,
+			'opt_out_status'  => $flag,
+			'previous_status' => false,
+		)
+	);
+}
+
 // Fallback.
 reply(
 	404,

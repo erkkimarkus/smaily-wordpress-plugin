@@ -18,6 +18,7 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
+use Smaily\Connect\Privacy\GdprHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
@@ -164,6 +165,17 @@ final class Bootstrap {
 		// front-end-only hook; StorefrontBeacon::enqueue() self-gates on
 		// connected + browse-tracking + WooCommerce active.
 		( new StorefrontBeacon( new RecEngineSettings() ) )->register();
+
+		// GDPR rights for rec-engine personal data (3.8) — registers a WP
+		// Privacy API exporter (Art 15) + eraser (Art 17) so WordPress's own
+		// Tools → Export / Erase Personal Data covers the rec data + markers.
+		$gdpr_bootstrap = $this;
+		( new GdprHandler(
+			$this->rec_engine_settings(),
+			static function () use ( $gdpr_bootstrap ): RecEngineClient {
+				return $gdpr_bootstrap->rec_client();
+			}
+		) )->register();
 
 		// Admin UI (wizard + settings React mount). The two helpers in
 		// admin/wizard.php are intentionally loaded only on admin requests

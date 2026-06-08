@@ -259,6 +259,48 @@ final class ClientTest extends TestCase {
 		);
 	}
 
+	public function test_customer_export_is_a_get_to_the_url_encoded_email(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'customer_export' => 'https://engine.test/api/v1/customer/%s/export' )
+		);
+
+		$client->customer_export( 'mari@example.com' );
+
+		self::assertSame( 'GET', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/customer/mari%40example.com/export', $client->captured['url'] );
+		self::assertNull( $client->captured['body'], 'Export is a GET — no body.' );
+	}
+
+	public function test_customer_delete_is_a_delete(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'customer_delete' => 'https://engine.test/api/v1/customer/%s' )
+		);
+
+		$client->customer_delete( 'mari@example.com', array( 'confirm' => true, 'reason' => 'user_request' ) );
+
+		self::assertSame( 'DELETE', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/customer/mari%40example.com', $client->captured['url'] );
+		self::assertSame( array( 'confirm' => true, 'reason' => 'user_request' ), $client->captured['body'] );
+	}
+
+	public function test_customer_opt_out_is_a_post(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'customer_opt_out' => 'https://engine.test/api/v1/customer/%s/opt-out' )
+		);
+
+		$client->customer_opt_out( 'mari@example.com', array( 'opt_out' => true, 'reason' => 'user_preference' ) );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/customer/mari%40example.com/opt-out', $client->captured['url'] );
+		self::assertSame( array( 'opt_out' => true, 'reason' => 'user_preference' ), $client->captured['body'] );
+	}
+
 	/**
 	 * Client double that captures the resolved (method, url, body) instead
 	 * of hitting the network, and returns a canned 200 body.

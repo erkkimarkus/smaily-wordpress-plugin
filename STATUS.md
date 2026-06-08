@@ -259,12 +259,33 @@ see "Pilot go-live" below.
   retroactive binding — after a browse event with the email retroactively binds
   (`retroactive_bound=2`, 3.4.4 behaviour reconfirmed), the merge is a no-op
   (`updated=0`); plus the 404 path (unknown customer → `customer_not_found`).
-  ZIP'd. **3.7 identity-merge COMPLETE.** Next: 3.8 GDPR.
+  ZIP'd. **3.7 identity-merge COMPLETE.**
+
+### In progress
+
+- **3.8 GDPR** — rec-engine personal-data rights via the WP Privacy API. Scope
+  authority: `docs/DATA_MODEL_GDPR.md` (referenced, not re-derived). DECISIONS
+  F3-28. **3.8.0 DONE**: `Client::customer_export` (§8 GET) / `customer_delete`
+  (§9 DELETE) / `customer_opt_out` (§10 POST) + `GdprHandler` registering a WP
+  Privacy **exporter** (Art 15) + **eraser** (Art 17). Export is conservative
+  (engine browse_events/visitor_tokens/recommendations/email_events + customer
+  record MINUS decision-logic fields like segment/RFM/engagement + plugin
+  `_smaily_*` rec-meta; NOT Woo orders/totals — Woo's exporter owns that; NOT
+  rec_attribution — silent). Erase is complete (engine §9 CASCADE incl.
+  attribution; 404=already-gone=success; + plugin meta removed). **HPOS-safe**:
+  order meta via `$order->get_meta`/`delete_meta_data` (NOT get_post_meta — would
+  miss wc_orders_meta under HPOS; caught by PHPStan, a real bug). Opt-out = the
+  §10 Client method only (the Smaily profiling-consent trigger + beacon two-gate
+  stop is a separate later piece). Mock §8/§9/§10 routes + 3 Client unit tests +
+  5 integration (incl. the WC-boundary test: `_smaily_rec_id` exported,
+  `total_amount`/`line_total` NOT). ci:strict exit=0; integration OK 75 (+5).
+  Next: 3.8.1 live-walk + ZIP.
 
 ### Next
 
-- **3.8 GDPR** (WP Privacy API — export/erase) → **3.9** Step 4 (4a) activation.
-  Then Phase 3 is done.
+- **3.8.1** GDPR live-walk (export/erase/opt-out against the real engine) + ZIP →
+  **3.9** Step 4 (4a) activation. Then Phase 3 is done. (Separate, after 3.8:
+  Smaily profiling-consent wiring + beacon two-gate stop.)
 
 ### Waiting / lock conditions
 
