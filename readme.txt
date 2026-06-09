@@ -1,10 +1,11 @@
 === Smaily Connect ===
 Contributors: sendsmaily, kaarel
 Tags: smaily, newsletter, email, mail, marketing
-Requires PHP: 7.0
-Requires at least: 6.0
-Tested up to: 6.8
-WC tested up to: 9.6.1
+Requires PHP: 8.0
+Requires at least: 6.2
+Tested up to: 6.9
+WC requires at least: 6.9
+WC tested up to: 10.7
 Stable tag: 1.6.1
 License: GPLv3 or later
 
