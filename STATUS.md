@@ -358,6 +358,10 @@ see "Pilot go-live" below.
   pilot-acceptance plan (`TESTING.md`, business pass/fail) is a separate follow-up —
   it needs Erkki's acceptance criteria.
 
+> **Consolidated deferred index: `BACKLOG.md`** — the canonical single view of
+> all deferred work (priority + why + location). The sections below remain for
+> narrative continuity; `BACKLOG.md` is the list to triage from.
+
 **Post-pilot (deferred):**
 - **3.10.3** — email channel (§13a email level + Notifications subpanel) via
   `wp_mail` (admin-notice base already covers proactive-in-wp-admin; email needs
@@ -501,6 +505,8 @@ sides ready = go-live.
 ---
 
 ## Known deferred items (tracked, not blocking)
+
+> Consolidated with priority in `BACKLOG.md` (🟢 / 🔵 tiers).
 
 - N-7 EVENT_* constant location asymmetry (catalog `EVENT_CATALOG_*` on
   CatalogHookHandler, customer/order on their Flusher) — still asymmetric after
