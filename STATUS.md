@@ -391,9 +391,18 @@ default-on). Sub-PRs:
   `Bootstrap::profiling_consent()`. Tests: +2 beacon (drop one / all-dropped) + 1
   identity (no retroactive bind). ci:strict exit=0 (unit 307, JS 144); integration
   OK 90 (+3).
-- [ ] **(a).2** — live-walk (write→read-back→enforce→§10→beacon-stop) + WP opt-out
-  UX (now a GDPR requirement, not a refinement). Live-walk test emails need a
-  deliverable domain (Smaily rejects `.test`).
+- [x] **(a).2** — WP opt-out UX + live-walk. **WP UX:** `ProfilingConsentAccount`
+  adds a **WooCommerce My Account → privacy toggle** ("use my data for personalised
+  recommendations") — shopper-facing per spec §10, the working opt-out the model
+  requires. The toggle's state mirrors the read-back (shows a Smaily-side opt-out
+  too); checked→`opt_in`, unchecked→`opt_out`. **Live-walk** `bin/walk-a-profiling.cjs`
+  against real Smaily + the engine, via the WIRED code: **9/10** — write→read-back
+  round-trip ✓, enforcement rule ✓, may_profile ✓, opt-out→Smaily=0 ✓, **beacon-stop
+  (drop) ✓**, opt-in restore ✓. The **§10 step is env-blocked**: the dev connection
+  is the stale integration fixture (`re-fixture.test`, unreachable), not real
+  MiuMjau — re-run after a real setup-token re-exchange; §10 itself is already
+  3.8-live-walked (10/10) + integration-proven. 3 account unit tests. ci:strict
+  exit=0 (unit 310); integration OK 90.
 - **TODO** — explicit opt-in if AKI tightens (`is_allowed()` is invertible); privacy
   policy must mention profiling (Erkki / docs).
 

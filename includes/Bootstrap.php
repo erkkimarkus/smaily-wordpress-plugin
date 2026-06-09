@@ -21,6 +21,7 @@ use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Privacy\GdprHandler;
 use Smaily\Connect\Privacy\ProfilingConsent;
+use Smaily\Connect\Privacy\ProfilingConsentAccount;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
@@ -197,6 +198,10 @@ final class Bootstrap {
 				return $notify_bootstrap->smaily_client();
 			}
 		) )->register();
+
+		// Shopper-facing profiling-consent opt-out ((a).2) — a My Account privacy
+		// toggle. The opt-out the opt-out model legally requires (DECISIONS F3-31).
+		( new ProfilingConsentAccount( $this->profiling_consent() ) )->register();
 
 		// Admin UI (wizard + settings React mount). The two helpers in
 		// admin/wizard.php are intentionally loaded only on admin requests
