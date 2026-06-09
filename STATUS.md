@@ -369,10 +369,23 @@ see "Pilot go-live" below.
   integration runs on both 6.9.4 (current) + 7.0 (compat). Worth doing for real 7.0
   proof; deferred behind the pilot-blockers (analogous to the legacy-WC matrix).
 
-**After pilot-hardening:**
-- **Smaily profiling-consent wiring + beacon two-gate stop** — awaits the Smaily
-  profiling-consent parameter API spec (`SMAILY_PROFILING_CONSENT_SPEC.md`, to be
-  provided). Not a numbered 3.x sub-PR.
+**After pilot-hardening — (a) Smaily profiling-consent wiring (in progress):**
+Spec: `SMAILY_PROFILING_CONSENT_SPEC.md`; design: DECISIONS F3-31 (OPT-OUT model,
+default-on). Sub-PRs:
+- [x] **(a).0** — probe-first + Client read/write + enforcement core. A live probe
+  against the real Smaily API confirmed write (`upsert_subscribers`, custom fields
+  auto-create → `101`) + read-back (`GET /api/contact.php?email=` → `is_unsubscribed`
+  + `smaily_rec_profiling`); caught that the spec had *assumed* read-back (the one
+  real risk). Built `Client::get_contact_consent` + `write_profiling_consent` +
+  `ProfilingConsent` (pure opt-out rule `is_allowed`, cached read-back daily TTL,
+  WP opt-out → Smaily write + cache + engine §10 opt-out, fail-open). 12 unit tests.
+- [ ] **(a).1** — beacon two-gate (the profiling gate at the proxy; known-email →
+  cache-check → off → drop; anon → cookie gate only).
+- [ ] **(a).2** — live-walk (write→read-back→enforce→§10→beacon-stop) + WP opt-out
+  UX (now a GDPR requirement, not a refinement). Live-walk test emails need a
+  deliverable domain (Smaily rejects `.test`).
+- **TODO** — explicit opt-in if AKI tightens (`is_allowed()` is invertible); privacy
+  policy must mention profiling (Erkki / docs).
 
 ### Waiting / lock conditions
 

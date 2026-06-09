@@ -1617,6 +1617,54 @@ reads); the legacy `smly_plus_retry_failed_events` job (the pattern 3.10.1 fixes
 it re-drives pending, not terminal failed). Pilot-hardening order: P5 → 3.10.0 →
 3.10.1 → 3.10.2 → P4 (onboarding doc); 3.10.3 + queue-janitor + GCM are post-pilot.
 
+### F3-31: Profiling consent — opt-out model (default-on), bidirectional Smaily sync
+
+**Context:** the rec-engine profiles Smaily contacts; GDPR requires a consent basis
+for profiling. Authority is Smaily (RECENGINE_API_CONTRACT line 722 — consent is NOT
+in the rec-engine contract); the plugin writes the consent to a Smaily contact and
+reads it back. Spec: `docs/SMAILY_PROFILING_CONSENT_SPEC.md` (the scope authority).
+
+**Decision (Erkki, 2026-06): OPT-OUT model, default-on.** Profile a contact UNLESS
+they've explicitly opted out. Enforcement (the inverse of the original opt-in draft):
+`profile IF is_unsubscribed != "1" AND smaily_rec_profiling != "0"` — don't-profile
+only on the general unsubscribe (stronger) OR an explicit profiling opt-out; a
+missing field / contact-not-in-Smaily (206) → profile. Read-back values are Smaily
+**strings** ("0"/"1") → string comparison. A read-back error **fails open** (profiles).
+
+**Rationale:** Estonian AKI does not currently require a separate explicit profiling
+**opt-in** — it requires a *transparent action* + a *working opt-out*. So default-on
++ a real opt-out path is lawful today. This is a **conscious decision carrying a
+small GDPR risk** that Erkki is investigating separately before any opt-in TODO;
+mitigated by transparency (privacy policy mentions profiling) + the working opt-out.
+
+**Two consequences:**
+- The **WP opt-out UX ((a).2) becomes a GDPR requirement, not a refinement** — the
+  opt-out model is only lawful if the shopper can actually opt out.
+- **TODO — explicit opt-in if AKI tightens.** `ProfilingConsent::is_allowed()` is
+  built pure + invertible: flip to `profile IFF smaily_rec_profiling == "1"`.
+
+**Probe-confirmed mechanism ((a).0):** write via the existing `upsert_subscribers`
+(form-encoded, custom fields auto-create) → `{code:101}`; read-back via
+`GET /api/contact.php?email=` returns `is_unsubscribed` + `smaily_rec_profiling`
+(206 on miss). Smaily rejects `.test` email domains on write — a live-test gotcha,
+not a code issue (no latent bug in the contact sync). The probe applied the project
+scar "don't assume a wire shape — live-probe it" and caught that my own spec had
+*assumed* read-back without verifying — the read-back endpoint was the one real risk.
+
+**Enforcement runtime (3.10.x-style):** cached read-back (`smly_profiling_*`
+transient, **daily TTL** — a Smaily-side opt-out propagates within a day; profiling
+isn't real-time-critical, but a week would be a GDPR problem). WP-side opt-out writes
+update the cache immediately. OFF → engine §10 `customer_opt_out` (3.8) + beacon-stop
+((a).1). Cookie two-gate: the beacon sends IFF browser-cookie-consent (CookieYes,
+ePrivacy) AND `smaily_rec_profiling != "0"` (this gate) — profiling default-on means
+the beacon depends mostly on the cookie gate, plus the opt-out check.
+
+**Relationships:** SMAILY_PROFILING_CONSENT_SPEC.md (authority), F3-28.5 (the
+deferred piece this is), §10 `customer_opt_out` (3.8, the engine-side enforcement),
+3.4.2 two-gate consent (the cookie gate this layers onto). Sub-PRs: (a).0 Client
+read/write + `ProfilingConsent` enforcement (this); (a).1 beacon two-gate; (a).2
+live-walk + WP opt-out UX.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or

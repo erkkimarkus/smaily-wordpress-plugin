@@ -123,6 +123,56 @@ class Client {
 	}
 
 	/**
+	 * Read a single contact's consent signals back by email (profiling-consent
+	 * wiring, (a).0). Smaily returns the contact's fields on a hit, or a
+	 * `{code:206, message:"Could not find requested email address"}` status on a
+	 * miss (HTTP 200 either way — probe-confirmed against the live API).
+	 *
+	 * @return array{found: bool, is_unsubscribed: ?string, smaily_rec_profiling: ?string}
+	 *         Values come back as STRINGS ("0"/"1") — callers compare as strings.
+	 */
+	public function get_contact_consent( string $email ): array {
+		$body = $this->request( 'GET', 'contact', array( 'email' => $email ) );
+
+		// A status payload ({code, message}) = not-found / error, never a contact.
+		if ( ! is_array( $body ) || isset( $body['code'] ) ) {
+			return array(
+				'found'                => false,
+				'is_unsubscribed'      => null,
+				'smaily_rec_profiling' => null,
+			);
+		}
+
+		// The hit is a contact object, or a single-element list of one.
+		$contact = isset( $body[0] ) && is_array( $body[0] ) ? $body[0] : $body;
+
+		return array(
+			'found'                => true,
+			'is_unsubscribed'      => isset( $contact['is_unsubscribed'] ) ? (string) $contact['is_unsubscribed'] : null,
+			'smaily_rec_profiling' => isset( $contact['smaily_rec_profiling'] ) ? (string) $contact['smaily_rec_profiling'] : null,
+		);
+	}
+
+	/**
+	 * Write the profiling-consent fields onto a contact via the existing upsert
+	 * (the custom fields auto-create on Smaily's side — probe-confirmed). The
+	 * boolean drives enforcement; the ISO-8601 timestamp is the Art 7 audit trail.
+	 *
+	 * @return array<string, mixed> The Smaily response ({code:101} on success).
+	 */
+	public function write_profiling_consent( string $email, bool $may_profile, string $changed_at ): array {
+		return $this->upsert_subscribers(
+			array(
+				array(
+					'email'                   => $email,
+					'smaily_rec_profiling'    => $may_profile ? 1 : 0,
+					'smaily_rec_profiling_ts' => $changed_at,
+				),
+			)
+		);
+	}
+
+	/**
 	 * Performs a single HTTP request against the configured Smaily subdomain.
 	 *
 	 * @param string                                   $method   "GET" or "POST".
