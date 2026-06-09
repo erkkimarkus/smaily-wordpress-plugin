@@ -299,6 +299,42 @@ email**, so a future `sprintf`-style regression fails the integration suite loud
 
 ---
 
+### 2.10 A "future-looking" version may be REAL — verify before downgrading it (knowledge-cutoff artefact)
+
+**What happened** (P5 version-floor reconciliation, two separate agents): the
+README requirements table listed `WordPress … tested up to 7.0`. The P5 "reconcile
+to one floor" pass treated WP 7.0 as a future/typo value and **downgraded it to
+6.9** — alongside a genuinely-correct fix (WooCommerce min `10.0 → 6.9`, since 10.0
+was an impossible floor for the WC-6.9.4 pilot). The reviewing agent then compounded
+it: in the next message it asserted "WP 7.0 doesn't exist" *before* checking. **Both
+were wrong** — WordPress 7.0 "Armstrong" shipped **2026-05-20**, the plugin team
+wrote a whole `docs/WP7_COMPAT.md` about supporting it, and the original README value
+was correct. The evidence was sitting in the repo the entire time.
+
+**Why two agents made the same mistake — it's systemic, not a one-off:**
+- **Knowledge cutoff.** Both agents' training cutoff predates WP 7.0 (May 2026), so
+  a 7.0 version *looks* non-existent. That's a **cutoff artefact, not a fact about
+  the world.** A version number later than your cutoff is exactly the case where
+  your prior is least trustworthy.
+- **Context-dimming + a true sibling.** WC `10.0` in the same table WAS a real error
+  (an impossible minimum for the pilot), correctly downgraded. WP `7.0` *looked the
+  same* (a suspiciously-high number) but had the **opposite truth**. Same shape,
+  different reality — pattern-matching off the WC case dragged WP down with it.
+
+**Rules for next time:**
+- **Before LOWERING a future-looking version value, verify it** — check the repo's
+  own compatibility docs (`WP7_COMPAT.md`), the file's git history (was it
+  deliberately set?), or web-search. Don't downgrade on a "that looks like a typo"
+  hunch. Lowering a real, supported version silently drops support.
+- **Treat any version newer than your knowledge cutoff as "unknown, verify",** not
+  "doesn't exist." The cutoff is the boundary of *your* knowledge, not of reality.
+- **"Same-looking" ≠ "same truth."** WC 10.0 (real error → downgrade) and WP 7.0
+  (real version → keep) were visually identical and oppositely correct. The check —
+  not the resemblance — is what tells them apart. A reconcile-to-one-truth pass must
+  verify each value against a source, not infer one value's fate from another's.
+
+---
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

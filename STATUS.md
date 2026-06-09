@@ -344,6 +344,11 @@ see "Pilot go-live" below.
   `wp_mail` (admin-notice base already covers proactive-in-wp-admin; email needs
   working server SMTP — recommend an SMTP plugin in the doc).
 - Queue janitor (prune `sent`/`failed` rows + index `created_at`), GCM encryption.
+- **WP 7.0 env-matrix verification** — the version floors now declare WP 6.6 /
+  tested 7.0 (per `docs/WP7_COMPAT.md`), but the integration suite still runs only
+  WP 6.9.4. WP7_COMPAT recommends a wp-env matrix adding a WP 7.0 compat env so
+  integration runs on both 6.9.4 (current) + 7.0 (compat). Worth doing for real 7.0
+  proof; deferred behind the pilot-blockers (analogous to the legacy-WC matrix).
 
 **After pilot-hardening:**
 - **Smaily profiling-consent wiring + beacon two-gate stop** — awaits the Smaily
