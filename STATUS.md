@@ -340,9 +340,15 @@ see "Pilot go-live" below.
   loop on a deterministic 4xx; the `http_NNN` classification is recorded for a
   future guarded auto-transient pass). ci:strict exit=0 (unit 285, JS 144);
   integration OK 85 (+3, `RecEngineEventsTest` retry cases).
-- [ ] **3.10.2** — proactive admin-notice (Layer 3 base): `NotificationManager`
-  (§13a, Event-Log + admin-notice levels) on failed-count/engine-down health
-  signals. No email yet.
+- [x] **3.10.2** — proactive admin-notice (Layer 3 base, §13a): `NotificationManager`
+  + a 15-min recurring health-check that raises a sticky `notice-error` when (a)
+  failed events > 50 in 24h across both queues (filterable threshold), or (b) the
+  rec-engine has been unreachable > 1h (time-based `down_since`, via a periodic
+  ping). Auto-clears when the condition resolves; **dismissible with a 24h cooldown**
+  (nonce'd admin-post link, no per-page nag, no JS). No email — that's 3.10.3,
+  post-pilot. Signal logic split into a pure `evaluate_signals` (7 unit tests);
+  `RecEngineHealthCheckTest` (2 integration). ci:strict exit=0 (unit 292, JS 144);
+  integration OK 87.
 - [ ] **P4** — pilot/merchant onboarding doc (INSTALL + acceptance/verify).
 
 **Post-pilot (deferred):**

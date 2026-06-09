@@ -18,6 +18,7 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
+use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Privacy\GdprHandler;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
@@ -174,6 +175,17 @@ final class Bootstrap {
 			$this->rec_engine_settings(),
 			static function () use ( $gdpr_bootstrap ): RecEngineClient {
 				return $gdpr_bootstrap->rec_client();
+			}
+		) )->register();
+
+		// Proactive health notifications (3.10.2) — a recurring health-check sets
+		// admin notices for "too many failures" / "engine unreachable >1h", so a
+		// pilot operator learns something broke without watching the Event Log.
+		$notify_bootstrap = $this;
+		( new NotificationManager(
+			$this->rec_engine_settings(),
+			static function () use ( $notify_bootstrap ): RecEngineClient {
+				return $notify_bootstrap->rec_client();
 			}
 		) )->register();
 
@@ -434,6 +446,13 @@ final class Bootstrap {
 		// Order ingest flush — its own recurring tick.
 		if ( ! as_has_scheduled_action( OrderFlusher::FLUSH_HOOK, array(), OrderFlusher::AS_GROUP ) ) {
 			as_schedule_recurring_action( time(), 60, OrderFlusher::FLUSH_HOOK, array(), OrderFlusher::AS_GROUP );
+		}
+
+		// Proactive health check (3.10.2) — every 15 min, recompute the admin-notice
+		// signals (failed-count > threshold in 24h; engine unreachable > 1h). Slow
+		// cadence: it makes a network ping and the signals are coarse-grained.
+		if ( ! as_has_scheduled_action( NotificationManager::HEALTH_HOOK, array(), NotificationManager::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 900, NotificationManager::HEALTH_HOOK, array(), NotificationManager::AS_GROUP );
 		}
 	}
 

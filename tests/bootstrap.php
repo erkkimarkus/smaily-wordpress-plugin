@@ -52,6 +52,19 @@ if ( ! defined( 'OBJECT_K' ) ) {
 	define( 'OBJECT_K', 'OBJECT_K' );
 }
 
+// Time constants (wp-includes/default-constants.php) — referenced in class
+// constant declarations (e.g. NotificationManager grace/cooldown), so they must
+// exist at class-load time even in the WP-less unit suite.
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
+}
+
 // WP REST infrastructure stubs — the unit suite tests endpoint handlers
 // in isolation without standing up wp-includes/rest-api.php. The shims
 // expose just enough surface (get_param, set_param, response code +
