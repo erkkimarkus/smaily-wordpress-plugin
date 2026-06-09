@@ -25,11 +25,11 @@ where something is.
 | Document | Audience | Status | Description |
 |----------|----------|--------|-------------|
 | `README.md` | Anyone evaluating the plugin | **Exists** | First impression. What the plugin does, who it's for, install summary, links to deeper docs. Lives at repo root, also surfaces in marketplace listings. (Refined further at Phase 3 end.) |
-| `INSTALL.md` | New WP-admin installing fresh | **TODO** (Phase 3 end) | Step-by-step install on a clean WordPress. Activation, wizard walkthrough, first sync verification. Screenshots. |
+| `docs/INSTALL.md` | Pilot merchant installing + setting up | **Written** (P4) | Merchant-facing: install (ZIP upload) → setup wizard (Smaily + rec-engine connect, browser-cookie consent + browse toggle) → verify (engine-confirmed backfill, Event Log, live smoke test) → troubleshoot (Event Log → Retry, health notices). Screenshot placeholders inline. Add the profiling-consent section once Smaily-consent (a) ships. |
 | `MIGRATION.md` | WP-admin running the legacy `sendsmaily/smaily-wordpress-plugin` | **TODO** (before pilot) | How to migrate from the legacy plugin to this one. What persists, what changes, what to back up first, rollback path. Critical: written **before pilot client install**. |
 | `FAQ.md` / `TROUBLESHOOTING.md` | WP-admin running into problems | **TODO** (after pilot, ~2-4 weeks in) | Real user questions and symptom→cause→fix patterns. Written **after** the pilot is in production and asks real questions. Drafting it earlier would just be guesses. |
 | `CHANGELOG.md` | Anyone tracking versions | **TODO** (Phase 3 end) | Version-by-version what changed. Required for WordPress.org marketplace if we publish there. Can be regenerated from git history. |
-| `TESTING.md` | Pilot client verifying the install works | **TODO** (before pilot) | Acceptance test plan for the pilot. Step-by-step "install → activate → wizard → verify Smaily connection → verify contact sync → ...". Pass/fail criteria. |
+| `TESTING.md` (pilot-acceptance) | Pilot engagement: is it production-ready? | **TODO** (before pilot — needs Erkki's criteria) | Business pass/fail criteria for the pilot engagement (distinct from INSTALL.md's technical verify). The acceptance bar is a product decision, so this waits on Erkki's input. NB: the existing root `/TESTING.md` is a separate Phase-2 dev sanity-test, not this. |
 
 ### Developer-facing — lives in repo, may be public or repo-only
 
@@ -96,4 +96,4 @@ document changes status (e.g. `TODO` → `Exists`), update its row.
 This index is itself a document — keep it current. Stale indexes erode trust faster
 than missing ones.
 
-**Last reviewed:** Phase 3 sub-PR 3.2.1 (commit context: 7cf1659)
+**Last reviewed:** pilot-hardening P4 (INSTALL.md written)

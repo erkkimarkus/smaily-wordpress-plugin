@@ -351,7 +351,12 @@ see "Pilot go-live" below.
   JS). No email — that's 3.10.3, post-pilot. Pure `evaluate_signals` (10 unit tests);
   `RecEngineHealthCheckTest` (2 integration). ci:strict exit=0 (unit 295, JS 144);
   integration OK 87.
-- [ ] **P4** — pilot/merchant onboarding doc (INSTALL + acceptance/verify).
+- [x] **P4** — pilot/merchant onboarding doc: `docs/INSTALL.md` (merchant-facing —
+  install → setup wizard → verify → troubleshoot, integrating the 3.10.x Event Log
+  / Retry / health-notice flows; documents only the *current* browser-cookie consent
+  + browse toggle, NOT profiling-consent which ships with (a)). The formal
+  pilot-acceptance plan (`TESTING.md`, business pass/fail) is a separate follow-up —
+  it needs Erkki's acceptance criteria.
 
 **Post-pilot (deferred):**
 - **3.10.3** — email channel (§13a email level + Notifications subpanel) via
