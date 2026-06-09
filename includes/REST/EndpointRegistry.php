@@ -91,7 +91,10 @@ final class EndpointRegistry {
 				new RecEngineSettings(),
 				static function ( string $api_key, string $base_url ): RecEngineClient {
 					return new RecEngineClient( $api_key, $base_url );
-				}
+				},
+				// (a).1: the beacon's profiling gate — drop browse events for an
+				// opted-out known contact before they reach the engine.
+				$bootstrap->profiling_consent()
 			),
 		);
 	}

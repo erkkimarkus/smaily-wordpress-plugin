@@ -12,6 +12,7 @@ namespace Smaily\Connect\REST;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
+use Smaily\Connect\Privacy\ProfilingConsent;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\Client;
@@ -126,12 +127,18 @@ class BeaconEndpoint {
 	/** @var callable(string $api_key, string $base_url): Client */
 	private $client_factory;
 
+	private ?ProfilingConsent $profiling;
+
 	/**
 	 * @param callable(string $api_key, string $base_url): Client $client_factory
+	 * @param ?ProfilingConsent $profiling The beacon's second gate ((a).1) — drops
+	 *        browse events carrying an opted-out contact's email before forwarding.
+	 *        Null = no profiling gate (only the cookie-consent gate applies).
 	 */
-	public function __construct( RecEngineSettings $settings, callable $client_factory ) {
+	public function __construct( RecEngineSettings $settings, callable $client_factory, ?ProfilingConsent $profiling = null ) {
 		$this->settings       = $settings;
 		$this->client_factory = $client_factory;
+		$this->profiling      = $profiling;
 	}
 
 	/**
@@ -203,6 +210,23 @@ class BeaconEndpoint {
 			);
 		}
 
+		// SECOND GATE (a).1 — drop browse events carrying an OPTED-OUT contact's
+		// email before they leave the building. Anon events (no email) have no
+		// contact to check and pass on the cookie-consent gate alone.
+		$events = $this->filter_by_profiling( $validation['events'] );
+		if ( $events === array() ) {
+			// Everything was for opted-out contacts — nothing to forward.
+			return new WP_REST_Response(
+				array(
+					'ok'           => true,
+					'processed'    => 0,
+					'deduplicated' => 0,
+					'errors'       => array(),
+				),
+				200
+			);
+		}
+
 		$api_key  = $this->settings->api_key();
 		$base_url = $this->settings->base_url();
 		if ( $api_key === '' || $base_url === '' ) {
@@ -217,7 +241,7 @@ class BeaconEndpoint {
 
 		$client = ( $this->client_factory )( $api_key, $base_url );
 		try {
-			$result = $client->ingest_browse( $validation['events'] );
+			$result = $client->ingest_browse( $events );
 		} catch ( ApiException $e ) {
 			return new WP_REST_Response(
 				array(
@@ -240,6 +264,45 @@ class BeaconEndpoint {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Drop events whose `customer_email` belongs to a contact that has opted out
+	 * of profiling. Anon events (no email) are kept — there's no contact to check,
+	 * so only the cookie-consent gate (client-side) applies to them. A
+	 * profiling-opt-out drop is a CONSCIOUS drop (the opt-out working), not an
+	 * error: aggregated into a 24h counter + logged ONCE per batch (never per
+	 * event, so a heavy opted-out browser can't flood the log).
+	 *
+	 * @param array<int, array<string, mixed>> $events
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function filter_by_profiling( array $events ): array {
+		if ( $this->profiling === null ) {
+			return $events;
+		}
+
+		$kept    = array();
+		$dropped = 0;
+		foreach ( $events as $event ) {
+			$email = isset( $event['customer_email'] ) ? (string) $event['customer_email'] : '';
+			if ( $email !== '' && ! $this->profiling->may_profile( $email ) ) {
+				++$dropped;
+				continue;
+			}
+			$kept[] = $event;
+		}
+
+		if ( $dropped > 0 ) {
+			$key = 'smly_profiling_dropped_24h';
+			set_transient( $key, (int) get_transient( $key ) + $dropped, DAY_IN_SECONDS );
+			error_log(
+				sprintf( '[smaily-connect profiling] dropped %d browse event(s) for opted-out contact(s)', $dropped )
+			);
+		}
+
+		return $kept;
 	}
 
 	/**

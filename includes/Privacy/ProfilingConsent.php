@@ -30,8 +30,11 @@ use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
  * When the decision resolves to "do not profile", two actions fire (the spec):
  *   1. engine opt-out (§10 Client::customer_opt_out) — excluded from recs;
  *   2. beacon-stop — the beacon's profiling gate ((a).1 consumes may_profile()).
+ *
+ * Not final: the beacon + identity-merge tests inject a double overriding
+ * may_profile() to drive the gate without standing up Smaily + transients.
  */
-final class ProfilingConsent {
+class ProfilingConsent {
 
 	private const CACHE_PREFIX = 'smly_profiling_';
 	private const CACHE_TTL    = DAY_IN_SECONDS;

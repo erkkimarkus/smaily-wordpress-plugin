@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Privacy\ProfilingConsent;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\Client;
@@ -52,12 +53,18 @@ class IdentityHookHandler {
 	/** @var callable(): Client */
 	private $client_factory;
 
+	private ?ProfilingConsent $profiling;
+
 	/**
 	 * @param callable(): Client $client_factory
+	 * @param ?ProfilingConsent  $profiling Profiling-consent gate ((a).1) — when the
+	 *        contact has opted out, skip the merge so their anon browse history is
+	 *        NOT retroactively bound to their profile. Null = no gate (pre-(a) builds).
 	 */
-	public function __construct( RecEngineSettings $settings, callable $client_factory ) {
+	public function __construct( RecEngineSettings $settings, callable $client_factory, ?ProfilingConsent $profiling = null ) {
 		$this->settings       = $settings;
 		$this->client_factory = $client_factory;
+		$this->profiling      = $profiling;
 	}
 
 	public function register(): void {
@@ -80,6 +87,14 @@ class IdentityHookHandler {
 
 		$email = strtolower( trim( (string) $user->user_email ) );
 		if ( $email === '' ) {
+			return;
+		}
+
+		// (a).1 profiling gate — if the contact has opted out of profiling, do NOT
+		// bind their anon browse history to their identity (respect the opt-out
+		// retroactively). The anon events stay unattributed rather than building a
+		// profile the shopper declined.
+		if ( $this->profiling !== null && ! $this->profiling->may_profile( $email ) ) {
 			return;
 		}
 

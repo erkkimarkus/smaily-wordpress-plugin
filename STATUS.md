@@ -379,8 +379,18 @@ default-on). Sub-PRs:
   real risk). Built `Client::get_contact_consent` + `write_profiling_consent` +
   `ProfilingConsent` (pure opt-out rule `is_allowed`, cached read-back daily TTL,
   WP opt-out → Smaily write + cache + engine §10 opt-out, fail-open). 12 unit tests.
-- [ ] **(a).1** — beacon two-gate (the profiling gate at the proxy; known-email →
-  cache-check → off → drop; anon → cookie gate only).
+- [x] **(a).1** — beacon two-gate + retroactive-bind respect. The `BeaconEndpoint`
+  proxy now drops browse events carrying an opted-out contact's email before
+  forwarding (anon events — no email — pass on the cookie gate alone); all-dropped
+  → `processed:0` without calling the engine. Drop is a **conscious drop** (opt-out
+  working, not an error): aggregated into a 24h counter (`smly_profiling_dropped_24h`,
+  for a future surface) + logged **once per batch** (never per event → no flood).
+  Plus: `IdentityHookHandler` **skips `identity.merge` for an opted-out contact** —
+  so their anon browse history is NOT retroactively bound to their profile (respect
+  the opt-out backwards; the anon events stay unattributed). Wired via
+  `Bootstrap::profiling_consent()`. Tests: +2 beacon (drop one / all-dropped) + 1
+  identity (no retroactive bind). ci:strict exit=0 (unit 307, JS 144); integration
+  OK 90 (+3).
 - [ ] **(a).2** — live-walk (write→read-back→enforce→§10→beacon-stop) + WP opt-out
   UX (now a GDPR requirement, not a refinement). Live-walk test emails need a
   deliverable domain (Smaily rejects `.test`).

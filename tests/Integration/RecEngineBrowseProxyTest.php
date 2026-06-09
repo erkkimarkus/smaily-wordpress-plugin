@@ -183,6 +183,55 @@ final class RecEngineBrowseProxyTest extends TestCase {
 
 	// --- helpers --------------------------------------------------------
 
+	// --- (a).1 profiling gate (the beacon's second gate) -------------------
+
+	/** Mirror ProfilingConsent::cache_key so we can pre-seed a decision. */
+	private function profiling_key( string $email ): string {
+		return 'smly_profiling_' . md5( strtolower( trim( $email ) ) );
+	}
+
+	public function test_profiling_opt_out_drops_only_the_known_email_event(): void {
+		$this->enable_beacon();
+		// out@ has opted out (cache hit = '0'); in@ + anon are allowed (default-on).
+		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
+
+		$response = RestRequestHelper::post(
+			'/beacon',
+			array(
+				'events' => array(
+					array( 'event_id' => 'pf-1', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'customer_email' => 'out@example.com' ),
+					array( 'event_id' => 'pf-2', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:01:00Z', 'customer_email' => 'in@example.com' ),
+					array( 'event_id' => 'pf-3', 'event_type' => 'product_view', 'session_id' => 's2', 'event_ts' => '2026-06-06T10:02:00Z' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		// The opted-out event is dropped; the allowed + anon ones reach the engine.
+		self::assertSame( 2, $response->get_data()['processed'] );
+
+		delete_transient( $this->profiling_key( 'out@example.com' ) );
+	}
+
+	public function test_all_events_opted_out_returns_zero_without_calling_engine(): void {
+		$this->enable_beacon();
+		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
+
+		$response = RestRequestHelper::post(
+			'/beacon',
+			array(
+				'events' => array(
+					array( 'event_id' => 'pf-only', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'customer_email' => 'out@example.com' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 0, $response->get_data()['processed'], 'all opted-out → nothing forwarded' );
+
+		delete_transient( $this->profiling_key( 'out@example.com' ) );
+	}
+
 	private function enable_beacon(): void {
 		$this->connect_to_mock();
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, true );

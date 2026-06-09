@@ -12,7 +12,9 @@ namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
+use Smaily\Connect\Privacy\ProfilingConsent;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Tests\Integration\Fixtures\RecEngineMockServer;
 use Smaily\Connect\Tests\Integration\Support\EnvScrub;
@@ -150,6 +152,46 @@ final class RecEngineIdentityMergeTest extends TestCase {
 				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
 			}
 		);
+	}
+
+	/** Same handler, but with the (a).1 profiling gate wired in. */
+	private function handler_with_profiling(): IdentityHookHandler {
+		$settings = new RecEngineSettings();
+		$client   = static function () use ( $settings ): Client {
+			return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+		};
+		$profiling = new ProfilingConsent(
+			$settings,
+			static fn (): ?SmailyClient => null, // unused — the cache is pre-seeded below.
+			$client
+		);
+
+		return new IdentityHookHandler( $settings, $client, $profiling );
+	}
+
+	public function test_opted_out_contact_is_not_retroactively_bound(): void {
+		$_COOKIE[ self::SESSION_COOKIE ] = 'anon-optout';
+		$_COOKIE[ self::VISITOR_COOKIE ] = 'vt_optout';
+		$email = 'merge-optout@example.test';
+		$user  = $this->make_user( $email );
+
+		// Pre-seed the profiling cache to opted-out (cache hit → no Smaily call).
+		$key = 'smly_profiling_' . md5( strtolower( $email ) );
+		set_transient( $key, '0', DAY_IN_SECONDS );
+
+		$this->handler_with_profiling()->on_login( $user->user_login, $user );
+
+		self::assertNull(
+			self::$engine->state()['last_merge_received'] ?? null,
+			'an opted-out contact must not be merged — their anon browse history is not retroactively bound'
+		);
+		self::assertSame(
+			'',
+			(string) get_user_meta( (int) $user->ID, IdentityHookHandler::MERGED_META_KEY, true ),
+			'no dedup marker is written when the merge is skipped'
+		);
+
+		delete_transient( $key );
 	}
 
 	private function make_user( string $email ): \WP_User {

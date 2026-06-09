@@ -1651,6 +1651,15 @@ not a code issue (no latent bug in the contact sync). The probe applied the proj
 scar "don't assume a wire shape — live-probe it" and caught that my own spec had
 *assumed* read-back without verifying — the read-back endpoint was the one real risk.
 
+**Fail-open risk (part of Erkki's separate GDPR review):** a read-back error returns
+*profile* (fail-open), consistent with the opt-out/default-on model. The narrow
+consent-risk window is: cache-miss **AND** read-error **AND** the contact had
+actually opted out — only then is someone profiled briefly without consent. Bounded
+by the cache (a WP-side opt-out sets cache `'0'` immediately; a known opt-out stays
+cached for the TTL, so the window needs a *cache-expired* opt-out + a *concurrent*
+read failure). Narrow + transient, but real — folded into Erkki's separate GDPR
+investigation alongside the opt-out-model risk.
+
 **Enforcement runtime (3.10.x-style):** cached read-back (`smly_profiling_*`
 transient, **daily TTL** — a Smaily-side opt-out propagates within a day; profiling
 isn't real-time-critical, but a week would be a GDPR problem). WP-side opt-out writes
@@ -1658,6 +1667,25 @@ update the cache immediately. OFF → engine §10 `customer_opt_out` (3.8) + bea
 ((a).1). Cookie two-gate: the beacon sends IFF browser-cookie-consent (CookieYes,
 ePrivacy) AND `smaily_rec_profiling != "0"` (this gate) — profiling default-on means
 the beacon depends mostly on the cookie gate, plus the opt-out check.
+
+**(a).1 — beacon gate placement + two design calls:**
+- **Gate placement:** the profiling gate is at the **`BeaconEndpoint` proxy**
+  (server-side), filtering events whose `customer_email` resolves to opted-out
+  before the forward. Anon events (no email) have no contact to check → only the
+  cookie gate applies (until identified). may_profile() reads the cache (one check
+  per batch — a batch is one visitor), so a read-back is at most once per
+  contact-per-TTL in the proxy path.
+- **Drop semantics (Erkki):** a profiling-opt-out drop is a **conscious drop, not
+  an error** — aggregated into a 24h counter (`smly_profiling_dropped_24h`, for a
+  future surface) and logged **once per batch** (never per event, so a heavy
+  opted-out browser can't flood the log). Beacon events aren't durable-queue rows,
+  so they don't appear in the Event Log — surfacing the drop count is a possible
+  refinement, not built.
+- **Anon→known retroactive (Erkki):** when an opted-out shopper logs in,
+  `IdentityHookHandler` **skips `identity.merge`** — so the engine never
+  retroactively binds their prior anon browse to their identity. The opt-out is
+  respected **backwards**; the anon events stay unattributed (not deleted — the
+  spec's "do not profile" = engine §10 opt-out + don't-bind, not erase).
 
 **Relationships:** SMAILY_PROFILING_CONSENT_SPEC.md (authority), F3-28.5 (the
 deferred piece this is), §10 `customer_opt_out` (3.8, the engine-side enforcement),

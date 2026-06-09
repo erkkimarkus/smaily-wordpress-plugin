@@ -20,6 +20,7 @@ use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Privacy\GdprHandler;
+use Smaily\Connect\Privacy\ProfilingConsent;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
@@ -377,7 +378,10 @@ final class Bootstrap {
 			$this->rec_engine_settings(),
 			static function () use ( $bootstrap ): RecEngineClient {
 				return $bootstrap->rec_client();
-			}
+			},
+			// (a).1: don't retroactively bind an opted-out contact's anon browse
+			// history — respect the profiling opt-out, even backwards.
+			$this->profiling_consent()
 		);
 		$identity->register();
 
@@ -645,6 +649,28 @@ final class Bootstrap {
 			$settings->base_url(),
 			$settings->endpoints(),
 			2
+		);
+	}
+
+	/**
+	 * Profiling-consent enforcement ((a).0/.1). The Smaily-client factory returns
+	 * the default client only once the email wizard is finished — an un-set-up
+	 * store has no contact to read consent from.
+	 */
+	public function profiling_consent(): ProfilingConsent {
+		$bootstrap = $this;
+
+		return new ProfilingConsent(
+			$this->rec_engine_settings(),
+			static function () use ( $bootstrap ): ?Client {
+				if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+					return null;
+				}
+				return $bootstrap->smaily_client();
+			},
+			static function () use ( $bootstrap ): RecEngineClient {
+				return $bootstrap->rec_client();
+			}
 		);
 	}
 
