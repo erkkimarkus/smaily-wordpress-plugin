@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getEventDetail, listEvents } from './events';
+import { getEventDetail, listEvents, retryEvents } from './events';
 import { _resetApiClient, configureApiClient } from './client';
 
 describe('events API wrappers', () => {
@@ -77,5 +77,37 @@ describe('events API wrappers', () => {
     expect(res.payload).toContain('order_id');
     const [url] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('https://example.test/api/events/detail?source=rec_engine&id=7');
+  });
+
+  it('retryEvents POSTs /events/retry with the source + id body', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ reset: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const res = await retryEvents({ source: 'rec_engine', id: 42 });
+
+    expect(res.reset).toBe(1);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('https://example.test/api/events/retry');
+    expect((init as RequestInit).method).toBe('POST');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ source: 'rec_engine', id: 42 });
+  });
+
+  it('retryEvents POSTs an empty body for retry-all', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ reset: 5 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const res = await retryEvents();
+
+    expect(res.reset).toBe(5);
+    const [, init] = fetchSpy.mock.calls[0]!;
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({});
   });
 });

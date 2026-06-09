@@ -14,7 +14,9 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
 use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+use Smaily\Connect\Smaily\RecEngine\OrderFlusher;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -66,6 +68,18 @@ class EventsEndpoint {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'detail' ),
+				'permission_callback' => array( $this, 'permission_check' ),
+			)
+		);
+
+		// Recovery (3.10.1): re-drive failed rows. Write route — manage_options +
+		// the WP cookie-nonce gate the same as every other admin POST here.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			self::ROUTE_PREFIX . '/retry',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'retry' ),
 				'permission_callback' => array( $this, 'permission_check' ),
 			)
 		);
@@ -169,6 +183,60 @@ class EventsEndpoint {
 				'payload' => isset( $row['payload'] ) ? (string) $row['payload'] : '',
 			),
 			200
+		);
+	}
+
+	/**
+	 * Re-drive failed rows (3.10.1, manual recovery). Body:
+	 *   { source?, id? }
+	 *   - id + source        → revive that single failed row in that queue.
+	 *   - source (no id)      → revive ALL failed rows in that queue.
+	 *   - neither             → revive ALL failed rows in BOTH queues.
+	 * reset_failed() flips FAILED→PENDING; this then kicks the recurring flushes
+	 * so the rows re-send promptly instead of waiting for the next 60s tick.
+	 */
+	public function retry( WP_REST_Request $request ): WP_REST_Response {
+		$source = $this->sanitize_source( (string) $request->get_param( 'source' ) );
+		$id     = (int) $request->get_param( 'id' );
+
+		if ( $id > 0 && $source === '' ) {
+			return new WP_REST_Response( array( 'error' => 'source_required_for_single_retry' ), 400 );
+		}
+
+		$ids   = $id > 0 ? array( $id ) : null;
+		$rec   = new IngestQueue();
+		$plus  = new EventQueue();
+		$reset = 0;
+
+		if ( $source !== self::SOURCE_SMAILY ) {
+			$n = $rec->reset_failed( $ids );
+			if ( $n > 0 ) {
+				$rec->schedule_flushes( $this->rec_flush_hooks() );
+			}
+			$reset += $n;
+		}
+		if ( $source !== self::SOURCE_REC ) {
+			$n = $plus->reset_failed( $ids );
+			if ( $n > 0 ) {
+				$plus->schedule_flush();
+			}
+			$reset += $n;
+		}
+
+		return new WP_REST_Response( array( 'reset' => $reset ), 200 );
+	}
+
+	/**
+	 * The rec queue is drained by three flushers, each on its own hook/group;
+	 * kick all so a reset row of any event type re-sends promptly.
+	 *
+	 * @return array<int, array{0: string, 1: string}>
+	 */
+	private function rec_flush_hooks(): array {
+		return array(
+			array( IngestQueue::FLUSH_HOOK, IngestQueue::AS_GROUP ),
+			array( CustomerFlusher::FLUSH_HOOK, CustomerFlusher::AS_GROUP ),
+			array( OrderFlusher::FLUSH_HOOK, OrderFlusher::AS_GROUP ),
 		);
 	}
 

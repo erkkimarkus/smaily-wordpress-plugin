@@ -174,6 +174,49 @@ class EventQueue {
 	}
 
 	/**
+	 * Revive terminally-`failed` rows back to `pending` so the recurring flush
+	 * re-attempts them (3.10.1 Event Log recovery). Resets the attempt counter +
+	 * last_error. `$ids` null = every failed row; otherwise only the given ids.
+	 * Manual-only by design (a deterministic failure would loop under auto-retry).
+	 * Returns the row count. This queue has no next_retry_at column.
+	 *
+	 * @param int[]|null $ids
+	 */
+	public function reset_failed( ?array $ids = null ): int {
+		global $wpdb;
+		$table = $this->table_name();
+
+		$set = 'SET status = %s, attempts = 0, last_error = NULL';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		if ( $ids === null ) {
+			$sql = $wpdb->prepare(
+				"UPDATE {$table} {$set} WHERE status = %s",
+				self::STATUS_PENDING,
+				self::STATUS_FAILED
+			);
+		} else {
+			$ids = array_values( array_filter( array_map( 'intval', $ids ), static fn ( int $i ): bool => $i > 0 ) );
+			if ( $ids === array() ) {
+				return 0;
+			}
+			$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+			$sql          = $wpdb->prepare(
+				"UPDATE {$table} {$set} WHERE status = %s AND id IN ( {$placeholders} )",
+				array_merge( array( self::STATUS_PENDING, self::STATUS_FAILED ), $ids )
+			);
+		}
+
+		return (int) $wpdb->query( $sql );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	}
+
+	/** Public kick so /events/retry can re-drive promptly after reset_failed(). */
+	public function schedule_flush(): void {
+		$this->maybe_schedule_flush();
+	}
+
+	/**
 	 * Ensure an async flush is queued. Deduplicated so multiple enqueues
 	 * in one request collapse to a single AS row.
 	 */

@@ -69,3 +69,25 @@ export function getEventDetail(
     { signal },
   );
 }
+
+export interface RetryResponse {
+  /** How many failed rows were revived to pending. */
+  reset: number;
+}
+
+/**
+ * Re-drive failed rows (3.10.1 recovery). `{ source, id }` retries one row;
+ * `{ source }` retries all failed in that queue; `{}` retries all failed in
+ * both. Flips FAILED→PENDING server-side and kicks the flushers so the rows
+ * re-send promptly (manual-only — auto-retry would loop on a deterministic 4xx).
+ */
+export function retryEvents(
+  args: { source?: EventSource; id?: number } = {},
+  signal?: AbortSignal,
+): Promise<RetryResponse> {
+  return apiRequest<RetryResponse>('/events/retry', {
+    method: 'POST',
+    body: args,
+    signal,
+  });
+}

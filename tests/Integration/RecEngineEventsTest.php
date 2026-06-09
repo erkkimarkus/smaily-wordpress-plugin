@@ -215,4 +215,41 @@ final class RecEngineEventsTest extends TestCase {
 		self::assertSame( 1, $data['sent'], 'one order.upsert is sent' );
 		self::assertSame( 1, $data['failed'], 'one order.upsert is terminally failed' );
 	}
+
+	// --- 3.10.1 recovery: /events/retry + reset_failed -----------------------
+
+	public function test_retry_single_revives_one_failed_row(): void {
+		global $wpdb;
+		// phpcs:disable WordPress.DB
+		$id = (int) $wpdb->get_var( 'SELECT id FROM ' . $this->rec_table() . " WHERE status = 'failed' LIMIT 1" );
+		// phpcs:enable WordPress.DB
+
+		$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/events/retry' );
+		$req->set_param( 'source', 'rec_engine' );
+		$req->set_param( 'id', $id );
+		$data = ( new EventsEndpoint() )->retry( $req )->get_data();
+
+		self::assertSame( 1, $data['reset'] );
+		// phpcs:disable WordPress.DB
+		$status = $wpdb->get_var( $wpdb->prepare( 'SELECT status FROM ' . $this->rec_table() . ' WHERE id = %d', $id ) );
+		// phpcs:enable WordPress.DB
+		self::assertSame( 'pending', $status, 'the failed row is revived to pending' );
+	}
+
+	public function test_retry_all_revives_failed_in_both_queues(): void {
+		// setUp seeds one failed row in each queue.
+		$req  = new WP_REST_Request( 'POST', '/smaily-connect/v1/events/retry' );
+		$data = ( new EventsEndpoint() )->retry( $req )->get_data();
+
+		self::assertSame( 2, $data['reset'], 'one failed row revived in each queue' );
+		self::assertSame( 0, $this->list( array( 'status' => 'failed' ) )['total'], 'no failed rows remain' );
+	}
+
+	public function test_retry_single_requires_a_source(): void {
+		$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/events/retry' );
+		$req->set_param( 'id', 123 );
+		$resp = ( new EventsEndpoint() )->retry( $req );
+
+		self::assertSame( 400, $resp->get_status() );
+	}
 }

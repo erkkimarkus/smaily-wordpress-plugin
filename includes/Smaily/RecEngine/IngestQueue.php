@@ -247,6 +247,60 @@ class IngestQueue {
 	}
 
 	/**
+	 * Revive terminally-`failed` rows back to `pending` so the recurring flushers
+	 * re-attempt them (3.10.1, the recovery half of the Event Log). Resets the
+	 * attempt counter + clears the retry-park + last_error so the row starts
+	 * fresh. `$ids` null = every failed row; otherwise only the given ids.
+	 *
+	 * This is the merchant-driven "Retry failed" path — manual by design (3.10.1):
+	 * a deterministic 4xx (validation) failure would loop forever under blind
+	 * auto-retry, so re-driving is an explicit action. Returns the row count.
+	 *
+	 * @param int[]|null $ids
+	 */
+	public function reset_failed( ?array $ids = null ): int {
+		global $wpdb;
+		$table = $this->table_name();
+
+		$set = 'SET status = %s, attempts = 0, next_retry_at = NULL, last_error = NULL';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		if ( $ids === null ) {
+			$sql = $wpdb->prepare(
+				"UPDATE {$table} {$set} WHERE status = %s",
+				self::STATUS_PENDING,
+				self::STATUS_FAILED
+			);
+		} else {
+			$ids = array_values( array_filter( array_map( 'intval', $ids ), static fn ( int $i ): bool => $i > 0 ) );
+			if ( $ids === array() ) {
+				return 0;
+			}
+			$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+			$sql          = $wpdb->prepare(
+				"UPDATE {$table} {$set} WHERE status = %s AND id IN ( {$placeholders} )",
+				array_merge( array( self::STATUS_PENDING, self::STATUS_FAILED ), $ids )
+			);
+		}
+
+		return (int) $wpdb->query( $sql );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	}
+
+	/**
+	 * Schedule this queue's recurring flush hooks immediately so a reset row
+	 * re-sends promptly instead of waiting for the next 60s tick. Public so the
+	 * /events/retry endpoint can kick a re-drive right after reset_failed().
+	 *
+	 * @param array<int, array{0: string, 1: string}> $hook_groups [hook, group] pairs.
+	 */
+	public function schedule_flushes( array $hook_groups ): void {
+		foreach ( $hook_groups as $pair ) {
+			$this->maybe_schedule_flush( $pair[0], $pair[1] );
+		}
+	}
+
+	/**
 	 * Ensure an async flush is queued for the given endpoint hook. Deduplicated
 	 * so multiple enqueues in one request collapse to a single AS row. The hook
 	 * + group are passed in because the shared queue serves several endpoints

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as eventsApi from '../../api/events';
@@ -67,6 +67,47 @@ describe('EventLog', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No events yet.')).toBeInTheDocument();
+    });
+  });
+
+  it('retries a failed row via the API and reloads', async () => {
+    vi.spyOn(eventsApi, 'listEvents').mockResolvedValue({
+      events: [ROW],
+      total: 1,
+      page: 1,
+      per_page: 50,
+      failed_24h: 1,
+    });
+    const retrySpy = vi.spyOn(eventsApi, 'retryEvents').mockResolvedValue({ reset: 1 });
+
+    render(<EventLog />);
+
+    // The per-row Retry button only renders for failed rows.
+    const retryButton = await screen.findByRole('button', { name: 'Retry' });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(retrySpy).toHaveBeenCalledWith({ source: 'rec_engine', id: 1 });
+    });
+  });
+
+  it('retry-all-failed posts an empty retry', async () => {
+    vi.spyOn(eventsApi, 'listEvents').mockResolvedValue({
+      events: [ROW],
+      total: 1,
+      page: 1,
+      per_page: 50,
+      failed_24h: 2,
+    });
+    const retrySpy = vi.spyOn(eventsApi, 'retryEvents').mockResolvedValue({ reset: 2 });
+
+    render(<EventLog />);
+
+    const retryAll = await screen.findByRole('button', { name: 'Retry all failed' });
+    fireEvent.click(retryAll);
+
+    await waitFor(() => {
+      expect(retrySpy).toHaveBeenCalledWith({});
     });
   });
 });

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getEventDetail,
   listEvents,
+  retryEvents,
   type EventDetailResponse,
   type EventRow,
   type EventSource,
@@ -41,6 +42,7 @@ export function EventLog(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<EventDetailResponse | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -77,6 +79,22 @@ export function EventLog(): React.JSX.Element {
     }
   }, []);
 
+  const handleRetry = useCallback(
+    async (args: { source?: EventSource; id?: number }): Promise<void> => {
+      setRetrying(true);
+      setError(null);
+      try {
+        await retryEvents(args);
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Retry failed.');
+      } finally {
+        setRetrying(false);
+      }
+    },
+    [load],
+  );
+
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   return (
@@ -86,16 +104,26 @@ export function EventLog(): React.JSX.Element {
           tone="danger"
           title={`${failed24h} failed ${failed24h === 1 ? 'event' : 'events'} in the last 24 hours`}
           actions={
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                setStatus('failed');
-                setPage(1);
-              }}
-            >
-              View only failed
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setStatus('failed');
+                  setPage(1);
+                }}
+              >
+                View only failed
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                loading={retrying}
+                onClick={() => void handleRetry({})}
+              >
+                Retry all failed
+              </Button>
+            </div>
           }
         >
           Some records didn&apos;t reach their destination. Review them below.
@@ -192,9 +220,21 @@ export function EventLog(): React.JSX.Element {
                     {row.last_error || '—'}
                   </td>
                   <td className="py-2 text-right">
-                    <Button variant="ghost" type="button" onClick={() => void openDetail(row)}>
-                      Details
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      {row.status === 'failed' && (
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          disabled={retrying}
+                          onClick={() => void handleRetry({ source: row.source, id: row.id })}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                      <Button variant="ghost" type="button" onClick={() => void openDetail(row)}>
+                        Details
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

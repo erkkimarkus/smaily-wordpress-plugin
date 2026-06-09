@@ -329,11 +329,17 @@ see "Pilot go-live" below.
 ### Next — pilot-hardening sequence (in order)
 
 **Pilot-blockers (must close before pilot), in order:**
-- [x] **P5** — version-floor reconciliation (WC 6.9 / WP 6.2 / PHP 8.0).
+- [x] **P5** — version-floor reconciliation (WC 6.9 / WP 6.2→6.6 / PHP 8.0; WP
+  tested 7.0 restored after a context-dimming slip, LESSONS §2.10).
 - [x] **3.10.0** — Event Log visibility (Layer 1, above).
-- [ ] **3.10.1** — failed-row recovery (Layer 2, P1): `IngestQueue::reset_failed()`
-  + `/events/retry` + "Retry now" / "Retry all failed" button. Manual-only base
-  (auto-transient deferred — guarded on the `http_NNN` classification 3.10.0 emits).
+- [x] **3.10.1** — failed-row recovery (Layer 2, P1): `IngestQueue::reset_failed()`
+  + `EventQueue::reset_failed()` (FAILED→PENDING, reset attempts/retry-park/error) +
+  `POST /events/retry` (single row / all-in-a-queue / all-in-both) that kicks the
+  flushers for a prompt re-send + "Retry" (per failed row) / "Retry all failed"
+  (banner) buttons in the Event Log. **Manual-only** by design (auto-retry would
+  loop on a deterministic 4xx; the `http_NNN` classification is recorded for a
+  future guarded auto-transient pass). ci:strict exit=0 (unit 285, JS 144);
+  integration OK 85 (+3, `RecEngineEventsTest` retry cases).
 - [ ] **3.10.2** — proactive admin-notice (Layer 3 base): `NotificationManager`
   (§13a, Event-Log + admin-notice levels) on failed-count/engine-down health
   signals. No email yet.
