@@ -186,6 +186,14 @@ final class Bootstrap {
 			$this->rec_engine_settings(),
 			static function () use ( $notify_bootstrap ): RecEngineClient {
 				return $notify_bootstrap->rec_client();
+			},
+			static function () use ( $notify_bootstrap ): ?Client {
+				// Only probe Smaily once the email wizard is finished — an
+				// un-set-up store isn't "down", just unconfigured.
+				if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+					return null;
+				}
+				return $notify_bootstrap->smaily_client();
 			}
 		) )->register();
 

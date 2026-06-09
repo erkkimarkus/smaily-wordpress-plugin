@@ -13,6 +13,7 @@ namespace Smaily\Connect\Tests\Integration;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 
@@ -71,7 +72,9 @@ final class RecEngineHealthCheckTest extends TestCase {
 		return new NotificationManager(
 			new RecEngineSettings(),
 			// Never invoked while disconnected; a valid client keeps the type honest.
-			static fn (): RecEngineClient => new RecEngineClient( 'sk_unused', 'https://unused.test' )
+			static fn (): RecEngineClient => new RecEngineClient( 'sk_unused', 'https://unused.test' ),
+			// Smaily not probed in this test — null = email side unconfigured.
+			static fn (): ?SmailyClient => null
 		);
 	}
 

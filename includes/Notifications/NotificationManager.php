@@ -17,6 +17,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -46,9 +47,10 @@ final class NotificationManager {
 	/** Dismiss cooldown — re-show a still-active notice after this (§13a's 24h window). */
 	public const DISMISS_COOLDOWN = DAY_IN_SECONDS;
 
-	public const OPTION_NOTICES    = 'smly_active_notices';
-	public const OPTION_DOWN_SINCE = 'smly_rec_health_down_since';
-	public const OPTION_DISMISSED  = 'smly_notice_dismissed';
+	public const OPTION_NOTICES           = 'smly_active_notices';
+	public const OPTION_DOWN_SINCE        = 'smly_rec_health_down_since';
+	public const OPTION_SMAILY_DOWN_SINCE = 'smly_smaily_health_down_since';
+	public const OPTION_DISMISSED         = 'smly_notice_dismissed';
 
 	public const DISMISS_ACTION = 'smly_dismiss_notice';
 
@@ -57,13 +59,24 @@ final class NotificationManager {
 	/** @var callable():RecEngineClient */
 	private $client_factory;
 
+	/** @var callable():?SmailyClient */
+	private $smaily_client_factory;
+
 	/**
 	 * @param callable():RecEngineClient $client_factory Lazily builds a connected
 	 *        rec-engine client (so we don't construct one when disconnected).
+	 * @param callable():?SmailyClient   $smaily_client_factory Builds the default
+	 *        Smaily client, or null when the email side isn't configured yet
+	 *        (so an un-set-up store isn't reported as "Smaily down").
 	 */
-	public function __construct( RecEngineSettings $settings, callable $client_factory ) {
-		$this->settings       = $settings;
-		$this->client_factory = $client_factory;
+	public function __construct(
+		RecEngineSettings $settings,
+		callable $client_factory,
+		callable $smaily_client_factory
+	) {
+		$this->settings              = $settings;
+		$this->client_factory        = $client_factory;
+		$this->smaily_client_factory = $smaily_client_factory;
 	}
 
 	public function register(): void {
@@ -79,11 +92,18 @@ final class NotificationManager {
 	 * recurring Action Scheduler tick (Bootstrap schedules HEALTH_HOOK).
 	 */
 	public function run_health_check(): void {
-		$now        = time();
-		$failed     = $this->failed_last_24h();
-		$down_since = $this->probe_engine( $now );
+		$now               = time();
+		$failed            = $this->failed_last_24h();
+		$down_since        = $this->probe_engine( $now );
+		$smaily_down_since = $this->probe_smaily( $now );
 
-		$notices = $this->evaluate_signals( $failed, $down_since, $now, $this->failed_threshold() );
+		$notices = $this->evaluate_signals(
+			$failed,
+			$down_since,
+			$now,
+			$this->failed_threshold(),
+			$smaily_down_since
+		);
 
 		update_option( self::OPTION_NOTICES, $notices, false );
 	}
@@ -91,11 +111,18 @@ final class NotificationManager {
 	/**
 	 * Pure signal evaluation — given the inputs, return the active-notice map.
 	 * Split out so the threshold + grace logic is unit-testable without a DB,
-	 * network, or clock.
+	 * network, or clock. Covers the pilot's BOTH sync paths: the rec-engine
+	 * (`engine_down`) and Smaily email (`smaily_down`).
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
-	public function evaluate_signals( int $failed_24h, ?int $down_since, int $now, int $threshold ): array {
+	public function evaluate_signals(
+		int $failed_24h,
+		?int $down_since,
+		int $now,
+		int $threshold,
+		?int $smaily_down_since = null
+	): array {
 		$notices = array();
 
 		if ( $failed_24h > $threshold ) {
@@ -110,6 +137,13 @@ final class NotificationManager {
 			$notices['engine_down'] = array(
 				'severity'   => 'error',
 				'down_since' => $down_since,
+			);
+		}
+
+		if ( $smaily_down_since !== null && ( $now - $smaily_down_since ) >= self::ENGINE_DOWN_GRACE ) {
+			$notices['smaily_down'] = array(
+				'severity'   => 'error',
+				'down_since' => $smaily_down_since,
 			);
 		}
 
@@ -144,6 +178,40 @@ final class NotificationManager {
 		if ( $down_since <= 0 ) {
 			$down_since = $now;
 			update_option( self::OPTION_DOWN_SINCE, $down_since, false );
+		}
+
+		return $down_since;
+	}
+
+	/**
+	 * Same down_since contract as probe_engine(), but for the Smaily email API —
+	 * the pilot's OTHER sync path (contacts + welcome/abandoned-cart automations).
+	 * The factory returns null when the email side isn't configured (setup wizard
+	 * not finished), so an un-set-up store is never reported as "Smaily down".
+	 */
+	private function probe_smaily( int $now ): ?int {
+		$client = ( $this->smaily_client_factory )();
+		if ( ! $client instanceof SmailyClient ) {
+			delete_option( self::OPTION_SMAILY_DOWN_SINCE );
+			return null;
+		}
+
+		$up = false;
+		try {
+			$up = $client->test_connection();
+		} catch ( \Throwable $e ) {
+			$up = false;
+		}
+
+		if ( $up ) {
+			delete_option( self::OPTION_SMAILY_DOWN_SINCE );
+			return null;
+		}
+
+		$down_since = (int) get_option( self::OPTION_SMAILY_DOWN_SINCE, 0 );
+		if ( $down_since <= 0 ) {
+			$down_since = $now;
+			update_option( self::OPTION_SMAILY_DOWN_SINCE, $down_since, false );
 		}
 
 		return $down_since;
@@ -261,6 +329,13 @@ final class NotificationManager {
 		if ( $key === 'engine_down' ) {
 			return __(
 				'Smaily Connect: the recommendation engine has been unreachable for over an hour — sync is queued and will resume automatically when it recovers.',
+				'smaily-connect'
+			);
+		}
+
+		if ( $key === 'smaily_down' ) {
+			return __(
+				'Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers.',
 				'smaily-connect'
 			);
 		}

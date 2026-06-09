@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 
 final class NotificationManagerTest extends TestCase {
@@ -32,7 +33,8 @@ final class NotificationManagerTest extends TestCase {
 		$client = $this->createMock( RecEngineClient::class );
 		return new NotificationManager(
 			$this->createMock( RecEngineSettings::class ),
-			static fn (): RecEngineClient => $client
+			static fn (): RecEngineClient => $client,
+			static fn (): ?SmailyClient => null
 		);
 	}
 
@@ -79,6 +81,29 @@ final class NotificationManagerTest extends TestCase {
 
 		self::assertArrayHasKey( 'failed_events', $notices );
 		self::assertArrayHasKey( 'engine_down', $notices );
+	}
+
+	public function test_smaily_down_over_an_hour_raises_a_separate_signal(): void {
+		$now     = 1_000_000;
+		$notices = $this->manager()->evaluate_signals( 0, null, $now, 50, $now - 3700 );
+
+		self::assertArrayHasKey( 'smaily_down', $notices );
+		self::assertArrayNotHasKey( 'engine_down', $notices, 'rec engine is up — only Smaily is down' );
+	}
+
+	public function test_smaily_down_within_grace_does_not_raise(): void {
+		$now     = 1_000_000;
+		$notices = $this->manager()->evaluate_signals( 0, null, $now, 50, $now - 1800 );
+
+		self::assertArrayNotHasKey( 'smaily_down', $notices );
+	}
+
+	public function test_both_sync_paths_can_be_down_at_once(): void {
+		$now     = 1_000_000;
+		$notices = $this->manager()->evaluate_signals( 0, $now - 7200, $now, 50, $now - 7200 );
+
+		self::assertArrayHasKey( 'engine_down', $notices );
+		self::assertArrayHasKey( 'smaily_down', $notices );
 	}
 
 	public function test_dismiss_records_the_key_with_a_timestamp(): void {
