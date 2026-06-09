@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-09 (3.9 Step-4 activation COMPLETE — locked design: connecting the rec-engine syncs ALL domains (system-decides), the four per-domain sync toggles (orders/customers/products/cart) were cosmetic/write-only and are REMOVED; browse-tracking is the only Step-4 toggle (legal-consent gate, opt-in default-off). Disconnect clears only the connection options and PRESERVES `smly_plus_rec_track_browsing`, so re-connect restores the toggle — which required a mandatory hydration fix (EnvDetector emits the saved value, hydrate reads it instead of hardcoding false; also fixes a plain-reload blanking bug). Dead option keys cleaned up idempotently on upgrade-detect. PLUGIN.md §Step-4-4a/§6 revised to match the vision; DECISIONS F3-29. Then a pre-3.9 task: PLUGIN.md translated ET→EN. Next: Phase 3 done; Smaily profiling-consent wiring + beacon two-gate stop is the remaining separate piece. POST-3.9: (i) **legacy-WC order-backfill verified** — WC 6.9.4 + PHP 8.1 env, real `wp_posts` traversal, full integration 75/75 on legacy (pilot precondition RESOLVED, see go-live checklist); (ii) a production-readiness audit surfaced two NEW pilot-blockers beyond features — failed-queue-row invisibility/no-re-drive (P1) and no surfaced diagnostic trail (P2) — plus a WC-version-header mismatch (header says 7.0, pilot is 6.9.4) and a missing pilot-onboarding doc; tracked for prioritisation.)_
+_Last updated: 2026-06-09 (3.9 Step-4 activation COMPLETE — locked design: connecting the rec-engine syncs ALL domains (system-decides), the four per-domain sync toggles (orders/customers/products/cart) were cosmetic/write-only and are REMOVED; browse-tracking is the only Step-4 toggle (legal-consent gate, opt-in default-off). Disconnect clears only the connection options and PRESERVES `smly_plus_rec_track_browsing`, so re-connect restores the toggle — which required a mandatory hydration fix (EnvDetector emits the saved value, hydrate reads it instead of hardcoding false; also fixes a plain-reload blanking bug). Dead option keys cleaned up idempotently on upgrade-detect. PLUGIN.md §Step-4-4a/§6 revised to match the vision; DECISIONS F3-29. Then a pre-3.9 task: PLUGIN.md translated ET→EN. Next: Phase 3 done; Smaily profiling-consent wiring + beacon two-gate stop is the remaining separate piece. POST-3.9: (i) **legacy-WC order-backfill verified** — WC 6.9.4 + PHP 8.1 env, real `wp_posts` traversal, full integration 75/75 on legacy (pilot precondition RESOLVED, see go-live checklist); (ii) a production-readiness audit surfaced two NEW pilot-blockers beyond features — failed-queue-row invisibility/no-re-drive (P1) and no surfaced diagnostic trail (P2) — plus a WC-version-header mismatch (header says 7.0, pilot is 6.9.4) and a missing pilot-onboarding doc; tracked for prioritisation. Then pilot-hardening began: **P5** version-floors reconciled (WC 6.9/WP 6.2/PHP 8.0); **3.10.0** Event Log visibility shipped — `/events` UNION read-model + Settings tab + sticky failed-banner + backfill progress now engine-confirmed sent/failed (no more "1400/1400 while failed"). Sequence ahead: 3.10.1 recovery → 3.10.2 notice → P4 onboarding doc; then Smaily-consent (awaits its spec). See pilot-hardening sequence below.)_
 
 ---
 
@@ -308,11 +308,47 @@ see "Pilot go-live" below.
   §Step-4-4a/§6 + §15-test-5 revised; DECISIONS F3-29; README row. ci:strict exit=0
   (unit 285, JS 134); integration OK. **Phase 3 feature work done.**
 
-### Next
+### Done — 3.10.0 pilot-hardening: Event Log visibility (Layer 1)
 
-- **Smaily profiling-consent wiring + beacon two-gate stop** — the remaining
-  separate piece (depends on the Smaily profiling-consent parameter API). Not a
-  numbered 3.x sub-PR; tracked as the post-Phase-3 consent work.
+- **3.10.0** — the diagnostics-visibility layer (production-readiness audit P2).
+  New `EventsEndpoint` (`/events` + `/events/detail`) = a read-only **Event Log**
+  (PLUGIN.md §13) UNION-ing both durable queues (`smly_rec_event_queue` +
+  `smly_plus_event_queue`) with source/status/type filters, pagination, drill-down
+  payload, and a **failed-in-24h count** for the sticky banner. No schema change —
+  the queues already carry status/attempts/last_error/created_at. New React
+  **Event Log** Settings tab (table + filters + drill-down modal + sticky banner),
+  always available (read-only, no Save/Discard). **Backfill progress fixed** to
+  report engine-confirmed `sent` + terminal `failed` (read-time count of the job's
+  event-types since `started_at`) instead of records *walked* — kills the
+  "1400/1400 while rows failed" lie; the panel now shows "N synced" + a failed
+  notice pointing to the Event Log. Watch-item confirmed: `last_error` carries the
+  HTTP code (`http_4xx`/`http_5xx`, `d6_item_error`), so 3.10.1's auto-transient
+  retry can classify 4xx-vs-5xx for free. Gates: ci:strict exit=0 (unit 285, JS
+  140 +6); integration OK 82 (+7, `RecEngineEventsTest`).
+
+### Next — pilot-hardening sequence (in order)
+
+**Pilot-blockers (must close before pilot), in order:**
+- [x] **P5** — version-floor reconciliation (WC 6.9 / WP 6.2 / PHP 8.0).
+- [x] **3.10.0** — Event Log visibility (Layer 1, above).
+- [ ] **3.10.1** — failed-row recovery (Layer 2, P1): `IngestQueue::reset_failed()`
+  + `/events/retry` + "Retry now" / "Retry all failed" button. Manual-only base
+  (auto-transient deferred — guarded on the `http_NNN` classification 3.10.0 emits).
+- [ ] **3.10.2** — proactive admin-notice (Layer 3 base): `NotificationManager`
+  (§13a, Event-Log + admin-notice levels) on failed-count/engine-down health
+  signals. No email yet.
+- [ ] **P4** — pilot/merchant onboarding doc (INSTALL + acceptance/verify).
+
+**Post-pilot (deferred):**
+- **3.10.3** — email channel (§13a email level + Notifications subpanel) via
+  `wp_mail` (admin-notice base already covers proactive-in-wp-admin; email needs
+  working server SMTP — recommend an SMTP plugin in the doc).
+- Queue janitor (prune `sent`/`failed` rows + index `created_at`), GCM encryption.
+
+**After pilot-hardening:**
+- **Smaily profiling-consent wiring + beacon two-gate stop** — awaits the Smaily
+  profiling-consent parameter API spec (`SMAILY_PROFILING_CONSENT_SPEC.md`, to be
+  provided). Not a numbered 3.x sub-PR.
 
 ### Waiting / lock conditions
 

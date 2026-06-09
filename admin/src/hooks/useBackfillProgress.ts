@@ -11,6 +11,8 @@ import { type BackfillProgress } from '../state/types';
 const idleProgress: BackfillProgress = {
   status: 'idle',
   processed: 0,
+  sent: 0,
+  failed: 0,
   total: 0,
   percent: 0,
   etaSeconds: null,
@@ -96,6 +98,8 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         setProgress({
           status: response.status,
           processed: response.processed,
+          sent: response.sent,
+          failed: response.failed,
           total: response.total,
           percent: response.percent,
           etaSeconds: response.eta_seconds,
@@ -123,6 +127,8 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       setProgress({
         status: response.status,
         processed: response.processed,
+        sent: response.sent,
+        failed: response.failed,
         total: response.total,
         percent: response.percent,
         etaSeconds: response.eta_seconds,
@@ -189,6 +195,8 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       setProgress({
         status: 'running',
         processed: 0,
+        sent: 0,
+        failed: 0,
         total: response.total,
         percent: 0,
         etaSeconds: null,

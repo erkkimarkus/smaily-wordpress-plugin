@@ -69,6 +69,8 @@ describe('useBackfillProgress', () => {
       .mockResolvedValueOnce({
         status: 'idle',
         processed: 0,
+        sent: 0,
+        failed: 0,
         total: 0,
         percent: 0,
         eta_seconds: null,
@@ -78,6 +80,8 @@ describe('useBackfillProgress', () => {
       .mockResolvedValueOnce({
         status: 'running',
         processed: 50,
+        sent: 50,
+        failed: 0,
         total: 100,
         percent: 50,
         eta_seconds: 30,
@@ -87,6 +91,8 @@ describe('useBackfillProgress', () => {
       .mockResolvedValueOnce({
         status: 'completed',
         processed: 100,
+        sent: 100,
+        failed: 0,
         total: 100,
         percent: 100,
         eta_seconds: null,

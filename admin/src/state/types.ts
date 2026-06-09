@@ -66,6 +66,10 @@ export type AsyncStatus =
 export interface BackfillProgress {
   status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
   processed: number;
+  /** Engine-confirmed rows (sent + deduplicated) for this run (3.10.0). */
+  sent: number;
+  /** Terminal failed rows for this run — per-row detail in the Event Log. */
+  failed: number;
   total: number;
   percent: number;
   etaSeconds: number | null;
@@ -221,6 +225,8 @@ export const idleAsync: AsyncStatus = { kind: 'idle' };
 export const idleBackfill: BackfillProgress = {
   status: 'idle',
   processed: 0,
+  sent: 0,
+  failed: 0,
   total: 0,
   percent: 0,
   etaSeconds: null,

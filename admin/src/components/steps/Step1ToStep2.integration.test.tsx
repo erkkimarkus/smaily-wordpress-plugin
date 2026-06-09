@@ -46,6 +46,8 @@ describe('Step 1 → Step 2 integration', () => {
       .mockResolvedValueOnce({
         status: 'idle',
         processed: 0,
+        sent: 0,
+        failed: 0,
         total: 0,
         percent: 0,
         eta_seconds: null,
@@ -55,6 +57,8 @@ describe('Step 1 → Step 2 integration', () => {
       .mockResolvedValue({
         status: 'running',
         processed: 0,
+        sent: 0,
+        failed: 0,
         total: 1_234,
         percent: 0,
         eta_seconds: null,

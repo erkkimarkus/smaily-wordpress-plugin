@@ -16,6 +16,7 @@ use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Backfill\AbstractBackfillJob;
+use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -213,6 +214,17 @@ class BackfillEndpoint {
 		$total     = (int) $row['total_count'];
 		$percent   = $total > 0 ? (int) round( ( $processed / $total ) * 100 ) : 0;
 
+		// Engine-confirmed truth (3.10.0): processed_count tracks records WALKED,
+		// which previously made the panel read "1400 / 1400" even when rows
+		// silently failed in the queue. Count the actual queue outcomes for this
+		// job's event types since the run started, so the UI can show "N synced,
+		// M failed" instead of conflating walked with sent. Read-time + no schema
+		// change; the per-row detail lives in the Event Log (/events).
+		$counts = $this->engine_confirmed_counts(
+			$job_type,
+			isset( $row['started_at'] ) ? (string) $row['started_at'] : null
+		);
+
 		// Surface started_at + completed_at so the React UI can render
 		// "Last run: 2026-05-21 10:42, 142 / 142" between runs. Previously
 		// the only way to see a completed backfill was to be on the page
@@ -222,6 +234,8 @@ class BackfillEndpoint {
 			array(
 				'status'       => (string) $row['status'],
 				'processed'    => $processed,
+				'sent'         => $counts['sent'],
+				'failed'       => $counts['failed'],
 				'total'        => $total,
 				'percent'      => min( 100, max( 0, $percent ) ),
 				'eta_seconds'  => $this->estimate_eta( $row, $processed, $total ),
@@ -229,6 +243,75 @@ class BackfillEndpoint {
 				'completed_at' => isset( $row['completed_at'] ) ? (string) $row['completed_at'] : null,
 			),
 			200
+		);
+	}
+
+	/**
+	 * Each backfill job_type drains its records through a specific queue +
+	 * event-type set. Map it so status() can count the real outcomes.
+	 *
+	 * @var array<string, array{queue: string, types: string[]}>
+	 */
+	private const JOB_QUEUE_MAP = array(
+		'products'  => array(
+			'queue' => 'rec',
+			'types' => array( 'catalog.upsert', 'catalog.delete' ),
+		),
+		'customers' => array(
+			'queue' => 'rec',
+			'types' => array( 'customer.upsert' ),
+		),
+		'orders'    => array(
+			'queue' => 'rec',
+			'types' => array( 'order.upsert' ),
+		),
+		'contacts'  => array(
+			'queue' => 'smaily',
+			'types' => array( 'contact.sync' ),
+		),
+	);
+
+	/**
+	 * Count engine-confirmed `sent` and terminal `failed` queue rows for this
+	 * job's event types since the run started. `deduplicated` rows are marked
+	 * `sent` by the flusher (already in the engine), so they count as synced.
+	 * Bounded to created_at >= started_at so a re-run doesn't tally prior rows.
+	 *
+	 * @return array{sent: int, failed: int}
+	 */
+	private function engine_confirmed_counts( string $job_type, ?string $started_at ): array {
+		$map = self::JOB_QUEUE_MAP[ $job_type ] ?? null;
+		if ( $map === null || $started_at === null || $started_at === '' ) {
+			return array(
+				'sent'   => 0,
+				'failed' => 0,
+			);
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . ( $map['queue'] === 'rec' ? IngestQueue::TABLE_SUFFIX : EventQueue::TABLE_SUFFIX );
+
+		$placeholders = implode( ', ', array_fill( 0, count( $map['types'] ), '%s' ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					SUM( status = 'sent' ) AS sent,
+					SUM( status = 'failed' ) AS failed
+				FROM {$table}
+				WHERE event_type IN ( {$placeholders} ) AND created_at >= %s",
+				array_merge( $map['types'], array( $started_at ) )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		// SUM() returns NULL when no rows match; `?? 0` also keeps this null-safe
+		// against a get_row result that doesn't carry the aggregate columns.
+		return array(
+			'sent'   => is_array( $row ) ? (int) ( $row['sent'] ?? 0 ) : 0,
+			'failed' => is_array( $row ) ? (int) ( $row['failed'] ?? 0 ) : 0,
 		);
 	}
 

@@ -152,6 +152,8 @@ describe('wizardReducer — Step 2 Subscribers', () => {
         progress: {
           status: 'running',
           processed: 25,
+          sent: 25,
+          failed: 0,
           total: 100,
           percent: 25,
           etaSeconds: 180,

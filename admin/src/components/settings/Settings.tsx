@@ -28,6 +28,7 @@ import {
   Step4Recommendations,
   Step5Integrations,
 } from '../steps';
+import { EventLog } from './EventLog';
 
 export interface SettingsProps {
   initialEnv?: ServerEnv;
@@ -40,15 +41,16 @@ export interface SettingsProps {
   initialState?: WizardState;
 }
 
-const TABS: Array<{ value: SettingsTabKey | 'integrations'; label: string }> = [
+const TABS: Array<{ value: SettingsTabKey | 'integrations' | 'events'; label: string }> = [
   { value: 'connection', label: 'Connection' },
   { value: 'subscribers', label: 'Subscribers' },
   { value: 'woocommerce', label: 'WooCommerce' },
   { value: 'recommendations', label: 'Recommendations' },
   { value: 'integrations', label: 'Integrations' },
+  { value: 'events', label: 'Event Log' },
 ];
 
-type AnyTab = SettingsTabKey | 'integrations';
+type AnyTab = SettingsTabKey | 'integrations' | 'events';
 
 /**
  * Settings root — orchestrates tab routing + per-tab dirty tracking +
@@ -152,7 +154,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
   });
 
   const handleSave = useCallback((): void => {
-    if (activeTab === 'integrations') {
+    if (activeTab === 'integrations' || activeTab === 'events') {
       return;
     }
     const payload = buildTabPayload(rawState, activeTab);
@@ -170,7 +172,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
   // narrow it out alongside 'integrations' so dirtyTabs indexing is
   // safe.
   const tabIsDirty =
-    activeTab !== 'integrations' && activeTab !== 'finish'
+    activeTab !== 'integrations' && activeTab !== 'finish' && activeTab !== 'events'
       ? rawState.dirtyTabs[activeTab]
       : false;
 
@@ -192,7 +194,10 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
                 value: t.value,
                 label: t.label,
                 badge:
-                  t.value !== 'integrations' && t.value !== 'finish' && rawState.dirtyTabs[t.value]
+                  t.value !== 'integrations' &&
+                  t.value !== 'finish' &&
+                  t.value !== 'events' &&
+                  rawState.dirtyTabs[t.value]
                     ? '•'
                     : undefined,
                 disabled: isLocked,
@@ -242,9 +247,12 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
           <TabPanel active={activeTab === 'integrations'}>
             <Step5Integrations state={rawState} inSettings />
           </TabPanel>
+          <TabPanel active={activeTab === 'events'}>
+            <EventLog />
+          </TabPanel>
         </main>
 
-        {activeTab !== 'integrations' && (
+        {activeTab !== 'integrations' && activeTab !== 'events' && (
           <footer className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t border-border-subtle bg-surface px-6 py-4 shadow-card">
             <Button
               variant="ghost"

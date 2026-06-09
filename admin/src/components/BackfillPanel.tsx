@@ -80,11 +80,19 @@ export function BackfillPanel({
             ariaLabel={`${label} backfill progress`}
           />
           <p className="mt-2 text-xs text-text-secondary">
-            {isRunning && `Sent ${progress.processed} of ${progress.total}.`}
-            {isComplete && `Done — ${progress.processed} of ${progress.total} ${noun} sent.`}
+            {/* Engine-confirmed sent (not just walked) so the count is honest
+                when rows fail; the per-row failures are listed in the Event Log. */}
+            {isRunning && `Synced ${progress.sent} of ${progress.total}.`}
+            {isComplete && `Done — ${progress.sent} of ${progress.total} ${noun} synced.`}
             {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
             {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
           </p>
+          {progress.failed > 0 && (isRunning || isComplete) && (
+            <p className="mt-1 text-xs text-danger-fg">
+              {progress.failed} {progress.failed === 1 ? 'record' : 'records'} failed to
+              sync — see the Event Log for details.
+            </p>
+          )}
           {(isComplete || wasCancelled || hasFailed) && progress.completedAt && (
             <p className="mt-1 text-xs text-text-tertiary">
               Last run finished {formatLastRun(progress.completedAt)}.

@@ -1575,6 +1575,48 @@ plan) — the audit established this from sources.
 HookHandlers already use. Browse end-user consent (CookieYes / WP Consent API) is
 unchanged — remembering the merchant preference does not bypass it.
 
+### F3-30: Pilot-hardening — diagnostics + recovery system (3.10, implements §13/§13a)
+
+**Context:** the production-readiness audit (after Phase-3 feature work) found two
+operational pilot-blockers that aren't feature gaps: **P1** — a terminal `failed`
+queue row is invisible and never re-driven (the rec queue, unlike the legacy
+Smaily queue, has no retry-failed mechanism, and even that only re-drives
+`pending`, not terminal `failed`); **P2** — no surfaced diagnostic trail
+(`error_log`-only; `last_error` written but never read back; the backfill panel
+reports records *walked*, so it read "1400/1400" while rows silently failed). These
+are "how do you operate it in a pilot" gaps, more impactful than the (low-risk,
+now-closed) legacy-backfill path.
+
+**Decision:** build the spec's already-designed §13 (Event Log) + §13a
+(NotificationManager) for the rec queue, **layered** across three audiences
+(merchant "is it syncing?", developer "why not?", proactive "something broke"), as
+ordered sub-PRs — visibility is the foundation (you can't recover what you can't
+see; the "Retry now" button lives inside the Event Log):
+1. **3.10.0 — visibility (P2):** read-only `/events` UNION read-model over both
+   queues + Event-Log Settings tab + sticky failed-24h banner + backfill progress
+   fixed to engine-confirmed sent/failed. No schema change (the columns exist;
+   sent/failed counted at read-time from the queue since the run's `started_at`).
+2. **3.10.1 — recovery (P1):** `IngestQueue::reset_failed()` (FAILED→PENDING) +
+   `/events/retry` + a manual "Retry now / Retry all failed" button. **Manual-only
+   base** — auto-retry is deferred because auto-retrying a deterministic 4xx loops
+   forever; it needs failure-kind classification, which 3.10.0 already enables
+   (`last_error` carries `http_4xx`/`http_5xx`/`d6_item_error`).
+3. **3.10.2 — proactive admin-notice (Layer 3 base):** `NotificationManager` notice
+   level on health signals (failed-count > N in 24h, engine-down > 1h). No infra.
+4. **3.10.3 — email (post-pilot):** §13a email level via **`wp_mail`**, NOT Smaily.
+
+**Email-channel decision (wp_mail over Smaily):** routing the alert through Smaily
+couples it to a system that may itself be down — a "Smaily connection failed" alert
+can't send via Smaily. `wp_mail` is independent (and is what §13a specs). The
+trade-off is server-SMTP reliability, mitigated by the admin-notice base (immune to
+mail failure, always visible in wp-admin) + documenting an SMTP-plugin recommendation.
+
+**Relationships:** PLUGIN.md §13 (Event Log) + §13a (NotificationManager) — the
+spec authority; F3-18 (the D6 queue's status/attempts/last_error the Event Log
+reads); the legacy `smly_plus_retry_failed_events` job (the pattern 3.10.1 fixes —
+it re-drives pending, not terminal failed). Pilot-hardening order: P5 → 3.10.0 →
+3.10.1 → 3.10.2 → P4 (onboarding doc); 3.10.3 + queue-janitor + GCM are post-pilot.
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or

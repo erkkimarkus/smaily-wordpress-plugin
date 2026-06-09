@@ -77,6 +77,7 @@ final class EndpointRegistry {
 				}
 			),
 			new SettingsEndpoint(),
+			new EventsEndpoint(),
 			new RecEngineEndpoint(
 				new RecEngineSettings(),
 				static function (): SetupExchange {

@@ -7,6 +7,8 @@ import { BackfillPanel } from './BackfillPanel';
 const IDLE = {
   status: 'idle' as const,
   processed: 0,
+  sent: 0,
+  failed: 0,
   total: 0,
   percent: 0,
   eta_seconds: null,

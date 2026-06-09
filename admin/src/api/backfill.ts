@@ -11,6 +11,10 @@ export interface BackfillStartResponse {
 export interface BackfillStatusResponse {
   status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
   processed: number;
+  /** Engine-confirmed rows (sent + deduplicated) for this run (3.10.0). */
+  sent: number;
+  /** Terminal failed rows for this run — per-row detail in the Event Log. */
+  failed: number;
   total: number;
   percent: number;
   eta_seconds: number | null;
