@@ -6,7 +6,7 @@
  * Domain Path:          /languages
  * License URI:          https://www.gnu.org/licenses/gpl-3.0.en.html
  * License:              GPL-3.0+
- * Requires at least:    6.2
+ * Requires at least:    6.6
  * Requires PHP:         8.0
  * WC requires at least: 6.9
  * WC tested up to:      10.7

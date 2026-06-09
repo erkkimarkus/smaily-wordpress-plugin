@@ -63,7 +63,7 @@ After Phase 3 completes, the plugin enters a pilot stabilization period before g
 
 | Component | Minimum | Tested up to |
 |-----------|---------|--------------|
-| WordPress | 6.2 | 6.9 |
+| WordPress | 6.6 | 7.0 |
 | WooCommerce | 6.9 | 10.7 |
 | PHP | 8.0 | 8.3 |
 | Smaily account | Active | — |
