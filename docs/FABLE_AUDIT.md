@@ -21,6 +21,9 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 >   2.0.0-beta.1, 2.0 description + changelog + upgrade notice, and the
 >   previously missing external-services disclosure for the recommendation
 >   engine (catalog/customer/order/browse data flows, consent gating).
+> - **F5** — §6 INSTALL.md gap: shopper profiling-opt-out section added
+>   (Step-4 subsection incl. the privacy-policy-must-mention-profiling
+>   warning, plus troubleshooting + quick-reference rows).
 > - Remaining items tracked below and in BACKLOG.md.
 
 > Scope note: this is a WordPress/WooCommerce plugin, so the section template was

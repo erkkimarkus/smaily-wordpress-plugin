@@ -95,6 +95,24 @@ steps in order.
   > cookie-consent banner is the second gate: both must say yes before any browse
   > event is sent.
 
+- **Shopper profiling opt-out (automatic — nothing to configure):** every
+  logged-in shopper gets a **"Personalised recommendations"** section on their
+  **My Account** dashboard with a checkbox — *"Use my data for personalised
+  recommendations"*. It is **on by default** (opt-out model); unticking it:
+  - stops their browsing events from being used for profiling (even if browse
+    tracking and cookie consent are otherwise on),
+  - tells the recommendation engine to stop profiling them,
+  - is remembered in Smaily too, so an opt-out made elsewhere (e.g. by support)
+    is respected on the store as well.
+
+  Shoppers who opt out **still receive emails** — they just get non-personalised
+  recommendations.
+
+  > ⚠️ **Your privacy policy must mention profiling.** Because personalisation
+  > is on by default, your store's privacy policy needs a sentence saying that
+  > browsing and purchase history is used to personalise recommendations and
+  > that customers can turn it off under **My Account**.
+
 ### Step 5 — Integrations
 
 - Informational only (Elementor, Contact Form 7, Landing Pages links). Nothing to
@@ -176,6 +194,7 @@ Each notice links to the Event Log and can be **dismissed** (it stays hidden for
 | Products rejected | Missing SKU | Add SKUs to the products; retry from the Event Log |
 | Browse "similar products" empty | Browse tracking off, or no shopper consent | Enable **Track browsing behavior** (Step 4) **and** install a consent banner |
 | A backfill shows fewer "synced" than total | Some rows failed | Event Log → filter Failed → fix → Retry |
+| A shopper doesn't want personalised recommendations | Profiling is on by default (opt-out model) | Point them to **My Account → Personalised recommendations** — untick + Save |
 
 If a problem persists after retrying and the connection tests succeed, capture a
 screenshot of the failed row's **Details** (the error + payload) for support.
@@ -191,3 +210,4 @@ screenshot of the failed row's **Details** (the error + payload) for support.
 | Re-run a backfill | Settings → **Subscribers** / **Recommendations** |
 | See what synced / failed, retry | Settings → **Event Log** |
 | Turn browse tracking on/off | Settings → **Recommendations** |
+| A shopper opts out of profiling | Shopper's own **My Account** dashboard → *Personalised recommendations* |
