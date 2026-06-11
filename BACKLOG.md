@@ -13,7 +13,7 @@ instead of five STATUS sub-sections + scattered DECISIONS notes.
 **Division of labour (keep it this way):**
 - **STATUS.md** — "where we are now" (current state, what just shipped).
 - **BACKLOG.md** (this file) — "what's deferred + why + priority" (the index).
-- **DECISIONS_DRAFT.md** — the *why* / rationale. This file **links** there, it
+- **DECISIONS.md** — the *why* / rationale. This file **links** there, it
   does not duplicate the reasoning.
 
 Priority legend: 🔴 pilot-need (before go-live) · 🟡 post-pilot · 🟢 nice-to-have
@@ -31,7 +31,12 @@ WP7_COMPAT Phase-4 + three audit-only gaps that were tracked nowhere)._
 |---|---|---|
 | **Privacy-policy must mention profiling** | Legal — the opt-out/default-on model requires a transparent disclosure. Erkki / docs. | STATUS L407/L422, DECISIONS F3-31 (L1643) |
 | **(a) fail-open GDPR-window review** | Conscious consent-risk in the read-error window (fail-open + opt-out model). Erkki investigating separately before any opt-in flip. | STATUS L423, DECISIONS L1637 |
-| **Doc-drift fix (upstream-merge need)** | Public docs describe an earlier state — go to the main plugin's docs on merge: **README** "(in progress)" → feature-complete + add Event-Log/profiling rows; ~~**INSTALL.md** profiling-opt-out section~~ (DONE 2026-06-11, FABLE_AUDIT fix F5 — Step-4 shopper-opt-out subsection + privacy-policy warning + troubleshooting/quick-ref rows); ~~**readme.txt** rewrite for 2.0~~ (DONE 2026-06-11, FABLE_AUDIT fix F4 — stable tag 2.0.0-beta.1, 2.0 description + changelog + the rec-engine external-services disclosure). | Audit (OSA-1); see README L5/L20/L39, `docs/INSTALL.md`, `readme.txt` |
+
+> **Doc-drift fix — RESOLVED 2026-06-11 in full** (upstream-merge prep sub-PR:
+> README feature-complete + Event-Log/profiling/janitor rows; readme.txt 2.0
+> rewrite (F4); INSTALL.md profiling section (F5); plus CHANGELOG.md created,
+> DECISIONS_DRAFT finalized as docs/DECISIONS.md, .pot/et.po regenerated with
+> 39 new-string translations, phase-4 cron-interval TODO decided: keep).
 
 > **WP 7.0 env-matrix — RESOLVED 2026-06-11** (baseline moved to WP 7.0 per
 > Erkki — the 6.9.4 baseline was interim; suite 99/99 on WP 7.0; runner memory

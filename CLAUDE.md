@@ -2,7 +2,7 @@
 
 If you are a fresh agent picking up this repo: read this first, then `STATUS.md`
 (where we are now), then `docs/RECENGINE_API_CONTRACT.md` (the contract you
-build against), `docs/DECISIONS_DRAFT.md` (why things are the way they are), and
+build against), `docs/DECISIONS.md` (why things are the way they are), and
 `docs/LESSONS.md` (mistakes already made — don't repeat them). README gives the
 30-second project orientation.
 
@@ -22,7 +22,7 @@ not a separate chore; it's part of the work that changed them.
 - **CLAUDE.md** (this file) — when you learn a new operational fact the hard way
   (a new `sg`-style gotcha, a build-command change, a new scar), add it here in
   the same commit. The whole point is that the next agent doesn't re-discover it.
-- **DECISIONS_DRAFT.md** — when a decision is made, changed, or superseded,
+- **DECISIONS.md** — when a decision is made, changed, or superseded,
   record it (with why, not just what). A reversed decision gets updated, not
   silently dropped.
 - **LESSONS.md** — when a class of mistake is caught (especially mock-vs-live,

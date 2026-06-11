@@ -1,7 +1,9 @@
-# DECISIONS_DRAFT.md — Smaily Connect technical decisions
+# DECISIONS.md — Smaily Connect technical decisions
 
-A draft consolidating all significant technical design decisions in the Smaily
-Connect plugin, with the reasoning behind each. Purpose: a future developer
+The canonical log of all significant technical design decisions in the Smaily
+Connect plugin, with the reasoning behind each. (Maintained through Phase 3 as
+`DECISIONS_DRAFT.md`; finalized under this name 2026-06-11 — the single-file
+F-numbered log was chosen over an ADR-per-file split.) Purpose: a future developer
 (including a future you) can quickly understand **why** the plugin is the way it
 is, not just **what** it is.
 
@@ -1754,7 +1756,7 @@ the recovery story 3.10.1 just built).
 (3 integration tests: retention matrix incl. pending-never, filterability,
 index presence).
 
-## How to keep this document going (during Phase 3)
+## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
 discovered along the way):
@@ -1762,11 +1764,10 @@ discovered along the way):
 1. Add a **new entry** in the relevant category (F3-22, F3-23, ...)
 2. Follow the 5-field form: Context / Decision / Rationale / Alternatives /
    Relationships
-3. Keep it **short** (5-15 lines per decision) — this is a draft, not a full ADR
-4. At the end of Phase 3, refine:
-   - Either split into **one ADR file per decision**
-     (`docs/adr/0001-coexistence.md`, ...)
-   - Or keep a single `DECISIONS.md` — depending on the repo's culture
+3. Keep it **short** (5-15 lines per decision) — a log entry, not a full ADR
+4. ~~At the end of Phase 3, refine~~ — DECIDED (2026-06-11): keep the single
+   `DECISIONS.md` file; the ADR-per-file split was rejected (the F-numbered
+   log is the working format both agents and humans navigate by)
 
 **What's likely to be added later in Phase 3** (F3-19/20/21 the 3.3 customers
 milestone, A-filter, datetime; F3-22 orders + status mapping; F3-23 N-7

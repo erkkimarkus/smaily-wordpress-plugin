@@ -2,7 +2,7 @@
 
 A WordPress plugin that integrates WooCommerce with [Smaily](https://smaily.com), an email marketing platform. Sends customer and order data to Smaily for transactional and marketing automation, and connects WooCommerce stores to Smaily's recommendation engine for personalized product suggestions in email campaigns.
 
-**Status:** 2.0.0-beta.1 — under active development. See [Roadmap](#roadmap) for what's complete and what's in progress.
+**Status:** 2.0.0-beta.1 — **plugin-side feature-complete for the pilot** (2026-06-09; audited + hardened 2026-06-11). Phase 3 and pilot-hardening are done; next is the pilot itself. See [Roadmap](#roadmap).
 
 This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin). It carries the legacy 1.x code alongside a new 2.0 codebase that coexists with it during the transition. See [Relationship to upstream](#relationship-to-upstream) for details.
 
@@ -17,10 +17,10 @@ The 2.0 rewrite (built alongside the legacy 1.x code, not replacing it) introduc
 - **Recommendation engine integration** — connects to Smaily's recommendation engine for product suggestions in email campaigns, with full attribution flow (`product_url` + UTM + recommendation tokens)
 - **Action Scheduler** for background work — replaces WP-Cron for reliability under load
 - **Idempotent data ingestion** — products, customers, and orders are sent with per-record `event_id`s so retries never duplicate
-- **Comprehensive WooCommerce coverage** — product changes, customer registrations, order events, browse activity (in progress per the Roadmap below)
+- **Comprehensive WooCommerce coverage** — product changes, customer registrations, order events, and consent-gated browse activity
 - **Backward compatibility with 1.x** — existing 1.x installs upgrade in place; legacy subscriber syncing continues until the new setup wizard is completed
 
-The 2.0 design treats the plugin as a serious sync layer between WooCommerce and Smaily, not a thin contact form. See [`docs/DECISIONS_DRAFT.md`](docs/DECISIONS_DRAFT.md) for the architectural choices and their rationales.
+The 2.0 design treats the plugin as a serious sync layer between WooCommerce and Smaily, not a thin contact form. See [`docs/DECISIONS.md`](docs/DECISIONS.md) for the architectural choices and their rationales.
 
 ---
 
@@ -36,14 +36,14 @@ Legacy 1.x code preserved; new 2.0 code activates alongside it. Existing 1.x ins
 
 Setup wizard for first-run connection. New mobile-first admin UI. Subscriber sync, abandoned cart, welcome series, and first-order triggers configurable through the new UI. Payload builders and the Smaily API client are in place.
 
-### Phase 3 — Recommendation engine integration (in progress)
+### Phase 3 — Recommendation engine integration ✓
 
 The plugin connects to Smaily's recommendation engine and feeds it product, customer, order, and browse data so the engine can produce personalized recommendations in email campaigns.
 
 | Sub-area | Status | Notes |
 |----------|--------|-------|
 | Setup-exchange (engine connection) | ✓ Complete | Live-verified |
-| Catalog ingest (products → engine) | ✓ Complete | Live-verified against deployed engine, 14/14 scenarios |
+| Catalog ingest (products → engine) | ✓ Complete | Live-verified 15/15 against deployed engine, incl. the per-item D6 error split (N-7.1) |
 | Customers ingest | ✓ Complete | Live-verified 10/10 against deployed engine (customers-end) |
 | Orders ingest | ✓ Complete | Live-verified 12/12 against deployed engine (orders-end) |
 | Browse ingest | ✓ Complete | `ingest_browse` + the public `/beacon` proxy; live-walked 13/13 (browse-beacon 3.4.0) |
@@ -52,10 +52,13 @@ The plugin connects to Smaily's recommendation engine and feeds it product, cust
 | Identity merge | ✓ Complete | Anonymous-session → known-customer binding on login (`wp_login` → `/identity/merge`); live-walked 6/6 (3.7) |
 | GDPR | ✓ Complete | WP Privacy API exporter (Art 15) + eraser (Art 17) + opt-out (§10), HPOS-safe order-meta; live-walked 10/10 (3.8) |
 | Step 4 4a activation | ✓ Complete | Connecting the engine syncs all domains (system-decides); per-domain sync toggles removed, browse-tracking is the only Step-4 toggle (consent-gated, preserved across disconnect/re-connect) (3.9) |
+| Event Log, retry & health notices | ✓ Complete | Read-only Event Log over both durable queues + per-row/bulk retry of failed events + proactive admin health notices (failed-count, engine-down, Smaily-down) (3.10.0–3.10.2) |
+| Profiling consent (shopper opt-out) | ✓ Complete | Opt-out model synced with Smaily (`smaily_rec_profiling`); beacon drop-gate + no retroactive identity-bind for opted-out shoppers; My Account toggle; live-walked 9/10 ((a).0–(a).2) |
+| Queue janitor & retention | ✓ Complete | Daily prune of terminal queue rows (sent 30d / failed 90d, filterable; pending never) + `created_at` index (F6) |
 
-### Phase 4 — Pilot stabilization (planned)
+### Phase 4 — Pilot stabilization (current)
 
-After Phase 3 completes, the plugin enters a pilot stabilization period before general availability.
+The plugin side is feature-complete and hardened (Event Log / retry / health notices, version-floor reconciliation, legacy-WC order-backfill verification, a full codebase audit with all fixes landed — see `docs/FABLE_AUDIT.md`). The pilot runs next on a real merchant; general availability and the upstream merge follow a passed pilot (`docs/TESTING.md` defines the pass/fail bar).
 
 ---
 
@@ -100,7 +103,7 @@ The plugin has three main layers:
 
 The 2.0 code lives under the `Smaily\Connect` namespace. The legacy 1.x code lives under `Smaily_Connect` and continues to function until the new setup wizard is completed.
 
-See [`docs/DECISIONS_DRAFT.md`](docs/DECISIONS_DRAFT.md) for the major architectural decisions, including the coexistence strategy (F1-1), the wizard-first activation model (F2-x), the variant A idempotency model (F3-7), and the catalog-end milestone defining the canonical pattern for ingest endpoints (F3-16).
+See [`docs/DECISIONS.md`](docs/DECISIONS.md) for the major architectural decisions, including the coexistence strategy (F1-1), the wizard-first activation model (F2-x), the variant A idempotency model (F3-7), and the catalog-end milestone defining the canonical pattern for ingest endpoints (F3-16).
 
 ---
 
@@ -112,7 +115,7 @@ All project documentation lives in [`docs/`](docs/). Start with the index.
 |----------|----------|---------|
 | [`docs/INDEX.md`](docs/INDEX.md) | All | Catalog of every document in the project |
 | [`docs/MIGRATION.md`](docs/MIGRATION.md) | Pilot clients upgrading from 1.x | Step-by-step upgrade procedure |
-| [`docs/DECISIONS_DRAFT.md`](docs/DECISIONS_DRAFT.md) | Maintainers, contributors | Every significant architectural decision with rationale |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Maintainers, contributors | Every significant architectural decision with rationale |
 | [`docs/LESSONS.md`](docs/LESSONS.md) | Maintainers | Lessons learned during development, especially around boundaries and testing discipline |
 | [`docs/RECENGINE_API_CONTRACT.md`](docs/RECENGINE_API_CONTRACT.md) | Plugin + engine developers | The canonical contract between the plugin and the recommendation engine |
 | [`docs/WP7_COMPAT.md`](docs/WP7_COMPAT.md) | Maintainers | WordPress 7.0 compatibility notes and the Abilities API strategy |
@@ -135,10 +138,12 @@ npm install
 The plugin is developed and tested against `wp-env` (WordPress + WooCommerce in a Docker container):
 
 ```bash
-npx wp-env start
+npx @wordpress/env start
 ```
 
-Once running, WordPress is available at `http://localhost:8888`. See `.wp-env.json` for the exact WP and WC versions used.
+(Use the full `@wordpress/env` package name — the bare `npx wp-env` alias is dead: it prints a deprecation notice and exits 0 without starting anything.)
+
+Once running, WordPress is available at `http://localhost:8888`. The baseline env is WP 7.0 + WC 10.7 (see `.wp-env.json`); reproducing the pilot's older stack (WC 6.9.4, legacy order storage) needs the override recipe in `CLAUDE.md`.
 
 ### Running tests
 
