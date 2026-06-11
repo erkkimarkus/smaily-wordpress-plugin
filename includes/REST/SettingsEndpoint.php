@@ -175,21 +175,6 @@ class SettingsEndpoint {
 	private function save_connection( array $data ): WP_REST_Response {
 		$errors = array();
 
-		// Sub-PR 2.H.16 diagnostic.
-		//
-		// Erkki's staging on 2.H.15 reports `savedSettings.smailyCredentials`
-		// empty after Save + reload, while the same code path saves
-		// correctly in my wp-env. The only way to reconcile is to see
-		// what the actual REST POST body looks like on his side —
-		// frontend may be shipping an empty payload (CredentialBlock
-		// edit-mode keystroke wired to wrong handler? Stale state?).
-		//
-		// Log the inbound shape + the values about to be persisted.
-		// Erkki tails wp-content/debug.log after a Save click and pastes
-		// the line so we can act on real data rather than guessing.
-		// Remove this block once the regression is pinned.
-		error_log( '[smaily-connect settings.save_connection] data=' . wp_json_encode( $data ) );
-
 		$smaily       = isset( $data['smailyCredentials'] ) && is_array( $data['smailyCredentials'] )
 			? $data['smailyCredentials']
 			: array();
@@ -199,16 +184,6 @@ class SettingsEndpoint {
 		$mode_raw     = isset( $data['multilingualMode'] ) ? (string) $data['multilingualMode'] : 'single';
 		$valid_modes  = array( 'single', 'A', 'B', 'C' );
 		$multilingual = in_array( $mode_raw, $valid_modes, true ) ? $mode_raw : 'single';
-
-		error_log(
-			sprintf(
-				'[smaily-connect settings.save_connection] resolved subdomain=[%s] username=[%s] password_len=%d mode=%s',
-				$subdomain,
-				$username,
-				strlen( $password ),
-				$multilingual
-			)
-		);
 
 		if ( $subdomain === '' || $username === '' ) {
 			$errors[] = array(
@@ -231,15 +206,8 @@ class SettingsEndpoint {
 		// loaded the wizard. Empty incoming password === "leave as-is";
 		// a non-empty value === "rotate to this".
 		if ( $password === '' ) {
-			$existing = get_option( self::LEGACY_OPTION_API_CREDENTIALS, array() );
-			$stored   = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
-			error_log(
-				sprintf(
-					'[smaily-connect settings.save_connection] empty inbound password — preserving stored secret (stored_len=%d)',
-					strlen( $stored )
-				)
-			);
-			$encrypted_password = $stored;
+			$existing           = get_option( self::LEGACY_OPTION_API_CREDENTIALS, array() );
+			$encrypted_password = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
 		} else {
 			$encrypted_password = $this->encrypt_password( $password );
 		}
@@ -311,17 +279,6 @@ class SettingsEndpoint {
 			? sanitize_key( (string) $data['defaultFallbackAccountKey'] )
 			: 'default';
 		update_option( 'smly_plus_default_fallback_account', $fallback_key );
-
-		// Sub-PR 2.H.16 diagnostic — confirm read-back works.
-		$readback = get_option( self::LEGACY_OPTION_API_CREDENTIALS );
-		error_log(
-			sprintf(
-				'[smaily-connect settings.save_connection] post-save readback subdomain=[%s] username=[%s] verified=%s',
-				is_array( $readback ) && isset( $readback['subdomain'] ) ? (string) $readback['subdomain'] : '(missing)',
-				is_array( $readback ) && isset( $readback['username'] ) ? (string) $readback['username'] : '(missing)',
-				get_option( 'smly_plus_default_connection_verified' ) ? 'true' : 'false'
-			)
-		);
 
 		return $this->success_response();
 	}

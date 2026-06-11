@@ -36,7 +36,8 @@ final class SettingsEndpointTest extends TestCase {
 				return true;
 			}
 		);
-		// Sub-PR 2.H.16 — post-save readback log needs get_option.
+		// The empty-inbound-password preserve path reads the stored secret
+		// back via get_option.
 		$writes =& $this->option_writes;
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = false ) use ( &$writes ) {
