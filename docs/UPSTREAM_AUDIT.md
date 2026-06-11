@@ -4,6 +4,16 @@
 **Audiitor:** Claude Code (implementatsiooni-agent)
 **Staatus:** AINULT AUDIT — mitte midagi cherry-pick'itud. Erkki vaatab üle ja otsustab.
 
+> **RESOLUTSIOON (lisatud 2026-06-11 — see märge jäi omal ajal lisamata):**
+> kõik 6 bug-fix'i cherry-pick'iti SAMAL päeval auditi järel (2026-06-03
+> 15:38–15:42): `fbf181b` #123, `64f75bb` #125, `07f9067` #124, `57ca299` #126,
+> `d05e866` #122, `10c520b` #121. Allpool olevad "🔴 VIGA ALLES" read kirjeldavad
+> auditi-hetke, MITTE praegust seisu — kood on verifitseeritud korras (2026-06-11
+> kontroll kõigis 6 asukohas). Lahtised on ainult kolm aruta-Erkki-ga punkti:
+> **#120** (tõlked, käsitsi .pot-ühildamine), **#128** (WP7/min-versioonid —
+> konflikt meie WC 6.9 floor'iga, EI rakenda enne pilooti), **#132** (release.sh,
+> ainult kui kasutame wp.org SVN-flow'd).
+
 ## Kontekst
 
 Plugin on fork `sendsmaily/smaily-wordpress-plugin`-st. Fork-punkti (common ancestor)
