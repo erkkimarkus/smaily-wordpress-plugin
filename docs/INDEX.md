@@ -29,7 +29,7 @@ where something is.
 | `MIGRATION.md` | WP-admin running the legacy `sendsmaily/smaily-wordpress-plugin` | **TODO** (before pilot) | How to migrate from the legacy plugin to this one. What persists, what changes, what to back up first, rollback path. Critical: written **before pilot client install**. |
 | `FAQ.md` / `TROUBLESHOOTING.md` | WP-admin running into problems | **TODO** (after pilot, ~2-4 weeks in) | Real user questions and symptom→cause→fix patterns. Written **after** the pilot is in production and asks real questions. Drafting it earlier would just be guesses. |
 | `CHANGELOG.md` | Anyone tracking versions | **TODO** (Phase 3 end) | Version-by-version what changed. Required for WordPress.org marketplace if we publish there. Can be regenerated from git history. |
-| `TESTING.md` (pilot-acceptance) | Pilot engagement: is it production-ready? | **TODO** (before pilot — needs Erkki's criteria) | Business pass/fail criteria for the pilot engagement (distinct from INSTALL.md's technical verify). The acceptance bar is a product decision, so this waits on Erkki's input. NB: the existing root `/TESTING.md` is a separate Phase-2 dev sanity-test, not this. |
+| `docs/TESTING.md` (pilot-acceptance) | Pilot engagement: is it production-ready? | **Written** (2026-06-11, from Erkki's criteria) | Business pass/fail criteria for the pilot engagement (distinct from INSTALL.md's technical verify): two gating dimensions (technical stability + merchant experience), business metrics tracked-not-gated, and logistics (4–6 wk, real data from start, check-in cadence, go/no-go review). NB: the existing root `/TESTING.md` is a separate Phase-2 dev sanity-test, not this. |
 
 ### Developer-facing — lives in repo, may be public or repo-only
 
