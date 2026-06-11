@@ -5,6 +5,15 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 **Method:** direct inspection + three parallel read-only exploration passes
 (functionality, security, database/quality); key findings spot-verified by hand.
 
+> **Remediation log (post-audit fixes):**
+> - **F1** `66f0a37` — §4#1 (CRITICAL, password in debug.log): all four 2.H.16
+>   diagnostic logs removed (regression confirmed resolved by Erkki).
+> - **F2** (this commit) — §4#3 dead `wp_ajax_smaily_admin_save` registration
+>   removed; §3/§7 factual correction: the `smly_plus_automation_mapping`
+>   writer DOES exist (`SettingsEndpoint::replace_automation_mappings()`,
+>   missed by the exploration pass) — recommendation 7 withdrawn.
+> - Remaining items tracked below and in BACKLOG.md.
+
 > Scope note: this is a WordPress/WooCommerce plugin, so the section template was
 > adapted — "Supabase tables / RLS" becomes custom `$wpdb` tables + `wp_options`
 > + access-control checks; "cron endpoints" becomes WP-Cron / Action Scheduler.
@@ -104,7 +113,7 @@ and tracked in `BACKLOG.md`.
 | `smly_plus_event_queue` | event_type, entity_id, payload, status, attempts, last_error | `(status, created_at)` | Smaily contact-sync queue (`EventQueue`, flusher, `EventsEndpoint`) |
 | `smly_rec_event_queue` | + event_uuid (UNIQUE), depends_on_event_id, next_retry_at | `(status, next_retry_at)`, uuid, depends_on | Rec-engine ingest (`IngestQueue`, all D6 flushers, `EventsEndpoint`) |
 | `smly_plus_backfill_job` | job_type, target, cursor_value, counts, status | UNIQUE `(job_type, target)` | All backfill jobs + `BackfillEndpoint` |
-| `smly_plus_automation_mapping` | trigger_type, language, account_key, workflow_id | UNIQUE `(trigger, lang, account)` | `Multilingual/Router` (reads; writer not located — **needs clarification**) |
+| `smly_plus_automation_mapping` | trigger_type, language, account_key, workflow_id | UNIQUE `(trigger, lang, account)` | `Multilingual/Router` reads; written by `SettingsEndpoint::replace_automation_mappings()` *(audit correction — initially reported as "writer not located")* |
 | `smly_rec_visitor` | visitor_id (PK), email, identified_at, first/last_seen | email | **Created but unused** — schema reserved; browse events intentionally bypass the DB (transient buffer) |
 
 **Options:** ~29 keys. Connection secrets (`smly_rec_api_key`, endpoints map,
@@ -125,7 +134,7 @@ events-filter, and all three backfill cursor queries).
 
 **Mismatches:**
 - `smly_rec_visitor` — created, never written (intentional forward-schema; documented).
-- `smly_plus_automation_mapping` — reads exist, no writer found in this pass; **needs clarification** (may be Mode B/C setup UI, possibly not yet wired).
+- ~~`smly_plus_automation_mapping` — reads exist, no writer found~~ — **corrected**: the writer is `SettingsEndpoint::replace_automation_mappings()`.
 - No tables used-but-missing were found.
 
 ---
@@ -234,7 +243,7 @@ browse render-moment + consent-plugin gating are manual pilot checks; the flaky
 4. **Close the leftover-diagnostic loop with a quick grep for other `error_log` payload dumps** — `SettingsEndpoint` has four `error_log` calls; verify each survives the "would I want this in a merchant's debug.log?" test.
 5. **Add the profiling-opt-out section to `docs/INSTALL.md`** — merchants need the shopper-facing toggle documented before pilot support requests arrive.
 6. **Run the planned manual pilot verifications early in week 1** (browse render-moment, CookieYes gating) — they're the only untested behaviour that ships to shoppers.
-7. **Clarify the `smly_plus_automation_mapping` writer** — reads exist but no code writes it; either the Mode B/C setup is unfinished or the writer lives somewhere this audit missed (needs clarification).
+7. ~~**Clarify the `smly_plus_automation_mapping` writer**~~ — withdrawn: the writer exists (`SettingsEndpoint::replace_automation_mappings()`); the audit's exploration pass missed it.
 8. **Delete the dead `wp_ajax_smaily_admin_save` registration** — one line, removes a confusing phantom endpoint.
 9. **Schedule the queue janitor + `created_at` index before the pilot generates months of rows** — both queues currently grow without pruning; cheap now, painful at scale.
 10. **Add direct unit tests for the WC hook handlers when next touched** — ~1 200 LOC of glue covered only indirectly; a regression there fails silently until an integration run.
