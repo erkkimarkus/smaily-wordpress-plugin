@@ -371,11 +371,15 @@ see "Pilot go-live" below.
   daily AS prune, sent 30d / failed 90d filterable, pending never; migration
   006 `idx_created_at`). (~~GCM encryption~~ — DONE 2026-06-11, FABLE_AUDIT
   fix F3 / DECISIONS F3-32: Cypher v2 GCM + upgrade re-encryption.)
-- **WP 7.0 env-matrix verification** — the version floors now declare WP 6.6 /
-  tested 7.0 (per `docs/WP7_COMPAT.md`), but the integration suite still runs only
-  WP 6.9.4. WP7_COMPAT recommends a wp-env matrix adding a WP 7.0 compat env so
-  integration runs on both 6.9.4 (current) + 7.0 (compat). Worth doing for real 7.0
-  proof; deferred behind the pilot-blockers (analogous to the legacy-WC matrix).
+- ~~**WP 7.0 env-matrix verification**~~ — **RESOLVED 2026-06-11**, with a
+  twist: instead of a two-env matrix, Erkki moved the integration BASELINE to
+  WP 7.0 (`.wp-env.json` core → `wordpress.org/wordpress-7.0.zip`; the WP 6.9.4
+  baseline was an interim step). **Full suite 99/99 green on WP 7.0** (WC 10.7 +
+  Polylang). One real 7.0 finding: the heavier core exhausted the 128M phpunit
+  memory limit during in-process REST dispatch → the runner now passes
+  `-d memory_limit=512M`. The PILOT still runs the old stack — the
+  pilot-faithful override recipe (WC 6.9.4 + PHP 8.1) is documented in
+  CLAUDE.md ("Integration baseline is WP 7.0…").
 
 **After pilot-hardening — (a) Smaily profiling-consent wiring (in progress):**
 Spec: `SMAILY_PROFILING_CONSENT_SPEC.md`; design: DECISIONS F3-31 (OPT-OUT model,
@@ -439,7 +443,8 @@ live-walk). Feature-complete ZIP cut at this commit.
 - **Manual / pilot verification (not machine-testable):** the browse render-moment
   (page-view fires on the right page), and live consent gating (CookieYes actually
   suppresses the beacon). See "Known deferred items".
-- **Pre-pilot pin:** the WP 7.0 env-matrix verification (post-pilot-hardening item).
+- ~~**Pre-pilot pin:** the WP 7.0 env-matrix verification~~ — DONE 2026-06-11
+  (baseline moved to WP 7.0, suite 99/99; see Post-pilot section).
 
 ### Waiting / lock conditions
 

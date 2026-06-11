@@ -134,6 +134,27 @@ same shape, table_spec-verified), but if a legacy-storage order-backfill issue
 surfaces, reproduce it against a LEGACY WC env — the HPOS-mode wp-env won't show
 it. Do NOT assume "integration green" covers the legacy order path.
 
+### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
+Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's
+call: new work targets 7.0; the earlier WP 6.9.4 baseline was an interim step).
+The PILOT still runs the OLD stack — WC 6.9.4, legacy order storage, older WP —
+so a pilot bug may NOT reproduce on the default env. To stand up a
+pilot-faithful env, drop in a `.wp-env.override.json` (gitignored-by-use,
+delete after) like the legacy-WC verification used:
+
+```
+{ "core": "WordPress/WordPress#6.9.4", "phpVersion": "8.1",
+  "plugins": ["https://downloads.wordpress.org/plugin/woocommerce.6.9.4.zip",
+               "https://downloads.wordpress.org/plugin/polylang.latest-stable.zip"] }
+```
+
+then `npx @wordpress/env start --update` (NOT `npx wp-env` — that alias only
+prints a deprecation notice and exits 0 WITHOUT starting, which silently looks
+like success), reset the carried-over HPOS options so `is_hpos()=false`, run
+the suite, and restore the default env afterwards (delete the override +
+`start --update` again). See the go-live checklist entry in STATUS.md for the
+original WC 6.9.4 walk-through.
+
 ### Endpoints-map URL placeholder is `{email}`, not `%s` — substitute, don't sprintf
 The engine's endpoints-map advertises the GDPR customer URLs (§8/§9/§10) with a
 literal `{email}` token: `…/customer/{email}/export`. The email goes in the URL

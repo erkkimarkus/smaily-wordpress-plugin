@@ -29,10 +29,13 @@ WP7_COMPAT Phase-4 + three audit-only gaps that were tracked nowhere)._
 
 | What | Why deferred | Doc location |
 |---|---|---|
-| **WP 7.0 env-matrix verification** | Floors declare WP tested-7.0, but integration runs only WP 6.9.4. Add a wp-env compat env so integration runs on both 6.9.4 + 7.0. Pre-pilot pin. | STATUS §Post-pilot (L366), `docs/WP7_COMPAT.md` |
 | **Privacy-policy must mention profiling** | Legal — the opt-out/default-on model requires a transparent disclosure. Erkki / docs. | STATUS L407/L422, DECISIONS F3-31 (L1643) |
 | **(a) fail-open GDPR-window review** | Conscious consent-risk in the read-error window (fail-open + opt-out model). Erkki investigating separately before any opt-in flip. | STATUS L423, DECISIONS L1637 |
 | **Doc-drift fix (upstream-merge need)** | Public docs describe an earlier state — go to the main plugin's docs on merge: **README** "(in progress)" → feature-complete + add Event-Log/profiling rows; ~~**INSTALL.md** profiling-opt-out section~~ (DONE 2026-06-11, FABLE_AUDIT fix F5 — Step-4 shopper-opt-out subsection + privacy-policy warning + troubleshooting/quick-ref rows); ~~**readme.txt** rewrite for 2.0~~ (DONE 2026-06-11, FABLE_AUDIT fix F4 — stable tag 2.0.0-beta.1, 2.0 description + changelog + the rec-engine external-services disclosure). | Audit (OSA-1); see README L5/L20/L39, `docs/INSTALL.md`, `readme.txt` |
+
+> **WP 7.0 env-matrix — RESOLVED 2026-06-11** (baseline moved to WP 7.0 per
+> Erkki — the 6.9.4 baseline was interim; suite 99/99 on WP 7.0; runner memory
+> 512M; pilot-repro override recipe in CLAUDE.md). No longer a backlog item.
 
 > **Queue janitor + created_at index — RESOLVED 2026-06-11** (pulled forward
 > pre-pilot per FABLE_AUDIT rec 9; fix F6, DECISIONS F3-33: daily AS tick prunes

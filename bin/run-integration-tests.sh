@@ -75,8 +75,11 @@ for arg in "$@"; do
   QUOTED_ARGS="${QUOTED_ARGS} '${escaped}'"
 done
 
+# -d memory_limit: WP 7.0 core is heavier than 6.9 — the suite exhausted
+# the container's 128M default during in-process REST dispatch when the
+# baseline moved to WP 7.0 (2026-06-11). 512M gives ample headroom.
 CMD="docker exec \"$CONTAINER_NAME\" \
-  php \"$PLUGIN_PATH_IN_CONTAINER/vendor/bin/phpunit\" \
+  php -d memory_limit=512M \"$PLUGIN_PATH_IN_CONTAINER/vendor/bin/phpunit\" \
     --configuration \"$PLUGIN_PATH_IN_CONTAINER/phpunit.integration.xml.dist\" \
     ${QUOTED_ARGS}"
 

@@ -35,10 +35,13 @@ UI contract.
 
 These are **small**, no need to interrupt Phase 3 rec-engine work:
 
-1. **Extend the wp-env matrix** — alongside (or inside) `.wp-env.json`, a WP 7.0 test
-   configuration. The agent's integration suite runs on both: WP 6.9.4 (current
-   support) and WP 7.0 (compatibility check). The 3.0 integration baseline picks this
-   up automatically — `npm run ci:strict` covers both.
+1. ~~**Extend the wp-env matrix**~~ — **DONE 2026-06-11**, as a baseline move
+   rather than a two-env matrix: `.wp-env.json` core is now WP 7.0 (Erkki's
+   call — the WP 6.9.4 baseline was an interim step). Full integration suite
+   99/99 on WP 7.0 + WC 10.7. Finding: WP 7.0's heavier core exhausted the
+   128M phpunit memory limit in REST dispatch → the runner now passes
+   `php -d memory_limit=512M`. The pilot's old stack (WC 6.9.4 + PHP 8.1)
+   remains reproducible via the override recipe in CLAUDE.md.
 
 2. **Visual audit** — the agent's Chromium walks check the wizard and Settings
    against the WP 7 admin chrome. There will likely be **small shifts** (focus ring
