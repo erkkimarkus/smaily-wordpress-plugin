@@ -12,6 +12,11 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 >   removed; §3/§7 factual correction: the `smly_plus_automation_mapping`
 >   writer DOES exist (`SettingsEndpoint::replace_automation_mappings()`,
 >   missed by the exploration pass) — recommendation 7 withdrawn.
+> - **F3** — §4#2 (IMPORTANT, static IV / AUTH_KEY-prefix leak): Cypher v2 —
+>   AES-256-GCM (`smy2:` versioned blob, random nonce), legacy-CBC read
+>   fallback, `Activation::reencrypt_legacy_secrets()` migrates all stored
+>   secrets on upgrade. Closes the BACKLOG GCM item early (DECISIONS F3-32);
+>   proven by `CypherGcmTest` (6 integration tests against the real class).
 > - Remaining items tracked below and in BACKLOG.md.
 
 > Scope note: this is a WordPress/WooCommerce plugin, so the section template was

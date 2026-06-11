@@ -366,7 +366,9 @@ see "Pilot go-live" below.
 - **3.10.3** — email channel (§13a email level + Notifications subpanel) via
   `wp_mail` (admin-notice base already covers proactive-in-wp-admin; email needs
   working server SMTP — recommend an SMTP plugin in the doc).
-- Queue janitor (prune `sent`/`failed` rows + index `created_at`), GCM encryption.
+- Queue janitor (prune `sent`/`failed` rows + index `created_at`). (~~GCM
+  encryption~~ — DONE 2026-06-11, FABLE_AUDIT fix F3 / DECISIONS F3-32: Cypher
+  v2 GCM + upgrade re-encryption.)
 - **WP 7.0 env-matrix verification** — the version floors now declare WP 6.6 /
   tested 7.0 (per `docs/WP7_COMPAT.md`), but the integration suite still runs only
   WP 6.9.4. WP7_COMPAT recommends a wp-env matrix adding a WP 7.0 compat env so

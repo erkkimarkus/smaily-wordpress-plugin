@@ -1693,6 +1693,36 @@ deferred piece this is), §10 `customer_opt_out` (3.8, the engine-side enforceme
 read/write + `ProfilingConsent` enforcement (this); (a).1 beacon two-gate; (a).2
 live-walk + WP opt-out UX.
 
+### F3-32 — Cypher v2: AES-256-GCM, versioned blob, upgrade re-encryption (audit fix)
+
+**Context:** FABLE_AUDIT §4#2 — the legacy AES-256-CBC blob used a STATIC IV
+(= a prefix of `AUTH_KEY`) for every encryption and persisted that IV inside the
+stored value: every DB dump leaked an AUTH_KEY prefix, and equal plaintexts
+produced equal ciphertexts. A CBC→GCM upgrade was already in BACKLOG (post-pilot).
+
+**Decision:** `Cypher::encrypt()` now writes ONLY the v2 format — `smy2:` +
+base64(nonce(12) ‖ tag(16) ‖ ct), AES-256-GCM, random per-message nonce, key =
+raw-binary sha256(SECURE_AUTH_KEY). `decrypt()` dispatches on the prefix and
+keeps a behaviour-identical legacy CBC+HMAC read path (decrypt-only, never
+written). `Activation::reencrypt_legacy_secrets()` (runs inside `run()`, so on
+activation AND upgrade-detect, idempotent via the prefix check) migrates all
+three storage locations: the legacy default credentials array, every
+`smly_plus_credentials_*` account, and `smly_rec_api_key` (autoload=false
+preserved). An undecryptable blob (rotated salts) is left byte-identical —
+overwriting would destroy the "re-enter your credential" evidence.
+
+**Rationale:** any IV fix forces a stored-format migration; going straight to
+GCM costs ONE migration instead of two and closes the BACKLOG item. AEAD also
+retires the hand-rolled encrypt-then-MAC.
+
+**Alternatives:** random-IV CBC (same migration cost, keeps the hand-rolled
+HMAC); lazy re-encrypt-on-save only (leaves leaking blobs in the DB
+indefinitely on installs that never re-save).
+
+**Relationships:** FABLE_AUDIT §4#2 + remediation log; BACKLOG GCM item
+(closed); `CypherGcmTest` (integration — the REAL class; the unit suite runs a
+spy shim, see tests/bootstrap.php).
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or

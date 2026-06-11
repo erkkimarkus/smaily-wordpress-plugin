@@ -52,9 +52,74 @@ final class Activation {
 		self::set_default_options();
 		self::run_migrations();
 		self::cleanup_removed_rec_feature_options();
+		self::reencrypt_legacy_secrets();
 		self::migrate_wp_cron_to_action_scheduler();
 		self::schedule_recurring_action_scheduler_jobs();
 		self::stamp_plugin_version();
+	}
+
+	/**
+	 * One-time migration of stored secrets from the legacy CBC blob format to
+	 * the v2 GCM format (FABLE_AUDIT §4#2: the legacy format used a static IV
+	 * taken from AUTH_KEY and persisted it in the blob, leaking an AUTH_KEY
+	 * prefix into every DB dump).
+	 *
+	 * Idempotent: already-migrated blobs are skipped by the `smy2:` prefix
+	 * check, and a blob that no longer decrypts (e.g. the WP salts were
+	 * rotated since it was written) is left untouched — it is equally
+	 * unreadable in either format, and overwriting it would destroy the
+	 * evidence the merchant needs to know to re-enter the credential.
+	 *
+	 * Covers every location that persists a Cypher blob: the legacy default
+	 * Smaily credentials array, the per-account Phase-2 credential arrays,
+	 * and the rec-engine API key (a raw string option, autoload=false).
+	 */
+	private static function reencrypt_legacy_secrets(): void {
+		if ( ! class_exists( \Smaily_Connect\Includes\Cypher::class ) ) {
+			require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-cypher.class.php';
+		}
+
+		global $wpdb;
+
+		// Array-shaped credential options: the legacy default + per-account.
+		$option_keys = array( Settings\Credentials::LEGACY_OPTION_KEY );
+		$like        = $wpdb->esc_like( Settings\Credentials::PHASE2_OPTION_PREFIX ) . '%';
+		$per_account = $wpdb->get_col(
+			$wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like )
+		);
+		foreach ( array_merge( $option_keys, is_array( $per_account ) ? $per_account : array() ) as $key ) {
+			$value = get_option( $key );
+			if ( ! is_array( $value ) || ! isset( $value['password'] ) ) {
+				continue;
+			}
+			$migrated = self::reencrypted_blob( (string) $value['password'] );
+			if ( $migrated !== null ) {
+				$value['password'] = $migrated;
+				update_option( $key, $value );
+			}
+		}
+
+		// Raw-string rec-engine API key (keep autoload=false).
+		$migrated = self::reencrypted_blob( (string) get_option( Settings\RecEngineSettings::OPTION_API_KEY, '' ) );
+		if ( $migrated !== null ) {
+			update_option( Settings\RecEngineSettings::OPTION_API_KEY, $migrated, false );
+		}
+	}
+
+	/**
+	 * Re-encrypt a single stored blob, or null when no write is needed
+	 * (empty, already v2, or undecryptable — see reencrypt_legacy_secrets).
+	 */
+	private static function reencrypted_blob( string $blob ): ?string {
+		if ( $blob === '' || \Smaily_Connect\Includes\Cypher::is_v2( $blob ) ) {
+			return null;
+		}
+		$plain = \Smaily_Connect\Includes\Cypher::decrypt( $blob );
+		if ( $plain === '' ) {
+			return null;
+		}
+
+		return \Smaily_Connect\Includes\Cypher::encrypt( $plain );
 	}
 
 	/**
