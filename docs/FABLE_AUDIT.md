@@ -24,6 +24,10 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 > - **F5** — §6 INSTALL.md gap: shopper profiling-opt-out section added
 >   (Step-4 subsection incl. the privacy-policy-must-mention-profiling
 >   warning, plus troubleshooting + quick-reference rows).
+> - **F6** — §5/§7#9 (queue growth): `DB\QueueJanitor` daily AS tick prunes
+>   terminal rows (sent 30d / failed 90d, filterable; pending never) in
+>   LIMIT-batches from both queues; migration 006 adds `idx_created_at` to
+>   both tables. Pulled forward pre-pilot (DECISIONS F3-33).
 > - Remaining items tracked below and in BACKLOG.md.
 
 > Scope note: this is a WordPress/WooCommerce plugin, so the section template was

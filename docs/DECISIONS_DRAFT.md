@@ -1723,6 +1723,37 @@ indefinitely on installs that never re-save).
 (closed); `CypherGcmTest` (integration — the REAL class; the unit suite runs a
 spy shim, see tests/bootstrap.php).
 
+### F3-33 — Queue janitor: terminal-row retention prune + created_at index (audit fix)
+
+**Context:** both durable queues grew without bound (sent/failed rows never
+pruned), and the rec-queue had no index a `created_at` range scan could use —
+FABLE_AUDIT §5 watch-item; the BACKLOG "Queue janitor" item was pulled forward
+pre-pilot (Erkki: months of pilot rows would make this expensive later).
+
+**Decision:** `DB\QueueJanitor` — a daily Action Scheduler tick
+(`smly_plus_queue_janitor`) deletes terminal rows past retention from BOTH
+queues: `sent` after 30 days, `failed` after 90 days (both filterable:
+`smaily_connect_janitor_{sent,failed}_retention_days`). **`pending` rows are
+NEVER pruned regardless of age** — they are work, not history; an old parked
+retry must survive until it terminally resolves. DELETEs run in LIMIT-1000
+batches, max 20 per status per run (a neglected table drains over consecutive
+daily ticks instead of one table-locking statement). Migration 006 restates
+both CREATE TABLEs with `KEY idx_created_at` (the dbDelta-supported way to add
+an index).
+
+**Rationale:** failed rows keep a long window because they are the Event Log's
+diagnostic evidence and stay retryable until pruned; sent rows are
+engine-confirmed and only useful as a short audit trail.
+
+**Alternatives:** prune on flush (couples housekeeping to the hot path);
+TTL-partitioned tables (overkill at this scale); pruning failed fast (destroys
+the recovery story 3.10.1 just built).
+
+**Relationships:** FABLE_AUDIT §5/§7#9 + remediation F6; 3.10.0 Event Log
+(failed-in-24h count also benefits from the index); `QueueJanitorTest`
+(3 integration tests: retention matrix incl. pending-never, filterability,
+index presence).
+
 ## How to keep this document going (during Phase 3)
 
 For every new significant technical decision (as part of a sub-PR plan or

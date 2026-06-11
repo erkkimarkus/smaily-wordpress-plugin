@@ -34,6 +34,11 @@ WP7_COMPAT Phase-4 + three audit-only gaps that were tracked nowhere)._
 | **(a) fail-open GDPR-window review** | Conscious consent-risk in the read-error window (fail-open + opt-out model). Erkki investigating separately before any opt-in flip. | STATUS L423, DECISIONS L1637 |
 | **Doc-drift fix (upstream-merge need)** | Public docs describe an earlier state — go to the main plugin's docs on merge: **README** "(in progress)" → feature-complete + add Event-Log/profiling rows; ~~**INSTALL.md** profiling-opt-out section~~ (DONE 2026-06-11, FABLE_AUDIT fix F5 — Step-4 shopper-opt-out subsection + privacy-policy warning + troubleshooting/quick-ref rows); ~~**readme.txt** rewrite for 2.0~~ (DONE 2026-06-11, FABLE_AUDIT fix F4 — stable tag 2.0.0-beta.1, 2.0 description + changelog + the rec-engine external-services disclosure). | Audit (OSA-1); see README L5/L20/L39, `docs/INSTALL.md`, `readme.txt` |
 
+> **Queue janitor + created_at index — RESOLVED 2026-06-11** (pulled forward
+> pre-pilot per FABLE_AUDIT rec 9; fix F6, DECISIONS F3-33: daily AS tick prunes
+> terminal rows — sent 30d / failed 90d, filterable, pending never — in
+> LIMIT-batches; migration 006 adds `idx_created_at` to both queues).
+
 > **GCM encryption — RESOLVED 2026-06-11** (FABLE_AUDIT fix F3, DECISIONS F3-32:
 > Cypher v2 `smy2:` AES-256-GCM + legacy-read fallback + Activation upgrade
 > re-encryption of all stored secrets). No longer a backlog item.
@@ -48,7 +53,6 @@ WP7_COMPAT Phase-4 + three audit-only gaps that were tracked nowhere)._
 | What | Why deferred | Doc location |
 |---|---|---|
 | **3.10.3 email channel** (`wp_mail`) | Admin-notice base already covers proactive-in-wp-admin; email needs working server SMTP (recommend an SMTP plugin in the doc). | STATUS L362, DECISIONS L1606 |
-| **Queue janitor** (prune `sent`/`failed` rows + index `created_at`) | Scale-housekeeping, not pilot-blocking. | STATUS L365, DECISIONS L1618 |
 | **(a) explicit opt-in if AKI tightens** | Conditional — `ProfilingConsent::is_allowed()` is invertible; flip only if the regulator requires opt-in. | STATUS L406, DECISIONS L1643 |
 | **(a) drop-count UI surface** (`smly_profiling_dropped_24h`) | Counter is wired; surfacing it in the UI is a refinement, not built. | STATUS L386, DECISIONS L1682 |
 | **Auto-retry of transient failures** | Conscious choice: Retry is **manual-only** — auto-retrying a deterministic 4xx loops. Revisit only if transient-vs-permanent classification is added. | STATUS L339, DECISIONS L1601 |

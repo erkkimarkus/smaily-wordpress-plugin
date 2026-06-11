@@ -18,6 +18,7 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
+use Smaily\Connect\DB\QueueJanitor;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Privacy\GdprHandler;
 use Smaily\Connect\Privacy\ProfilingConsent;
@@ -202,6 +203,11 @@ final class Bootstrap {
 		// Shopper-facing profiling-consent opt-out ((a).2) — a My Account privacy
 		// toggle. The opt-out the opt-out model legally requires (DECISIONS F3-31).
 		( new ProfilingConsentAccount( $this->profiling_consent() ) )->register();
+
+		// Queue janitor (FABLE_AUDIT F6) — daily retention prune of terminal
+		// sent/failed rows in both durable queues, so the tables stay bounded
+		// in production. Scheduled in register_action_scheduler_jobs().
+		( new QueueJanitor() )->register_hooks();
 
 		// Admin UI (wizard + settings React mount). The two helpers in
 		// admin/wizard.php are intentionally loaded only on admin requests
@@ -470,6 +476,14 @@ final class Bootstrap {
 		// cadence: it makes a network ping and the signals are coarse-grained.
 		if ( ! as_has_scheduled_action( NotificationManager::HEALTH_HOOK, array(), NotificationManager::AS_GROUP ) ) {
 			as_schedule_recurring_action( time(), 900, NotificationManager::HEALTH_HOOK, array(), NotificationManager::AS_GROUP );
+		}
+
+		// Queue janitor — daily retention prune (sent 30d / failed 90d,
+		// filterable) of both durable queues. Daily cadence: retention is
+		// measured in days, and the LIMIT-batched DELETEs drain any backlog
+		// over consecutive runs.
+		if ( ! as_has_scheduled_action( QueueJanitor::HOOK, array(), QueueJanitor::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), DAY_IN_SECONDS, QueueJanitor::HOOK, array(), QueueJanitor::AS_GROUP );
 		}
 	}
 
