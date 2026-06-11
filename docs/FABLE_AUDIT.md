@@ -17,6 +17,10 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 >   fallback, `Activation::reencrypt_legacy_secrets()` migrates all stored
 >   secrets on upgrade. Closes the BACKLOG GCM item early (DECISIONS F3-32);
 >   proven by `CypherGcmTest` (6 integration tests against the real class).
+> - **F4** — §6 readme.txt drift: full 2.0 rewrite — stable tag →
+>   2.0.0-beta.1, 2.0 description + changelog + upgrade notice, and the
+>   previously missing external-services disclosure for the recommendation
+>   engine (catalog/customer/order/browse data flows, consent gating).
 > - Remaining items tracked below and in BACKLOG.md.
 
 > Scope note: this is a WordPress/WooCommerce plugin, so the section template was
