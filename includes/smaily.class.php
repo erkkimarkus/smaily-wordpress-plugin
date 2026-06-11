@@ -275,13 +275,13 @@ class Smaily_Connect {
 		$this->api = new API( $this->options, $this->plugin_name );
 		$this->api->register_hooks();
 
-		$this->blocks = new Blocks( $this->options, $this->plugin_name, $this->version );
+		$this->blocks = new Blocks();
 		$this->blocks->register_hooks();
 
 		$this->lifecycle = new Lifecycle();
 		$this->lifecycle->register_hooks();
 
-		$this->public_base = new Public_Base( $this->options, $this->plugin_name, $this->version );
+		$this->public_base = new Public_Base( $this->options );
 		$this->public_base->register_hooks();
 
 		if ( Helper::is_woocommerce_active() ) {
@@ -314,7 +314,7 @@ class Smaily_Connect {
 		}
 
 		if ( Helper::is_elementor_active() ) {
-			$this->elementor = new Elementor_Admin( $this->plugin_name );
+			$this->elementor = new Elementor_Admin();
 			$this->elementor->register_hooks();
 		}
 	}
