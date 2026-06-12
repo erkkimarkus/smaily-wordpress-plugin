@@ -8,23 +8,23 @@ modified. · **Repo state:** commit `906cf3d` (main), v2.0.0-beta.1.
 > **Remediation log (post-audit fixes):**
 > - **F1** `66f0a37` — §4#1 (CRITICAL, password in debug.log): all four 2.H.16
 >   diagnostic logs removed (regression confirmed resolved by Erkki).
-> - **F2** (this commit) — §4#3 dead `wp_ajax_smaily_admin_save` registration
+> - **F2** `11e03ce` — §4#3 dead `wp_ajax_smaily_admin_save` registration
 >   removed; §3/§7 factual correction: the `smly_plus_automation_mapping`
 >   writer DOES exist (`SettingsEndpoint::replace_automation_mappings()`,
 >   missed by the exploration pass) — recommendation 7 withdrawn.
-> - **F3** — §4#2 (IMPORTANT, static IV / AUTH_KEY-prefix leak): Cypher v2 —
+> - **F3** `fde2ee5` — §4#2 (IMPORTANT, static IV / AUTH_KEY-prefix leak): Cypher v2 —
 >   AES-256-GCM (`smy2:` versioned blob, random nonce), legacy-CBC read
 >   fallback, `Activation::reencrypt_legacy_secrets()` migrates all stored
 >   secrets on upgrade. Closes the BACKLOG GCM item early (DECISIONS F3-32);
 >   proven by `CypherGcmTest` (6 integration tests against the real class).
-> - **F4** — §6 readme.txt drift: full 2.0 rewrite — stable tag →
+> - **F4** `ff1436f` — §6 readme.txt drift: full 2.0 rewrite — stable tag →
 >   2.0.0-beta.1, 2.0 description + changelog + upgrade notice, and the
 >   previously missing external-services disclosure for the recommendation
 >   engine (catalog/customer/order/browse data flows, consent gating).
-> - **F5** — §6 INSTALL.md gap: shopper profiling-opt-out section added
+> - **F5** `f2b15fe` — §6 INSTALL.md gap: shopper profiling-opt-out section added
 >   (Step-4 subsection incl. the privacy-policy-must-mention-profiling
 >   warning, plus troubleshooting + quick-reference rows).
-> - **F6** — §5/§7#9 (queue growth): `DB\QueueJanitor` daily AS tick prunes
+> - **F6** `4e99914` — §5/§7#9 (queue growth): `DB\QueueJanitor` daily AS tick prunes
 >   terminal rows (sent 30d / failed 90d, filterable; pending never) in
 >   LIMIT-batches from both queues; migration 006 adds `idx_created_at` to
 >   both tables. Pulled forward pre-pilot (DECISIONS F3-33).
@@ -168,9 +168,9 @@ events-filter, and all three backfill cursor queries).
 
 | # | Severity | Finding | Evidence |
 |---|---|---|---|
-| 1 | **CRITICAL** | **Plaintext Smaily password logged to `debug.log`.** `error_log('[…settings.save_connection] data=' . wp_json_encode($data))` logs the full REST payload — including `smailyCredentials.password` — on every connection save. It is a leftover "Sub-PR 2.H.16 diagnostic" whose own comment says *"Remove this block once the regression is pinned."* `wp-content/debug.log` is often web-readable. | `includes/REST/SettingsEndpoint.php:191` (the second log at :203 is the safe pattern — `password_len` only) |
-| 2 | **IMPORTANT** | **Static IV derived from `AUTH_KEY` — and stored in the DB blob.** `Smaily_Cypher` (AES-256-CBC + HMAC-SHA256, encrypt-then-MAC with `hash_equals` — that part is sound) uses `substr(AUTH_KEY, 0, 16)` as the IV for *every* encryption, and prepends that IV to the base64 value persisted in `wp_options`. Consequences: (a) deterministic encryption — equal plaintexts produce equal ciphertexts; (b) **the first 16 bytes of `AUTH_KEY` are recoverable from any DB dump/backup**. The CBC→GCM upgrade is already in BACKLOG (post-pilot); this finding raises its priority — a random per-message IV is a small change even before GCM. | `includes/smaily-cypher.class.php:21–25,40–47` |
-| 3 | MINOR | Dead AJAX registration: `wp_ajax_smaily_admin_save` hooks a method that does not exist anywhere. Harmless (WP ignores it) but confusing. | `admin/smaily-admin.class.php:81` |
+| 1 | **CRITICAL — ✅ FIXED (F1 `66f0a37`)** | **Plaintext Smaily password logged to `debug.log`.** `error_log('[…settings.save_connection] data=' . wp_json_encode($data))` logs the full REST payload — including `smailyCredentials.password` — on every connection save. It is a leftover "Sub-PR 2.H.16 diagnostic" whose own comment says *"Remove this block once the regression is pinned."* `wp-content/debug.log` is often web-readable. | `includes/REST/SettingsEndpoint.php:191` (the second log at :203 is the safe pattern — `password_len` only) |
+| 2 | **IMPORTANT — ✅ FIXED (F3 `fde2ee5`, AES-256-GCM + upgrade re-encryption)** | **Static IV derived from `AUTH_KEY` — and stored in the DB blob.** `Smaily_Cypher` (AES-256-CBC + HMAC-SHA256, encrypt-then-MAC with `hash_equals` — that part is sound) uses `substr(AUTH_KEY, 0, 16)` as the IV for *every* encryption, and prepends that IV to the base64 value persisted in `wp_options`. Consequences: (a) deterministic encryption — equal plaintexts produce equal ciphertexts; (b) **the first 16 bytes of `AUTH_KEY` are recoverable from any DB dump/backup**. The CBC→GCM upgrade is already in BACKLOG (post-pilot); this finding raises its priority — a random per-message IV is a small change even before GCM. | `includes/smaily-cypher.class.php:21–25,40–47` |
+| 3 | MINOR — ✅ FIXED (F2 `11e03ce`) | Dead AJAX registration: `wp_ajax_smaily_admin_save` hooks a method that does not exist anywhere. Harmless (WP ignores it) but confusing. | `admin/smaily-admin.class.php:81` |
 | 4 | MINOR | Beacon rate-limiting rides on transients — on a host with an unreliable object cache the limit may not persist. Acceptable for telemetry; worth knowing. | `REST/BeaconEndpoint.php` |
 | 5 | MINOR | `SetupExchange` accepts a merchant-pasted engine URL (scheme+host extracted via `wp_parse_url`, path regex-validated) — an admin could point it at an internal host (SSRF-shaped), but the actor is already `manage_options`. Low practical risk. | `Smaily/RecEngine/SetupExchange.php:76–118` |
 
@@ -225,13 +225,13 @@ browse render-moment + consent-plugin gating are manual pilot checks; the flaky
 
 ## 6) Work in progress / unfinished
 
-- **Leftover diagnostic block** — `SettingsEndpoint.php:178–210`, self-labelled
+- ✅ RESOLVED (F1) — **Leftover diagnostic block** — `SettingsEndpoint.php:178–210`, self-labelled
   "remove once the regression is pinned" (and it logs the password — §4#1).
   Needs confirmation whether the 2.H.15/2.H.16 staging regression was resolved.
-- **`readme.txt` drift (release blocker for any public release):** `Stable tag: 1.6.1` vs plugin
+- ✅ RESOLVED (F4) — **`readme.txt` drift:** `Stable tag: 1.6.1` vs plugin
   `Version: 2.0.0-beta.1`; changelog ends at 1.6.1; description predates the
   whole rec-engine feature set. Tracked in BACKLOG ("doc-drift, upstream-merge").
-- **`docs/INSTALL.md`** lacks the profiling-opt-out section ((a).2 shipped a
+- ✅ RESOLVED (F5) — **`docs/INSTALL.md`** lacked the profiling-opt-out section ((a).2 shipped a
   My Account toggle after the doc was written). Tracked.
 - **`smly_rec_visitor` table** — created, never populated (intentional reserve).
 - **JS `mergeIdentity()` stub** in `rec-engine-client.ts` still throws —
@@ -253,16 +253,16 @@ browse render-moment + consent-plugin gating are manual pilot checks; the flaky
 
 ## 7) Prioritized recommendations
 
-1. **Remove the password-logging diagnostic at `SettingsEndpoint.php:191` (or the whole 178–210 block if the 2.H.16 regression is pinned)** — it writes the merchant's Smaily password in plaintext to `debug.log` on every save; this is the one finding that should not reach the pilot.
-2. **Fix the static-IV cipher before more secrets accumulate** — switch `Smaily_Cypher` to a random per-message IV now (tiny change), GCM later as planned; today every DB backup leaks an `AUTH_KEY` prefix and ciphertexts are deterministic.
-3. **Sync `readme.txt` (stable tag, changelog, description) with v2.0.0-beta.1** — a stable tag pointing at 1.6.1 will break/confuse any update or marketplace flow and misdescribes the product.
-4. **Close the leftover-diagnostic loop with a quick grep for other `error_log` payload dumps** — `SettingsEndpoint` has four `error_log` calls; verify each survives the "would I want this in a merchant's debug.log?" test.
-5. **Add the profiling-opt-out section to `docs/INSTALL.md`** — merchants need the shopper-facing toggle documented before pilot support requests arrive.
-6. **Run the planned manual pilot verifications early in week 1** (browse render-moment, CookieYes gating) — they're the only untested behaviour that ships to shoppers.
+1. ✅ DONE (F1 `66f0a37`) — **Remove the password-logging diagnostic at `SettingsEndpoint.php:191` (or the whole 178–210 block if the 2.H.16 regression is pinned)** — it writes the merchant's Smaily password in plaintext to `debug.log` on every save; this is the one finding that should not reach the pilot.
+2. ✅ DONE (F3 `fde2ee5`, went straight to GCM) — **Fix the static-IV cipher before more secrets accumulate** — switch `Smaily_Cypher` to a random per-message IV now (tiny change), GCM later as planned; today every DB backup leaks an `AUTH_KEY` prefix and ciphertexts are deterministic.
+3. ✅ DONE (F4 `ff1436f`, full rewrite incl. external-services disclosure) — **Sync `readme.txt` with v2.0.0-beta.1** — a stable tag pointing at 1.6.1 will break/confuse any update or marketplace flow and misdescribes the product.
+4. ✅ DONE (verified during F1: the remaining ~25 `error_log` calls are operational error messages, no payload dumps) — **Close the leftover-diagnostic loop** — `SettingsEndpoint` has four `error_log` calls; verify each survives the "would I want this in a merchant's debug.log?" test.
+5. ✅ DONE (F5 `f2b15fe`) — **Add the profiling-opt-out section to `docs/INSTALL.md`** — merchants need the shopper-facing toggle documented before pilot support requests arrive.
+6. ⏳ OPEN (pilot-time by nature) — **Run the planned manual pilot verifications early in week 1** (browse render-moment, CookieYes gating) — they're the only untested behaviour that ships to shoppers.
 7. ~~**Clarify the `smly_plus_automation_mapping` writer**~~ — withdrawn: the writer exists (`SettingsEndpoint::replace_automation_mappings()`); the audit's exploration pass missed it.
-8. **Delete the dead `wp_ajax_smaily_admin_save` registration** — one line, removes a confusing phantom endpoint.
-9. **Schedule the queue janitor + `created_at` index before the pilot generates months of rows** — both queues currently grow without pruning; cheap now, painful at scale.
-10. **Add direct unit tests for the WC hook handlers when next touched** — ~1 200 LOC of glue covered only indirectly; a regression there fails silently until an integration run.
+8. ✅ DONE (F2 `11e03ce`) — **Delete the dead `wp_ajax_smaily_admin_save` registration** — one line, removes a confusing phantom endpoint.
+9. ✅ DONE (F6 `4e99914`, pulled forward pre-pilot) — **Schedule the queue janitor + `created_at` index** — both queues currently grow without pruning; cheap now, painful at scale.
+10. ⏳ OPEN (BACKLOG, when next touched) — **Add direct unit tests for the WC hook handlers** — ~1 200 LOC of glue covered only indirectly; a regression there fails silently until an integration run.
 
 ---
 
