@@ -333,6 +333,39 @@ was correct. The evidence was sitting in the repo the entire time.
   not the resemblance — is what tells them apart. A reconcile-to-one-truth pass must
   verify each value against a source, not infer one value's fate from another's.
 
+### 2.11 Silent pre-enqueue drops are invisible to every monitor you built (pilot, F3-36)
+
+The first real pilot store had **no SKUs on any product**. Three surfaces
+degraded, but only ONE was visible: orders D6-failed loudly in the Event Log
+(50 red rows), while the catalog — the surface that mattered most — was
+**silently empty**: SKU-less units were dropped *before enqueue*, so there was
+no queue row, no failure, no Event Log trace, nothing for health notices to
+count. The engine simply never saw the store, and every dashboard said "fine".
+
+**The general lesson:** a validity filter placed BEFORE the queue turns "can't
+ingest" into "never happened." Everything downstream of the queue is
+observable (rows, statuses, retries, Event Log, notices); everything upstream
+is invisible. So:
+
+- **Don't pre-filter what the pipeline can make observable.** If a record
+  can't be sent, let it reach a state the Event Log can show (or make it
+  sendable — here, synthetic keys). A drop that leaves no trace will be
+  diagnosed from the OUTSIDE (the merchant asking "where are my products?"),
+  at pilot time, by a human.
+- **"Engine requires X" ≠ "skip records without X".** The requirement was
+  real (sku is the engine's key); the response to it was wrong. The right
+  question is "how do we SUPPLY X for every record?" (SkuResolver synthesises
+  it), not "which records do we silently exclude?".
+- **Test-store defaults hide this class.** Every dev/test product got a SKU
+  out of habit (`make_product('ORD-SKU-1', …)`), so no gate — unit,
+  integration, or live-walk — ever exercised a SKU-less store. The store
+  configuration matrix (SKUs: none/partial/all; HPOS/legacy; guest-only) is
+  test input, same as the data matrix.
+- **A loud failure next to a silent one is a gift:** the 50 failed orders were
+  the only reason the catalog gap was found on day one. When one surface
+  fails on a data-shape assumption, immediately audit every OTHER surface
+  sharing that assumption for the silent version of the same failure.
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs

@@ -26,7 +26,14 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-12 (**P7 upstream auto-update clobber guard** — upstream's
+_Last updated: 2026-06-12 (**P8 pilot day-1 fix: SkuResolver / F3-36** — the
+pilot store has NO SKUs + old orders reference deleted products; catalog was
+silently empty (pre-enqueue drop, no Event Log trace), orders D6-failed on
+empty `items[]` (the 50 red rows), browse events rejected. Fix: synthetic
+`wc-{id}` keys on all three surfaces + empty-items terminal skip + mock now
+enforces items min-1; **2.1.0-beta.2**; LESSONS §2.11. Live-walks 3.2/3.3-orders/3.4-browse
+pending (permission gate), then pilot redeploy + catalog re-backfill + Retry
+all failed. Earlier same day: **P7 upstream auto-update clobber guard** — upstream's
 w.org 2.0.0 would have been offered/auto-applied OVER the fork; fixed with
 `Update URI` header + renumber to **2.1.0-beta.1**; first GH pre-release
 v2.1.0-beta.1-rc.1 with pilot ZIP. Same day, earlier: **P6 RSS feed URL builder** — pilot-prep finding:
@@ -374,6 +381,32 @@ see "Pilot go-live" below.
   (v2.1.0-beta.1-rc.1) with the pilot ZIP attached — README's Releases
   install link now resolves. NOTE: pilot ZIPs from before this fix
   (≤ db4e1cd) are vulnerable if installed on a site with auto-updates on.
+
+### Done (code+gates) / pending (live-walks) — P8 pilot day-1: SkuResolver (2026-06-12)
+
+- **P8 / F3-36** — pilot connect surfaced that the store has **zero SKUs** and
+  old orders reference deleted products. Three surfaces were broken, catalog
+  SILENTLY (pre-enqueue drop → engine never saw the store; LESSONS §2.11).
+  Fix: `Support\SkuResolver` — real SKU else synthetic `wc-{id}` — used by
+  CatalogPayloadBuilder (expand no longer filters; HookHandler guards
+  removed), OrderPayloadBuilder, StorefrontBeacon (sku always present).
+  OrderFlusher terminal-skips empty-`items[]` orders (3rd skip case).
+  Deleted products: WC ZEROES the items' product reference on permanent
+  deletion (empirical, WC 10.7 — initial id-survives assumption was wrong,
+  the new integration test caught it) → all-deleted orders terminal-skip
+  cleanly; id-survives data keys wc-{id} (unit-covered). Mock orders route
+  now enforces items min-1 (the divergence that hid this). Version →
+  2.1.0-beta.2.
+- **Pending:** live-walks 3.2 (new over-64-char lock-proof lever), 3.3-orders,
+  3.4-browse — blocked on the engine-write permission gate (agent classifier);
+  Erkki runs them or grants the rule. THEN: ZIP + GH pre-release
+  v2.1.0-beta.2-rc.1 → pilot redeploy → **catalog backfill re-run** (fills the
+  silently-empty catalog) → Event Log **Retry all failed** (flusher rebuilds
+  payloads fresh at flush, so the 50 rows heal in place).
+- NB: wp-env carries a LIVE MiuMjau connection right now (fresh token
+  exchanged 2026-06-12 ~15:00). An integration-suite run scrubs it (EnvScrub)
+  — run the walks FIRST, or snapshot/restore the `smly_rec_*` options around
+  the suite.
 
 ### Next — pilot-hardening sequence (in order)
 

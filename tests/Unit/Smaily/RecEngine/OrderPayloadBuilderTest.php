@@ -163,20 +163,64 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 'REAL', $payload['items'][0]['sku'] );
 	}
 
-	public function test_skuless_line_items_are_skipped(): void {
-		// §5 requires items[].sku; a SKU-less line would reject the whole order,
-		// and can't be recommendation-keyed — drop it.
+	public function test_skuless_line_gets_synthetic_product_key(): void {
+		// F3-36: §5 requires items[].sku; a SKU-less line used to be dropped,
+		// which on a SKU-less store emptied items[] and D6-rejected the whole
+		// order. SkuResolver keys it wc-{product id} instead.
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
-				'items'  => array( $this->mock_item( 'HAS-SKU', 1, '10.00', '10.00' ), $this->mock_item( '', 1, '5.00', '5.00' ) ),
+				'items'  => array(
+					$this->mock_item( 'HAS-SKU', 1, '10.00', '10.00' ),
+					$this->mock_item( '', 1, '5.00', '5.00', array( 'product_id' => 432 ) ),
+				),
 			)
 		);
 
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
-		self::assertCount( 1, $payload['items'], 'The SKU-less line is dropped.' );
+		self::assertCount( 2, $payload['items'] );
 		self::assertSame( 'HAS-SKU', $payload['items'][0]['sku'] );
+		self::assertSame( 'wc-432', $payload['items'][1]['sku'] );
+	}
+
+	public function test_deleted_product_line_keys_from_stored_item_ids(): void {
+		// The id-SURVIVES case: the product no longer loads but the line item
+		// still carries ids (older WC / intact data) — variation id wins over
+		// the parent product id, like catalog treats variations as the units.
+		// NB: current WC zeroes these ids on permanent deletion (F3-36); that
+		// path is integration-tested as a terminal skip.
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array(
+					$this->mock_item( '', 1, '5.00', '5.00', array( 'product' => null, 'product_id' => 432 ) ),
+					$this->mock_item( '', 2, '8.00', '8.00', array( 'product' => null, 'product_id' => 432, 'variation_id' => 433 ) ),
+				),
+			)
+		);
+
+		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+
+		self::assertCount( 2, $payload['items'] );
+		self::assertSame( 'wc-432', $payload['items'][0]['sku'] );
+		self::assertSame( 'wc-433', $payload['items'][1]['sku'] );
+	}
+
+	public function test_unkeyable_line_is_dropped_and_items_can_end_empty(): void {
+		// A deleted-product line with no stored ids at all cannot be keyed —
+		// dropped. With every line dropped, items[] is empty; the FLUSHER
+		// terminal-skips such orders (engine requires items min 1).
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( '', 1, '5.00', '5.00', array( 'product' => null ) ) ),
+			)
+		);
+
+		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+
+		self::assertSame( array(), $payload['items'] );
 	}
 
 	// --- doubles -------------------------------------------------------------
@@ -219,12 +263,24 @@ final class OrderPayloadBuilderTest extends TestCase {
 		return $order;
 	}
 
-	private function mock_item( string $sku, int $qty, string $subtotal, string $total ): \WC_Order_Item_Product {
-		$product = $this->createMock( \WC_Product::class );
-		$product->method( 'get_sku' )->willReturn( $sku );
+	/**
+	 * @param array<string, mixed> $opts 'product' => null simulates a deleted
+	 *                                   product; 'product_id'/'variation_id'
+	 *                                   are the ids WC stored on the line.
+	 */
+	private function mock_item( string $sku, int $qty, string $subtotal, string $total, array $opts = array() ): \WC_Order_Item_Product {
+		if ( array_key_exists( 'product', $opts ) ) {
+			$product = $opts['product'];
+		} else {
+			$product = $this->createMock( \WC_Product::class );
+			$product->method( 'get_sku' )->willReturn( $sku );
+			$product->method( 'get_id' )->willReturn( (int) ( $opts['product_id'] ?? 0 ) );
+		}
 
 		$item = $this->createMock( \WC_Order_Item_Product::class );
 		$item->method( 'get_product' )->willReturn( $product );
+		$item->method( 'get_product_id' )->willReturn( (int) ( $opts['product_id'] ?? 0 ) );
+		$item->method( 'get_variation_id' )->willReturn( (int) ( $opts['variation_id'] ?? 0 ) );
 		$item->method( 'get_quantity' )->willReturn( $qty );
 		$item->method( 'get_subtotal' )->willReturn( $subtotal );
 		$item->method( 'get_total' )->willReturn( $total );
@@ -242,6 +298,8 @@ if ( ! class_exists( \WC_Order_Item_Product::class ) ) {
 		<<<'PHP'
 		class WC_Order_Item_Product {
 			public function get_product() { return null; }
+			public function get_product_id( $context = 'view' ) { return 0; }
+			public function get_variation_id( $context = 'view' ) { return 0; }
 			public function get_quantity( $context = 'view' ) { return 0; }
 			public function get_subtotal( $context = 'view' ) { return '0'; }
 			public function get_total( $context = 'view' ) { return '0'; }

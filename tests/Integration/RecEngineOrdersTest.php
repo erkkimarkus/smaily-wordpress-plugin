@@ -100,6 +100,75 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 0, $stats['failed'] );
 	}
 
+	public function test_skuless_product_order_ingests_with_synthetic_key(): void {
+		// F3-36 (pilot find): the pilot store has no SKUs at all. The order
+		// must still ingest, keyed wc-{product id} by SkuResolver — before
+		// this, every line dropped and the empty items[] D6-failed the order
+		// on every retry.
+		$product = $this->make_skuless_product( '7.00' );
+		$this->make_order( 'skuless@example.test', 'completed', $product );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'], 'stats: ' . wp_json_encode( $stats ) );
+		self::assertSame( 0, $stats['failed'] );
+
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertSame( 'wc-' . $product->get_id(), $payloads[0]['items'][0]['sku'] );
+	}
+
+	public function test_deleted_product_order_is_terminal_skipped(): void {
+		// The pilot's failed orders referenced already-deleted products.
+		// Empirical (this env, WC 10.7): permanent product deletion ZEROES
+		// the order items' _product_id reference — the line is unkeyable, so
+		// an order whose every product was deleted builds an empty items[]
+		// and must be terminal-skipped (never sent, never red in the Event
+		// Log). If a WC version leaves the id intact, the resolver keys the
+		// line wc-{id} instead and the order ingests — both paths are valid;
+		// the unit suite covers the id-survives case.
+		$product = $this->make_skuless_product( '9.00' );
+		$pid     = $product->get_id();
+		$this->make_order( 'deleted-product@example.test', 'completed', $product );
+
+		wp_delete_post( $pid, true );
+		self::assertFalse( wc_get_product( $pid ), 'Precondition: the product row is gone.' );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['skipped'], 'stats: ' . wp_json_encode( $stats ) );
+		self::assertSame( 0, $stats['sent'] );
+		self::assertSame( 0, $stats['failed'], 'A deleted-product order must not fail — it leaves the queue cleanly.' );
+	}
+
+	public function test_order_with_no_product_lines_is_terminal_skipped(): void {
+		// Only non-product lines (a fee) → items[] builds empty → the engine
+		// would D6-reject on items min 1 forever. The flusher terminal-skips
+		// instead of sending (F3-36).
+		$order = wc_create_order();
+		$order->set_billing_email( 'fee-only@example.test' );
+		$fee = new \WC_Order_Item_Fee();
+		$fee->set_name( 'Handling' );
+		$fee->set_total( '5.00' );
+		$order->add_item( $fee );
+		$order->calculate_totals();
+		$order->set_status( 'completed' );
+		$order_id               = (int) $order->save();
+		$this->created_orders[] = $order_id;
+
+		$before = self::$engine->state()['last_orders_received'] ?? null;
+		$stats  = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['skipped'] );
+		self::assertSame( 0, $stats['sent'] );
+		self::assertSame( 0, $stats['failed'] );
+		self::assertSame(
+			$before,
+			self::$engine->state()['last_orders_received'] ?? null,
+			'No engine call was made for the empty-items order.'
+		);
+	}
+
 	public function test_revoked_key_401_fails_batch_without_retry(): void {
 		$product = $this->make_product( 'ORD-SKU-3', '5.00' );
 		$this->make_order( 'auth-401@example.test', 'completed', $product );
@@ -139,6 +208,21 @@ final class RecEngineOrdersTest extends TestCase {
 
 		$loaded = wc_get_product( $id );
 		self::assertInstanceOf( \WC_Product::class, $loaded );
+		return $loaded;
+	}
+
+	private function make_skuless_product( string $price ): \WC_Product {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Order Test (no sku)' );
+		$product->set_regular_price( $price );
+		$product->set_price( $price );
+		$product->set_stock_status( 'instock' );
+		$id                       = (int) $product->save();
+		$this->created_products[] = $id;
+
+		$loaded = wc_get_product( $id );
+		self::assertInstanceOf( \WC_Product::class, $loaded );
+		self::assertSame( '', $loaded->get_sku(), 'Precondition: the product really has no SKU.' );
 		return $loaded;
 	}
 

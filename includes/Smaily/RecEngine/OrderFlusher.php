@@ -23,10 +23,14 @@ defined( 'ABSPATH' ) || exit;
  * Each order.upsert row is keyed on the WC order id (entity_id): the flusher
  * loads the WC_Order FRESH and builds it. Order-id keying means guest orders
  * work without a payload-carried path — the engine auto-creates the customer
- * from the order's customer_email. Two terminal skips: the order vanished, OR
+ * from the order's customer_email. Three terminal skips: the order vanished;
  * its CURRENT status is no longer a confirmed purchase (map_status === '' —
- * e.g. it moved back to pending after enqueue); the hook re-enqueues if it
- * becomes mappable again, so skipping is safe.
+ * e.g. it moved back to pending after enqueue; the hook re-enqueues if it
+ * becomes mappable again, so skipping is safe); OR the built payload has an
+ * empty items[] (every line dropped — only non-product lines, or product
+ * lines with no usable id). The engine requires items min 1, so sending such
+ * an order can never succeed; before this guard (F3-36) it was sent anyway
+ * and D6-failed on every retry, flooding the Event Log on the pilot.
  *
  * Kept separate from the catalog/customer flushers (its own AS hook/group) so
  * the retry cycles are independent; the shared D6 logic is inherited.
@@ -87,7 +91,13 @@ class OrderFlusher extends AbstractD6Flusher {
 		if ( $this->builder->map_status( (string) $order->get_status() ) === '' ) {
 			return null;
 		}
-		return $this->builder->build( $order, (string) ( $row['event_uuid'] ?? '' ) );
+		$payload = $this->builder->build( $order, (string) ( $row['event_uuid'] ?? '' ) );
+		// Engine requires items min 1 — an all-lines-dropped order can never
+		// succeed, so it's a terminal skip, not a send-and-fail.
+		if ( ( $payload['items'] ?? array() ) === array() ) {
+			return null;
+		}
+		return $payload;
 	}
 
 	/**

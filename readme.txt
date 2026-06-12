@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.1
+Stable tag: 2.1.0-beta.2
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,12 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.2 =
+
+* Fixed: stores whose products have no SKUs now sync fully to the recommendation engine. Products without a SKU are keyed by a stable synthetic identifier (wc-<id>) across catalog, order and browse-tracking sync; previously such products were silently skipped and their orders failed to sync.
+* Fixed: orders whose products were later permanently deleted from the store no longer fail repeatedly in the Event Log — they are skipped cleanly (WooCommerce removes the product reference on deletion, so those line items cannot be synced).
+* Fixed: orders with no syncable line items (e.g. fee-only orders) are now skipped cleanly instead of repeatedly failing in the Event Log.
 
 = 2.1.0-beta.1 =
 
@@ -180,6 +186,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.2 =
+Recommended for all stores, essential for stores whose products have no SKUs: product, order and browse sync to the recommendation engine now works without SKUs. After upgrading, re-run the catalog import and use "Retry all failed" in the Event Log to heal previously failed orders.
 
 = 2.1.0-beta.1 =
 Major update. Existing settings and behaviour are preserved — legacy subscriber sync continues unchanged until you complete the new setup wizard. The recommendation-engine features are optional and stay off until you connect them. Stored API credentials are automatically re-encrypted with a stronger scheme on upgrade.

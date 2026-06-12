@@ -4,6 +4,39 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 2.1.0-beta.2 — pilot debugging (2026-06-12)
+
+First fixes from real pilot data (DECISIONS F3-36): the pilot store has **no
+SKUs at all** and its old orders reference deleted products — both broke
+rec-engine sync, one of them silently.
+
+- **SkuResolver — synthetic `wc-{id}` product keys** (`Support/SkuResolver.php`):
+  the engine keys catalog, order items, AND browse events on `sku`, but WC
+  doesn't require SKUs. One shared resolver now supplies the key on all three
+  surfaces: the real SKU when set, else `wc-{product/variation id}`. Before:
+  catalog silently dropped SKU-less units *before enqueue* (zero Event Log
+  trace — the engine just never saw the store), orders built empty `items[]`
+  and were D6-rejected on every retry, browse omitted `sku` and the engine
+  rejected `product_view`/`cart_*` events.
+- **Deleted-product orders stop failing**: current WC ZEROES the order items'
+  product reference on permanent deletion (verified empirically on WC 10.7 —
+  the initial assumption that the id survives was wrong; the integration test
+  caught it), so those lines are unkeyable. Such orders are now terminal-
+  skipped cleanly; on WC data where the reference survives, the line keys
+  `wc-{id}` and ingests (unit-covered). Either way: no more red rows.
+  (Non-catalog SKUs in orders/browse are engine-accepted — proven by the
+  existing green live-walks, which always sent SKUs without catalog rows.)
+- **Empty-`items[]` orders are terminal-skipped, not sent**: an order whose
+  every line drops (deleted products, fee-only orders) can never pass the
+  engine's `items` min-1 — OrderFlusher now skips it (third terminal-skip
+  case) instead of send-and-fail-forever flooding the Event Log.
+- **Mock hardened in the same pass** (LESSONS §2.3 discipline): the mock
+  orders route now enforces `items` min 1 — it was the divergence that kept
+  integration green while the live engine D6-failed.
+- Catalog live-walk D6 lock-proof lever updated: empty-sku is no longer
+  producible through the builder; the proof now uses an over-64-char SKU
+  (contract §3 cap).
+
 ## 2.1.0-beta.1 — in development (feature-complete for pilot 2026-06-09; audited + hardened 2026-06-11)
 
 > Version note: this release was developed as 2.0.0-beta.1 and renumbered to

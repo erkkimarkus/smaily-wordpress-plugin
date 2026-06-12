@@ -264,23 +264,23 @@ try {
 
 // --- 6b. FLUSHER D6 split — the N-7 lock proof ---------------------------
 // A valid product + a product the engine genuinely D6-rejects, both through
-// the REAL flusher. The reject lever is an EMPTY sku — the live engine
-// returns it as a per-item error (proved in catalog_d6_partial_success
-// above: sku "" must contain at least 1 character). A no-SKU
-// product is enqueued DIRECTLY (the handler skips SKU-less units, but the
-// proof is about the FLUSHER's split, not the handler): the flusher reloads
-// it by id, the builder sends sku '', the engine errors[] that one row.
-// The flusher must mark THAT row failed and the valid one sent. Before N-7
-// the catalog flusher marked the whole batch sent on any 2xx — silently
-// losing the rejected product. This is the lock condition's actual proof.
+// the REAL flusher. The reject lever WAS an empty sku, but F3-36's
+// SkuResolver now keys SKU-less products synthetically (wc-{id}) — a no-SKU
+// product is VALID. The new lever is a sku LONGER THAN THE ENGINE'S 64-CHAR
+// CAP (contract §3: sku string max 64): the builder passes a real product
+// SKU through untouched, the engine errors[] that one row. The flusher must
+// mark THAT row failed and the valid one sent. Before N-7 the catalog
+// flusher marked the whole batch sent on any 2xx — silently losing the
+// rejected product. This is the lock condition's actual proof.
 CatalogHookHandler::reset_seen();
 $good_pid  = live_make_simple( 'LIVE-LOCK-OK', '4.00' );
 $created[] = $good_pid;
 $handler->on_save_product( $good_pid );
 
-// No-SKU product → builder emits sku '' → engine per-item reject.
+// Over-64-char SKU → builder passes it through → engine per-item reject.
 $badp = new WC_Product_Simple();
-$badp->set_name( 'Lock Bad (no sku)' );
+$badp->set_name( 'Lock Bad (sku over 64 chars)' );
+$badp->set_sku( 'LIVE-LOCK-BAD-' . str_repeat( 'X', 64 ) );
 $badp->set_regular_price( '4.00' );
 $badp->set_price( '4.00' );
 $badp->set_stock_status( 'instock' );

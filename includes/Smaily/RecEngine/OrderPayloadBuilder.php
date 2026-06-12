@@ -12,6 +12,7 @@ namespace Smaily\Connect\Smaily\RecEngine;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
+use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
 
 /**
  * Translates a WC_Order into one entry of the `POST /api/v1/ingest/orders`
@@ -155,14 +156,18 @@ class OrderPayloadBuilder {
 
 	/**
 	 * Order line items → wire `items[]`. Shipping / fee / tax / coupon lines
-	 * are skipped (only product lines), and so are SKU-less product lines: the
-	 * engine keys order items on SKU (§5 `items[].sku` is required), so a
-	 * SKU-less line would fail per-item validation and reject the whole order.
-	 * Dropping it is safe — items[] already excludes shipping/tax/fees, so the
-	 * engine never sums items to total_amount, and a SKU-less line can't be
-	 * recommendation-keyed anyway. unit_price is the pre-discount per-unit
-	 * price (subtotal / qty); line_total is the post-discount total; the
-	 * per-line discount is subtotal − total (omitted when zero).
+	 * are skipped (only product lines). The engine keys order items on SKU
+	 * (§5 `items[].sku` is required); SkuResolver (F3-36) supplies it — the
+	 * real SKU when set, else the synthetic `wc-{id}` key, so a store that
+	 * never set SKUs stays fully ingestable. A DELETED product's line keys
+	 * from the id WC stored on the item when that survives; current WC zeroes
+	 * it on permanent deletion (empirical, WC 10.7), making the line
+	 * unkeyable (resolver returns '') → dropped. An order whose every line drops would
+	 * wire an empty items[] — the engine rejects that (min 1); OrderFlusher
+	 * terminal-skips such rows instead of sending them. unit_price is the
+	 * pre-discount per-unit price (subtotal / qty); line_total is the
+	 * post-discount total; the per-line discount is subtotal − total
+	 * (omitted when zero).
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -174,7 +179,9 @@ class OrderPayloadBuilder {
 			}
 
 			$product = $item->get_product();
-			$sku     = ( $product instanceof \WC_Product ) ? (string) $product->get_sku() : '';
+			$sku     = ( $product instanceof \WC_Product )
+				? SkuResolver::resolve( $product )
+				: SkuResolver::resolve_order_item( $item );
 			if ( $sku === '' ) {
 				continue;
 			}

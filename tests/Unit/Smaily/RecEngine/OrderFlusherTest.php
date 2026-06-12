@@ -130,6 +130,20 @@ final class OrderFlusherTest extends TestCase {
 		self::assertSame( array( 1 ), $queue->sent );
 	}
 
+	public function test_empty_items_payload_is_terminal_skip_not_send(): void {
+		// F3-36: every line dropped (only non-product lines, or unkeyable
+		// deleted-product lines) → engine would D6-reject on items min 1, on
+		// every retry, forever. Terminal skip instead — never sent.
+		$queue = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$flush = $this->fake_flusher( $queue, $this->d6_client( array() ), true, array( 100 => true ), 'completed', false );
+
+		$stats = $flush->flush();
+
+		self::assertSame( 1, $stats['skipped'] );
+		self::assertSame( array( 1 ), $queue->sent, 'Empty-items order leaves the queue without an engine call.' );
+		self::assertSame( array(), $queue->failed );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	/**
@@ -203,7 +217,7 @@ final class OrderFlusherTest extends TestCase {
 	/**
 	 * @param array<int, true> $orders_by_id Entity ids that resolve to an order.
 	 */
-	private function fake_flusher( IngestQueue $queue, Client $client, bool $connected, array $orders_by_id = array(), string $map_status = 'completed' ): OrderFlusher {
+	private function fake_flusher( IngestQueue $queue, Client $client, bool $connected, array $orders_by_id = array(), string $map_status = 'completed', bool $with_items = true ): OrderFlusher {
 		$settings = new class( $connected ) extends RecEngineSettings {
 			private bool $connected;
 			public function __construct( bool $connected ) {
@@ -214,16 +228,24 @@ final class OrderFlusherTest extends TestCase {
 			}
 		};
 
-		$builder = new class( $map_status ) extends OrderPayloadBuilder {
+		$builder = new class( $map_status, $with_items ) extends OrderPayloadBuilder {
 			private string $map_status;
-			public function __construct( string $map_status ) {
+			private bool $with_items;
+			public function __construct( string $map_status, bool $with_items ) {
 				$this->map_status = $map_status;
+				$this->with_items = $with_items;
 			}
 			public function map_status( string $wc_status ): string {
 				return $this->map_status;
 			}
 			public function build( \WC_Order $order, string $event_uuid ): array {
-				return array( 'external_order_id' => 'WC', 'event_id' => $event_uuid );
+				return array(
+					'external_order_id' => 'WC',
+					'event_id'          => $event_uuid,
+					'items'             => $this->with_items
+						? array( array( 'sku' => 'S', 'qty' => 1, 'unit_price' => 1.0, 'line_total' => 1.0 ) )
+						: array(),
+				);
 			}
 		};
 

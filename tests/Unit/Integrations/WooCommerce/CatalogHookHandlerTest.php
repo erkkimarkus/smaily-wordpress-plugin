@@ -66,14 +66,18 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertSame( '102', $queue->enqueued[1]['entity_id'] );
 	}
 
-	public function test_skuless_unit_is_not_enqueued(): void {
+	public function test_skuless_unit_is_enqueued_for_synthetic_keying(): void {
+		// F3-36: SkuResolver keys SKU-less units wc-{id} in the builder, so
+		// the handler no longer drops them (the old drop silently emptied a
+		// SKU-less store's catalog — the pilot find).
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 100, '' );
 		$handler = $this->handler( $queue, true, $product, array( $product ) );
 
 		$handler->on_save_product( 100 );
 
-		self::assertSame( array(), $queue->enqueued, 'A unit without a SKU cannot be keyed by the engine — drop it.' );
+		self::assertCount( 1, $queue->enqueued, 'SKU-less unit is enqueued; build() supplies the synthetic key.' );
+		self::assertSame( '100', $queue->enqueued[0]['entity_id'] );
 	}
 
 	public function test_repeat_save_in_one_request_is_deduped(): void {

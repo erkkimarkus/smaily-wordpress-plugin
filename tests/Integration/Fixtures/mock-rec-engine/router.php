@@ -550,6 +550,21 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 		$email       = isset( $order['customer_email'] ) ? (string) $order['customer_email'] : '';
 		$event_id    = isset( $order['event_id'] ) ? (string) $order['event_id'] : '';
 
+		// Live-engine Zod: items[] is required, min 1. The mock NOT enforcing
+		// this hid the pilot's empty-items orders (every line SKU-less or its
+		// product deleted) — integration green, live D6-failed (F3-36). Keep
+		// this check; the flusher must terminal-skip such orders, never send.
+		$order_items = ( isset( $order['items'] ) && is_array( $order['items'] ) ) ? $order['items'] : array();
+		if ( count( $order_items ) === 0 ) {
+			$errors[] = array(
+				'index'             => $index,
+				'external_order_id' => $external_id,
+				'field'             => 'items',
+				'message'           => 'Array must contain at least 1 element(s)',
+			);
+			continue;
+		}
+
 		if ( strpos( $email, 'd6err-' ) === 0 ) {
 			$errors[] = array(
 				'index'             => $index,
@@ -576,6 +591,9 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 		},
 		$orders
 	);
+	// Full wire payloads, so tests can assert items[].sku etc. (F3-36 asserts
+	// the synthetic wc-{id} key reached the wire).
+	$state['last_orders_payload'] = $orders;
 	save_state( $state_file, $state );
 
 	$response = array(

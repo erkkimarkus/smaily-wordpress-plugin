@@ -120,9 +120,8 @@ class CatalogHookHandler {
 	}
 
 	private function enqueue_upsert( \WC_Product $unit ): void {
-		if ( (string) $unit->get_sku() === '' ) {
-			return;
-		}
+		// No SKU guard here (F3-36): SkuResolver keys SKU-less units
+		// synthetically in the builder, so every expanded unit is ingestable.
 		if ( $this->already_seen( self::EVENT_CATALOG_UPSERT, (int) $unit->get_id() ) ) {
 			return;
 		}
@@ -132,9 +131,7 @@ class CatalogHookHandler {
 	}
 
 	private function enqueue_delete( \WC_Product $unit ): void {
-		if ( (string) $unit->get_sku() === '' ) {
-			return;
-		}
+		// No SKU guard here either (F3-36) — see enqueue_upsert().
 		if ( $this->already_seen( self::EVENT_CATALOG_DELETE, (int) $unit->get_id() ) ) {
 			return;
 		}

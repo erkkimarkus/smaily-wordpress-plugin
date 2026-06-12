@@ -12,6 +12,7 @@ namespace Smaily\Connect\Smaily\RecEngine;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
+use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
 
 /**
  * Translates a WC_Product into one entry of the
@@ -28,7 +29,9 @@ use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
  *     queue row with its own event_uuid, so the engine dedups each
  *     variation independently (a price change on one variation must not
  *     be masked by another variation's idempotency key). SKU-less units
- *     are dropped — the engine keys catalog on SKU.
+ *     get a synthetic `wc-{id}` key from SkuResolver (F3-36) — they used
+ *     to be dropped here, which on a SKU-less store silently emptied the
+ *     whole catalog with zero Event Log trace.
  *
  *   - build()   maps ONE unit + its queue-row event_uuid into the wire
  *     object. The event_uuid → `event_id` field rename is the single
@@ -60,7 +63,8 @@ class CatalogPayloadBuilder {
 	 * Expand a product into the ingestable units it represents.
 	 *
 	 * @return array<int, \WC_Product> Simple → [itself]; variable → its
-	 *         variations; either filtered to SKU-bearing units only.
+	 *         loadable variations. Every unit is ingestable: build() keys
+	 *         SKU-less units synthetically via SkuResolver (F3-36).
 	 */
 	public function expand( \WC_Product $product ): array {
 		if ( $product->is_type( 'variable' ) ) {
@@ -70,16 +74,9 @@ class CatalogPayloadBuilder {
 				if ( $variation === null ) {
 					continue;
 				}
-				if ( (string) $variation->get_sku() === '' ) {
-					continue;
-				}
 				$units[] = $variation;
 			}
 			return $units;
-		}
-
-		if ( (string) $product->get_sku() === '' ) {
-			return array();
 		}
 
 		return array( $product );
@@ -95,7 +92,7 @@ class CatalogPayloadBuilder {
 			// queue.event_uuid → wire body.event_id. The one rename that
 			// carries the row's idempotency key to the engine, per-product.
 			'event_id'      => $event_uuid,
-			'sku'           => (string) $product->get_sku(),
+			'sku'           => SkuResolver::resolve( $product ),
 			'name'          => (string) $product->get_name(),
 			'category_path' => $this->primary_category_path( $product ),
 			'price'         => (float) $product->get_price(),

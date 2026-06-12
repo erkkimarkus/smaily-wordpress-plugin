@@ -1835,6 +1835,66 @@ every plugin list).
 F3-34/P6 (the release-prep that surfaced this); MIGRATION.md §"Class not
 found" (version pointer corrected — composer.json never carried a version).
 
+### F3-36 — SkuResolver: synthetic `wc-{id}` product keys for SKU-less stores (pilot find)
+
+**Context:** first day of pilot debugging (2026-06-12). The pilot store has
+**no SKUs on any product**, and its older orders reference deleted products.
+The engine keys its entire pipeline on `sku` (catalog natural key
+`(tenant_id, sku)`; order `items[].sku` required; browse `product_view`/
+`cart_*` `sku` required), and the plugin treated "no SKU" as "not ingestable"
+on every surface — each failing differently: catalog units were dropped
+BEFORE enqueue (silent — zero Event Log trace, engine catalog simply empty),
+orders built an empty `items[]` and were D6-rejected (`items: Array must
+contain at least 1`) on every retry (the user-visible symptom: 50 failed
+order.upserts), and the beacon omitted `sku` so the engine rejected those
+browse events. Net effect: the engine could learn nothing from this store.
+
+**Decision:** one shared `Support\SkuResolver` supplies the engine key on all
+three surfaces — the real SKU when set, else synthetic **`wc-{product or
+variation id}`** (stable, ≤64 chars). CatalogPayloadBuilder/expand no longer
+filters SKU-less units (CatalogHookHandler's belt-and-braces guards removed
+too); OrderPayloadBuilder keys lines via the resolver (variation id wins,
+like catalog treats variations as units); StorefrontBeacon always emits
+`sku`. Plus a safety net: an order whose every line drops is a TERMINAL SKIP
+in OrderFlusher (third skip case) — never sent, because `items` min-1 can
+never pass. The mock orders route now enforces `items` min-1 (it was the
+divergence hiding this from integration), and the catalog walk's D6
+lock-proof lever moved from empty-sku (now impossible through the builder)
+to an over-64-char SKU.
+
+**Deleted products — assumption falsified by the integration env:** the
+plan assumed WC line items retain the product id after deletion. WRONG on
+current WC: permanent deletion ZEROES the items' `_product_id` (verified
+empirically, WC 10.7 wp-env — the new integration test caught it first run).
+So all-deleted orders (the pilot's 2219–2227) resolve as unkeyable → empty
+items[] → terminal skip: they leave the queue cleanly instead of D6-failing
+forever. The id-survives path (older WC / intact data) still keys `wc-{id}`
+and ingests — unit-covered. Both outcomes correct, neither send-and-fail.
+
+**Live evidence instead of a new probe:** non-catalog SKUs in orders and
+browse are ACCEPTED by the engine — proven by the existing green walks
+(walk-3.3-orders sent item SKUs with no catalog row, 12/12; walk-3.4-browse
+sent WALK-* SKUs never ingested, 13/13). So synthetic keys are safe even
+when their catalog row never existed.
+
+**Trade-off (accepted):** if the merchant later assigns a real SKU to a
+product already ingested as `wc-{id}`, the key changes — fresh catalog entry,
+history splits between the keys. Accepted over a tenant-level "key mode"
+setting (more code; identical output for a fully SKU-less store). Documented
+in SkuResolver's docblock.
+
+**Alternatives:** require the pilot to add SKUs (rejected — unrealistic for a
+store that never used them, impossible for deleted products); send product_id
+in a separate field + engine-side change (rejected — contract change for a
+plugin-solvable problem); skip-only fix without synthetic keys (rejected —
+fixes the Event Log noise but leaves the engine blind to the whole store).
+
+**Relationships:** F3-16/F3-19 (the builders); F3-18/N-7.1 (D6 split — the
+lock-proof lever change); F3-21 (IsoDate — same single-source pattern);
+LESSONS §2.10 (the silent-drop lesson). Pilot go-live: after deploy, re-run
+catalog backfill + Event Log "Retry all failed" (the flusher rebuilds
+payloads fresh at flush, so the failed rows heal in place).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -81,6 +81,17 @@ tests, WC objects are built with PHPUnit `createMock` + shared shims (e.g. the
 `WC_Order` shim in HookHandlerTest, `WC_Order_Item_Product`). Reuse this pattern
 for any new WC-dependent unit test.
 
+### Use SkuResolver for the engine product key — never raw get_sku()
+The engine keys catalog, order items, AND browse events on `sku`, but WC
+doesn't require SKUs — the pilot store has none at all (F3-36). Every place
+that puts a product key on the wire goes through `Support\SkuResolver`
+(real SKU else synthetic `wc-{id}`; deleted-product order lines key from the
+ids stored on the line item). A raw `get_sku()` + empty-check reintroduces
+the pilot's day-1 breakage: silently empty catalog (pre-enqueue drop, no
+Event Log trace), D6-failed orders, rejected browse events. If you add a new
+SKU surface, use the resolver; if a record still can't be keyed, make it
+observable (terminal skip), never a silent pre-enqueue drop (LESSONS §2.11).
+
 ### Use the IsoDate helper for datetimes — never raw format
 The engine's strict Zod `.datetime()` requires Z-suffix (`Y-m-d\TH:i:s\Z`), NOT
 `+00:00`. Raw `gmdate('c')` / `$date->format('c')` produces `+00:00` and the

@@ -176,15 +176,29 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( $product, $units[0] );
 	}
 
-	public function test_expand_simple_without_sku_returns_empty(): void {
+	public function test_expand_simple_without_sku_returns_itself(): void {
+		// F3-36: SKU-less units are no longer dropped — build() keys them
+		// synthetically. Dropping here silently emptied a SKU-less store's
+		// whole catalog (the pilot).
 		$product = $this->fake_product( array( 'sku' => '', 'type' => 'simple' ) );
 
-		self::assertSame( array(), ( new CatalogPayloadBuilder() )->expand( $product ) );
+		$units = ( new CatalogPayloadBuilder() )->expand( $product );
+
+		self::assertCount( 1, $units );
+		self::assertSame( $product, $units[0] );
 	}
 
-	public function test_expand_variable_fans_out_to_skued_variations(): void {
+	public function test_build_skuless_product_gets_synthetic_wc_id_key(): void {
+		$product = $this->fake_product( array( 'id' => 77, 'sku' => '', 'price' => '1.00' ) );
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'uuid-77' );
+
+		self::assertSame( 'wc-77', $payload['sku'] );
+	}
+
+	public function test_expand_variable_fans_out_to_all_variations(): void {
 		$v1 = $this->fake_product( array( 'id' => 101, 'sku' => 'V-1' ) );
-		$v2 = $this->fake_product( array( 'id' => 102, 'sku' => '' ) ); // skuless → dropped
+		$v2 = $this->fake_product( array( 'id' => 102, 'sku' => '' ) ); // skuless → synthetic key in build() (F3-36)
 		$v3 = $this->fake_product( array( 'id' => 103, 'sku' => 'V-3' ) );
 
 		Functions\when( 'wc_get_product' )->alias(
@@ -199,9 +213,10 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		$units = ( new CatalogPayloadBuilder() )->expand( $parent );
 
-		self::assertCount( 2, $units, 'Skuless variation must be dropped; each kept variation is its own ingest unit.' );
+		self::assertCount( 3, $units, 'Every loadable variation is its own ingest unit — SKU-less ones included (F3-36).' );
 		self::assertSame( 'V-1', $units[0]->get_sku() );
-		self::assertSame( 'V-3', $units[1]->get_sku() );
+		self::assertSame( '', $units[1]->get_sku() );
+		self::assertSame( 'V-3', $units[2]->get_sku() );
 	}
 
 	public function test_tags_carry_brand_and_category_path(): void {
