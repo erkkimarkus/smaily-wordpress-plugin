@@ -50,6 +50,8 @@ where something is.
 | `STYLE_MAPPING.md` | UI developers | **Exists** | Tailwind tokens, color palette, the layered-input pattern, primitive components. |
 | `FIELD_MAPPING.md` | Plugin developers, integration consumers | **Exists** | Canonical field-naming standard (Smaily WC plugin convention is canonical). Required reading for anyone touching subscriber sync. |
 | `UPSTREAM_COMPARISON.md` | Erkki, strategy/merge reviewers | **Written** (2026-06-12) | Point-in-time comparison of upstream 2.0.0 (a 1.6-line min-versions bump on w.org) vs fork 2.1.0-beta.1: features, stacks, version support, code quality, known problems, the version-collision story. Snapshot, not a living register — `UPSTREAM_AUDIT.md` stays the commit-level source of truth. |
+| `ENGINE_TEAM_PILOT_SYNC.md` | Engine team + Erkki | **Written** (2026-06-12) | Pilot go-live joint-sync brief: what the engine will see from the pilot tenant after beta.2 (synthetic `wc-{id}` keys, catalog backfill jump, orders retry flood, browse sku), the joint verification checklist, contract byte-sync action. Paste into the engine conversation; one-shot doc for the go-live window. |
+| `SPEC_DRAFT_BROWSE_ABANDONED_CART.md` | Engine team + Erkki | **Draft** (2026-06-12, post-pilot 🟡) | Feature spec draft: engine-side abandoned-cart from browse signals for guest-only stores (identity via Smaily-click/checkout merge; order-based suppression; consent gate; F3-37 age-window requirement). BACKLOG 🟡 entry links here. |
 
 ### Internal — Erkki's working drafts
 
