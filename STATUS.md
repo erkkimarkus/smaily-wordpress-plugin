@@ -31,7 +31,10 @@ pilot store has NO SKUs + old orders reference deleted products; catalog was
 silently empty (pre-enqueue drop, no Event Log trace), orders D6-failed on
 empty `items[]` (the 50 red rows), browse events rejected. Fix: synthetic
 `wc-{id}` keys on all three surfaces + empty-items terminal skip + mock now
-enforces items min-1; **2.1.0-beta.2**; LESSONS §2.11. Live-walks ALL GREEN
+enforces items min-1; **2.1.0-beta.2**; LESSONS §2.11. Same day, P9: pilot
+mass-email incident (sender = third-party CartBounty Pro, NOT us — but our
+legacy pipeline had the same unbounded-backlog flaw, enabled) → F3-37
+backlog guard + per-cart errors, rc.2. Live-walks ALL GREEN
 (catalog 15/15 w/ new lock-proof lever, orders 12/12, browse 13/13); GH
 pre-release **v2.1.0-beta.2-rc.1** published with the pilot ZIP. Next: pilot
 redeploy + catalog re-backfill + Retry all failed. Also: health-notice
@@ -418,6 +421,24 @@ see "Pilot go-live" below.
 - NB: wp-env carries a LIVE MiuMjau connection. An integration-suite run
   scrubs it (EnvScrub) — snapshot/restore the `smly_rec_*` options around the
   suite (done once already this way).
+
+### Done — P9 pilot day-1 #2: abandoned-cart backlog guard (F3-37, 2026-06-12)
+
+- **Incident:** mass abandoned-cart emails to customers minutes after the 2.x
+  install. **Sender was CartBounty Pro** (third-party plugin on the pilot
+  site; `cartbounty-pro` in the email links, no such email in the Smaily
+  account) — most plausibly its backlog drained when the plugin swap revived
+  the site's dead WP-Cron. NOT our pipeline — but ours has the identical
+  flaw and is ENABLED in the pilot DB (real 1.6-era option, wizard displayed
+  it honestly), one working autoresponder away from the same flood.
+- **Fix:** 24h backlog guard (filterable) on `cart_updated` (epoch compare —
+  the Z-form vs MySQL-format string-compare seam is a trap) + per-cart
+  log-and-continue instead of abort-unmarked. `AbandonedCartGuardTest`
+  (integration; fixture builds the cart table via real Lifecycle DDL).
+- **Pilot actions:** (1) decide ONE abandoned-cart system — CartBounty Pro
+  was already doing it; if it stays, turn OUR toggle OFF (Settings →
+  WooCommerce); double reminders otherwise. (2) Confirm attribution
+  on-site: CartBounty's email log timestamps vs install time.
 
 ### Next — pilot-hardening sequence (in order)
 

@@ -42,6 +42,17 @@ rec-engine sync, one of them silently.
   instead of injecting them inside the React header next to the Settings
   tabs (core's fallback target is the first `h1` in `.wrap` — which was the
   React flex-header's own h1).
+- **Abandoned-cart backlog guard + per-cart error handling** (F3-37): the
+  legacy reminder pass now (1) only emails carts the customer touched within
+  the last 24h (`smaily_connect_abandoned_cart_max_age_seconds` filter) —
+  older carts are expired without emailing — and (2) logs-and-continues on a
+  per-cart API failure instead of aborting the whole loop unmarked. Before,
+  a dormant cron period accumulated an unbounded backlog that the first
+  working tick after re-arming would mass-mail. (The pilot's day-1 mass
+  email actually came from a third-party cart plugin's identical backlog
+  drain when the plugin swap revived the site's dead cron — but our pipeline
+  carried the same flaw, enabled, one working autoresponder away from the
+  same flood.)
 
 ## 2.1.0-beta.1 — in development (feature-complete for pilot 2026-06-09; audited + hardened 2026-06-11)
 

@@ -168,7 +168,34 @@ class Cron {
 			Options::ABANDONED_CART_DEFAULT_FIELDS
 		);
 
+		/*
+		 * Backlog guard (F3-37): a reminder is only sent for carts the
+		 * customer touched RECENTLY; anything older is expired (marked
+		 * mail_sent, never emailed). A stale reminder is worthless, and a
+		 * re-armed scheduler must never mass-mail history: this pipeline's
+		 * `abandoned AND mail_sent IS NULL` query has no time bound, so a
+		 * dormant period (dead WP-Cron — exactly the pilot site's state at
+		 * the 1.x→2.x upgrade) accumulates a backlog that the first tick
+		 * after re-arming would drain in one mass send. The age signal is
+		 * cart_updated, NOT cart_abandoned_time: the status pass stamps the
+		 * latter with NOW() when it (re)marks a cart, so after a dormant
+		 * period every historical cart looks freshly abandoned by that
+		 * column. Timestamps are compared as epoch ints — cart_updated reads
+		 * back from MySQL in 'Y-m-d H:i:s' while the writer used the Z-form,
+		 * and a string compare across the two formats breaks on the
+		 * separator byte (' ' < 'T') for same-day values.
+		 */
+		$max_age = (int) apply_filters( 'smaily_connect_abandoned_cart_max_age_seconds', DAY_IN_SECONDS );
+		$expired = 0;
+
 		foreach ( $this->get_abandoned_carts() as $cart ) {
+			$updated_ts = isset( $cart['cart_updated'] ) ? strtotime( (string) $cart['cart_updated'] ) : false;
+			if ( $updated_ts !== false && $updated_ts < time() - $max_age ) {
+				$this->update_mail_sent_status( $cart['customer_id'] );
+				++$expired;
+				continue;
+			}
+
 			$cart_content = maybe_unserialize( $cart['cart_content'] );
 			if ( empty( $cart_content ) ) {
 				continue;
@@ -189,19 +216,40 @@ class Cron {
 				false
 			);
 
+			/*
+			 * Per-cart error handling (F3-37): log and move to the NEXT cart.
+			 * The pre-fix `return` aborted the whole loop on the first failure
+			 * without marking anything — hiding the failure (the rest of the
+			 * batch silently waited) and growing the very backlog the guard
+			 * above expires. An errored cart keeps mail_sent NULL, so it is
+			 * retried next tick until it sends or ages past the guard window.
+			 */
 			if ( empty( $response ) ) {
-				return $this->logger->error( 'Failed to trigger abandoned cart email flow - received an empty response' );
+				$this->logger->error( 'Failed to trigger abandoned cart email flow - received an empty response' );
+				continue;
 			}
 
 			if ( isset( $response['error'] ) ) {
-				return $this->logger->error( sprintf( 'Failed to send abandoned cart email with an error: %s', $response['error'] ) );
+				$this->logger->error( sprintf( 'Failed to send abandoned cart email with an error: %s', $response['error'] ) );
+				continue;
 			}
 
 			if ( isset( $response['body']['code'] ) && $response['body']['code'] !== 101 ) {
-				return $this->logger->error( sprintf( 'Failed to send abandoned cart email: %s', wp_json_encode( $response ) ) );
+				$this->logger->error( sprintf( 'Failed to send abandoned cart email: %s', wp_json_encode( $response ) ) );
+				continue;
 			}
 
 			$this->update_mail_sent_status( $cart['customer_id'] );
+		}
+
+		if ( $expired > 0 ) {
+			$this->logger->error(
+				sprintf(
+					'Backlog guard: expired %d abandoned cart(s) older than the reminder window (%d s) without emailing (filter: smaily_connect_abandoned_cart_max_age_seconds).',
+					$expired,
+					$max_age
+				)
+			);
 		}
 	}
 

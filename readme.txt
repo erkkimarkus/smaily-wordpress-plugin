@@ -94,6 +94,7 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 * Fixed: orders whose products were later permanently deleted from the store no longer fail repeatedly in the Event Log — they are skipped cleanly (WooCommerce removes the product reference on deletion, so those line items cannot be synced).
 * Fixed: orders with no syncable line items (e.g. fee-only orders) are now skipped cleanly instead of repeatedly failing in the Event Log.
 * Fixed: admin health notices now appear at the top of the plugin's Settings and wizard pages (full width, like on other admin pages) instead of overlapping the page header.
+* Fixed: abandoned cart reminders are only sent for recently abandoned carts (24 hours by default) — older carts are expired silently, so re-enabling the feature after a pause can never mass-email historical carts. A failure to send one reminder no longer blocks the rest.
 
 = 2.1.0-beta.1 =
 

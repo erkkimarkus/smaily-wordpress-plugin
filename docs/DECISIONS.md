@@ -1895,6 +1895,69 @@ LESSONS §2.10 (the silent-drop lesson). Pilot go-live: after deploy, re-run
 catalog backfill + Event Log "Retry all failed" (the flusher rebuilds
 payloads fresh at flush, so the failed rows heal in place).
 
+### F3-37 — Abandoned-cart backlog guard + per-cart error handling (pilot mass-email incident)
+
+**Context:** minutes after the 2.x plugin was installed on the pilot store,
+customers received abandoned-cart emails in bulk. **Attribution (corrected
+mid-investigation):** the emails came from **CartBounty Pro** — a third-party
+abandoned-cart plugin active on the site — NOT from our pipeline. Evidence:
+the email links carry `cartbounty-pro` references, and the client's Smaily
+account contains no automation and no such email. The first working
+hypothesis (our legacy pipeline → Smaily autoresponder) was WRONG and is
+recorded here deliberately: it was plausible, code-supported, and falsified
+only by looking at the actual email — attribute from the artifact, not the
+architecture. The most likely trigger mechanism: the site's WP-Cron had been
+effectively dead (which is also why no one remembered abandoned-cart being
+on), every cron-based plugin accumulated backlog, and the plugin swap
+(deactivating the old 1.6 code / re-arming schedulers) brought cron back to
+life — CartBounty's overdue reminders all fired at once. Needs on-site
+confirmation (CartBounty's email log timestamps vs install time).
+
+**Why we still fixed OUR pipeline:** it has the IDENTICAL structural flaw,
+and the pilot DB has it ENABLED (`smaily_connect_abandoned_cart_status` was
+true from the 1.6 era — the wizard toggle honestly displayed it). The legacy
+email pass drains `abandoned AND mail_sent IS NULL` with NO time bound, and
+aborted the whole loop on the first API error WITHOUT marking anything — so
+a dormant period accumulates a backlog, and the first successful tick after
+re-arming (e.g. the moment a working autoresponder appears in the Smaily
+account) would mass-mail it. On the pilot the flood was one working
+autoresponder away.
+
+**Decision (both in `integrations/woocommerce/cron.class.php`):**
+1. **Backlog guard:** a reminder is sent only for carts whose `cart_updated`
+   is within `smaily_connect_abandoned_cart_max_age_seconds` (filterable,
+   default 24h); older carts are expired — marked `mail_sent` without
+   emailing, with a summary log line. The age signal is `cart_updated`, NOT
+   `cart_abandoned_time`: the status pass stamps the latter NOW() when it
+   (re)marks, so after dormancy every historical cart looks freshly
+   abandoned by that column. Comparison is epoch-int, not string — MySQL
+   reads back `Y-m-d H:i:s` while the writer used the Z-form, and a string
+   compare breaks on the separator byte (`' ' < 'T'`) for same-day carts.
+2. **Per-cart error handling:** API failures log + `continue` (next cart)
+   instead of the upstream `return` (abort loop, mark nothing). A failed
+   cart stays unmarked → retried next tick until it sends or ages out of
+   the guard window. Bounded retries, no hidden backlog growth.
+
+**Tests:** `AbandonedCartGuardTest` (integration, real table + real hook
+wiring; the Smaily client is deliberately unconfigured so any send attempt
+fails — a `mail_sent` mark can only come from the guard). Covers: stale
+expired even when an earlier cart's send failed (the abort regression);
+fresh failed cart stays unmarked; same-day cart not wrongly expired (the
+string-compare seam). The tests env never runs activation, so the fixture
+creates the cart table via the real Lifecycle DDL (reflection — no schema
+duplication).
+
+**Alternatives:** turning the AS job off when the feature is disabled
+(insufficient — the pilot has it ENABLED); deleting old cart rows on upgrade
+(destructive, loses analytics); time-bounding the SQL query itself (equal
+effect but the expiry would be invisible — the guard logs what it expired).
+
+**Relationships:** upstream cherry-pick #123 (same legacy cron file); F3-36
+(same day, same lesson family — LESSONS §2.11's silent accumulation, here in
+time dimension); STATUS pilot checklist (CartBounty coexistence decision is
+the merchant's: two abandoned-cart systems on one store = double-reminder
+risk).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
