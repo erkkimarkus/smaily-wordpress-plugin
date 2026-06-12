@@ -66,11 +66,25 @@ sg docker -c "docker exec wp-env-connect-<hash>-tests-cli-1 \
   --filter <TestName>"
 ```
 
-### Live-walk needs a fresh setup-token
-Live-walks (against the real MiuMjau engine) need a connected tenant. The
-setup-token is **one-time** (consumed on exchange) and connections get scrubbed
-by integration test runs. When a live-walk reports `is_connected = 0`:
-- Ask the user to mint a fresh token into `/tmp/smaily_re_setup_token`
+### Live-walk needs a fresh setup-token — from the SANDBOX tenant, never MiuMjau
+**MiuMjau IS the pilot's PRODUCTION tenant** (engine-side correction,
+2026-06-12 sync: the engine has exactly two tenants — MiuMjau and the
+"Smaily Connect test" sandbox; there is no separate dev tenant). The
+2026-06-12 walks ran against production and the engine team had to purge the
+residue. **All future walks use the "Smaily Connect test" sandbox tenant** —
+ask Erkki for a setup token from THAT tenant's Integrations page.
+
+Also learned the hard way: under the engine's pre-0036 single-key model, a
+token exchange ROTATED the tenant's only API key — the 2026-06-12 wp-env
+exchange silently revoked the live pilot store's key mid-day. The engine now
+issues per-connection keys (migration 0036), so this can't recur — but it's
+the template for why dev work never touches a production tenant.
+
+Mechanics (unchanged): the setup-token is **one-time** (consumed on
+exchange) and connections get scrubbed by integration test runs (snapshot/
+restore the `smly_rec_*` options around a suite run to keep one alive). When
+a live-walk reports `is_connected = 0`:
+- Ask the user to mint a fresh SANDBOX token into `/tmp/smaily_re_setup_token`
   (plain token, secret-safe file method).
 - Exchange it via the plugin's real SetupExchange + store() path (F3-12).
 - Never echo the token; delete temp files after.

@@ -65,13 +65,26 @@ A scheduled engine job per tenant:
   customer who continued on another device. The order-suppression check (2)
   handles the bought-elsewhere case.
 
-## Open questions for the engine team
+## Open questions — ANSWERED by the engine team (2026-06-12, see ENGINE_TEAM_PILOT_SYNC_RESULTS.md)
 
-1. Detection job shape: cron sweep vs event-driven (on cart_add, schedule a
-   delayed check)?
-2. Window defaults (W1 start/end) and the per-customer rate cap value.
-3. Does the trigger reuse the existing Smaily automation-trigger path the
-   tenant configures, or a new engine-side template?
-4. Optional `qty` on `cart_add` — wanted, or is the SKU set enough for v1?
-5. Where does the consent flag come from — Smaily contact state at trigger
-   time (preferred) or a cached flag?
+The engine team confirmed good fit (existing `cart_abandonment` trigger seam +
+`browse_abandonment` playbook seam in the Pet pack). Their answers:
+
+1. **Job shape:** cron sweep (nightly + optional intraday), not event-driven —
+   matches the engine's enrichment paradigm and makes the F3-37 age window
+   trivially enforceable in one query.
+2. **Defaults:** W1 = 2h–24h (under 2h feels like surveillance; over 24h the
+   cart is stale); rate cap max 1 reminder / 7 days per customer, engine-side.
+3. **Trigger path:** reuse the existing Smaily custom-field trigger-block
+   mechanism — engine writes `rec_cart_abandoned=yes` + the reconstructed
+   cart into contact fields; the tenant's own Smaily automation sends. No new
+   engine-side template engine.
+4. **`qty` on `cart_add`:** not needed for v1 — SKU set + catalog join
+   suffices for a reminder. So NO plugin/contract change for v1 at all.
+5. **Consent:** Smaily contact state at trigger time via the existing
+   contact-sync path — Smaily's own automation refuses unsubscribed contacts
+   (authoritative gate); the engine additionally never syncs opted-out
+   customers. No cached flag.
+
+**Status:** 🟡 post-pilot on BOTH backlogs; nothing blocks; v1 needs zero
+plugin-side changes.

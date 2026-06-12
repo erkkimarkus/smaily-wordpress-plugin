@@ -26,7 +26,12 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-12 (**P8 pilot day-1 fix: SkuResolver / F3-36** — the
+_Last updated: 2026-06-12 late (**engine go-live sync done** — results in
+docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
+sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
+(the 91% retry-error rate was theirs); pilot needs: connection check after
+the key-rotation window + Retry-all-failed again + browse enable + joint
+GDPR run. Earlier: **P8 pilot day-1 fix: SkuResolver / F3-36** — the
 pilot store has NO SKUs + old orders reference deleted products; catalog was
 silently empty (pre-enqueue drop, no Event Log trace), orders D6-failed on
 empty `items[]` (the 50 red rows), browse events rejected. Fix: synthetic
@@ -439,6 +444,37 @@ see "Pilot go-live" below.
   was already doing it; if it stays, turn OUR toggle OFF (Settings →
   WooCommerce); double reminders otherwise. (2) Confirm attribution
   on-site: CartBounty's email log timestamps vs install time.
+
+### Done — engine-team go-live sync (2026-06-12 evening; results in docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md)
+
+- **Tenant correction:** MiuMjau IS the pilot production tenant (no separate
+  dev tenant exists). Today's walks ran against production; engine purged the
+  residue. **Future walks: "Smaily Connect test" sandbox ONLY** (CLAUDE.md
+  updated). Related incident, root-caused engine-side: the wp-env token
+  exchange (~12:08 UTC) ROTATED the tenant's single API key → the live pilot
+  store's key was silently revoked mid-day; engine migration 0036 (per-
+  connection keys) fixes the class.
+- **Results:** contract md5 MATCH; orders ✅ (2345 events/24h, dedup holds, the
+  6.9% non-catalog item SKUs = deleted-product lines — NB this also proves the
+  pilot's WC 6.9.4 does NOT zero item ids on product delete, unlike WC 10.7,
+  so the resolver's id-survives path is the live one there); catalog 🟡 5783
+  rows and growing (5201 wc-* + ~580 real SKUs — store is MIXED, not uniformly
+  SKU-less); browse 🟡 no real traffic yet; engine logs clean post-deploy.
+- **Engine fixed two of THEIR catalog-ingest bugs today** (intra-batch SKU
+  dedup; emoji-split in description truncation) — the 91% error rate the
+  backfill retries hit was engine-side, gone after their 14:24 UTC deploy.
+- **Open items (Erkki / pilot admin):** (1) pilot store: verify connection
+  alive (the key-rotation window!) — reconnect if Step 4 shows disconnected;
+  (2) Event Log → Retry all failed AGAIN (pre-14:24 engine-500 rows now
+  succeed; 401 rows from the key window too); (3) compare engine catalog
+  count vs store product+variation count; (4) enable/verify browse tracking
+  (off by default, consent-gated) — engine sees zero real browse traffic;
+  (5) joint GDPR round-trip with an Erkki-issued API key; (6) sandbox setup
+  token for wp-env so dev work leaves the production tenant.
+- SPEC_DRAFT_BROWSE_ABANDONED_CART: engine answered all 5 open questions
+  (cron sweep; 2h–24h window; 1/7d cap; custom-field trigger path; Smaily
+  consent authoritative; NO qty needed → v1 needs zero plugin changes).
+  Stays 🟡 on both backlogs.
 
 ### Next — pilot-hardening sequence (in order)
 
