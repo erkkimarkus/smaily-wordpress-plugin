@@ -45,7 +45,7 @@
         "install-block-modules": "npm run ci --prefix blocks",
         "lint": "phpcs -n . && npm run lint --prefix blocks",
         "lint:php": "phpcs -n .",
-        "analyze": "phpstan analyse --memory-limit=1G",
+        "analyze": "phpstan analyse --memory-limit=2G",
         "test": "phpunit && npm run test --prefix blocks",
         "test:php": "phpunit",
         "test:php:coverage": "phpunit --coverage-text --coverage-html=tmp/coverage",

@@ -1,6 +1,6 @@
 {
   "name": "smaily-connect-admin",
-  "version": "2.0.0-beta.1",
+  "version": "2.1.0-beta.1",
   "description": "Admin UI bundle + RecEngineClient stub for the Smaily Connect WordPress plugin.",
   "private": true,
   "license": "GPL-3.0-or-later",
@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "format": "prettier --write \"admin/src/**/*.{ts,tsx,css}\" \"public/js/lib/**/*.ts\"",
-    "ci:strict": "vendor/bin/phpcs --no-cache --runtime-set ignore_warnings_on_exit 1 && vendor/bin/phpstan analyse --memory-limit=1G --no-progress && vendor/bin/phpunit --testsuite=unit && npm run lint && npm run typecheck && npm run test"
+    "ci:strict": "vendor/bin/phpcs --no-cache --runtime-set ignore_warnings_on_exit 1 && vendor/bin/phpstan analyse --memory-limit=2G --no-progress && vendor/bin/phpunit --testsuite=unit && npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "clsx": "^2.1.1",
