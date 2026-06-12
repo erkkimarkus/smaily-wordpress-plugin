@@ -1,7 +1,29 @@
 # Trigger roadmap DRAFT — Woo→Smaily triggers + engine-side sweeps
 
-**Status:** idea register, post-pilot 🟡. Captured 2026-06-12 (Erkki + agent
-ideation during pilot day 1). Nothing here is scheduled; BACKLOG links here.
+**Status:** idea register + Erkki's scope decisions (2026-06-12 evening).
+BACKLOG links here.
+
+**Decisions (Erkki, 2026-06-12):**
+- **A2 Review request: GREENLIT** — separate automation selection, product
+  data passed exactly like abandoned cart does (trigger_automation +
+  product_N_* fields). Sub-PR planned.
+- **A3 Cross/upsell: content via RSS, no plugin content-logic** — plugin
+  supplies only the trigger (+ `last_purchase_categories` field for
+  segment-branching); Smaily templates carry the RSS block. Same trigger
+  engine as A2.
+- **A4 fields → winback/VIP: YES, logic must be CONFIGURABLE — and it is,
+  in Smaily**: plugin ships fields; thresholds/segments/templates live in
+  Smaily (ready-made templates being built there). Nothing hardcoded
+  plugin-side.
+- **A1 confirmation + A5 cancel/refund: OUT OF SCOPE for now** —
+  transactional emails belong to Smaily's separate transactional channel,
+  which needs its own setup; deliberately not now.
+- **A6 payment-failed: parked** (was already).
+- **Wishlist / back-in-stock: deferred** — without the engine both need a
+  third-party plugin (WC core has no wishlist nor notify-me interest
+  capture); with the engine back-in-stock rides browse interest with no
+  extra plugin (Family B). Revisit post-pilot via the engine route.
+- Family B stays engine-team territory (their calls, their logic).
 
 **Today's baseline (Woo + Smaily, no engine):** welcome series, first-order
 trigger, abandoned cart (now F3-37-guarded), subscriber sync + checkout
