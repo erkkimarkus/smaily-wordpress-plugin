@@ -1,5 +1,6 @@
 import { type WizardState } from '../../state/types';
 import { Card, Pill } from '../primitives';
+import { RssFeedSection } from './RssFeedSection';
 
 export interface Step5IntegrationsProps {
   state: WizardState;
@@ -64,6 +65,11 @@ const CARDS: IntegrationCard[] = [
  * installed (detected via state.env on PHP-mount) so admins know where
  * to start.
  *
+ * Below the cards, WooCommerce stores additionally get the product
+ * RSS-feed URL builder (RssFeedSection) — client-side only, so the
+ * step stays save-free. Gated on env.rss, which the server emits only
+ * when WC is active.
+ *
  * Links use admin_url() output (server-side) so the relative href stays
  * in-window — `target="_blank"` would dump users into a new tab which
  * is jarring in the wizard flow.
@@ -112,6 +118,8 @@ export function Step5Integrations({
           );
         })}
       </div>
+
+      {state.env.rss != null && <RssFeedSection rss={state.env.rss} />}
     </div>
   );
 }

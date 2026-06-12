@@ -48,6 +48,7 @@ use Smaily\Connect\Settings\RecEngineSettings;
  *       orders:    int,
  *       products:  int,
  *     },
+ *     rss: { baseUrl, categories[], defaults{} } | null,
  *   }
  *
  * The React bundle reads everything that's not in WizardState.env
@@ -68,6 +69,11 @@ class EnvDetector {
 	 *   wcActive: bool,
 	 *   hposActive: bool,
 	 *   storeTotals: array{customers: int, orders: int, products: int},
+	 *   rss: array{
+	 *     baseUrl: string,
+	 *     categories: array<int, array{slug: string, name: string}>,
+	 *     defaults: array{limit: int, category: string, sortBy: string, order: string, taxRate: float},
+	 *   }|null,
 	 * }
 	 */
 	public function snapshot(): array {
@@ -79,6 +85,7 @@ class EnvDetector {
 			'wcActive'           => $this->wc_active(),
 			'hposActive'         => $this->hpos_active(),
 			'storeTotals'        => $this->store_totals(),
+			'rss'                => $this->rss_snapshot(),
 		);
 	}
 
@@ -144,7 +151,12 @@ class EnvDetector {
 		return defined( 'WPCF7_VERSION' ) || class_exists( '\WPCF7' );
 	}
 
-	private function wc_active(): bool {
+	/**
+	 * Protected (not private) so tests can force the WC-active branch via
+	 * an anonymous subclass — defining a global `WooCommerce` class in the
+	 * unit suite would leak into every other test in the same process.
+	 */
+	protected function wc_active(): bool {
 		return class_exists( '\WooCommerce' );
 	}
 
@@ -223,6 +235,121 @@ class EnvDetector {
 		$published = isset( $counts->publish ) ? (int) $counts->publish : 0;
 		$draft     = isset( $counts->draft ) ? (int) $counts->draft : 0;
 		return $published + $draft;
+	}
+
+	/**
+	 * Product RSS-feed builder data for the Integrations step/tab.
+	 *
+	 * NULL when WooCommerce is inactive or the legacy tree isn't loaded —
+	 * the React bundle hides the RSS section entirely in that case.
+	 *
+	 * Background: the legacy "Smaily" menu (which carried the RSS settings
+	 * tab) was hidden as part of the 2.H.3 single-menu decision, but the
+	 * feed itself never stopped working — the legacy Rss class registers
+	 * its rewrite + template whenever WC is active. The old tab was, in
+	 * effect, just a URL builder: every parameter travels in the feed
+	 * URL's query string, nothing server-side depends on the saved
+	 * options. This block hands the React UI the same three ingredients
+	 * the old tab had: the permalink-aware base URL, the product-category
+	 * list, and the merchant's previously-saved legacy option values as
+	 * prefill (so a migrated pilot store sees its old configuration).
+	 *
+	 * @return array{
+	 *   baseUrl: string,
+	 *   categories: array<int, array{slug: string, name: string}>,
+	 *   defaults: array{limit: int, category: string, sortBy: string, order: string, taxRate: float},
+	 * }|null
+	 */
+	private function rss_snapshot(): ?array {
+		if ( ! $this->wc_active() ) {
+			return null;
+		}
+		// Defensive: the legacy loader requires these whenever WC is active,
+		// but the unit suite (and any future legacy-tree removal) won't have
+		// them — degrade to "no RSS section" rather than fatal.
+		if (
+			! class_exists( \Smaily_Connect\Integrations\WooCommerce\Rss::class )
+			|| ! class_exists( \Smaily_Connect\Includes\Options::class )
+		) {
+			return null;
+		}
+
+		return array(
+			'baseUrl'    => \Smaily_Connect\Integrations\WooCommerce\Rss::make_rss_feed_url(),
+			'categories' => $this->rss_categories(),
+			'defaults'   => array(
+				'limit'    => (int) get_option(
+					\Smaily_Connect\Includes\Options::RSS_LIMIT_OPTION,
+					\Smaily_Connect\Includes\Options::RSS_DEFAULT_LIMIT
+				),
+				'category' => (string) get_option( \Smaily_Connect\Includes\Options::RSS_CATEGORY_OPTION, '' ),
+				// Legacy naming is crossed here on purpose: the *_sort_by
+				// option holds the order_by FIELD and *_order_by holds the
+				// ASC/DESC direction (see legacy Options::get_settings()).
+				'sortBy'   => (string) get_option(
+					\Smaily_Connect\Includes\Options::RSS_SORT_BY_OPTION,
+					\Smaily_Connect\Includes\Options::RSS_DEFAULT_SORT_BY
+				),
+				'order'    => (string) get_option(
+					\Smaily_Connect\Includes\Options::RSS_ORDER_BY_OPTION,
+					\Smaily_Connect\Includes\Options::RSS_DEFAULT_ORDER_BY
+				),
+				'taxRate'  => $this->rss_tax_rate_default(),
+			),
+		);
+	}
+
+	/**
+	 * Product categories for the feed's category filter — same query the
+	 * legacy RSS tab ran (alphabetical, empty categories included).
+	 *
+	 * @return array<int, array{slug: string, name: string}>
+	 */
+	private function rss_categories(): array {
+		if ( ! function_exists( 'get_terms' ) ) {
+			return array();
+		}
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'orderby'    => 'name',
+				'order'      => 'asc',
+				'hide_empty' => false,
+			)
+		);
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		$categories = array();
+		foreach ( $terms as $term ) {
+			$categories[] = array(
+				'slug' => (string) $term->slug,
+				'name' => (string) $term->name,
+			);
+		}
+		return $categories;
+	}
+
+	/**
+	 * Prefill for the tax-rate field, mirroring the legacy tab's default
+	 * chain: saved option → store base tax rate (when taxes enabled) →
+	 * 0. The value only matters as prefill; the feed reads the rate from
+	 * the URL's tax_rate query param.
+	 */
+	private function rss_tax_rate_default(): float {
+		$store_rate = null;
+		if ( function_exists( 'wc_tax_enabled' ) && wc_tax_enabled() && class_exists( '\WC_Tax' ) ) {
+			foreach ( \WC_Tax::get_base_tax_rates() as $rate ) {
+				if ( is_array( $rate ) && array_key_exists( 'rate', $rate ) ) {
+					$store_rate = (float) $rate['rate'];
+					break;
+				}
+			}
+		}
+		return (float) get_option(
+			\Smaily_Connect\Includes\Options::RSS_TAX_RATE,
+			$store_rate ?? (float) \Smaily_Connect\Includes\Options::RSS_DEFAULT_TAX_RATE
+		);
 	}
 
 	/**

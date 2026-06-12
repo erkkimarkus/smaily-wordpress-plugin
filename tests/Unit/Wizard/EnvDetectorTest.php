@@ -78,6 +78,130 @@ final class EnvDetectorTest extends TestCase {
 		self::assertFalse( $snapshot['hposActive'] );
 		// Order count must be 0 when wc_get_orders is undefined — not a fatal error.
 		self::assertSame( 0, $snapshot['storeTotals']['orders'] );
+		// No WC → no RSS feed → React hides the builder section.
+		self::assertNull( $snapshot['rss'] );
+	}
+
+	/**
+	 * WC-active positive path. We can't define a global `WooCommerce`
+	 * class (it would leak into the wc-inactive test above — one PHPUnit
+	 * process), so an anonymous subclass forces the branch instead; this
+	 * is why EnvDetector::wc_active() is protected. The legacy Rss +
+	 * Options classes are real (require'd below), so the test exercises
+	 * the actual make_rss_feed_url() URL shape, not a mock of it.
+	 */
+	public function test_snapshot_rss_block_carries_base_url_categories_and_legacy_prefill(): void {
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-options.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/rss.class.php';
+
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+		Functions\when( 'get_site_url' )->justReturn( 'https://shop.test/smaily-rss-feed' );
+		Functions\when( 'add_query_arg' )->alias(
+			static function ( array $args, string $url ): string {
+				return $args === array() ? $url : $url . '?' . http_build_query( $args );
+			}
+		);
+		Functions\when( 'get_terms' )->justReturn(
+			array(
+				(object) array(
+					'slug' => 'hoodies',
+					'name' => 'Hoodies',
+				),
+				(object) array(
+					'slug' => 'tshirts',
+					'name' => 'T-shirts',
+				),
+			)
+		);
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = false ) {
+				// The pilot's previously-saved legacy RSS options must
+				// surface as prefill.
+				if ( $key === \Smaily_Connect\Includes\Options::RSS_LIMIT_OPTION ) {
+					return '25';
+				}
+				if ( $key === \Smaily_Connect\Includes\Options::RSS_CATEGORY_OPTION ) {
+					return 'hoodies';
+				}
+				return $default;
+			}
+		);
+
+		global $wp_rewrite;
+		$wp_rewrite = new class() {
+			public function using_permalinks(): bool {
+				return true;
+			}
+		};
+
+		$detector = new class() extends EnvDetector {
+			protected function wc_active(): bool {
+				return true;
+			}
+		};
+
+		$snapshot = $detector->snapshot();
+		$rss      = $snapshot['rss'];
+
+		self::assertNotNull( $rss );
+		self::assertSame( 'https://shop.test/smaily-rss-feed', $rss['baseUrl'] );
+		self::assertSame(
+			array(
+				array(
+					'slug' => 'hoodies',
+					'name' => 'Hoodies',
+				),
+				array(
+					'slug' => 'tshirts',
+					'name' => 'T-shirts',
+				),
+			),
+			$rss['categories']
+		);
+		self::assertSame( 25, $rss['defaults']['limit'] );
+		self::assertSame( 'hoodies', $rss['defaults']['category'] );
+		// Unsaved fields fall back to the legacy defaults.
+		self::assertSame( 'modified', $rss['defaults']['sortBy'] );
+		self::assertSame( 'DESC', $rss['defaults']['order'] );
+		// No wc_tax_enabled() in this env → tax-rate prefill bottoms out at 0.
+		self::assertSame( 0.0, $rss['defaults']['taxRate'] );
+	}
+
+	/**
+	 * Non-permalink installs get the ?smaily-rss-feed=true base form —
+	 * the React builder must append its params to an URL that already
+	 * has a query string, so the server must emit the honest base.
+	 */
+	public function test_snapshot_rss_base_url_uses_query_form_without_permalinks(): void {
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-options.class.php';
+		require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/rss.class.php';
+
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+		Functions\when( 'get_site_url' )->justReturn( 'https://shop.test' );
+		Functions\when( 'add_query_arg' )->alias(
+			static function ( array $args, string $url ): string {
+				return $args === array() ? $url : $url . '?' . http_build_query( $args );
+			}
+		);
+		Functions\when( 'get_terms' )->justReturn( array() );
+
+		global $wp_rewrite;
+		$wp_rewrite = new class() {
+			public function using_permalinks(): bool {
+				return false;
+			}
+		};
+
+		$detector = new class() extends EnvDetector {
+			protected function wc_active(): bool {
+				return true;
+			}
+		};
+
+		$rss = $detector->snapshot()['rss'];
+
+		self::assertNotNull( $rss );
+		self::assertSame( 'https://shop.test?smaily-rss-feed=true', $rss['baseUrl'] );
 	}
 
 	public function test_snapshot_counts_users_and_products(): void {

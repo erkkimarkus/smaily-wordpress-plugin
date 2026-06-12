@@ -1756,6 +1756,44 @@ the recovery story 3.10.1 just built).
 (3 integration tests: retention matrix incl. pending-never, filterability,
 index presence).
 
+### F3-34 — RSS feed URL builder relocated to Integrations (client-side, stateless)
+
+**Context:** the pilot's old plugin (1.6) had an RSS settings tab; the new UI
+seemed to have dropped the feature. Investigation (2026-06-12): the feed itself
+never stopped working — the legacy `Rss` class registers its rewrite + template
+whenever WC is active, all parameters travel in the feed URL's query string.
+Only the settings UI vanished, as a **side-effect** of the 2.H.3 legacy-menu
+hide (the RSS tab lived in the hidden menu); the React UI never got a panel.
+Existing template URLs at the pilot keep working unchanged.
+
+**Decision:** rebuild the URL builder as `RssFeedSection` under the
+**Integrations** step/tab (Erkki's placement call — not data-sync, not
+automations; both wizard Step 5 and Settings, same component). **Purely
+client-side and stateless**: the old tab's options were only ever prefill for
+a URL generator, so the new section saves nothing — no save-footer, no
+dirty-tracking, no REST changes; Integrations stays info-only. Server side,
+`EnvDetector::rss_snapshot()` emits a `rss` boot-payload block (permalink-aware
+base URL via legacy `Rss::make_rss_feed_url()`, `product_cat` terms, legacy
+option values as prefill — a migrated store sees its old configuration); null
+when WC is inactive, which hides the section. `buildRssFeedUrl()` mirrors the
+legacy admin.js param contract byte-for-byte (incl. the `order_by=none` omits
+`order_by`+`order` quirk).
+
+**Rationale:** the URL is the artifact the merchant copies into a Smaily
+template; persisting builder inputs adds a save path for zero behavioural
+gain. Prefill-from-legacy covers migration continuity.
+
+**Alternatives:** RSS panel with a real save path (rejected — would force
+dirty-tracking onto the info-only tab for no benefit); un-hiding the legacy
+tab (rejected — reverses 2.H.3); leaving it URL-only/undocumented (rejected —
+the pilot merchant can't discover the feature).
+
+**Relationships:** 2.H.3 (legacy-menu hide — the cause); `EnvDetectorTest`
+(unit: null-gate + WC-active subclass path), `RssBootSnapshotTest`
+(integration: pins that the legacy classes are actually loaded in a real env —
+the seam the unit suite must fake), `rss-feed-url.test.ts` +
+`RssFeedSection.test.tsx` (vitest).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

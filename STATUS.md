@@ -26,7 +26,10 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-11 (THREE update groups this day. **Upstream-merge prep
+_Last updated: 2026-06-12 (**P6 RSS feed URL builder** — pilot-prep finding:
+old 1.6 RSS tab had no new-UI home (2.H.3 side-effect; the feed itself never
+broke). Rebuilt stateless on Integrations step/tab; EnvDetector emits the
+boot-payload `rss` block; DECISIONS F3-34. Previous day 2026-06-11: THREE update groups. **Upstream-merge prep
 sub-PR (latest):** README feature-complete refresh; CHANGELOG.md created;
 DECISIONS_DRAFT finalized as `docs/DECISIONS.md` (single-file log chosen over
 ADR split); .pot regenerated + et.po updated with 39 new-string Estonian
@@ -333,6 +336,21 @@ see "Pilot go-live" below.
   HTTP code (`http_4xx`/`http_5xx`, `d6_item_error`), so 3.10.1's auto-transient
   retry can classify 4xx-vs-5xx for free. Gates: ci:strict exit=0 (unit 285, JS
   140 +6); integration OK 82 (+7, `RecEngineEventsTest`).
+
+### Done — P6 RSS feed URL builder in Integrations (2026-06-12)
+
+- **P6** — pilot-prep finding: the old 1.6 plugin's RSS settings tab had no
+  home in the new UI. The FEED never broke (legacy `Rss` class registers
+  rewrite + template whenever WC is active; all params live in the URL's query
+  string — pilot's existing template URLs keep working). The tab vanished as a
+  side-effect of the 2.H.3 legacy-menu hide. Rebuilt as `RssFeedSection` on the
+  **Integrations** step/tab (wizard Step 5 + Settings, same component),
+  **client-side + stateless** — no save path, Integrations stays info-only.
+  `EnvDetector::rss_snapshot()` emits base URL (permalink-aware) + product
+  categories + legacy-option prefill; null hides the section when WC inactive.
+  URL builder mirrors legacy admin.js byte-for-byte. DECISIONS F3-34.
+  Gates: ci:strict exit=0; integration +2 (`RssBootSnapshotTest` pins the
+  legacy-classes-loaded seam the unit suite must fake).
 
 ### Next — pilot-hardening sequence (in order)
 

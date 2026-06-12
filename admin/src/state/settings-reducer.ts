@@ -3,6 +3,7 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  type RssFeedBootData,
   type WizardState,
 } from './types';
 
@@ -38,6 +39,8 @@ export interface ServerEnv {
     orders?: number;
     products?: number;
   };
+  /** RSS-feed builder data; null/absent when WooCommerce is inactive. */
+  rss?: RssFeedBootData | null;
   smailyCredentials?: {
     subdomain?: string;
     username?: string;
@@ -74,6 +77,7 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
         orders: env.storeTotals?.orders ?? 0,
         products: env.storeTotals?.products ?? 0,
       },
+      rss: env.rss ?? null,
     },
 
     smailyCredentials: {

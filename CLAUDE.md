@@ -52,6 +52,20 @@ sg docker -c "composer run test:integration"
 Integration tests run real WP + WooCommerce + MariaDB via wp-env. Do NOT
 conclude "Docker unavailable" from a bare `docker info` failure — use `sg`.
 
+**Filtered/single-test integration runs:** the wrapper runs the suite in the
+`…-tests-cli-1` container with `phpunit.integration.xml.dist`. A hand-rolled
+`docker exec` into a `…-wordpress-1` container with the default
+`phpunit.xml.dist` loads the UNIT bootstrap (no wp-load, no WooCommerce) —
+the test then fails with `undefined function update_option()` / "WooCommerce
+missing" even though the real suite is green. Correct form:
+
+```
+sg docker -c "docker exec wp-env-connect-<hash>-tests-cli-1 \
+  php /var/www/html/wp-content/plugins/smaily-connect/vendor/bin/phpunit \
+  --configuration /var/www/html/wp-content/plugins/smaily-connect/phpunit.integration.xml.dist \
+  --filter <TestName>"
+```
+
 ### Live-walk needs a fresh setup-token
 Live-walks (against the real MiuMjau engine) need a connected tenant. The
 setup-token is **one-time** (consumed on exchange) and connections get scrubbed

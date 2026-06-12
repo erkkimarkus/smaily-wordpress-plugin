@@ -109,6 +109,32 @@ export interface AutomationMapping {
 }
 
 /**
+ * Product RSS-feed builder data — server-computed in
+ * EnvDetector::rss_snapshot() and emitted on the boot payload whenever
+ * WooCommerce is active. The feed reads every parameter from the URL's
+ * query string, so the builder is purely client-side: this is static
+ * boot data, never round-tripped to a save endpoint.
+ */
+export interface RssFeedBootData {
+  /**
+   * Permalink-aware feed base URL without builder params — either
+   * `https://store/smaily-rss-feed` or, on non-permalink installs,
+   * `https://store/?smaily-rss-feed=true`.
+   */
+  baseUrl: string;
+  /** Product categories for the feed filter, alphabetical. */
+  categories: Array<{ slug: string; name: string }>;
+  /** Prefill — the merchant's previously-saved legacy RSS option values. */
+  defaults: {
+    limit: number;
+    category: string;
+    sortBy: string;
+    order: string;
+    taxRate: number;
+  };
+}
+
+/**
  * Single source-of-truth state for both wizard and settings.
  *
  * Field-population strategy: Phase 2 sub-PR 2.B defines the full shape
@@ -133,6 +159,12 @@ export interface WizardState {
       orders: number;
       products: number;
     };
+    /**
+     * RSS-feed builder data; null/absent when WooCommerce is inactive
+     * (the Integrations RSS section hides). Optional rather than
+     * `| null` only, so pre-existing env fixtures stay valid.
+     */
+    rss?: RssFeedBootData | null;
   };
 
   /** Step 1 — Connect. */

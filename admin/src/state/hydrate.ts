@@ -5,6 +5,7 @@ import {
   idleBackfill,
   type AutomationMapping,
   type AutomationTrigger,
+  type RssFeedBootData,
   type WizardState,
 } from './types';
 
@@ -45,6 +46,13 @@ export interface BootPayload {
       orders: number;
       products: number;
     };
+    /**
+     * RSS-feed builder data from EnvDetector::rss_snapshot(); null when
+     * WooCommerce is inactive. Optional for forward/backward payload
+     * compatibility (an old cached bundle reading a new payload or
+     * vice versa must not crash hydrate).
+     */
+    rss?: RssFeedBootData | null;
   };
   savedSettings: {
     smailyCredentials: { subdomain: string; username: string; password: string };
@@ -135,6 +143,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
         elementorPresent: false,
         cf7Present: false,
         storeTotals: { customers: 0, orders: 0, products: 0 },
+        rss: null,
       },
       smailyCredentials: { ...emptyCredentials },
       smailyConnection: idleAsync,
@@ -189,6 +198,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       elementorPresent: env.elementorPresent,
       cf7Present: env.cf7Present,
       storeTotals: env.storeTotals,
+      rss: env.rss ?? null,
     },
     smailyCredentials: { ...s.smailyCredentials },
     smailyConnection:

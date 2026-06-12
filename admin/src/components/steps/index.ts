@@ -12,5 +12,6 @@ export {
   Step4Recommendations,
   type Step4RecommendationsProps,
 } from './Step4Recommendations';
+export { RssFeedSection, type RssFeedSectionProps } from './RssFeedSection';
 export { Step5Integrations, type Step5IntegrationsProps } from './Step5Integrations';
 export { Step6Done, type Step6DoneProps } from './Step6Done';
