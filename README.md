@@ -18,6 +18,7 @@ The 2.0 rewrite (built alongside the legacy 1.x code, not replacing it) introduc
 - **Action Scheduler** for background work — replaces WP-Cron for reliability under load
 - **Idempotent data ingestion** — products, customers, and orders are sent with per-record `event_id`s so retries never duplicate
 - **Comprehensive WooCommerce coverage** — product changes, customer registrations, order events, and consent-gated browse activity
+- **Product RSS feed for email templates** — the proven 1.x product feed (load store products straight into Smaily templates) carries over unchanged, with its URL builder rebuilt into the new UI (wizard Integrations step / Settings → Integrations); existing feed URLs keep working
 - **Backward compatibility with 1.x** — existing 1.x installs upgrade in place; legacy subscriber syncing continues until the new setup wizard is completed
 
 The 2.0 design treats the plugin as a serious sync layer between WooCommerce and Smaily, not a thin contact form. See [`docs/DECISIONS.md`](docs/DECISIONS.md) for the architectural choices and their rationales.

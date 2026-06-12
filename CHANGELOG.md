@@ -34,6 +34,11 @@ setup wizard is completed.
   (sent 30d / failed 90d, filterable; pending rows never pruned).
 - **Multilingual-aware routing** — Polylang / WPML / TranslatePress adapters for
   per-language Smaily accounts and automation workflows.
+- **Product RSS feed URL builder** on the Integrations step/tab (wizard and
+  Settings) — category / limit / ordering / tax-rate pickers with a live,
+  copyable feed URL, prefilled from previously-saved 1.x RSS settings. The
+  feed itself is the unchanged 1.x endpoint (all parameters travel in the
+  URL), so existing template URLs keep working.
 - Estonian translations for all new 2.0 strings.
 
 ### Changed

@@ -350,7 +350,11 @@ see "Pilot go-live" below.
   categories + legacy-option prefill; null hides the section when WC inactive.
   URL builder mirrors legacy admin.js byte-for-byte. DECISIONS F3-34.
   Gates: ci:strict exit=0; integration +2 (`RssBootSnapshotTest` pins the
-  legacy-classes-loaded seam the unit suite must fake).
+  legacy-classes-loaded seam the unit suite must fake). Follow-up same day:
+  README.md "What's new in 2.0" + readme.txt 2.0 feature list + CHANGELOG
+  gained the RSS-builder line (user-facing feature, worth surfacing); fresh
+  pilot ZIP cut; first GitHub **pre-release** (v2.0.0-beta.1) published with
+  the ZIP attached — README's Releases install link now actually resolves.
 
 ### Next — pilot-hardening sequence (in order)
 

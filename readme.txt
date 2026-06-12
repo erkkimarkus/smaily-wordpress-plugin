@@ -44,6 +44,7 @@ Version 2.0 is a major update built alongside the proven 1.x feature set:
 * **Privacy built in** – integrates with the WordPress Privacy tools (personal data export and erasure), and shoppers can opt out of recommendation profiling from their WooCommerce My Account page.
 * **Reliability you can see** – background work runs on durable queues (Action Scheduler); an Event Log shows every sync event, failed items can be retried from the UI, and health notices warn you proactively when a connected service is unreachable.
 * **Multilingual-aware** – language detection works with Polylang, WPML and TranslatePress for routing subscribers to the right lists and automations.
+* **Product RSS feed** – load store products straight into your Smaily email templates. The familiar 1.x feed is unchanged; its URL builder now lives on the Integrations tab, and existing feed URLs keep working.
 
 Existing 1.x installs upgrade in place: legacy behaviour continues unchanged until you complete the new setup wizard.
 
