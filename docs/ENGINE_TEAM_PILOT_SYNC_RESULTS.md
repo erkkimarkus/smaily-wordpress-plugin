@@ -77,6 +77,28 @@ existing rails. Answers to the 5 open questions:
 
 Status stays 🟡 post-pilot on the engine backlog too; nothing blocks.
 
+## Addendum — late evening 2026-06-12 (engine commits `a423af0`…`7c202e5`)
+
+1. **Orders "gap" explained:** plugin-side "~7000 sent" vs engine ~2900 was the
+   retry queue still draining (~1700 orders/h observed). Residual that never
+   arrives = unmapped statuses (never sent, by design), deleted-product orders
+   (terminal-skipped), and engine D6 rejections (mainly email-less legacy
+   orders). **Ask:** when the queue is empty, send terminal-state counts + a
+   sample of `errors[]` payloads so we can reconcile exactly.
+2. **Woo attributes arrive as TERM IDs** (`pa_kaubamargid: ["398"]`,
+   `pa_lemmiklooma-vanus: ["441"]`, `pa_vali-kaal: ["206"]`) — contract §3
+   intends labels. Engine cannot derive life_stage/brand/pack_size until the
+   plugin sends term names. **This is the top plugin-side ask.**
+3. **Engine-side mitigation shipped:** species / canonical category /
+   replenishable are now derived automatically from category slugs
+   (multilingual et/en/ru/fi) inside every ingest upsert; existing rows
+   backfilled (species 0 → 4378 of 5783; replenishable 297 → 3445). So species
+   gates work even before the term-ID fix.
+4. **Admin console:** catalog/orders/customers pages got KPI cards +
+   search/filters; setup-token + API-key management UI shipped earlier today.
+5. **Open question for the merchant:** category `live-test-cat` (104 products)
+   — real store category or a leftover test category?
+
 ## Open items after this sync
 
 - [ ] Plugin side: catalog count comparison vs store (item 2) + `errors: []` confirmation from backfill batch logs.

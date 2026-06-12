@@ -235,25 +235,100 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( array( 'brand' => 'Acana', 'category_path' => 'toys' ), $payload['tags'] );
 	}
 
-	public function test_raw_attributes_extracted_from_attribute_objects(): void {
+	public function test_raw_attributes_custom_attribute_values_pass_through(): void {
+		// Non-taxonomy (custom) attribute: options ARE the literal values.
 		$attr = new class() {
 			/** @return string */
 			public function get_name() {
-				return 'pa_species';
+				return 'flavor';
 			}
 			/** @return array<int, string> */
 			public function get_options() {
-				return array( 'dog' );
+				return array( 'chicken' );
+			}
+			/** @return bool */
+			public function is_taxonomy() {
+				return false;
 			}
 		};
 
 		$product = $this->fake_product(
-			array( 'sku' => 'R', 'price' => '1.00', 'attributes' => array( 'pa_species' => $attr ) )
+			array( 'sku' => 'R', 'price' => '1.00', 'attributes' => array( 'flavor' => $attr ) )
 		);
 
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
 
-		self::assertSame( array( 'pa_species' => array( 'dog' ) ), $payload['raw_attributes'] );
+		self::assertSame( array( 'flavor' => array( 'chicken' ) ), $payload['raw_attributes'] );
+	}
+
+	public function test_raw_attributes_taxonomy_term_ids_resolve_to_labels(): void {
+		// Engine ask 2026-06-12: a REAL taxonomy attribute's get_options()
+		// returns term IDS — the wire must carry term NAMES. (The previous
+		// version of this test faked options that were already strings,
+		// mirroring the wrong assumption — LESSONS §2.4.)
+		Functions\when( 'wc_get_product_terms' )->alias(
+			static function ( int $product_id, string $taxonomy, array $args = array() ) {
+				return ( 'pa_kaubamargid' === $taxonomy && ( $args['fields'] ?? '' ) === 'names' )
+					? array( 'Brit Care' )
+					: array();
+			}
+		);
+
+		$attr = new class() {
+			/** @return string */
+			public function get_name() {
+				return 'pa_kaubamargid';
+			}
+			/** @return array<int, int> */
+			public function get_options() {
+				return array( 398 ); // term id, the pilot's exact symptom.
+			}
+			/** @return bool */
+			public function is_taxonomy() {
+				return true;
+			}
+		};
+
+		$product = $this->fake_product(
+			array( 'sku' => 'R2', 'price' => '1.00', 'attributes' => array( 'pa_kaubamargid' => $attr ) )
+		);
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
+
+		self::assertSame(
+			array( 'pa_kaubamargid' => array( 'Brit Care' ) ),
+			$payload['raw_attributes'],
+			'Term ids must resolve to term labels on the wire.'
+		);
+	}
+
+	public function test_raw_attributes_variation_slug_resolves_to_label(): void {
+		Functions\when( 'taxonomy_exists' )->alias(
+			static fn( string $tax ): bool => 'pa_vali-kaal' === $tax
+		);
+		Functions\when( 'get_term_by' )->alias(
+			static function ( string $by, string $value, string $tax ) {
+				return ( 'slug' === $by && '3kg' === $value && 'pa_vali-kaal' === $tax )
+					? new \WP_Term( '3 kg' )
+					: false;
+			}
+		);
+
+		$product = $this->fake_product(
+			array(
+				'sku'        => 'V',
+				'price'      => '1.00',
+				'attributes' => array(
+					'pa_vali-kaal' => '3kg',     // taxonomy slug → label
+					'engraving'    => 'Muki',    // custom value → unchanged
+				),
+			)
+		);
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
+
+		self::assertSame( '3 kg', $payload['raw_attributes']['pa_vali-kaal'] );
+		self::assertSame( 'Muki', $payload['raw_attributes']['engraving'] );
 	}
 
 	public function test_variation_inherits_parent_category_path(): void {
@@ -352,6 +427,21 @@ if ( ! class_exists( \WC_Product::class ) ) {
 			public function get_children( $context = 'view' ) { return array(); }
 			public function get_attributes( $context = 'view' ) { return array(); }
 			public function get_attribute( $name ) { return ''; }
+		}
+PHP
+	);
+}
+
+// WP_Term shim — variation_term_label() type-checks `instanceof WP_Term`
+// (PHPStan: the stubs' WP_Term::$name is non-nullable, so isset() is
+// rejected), and Brain Monkey doesn't load WP core classes.
+if ( ! class_exists( \WP_Term::class ) ) {
+	// phpcs:ignore Squiz.Commenting.ClassComment.Missing -- test shim.
+	eval(
+		<<<'PHP'
+		class WP_Term {
+			public $name = '';
+			public function __construct( $name = '' ) { $this->name = $name; }
 		}
 PHP
 	);

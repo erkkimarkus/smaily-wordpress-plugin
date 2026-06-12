@@ -36,6 +36,15 @@ rec-engine sync, one of them silently.
 - Catalog live-walk D6 lock-proof lever updated: empty-sku is no longer
   producible through the builder; the proof now uses an over-64-char SKU
   (contract §3 cap).
+- **Catalog attributes now wire term LABELS, not term ids** (engine ask
+  2026-06-12, their #1 priority): a taxonomy attribute's `get_options()`
+  returns term IDS (`pa_kaubamargid: ["398"]`) and a variation's value is
+  the term SLUG — both were forwarded as-is, blocking the engine's brand /
+  life_stage / pack_size rule derivation. The builder now resolves taxonomy
+  options via `wc_get_product_terms(fields=names)` and variation slugs via
+  `get_term_by`, with raw-value fallbacks. Custom attributes unchanged.
+  NB: deployed stores need a catalog backfill re-run to refresh existing
+  engine rows with labels.
 - **Health-notice placement fixed on the plugin's own pages**: the admin
   wrapper now emits the `wp-header-end` marker, so WP core relocates admin
   notices above the React app (full-width, like every other admin page)

@@ -476,6 +476,25 @@ see "Pilot go-live" below.
   consent authoritative; NO qty needed → v1 needs zero plugin changes).
   Stays 🟡 on both backlogs.
 
+### Done — engine ask #1: attribute term labels (2026-06-12 late)
+
+- Engine's PROMPT_woo_plugin_team.md (in docs/, committed) ask #1 fixed:
+  `raw_attributes` now carries term LABELS — taxonomy options (term ids) via
+  `wc_get_product_terms(fields=names)`, variation slugs via `get_term_by`;
+  custom attributes pass through. Unit tests rewritten (the old fake had
+  already-string options — LESSONS §2.4 shape, which is how the id leak
+  shipped) + a REAL WC_Product_Attribute integration test. Gates green
+  (323 unit / 107 integration). **Ships in the next rc (with tomorrow's
+  P10 + variation-stock hook); after deploy the pilot needs ANOTHER catalog
+  backfill re-run so existing rows pick up labels.**
+- NB: wp-env is now DISCONNECTED by design — the integration run scrubbed
+  the MiuMjau (production!) connection and it was deliberately not restored;
+  next connection = sandbox token (engine corrections doc).
+- Remaining engine asks: #2 retry-queue terminal report (Erkki/pilot DB when
+  queue empty), #3 browse beacon sends nothing — needs pilot-side check
+  (consent gate? toggle? JS loading?), #4 catalog count compare when
+  backfill done, #5 ask merchant about `live-test-cat` (104 products).
+
 ### Next — pilot-hardening sequence (in order)
 
 **Pilot-blockers (must close before pilot), in order:**

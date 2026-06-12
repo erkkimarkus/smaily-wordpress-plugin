@@ -224,6 +224,18 @@ class CatalogPayloadBuilder {
 	 * returns WC_Product_Attribute instances on a product and a flat
 	 * name => value map on a variation.
 	 *
+	 * Values are term LABELS, never term ids (engine ask, 2026-06-12): for a
+	 * TAXONOMY attribute WC_Product_Attribute::get_options() returns term
+	 * IDS (`pa_kaubamargid: ["398"]`) and a variation's scalar value is the
+	 * term SLUG — both were forwarded as-is, and the engine cannot derive
+	 * life_stage / brand / pack_size rules from numbers. Contract §3's
+	 * raw_attributes examples are labels. Custom (non-taxonomy) attributes
+	 * already carry their literal values and pass through unchanged. The
+	 * original unit test faked an attribute whose options were already
+	 * strings — mirroring the wrong assumption (LESSONS §2.4 shape), which
+	 * is why the id leak shipped; the integration test now uses a REAL
+	 * taxonomy attribute.
+	 *
 	 * @return array<string, mixed>
 	 */
 	private function raw_attributes( \WC_Product $product ): array {
@@ -240,18 +252,61 @@ class CatalogPayloadBuilder {
 		foreach ( $attributes as $key => $attribute ) {
 			$name = (string) $key;
 			if ( is_object( $attribute ) && method_exists( $attribute, 'get_name' ) && method_exists( $attribute, 'get_options' ) ) {
-				$name         = (string) $attribute->get_name();
-				$options      = $attribute->get_options();
-				$raw[ $name ] = is_array( $options ) ? array_map( 'strval', $options ) : (string) $options;
+				$name    = (string) $attribute->get_name();
+				$options = $attribute->get_options();
+				$options = is_array( $options ) ? $options : array( $options );
+
+				if ( method_exists( $attribute, 'is_taxonomy' ) && $attribute->is_taxonomy() ) {
+					$raw[ $name ] = $this->term_labels( $product, $name, $options );
+				} else {
+					$raw[ $name ] = array_map( 'strval', $options );
+				}
 				continue;
 			}
-			// Variation form: name => scalar value.
+			// Variation form: name => scalar value (term slug for taxonomy attributes).
 			if ( is_scalar( $attribute ) ) {
-				$raw[ $name ] = (string) $attribute;
+				$raw[ $name ] = $this->variation_term_label( $name, (string) $attribute );
 			}
 		}
 
 		return $raw;
+	}
+
+	/**
+	 * Resolve a taxonomy attribute's selected terms to their NAMES. Falls
+	 * back to the raw option values (stringified ids) when the lookup is
+	 * unavailable or empty — a degraded value beats a dropped attribute,
+	 * and the engine's mapping wizard surfaces it either way.
+	 *
+	 * @param array<int, mixed> $fallback get_options() values (term ids).
+	 *
+	 * @return array<int, string>
+	 */
+	private function term_labels( \WC_Product $product, string $taxonomy, array $fallback ): array {
+		if ( function_exists( 'wc_get_product_terms' ) ) {
+			$names = wc_get_product_terms( $product->get_id(), $taxonomy, array( 'fields' => 'names' ) );
+			if ( is_array( $names ) && $names !== array() ) {
+				return array_map( 'strval', array_values( $names ) );
+			}
+		}
+		return array_map( 'strval', $fallback );
+	}
+
+	/**
+	 * Resolve a variation attribute's term SLUG to the term name. Returns
+	 * the raw value when it isn't a taxonomy term (custom attribute values
+	 * and the "any" empty string pass through).
+	 */
+	private function variation_term_label( string $taxonomy, string $value ): string {
+		if ( $value === ''
+			|| ! function_exists( 'taxonomy_exists' )
+			|| ! function_exists( 'get_term_by' )
+			|| ! taxonomy_exists( $taxonomy )
+		) {
+			return $value;
+		}
+		$term = get_term_by( 'slug', $value, $taxonomy );
+		return ( $term instanceof \WP_Term ) ? (string) $term->name : $value;
 	}
 
 	private function attribute_value( \WC_Product $product, string $name ): string {

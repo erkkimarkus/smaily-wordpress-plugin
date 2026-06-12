@@ -7,10 +7,26 @@ BACKLOG links here.
 - **A2 Review request: GREENLIT** — separate automation selection, product
   data passed exactly like abandoned cart does (trigger_automation +
   product_N_* fields). Sub-PR planned.
-- **A3 Cross/upsell: content via RSS, no plugin content-logic** — plugin
-  supplies only the trigger (+ `last_purchase_categories` field for
-  segment-branching); Smaily templates carry the RSS block. Same trigger
-  engine as A2.
+- **A3 Cross/upsell: REVISED after RSS reality-check** — RSS gives every
+  recipient the SAME content; per-customer content must ride the trigger
+  payload. Woo CAN supply it: `get_cross_sell_ids()` / `get_upsell_ids()`
+  (merchant-curated) with `wc_get_related_products()` (category/tag
+  heuristic) as fallback, filtered (in stock, not already purchased, cap 4),
+  passed as the same `product_N_*` payload fields as abandoned cart.
+  **Erkki's field observation (2026-06-12): MANY merchants never configure
+  cross-sell/upsell ids** — so the curated path will often be empty and the
+  related-products fallback (weaker, category overlap) carries the email.
+  Plan accordingly: the v1 email must look good on fallback-only data, and
+  the settings UI should show which source the store actually has (e.g.
+  "X% of your products have curated cross-sells"). This quality gap is the
+  engine block's exact upsell story later.
+- **T-series plan agreed for NEXT session (Erkki, 2026-06-12 late):**
+  T1 trigger engine + Review instance (~1d; defaults pending: 7d delay /
+  completed-only / per-order flag ± per-email cooldown), T3 contact-field
+  enrichment (~1d; powers winback shape 2 + VIP), T2 cross/upsell instance
+  (+0.5–1d, with the fallback-quality caveat above). Winback shape decision
+  (re-trigger-resets-delay vs date-field-offset automation) = Erkki checks
+  Smaily capabilities.
 - **A4 fields → winback/VIP: YES, logic must be CONFIGURABLE — and it is,
   in Smaily**: plugin ships fields; thresholds/segments/templates live in
   Smaily (ready-made templates being built there). Nothing hardcoded

@@ -267,6 +267,58 @@ final class RecEngineCatalogTest extends TestCase {
 		return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints() );
 	}
 
+	public function test_taxonomy_attribute_wires_term_labels_not_ids(): void {
+		// Engine ask 2026-06-12: a REAL WC taxonomy attribute's get_options()
+		// returns term IDS (`pa_kaubamargid: ["398"]` was what the engine
+		// received from the pilot) — the wire must carry term NAMES, or the
+		// engine cannot derive brand / life_stage / pack_size rules. The unit
+		// suite fakes the attribute object; only a real WC_Product_Attribute
+		// exhibits the id behavior, hence this test (LESSONS §2.4).
+		$attr_id = wc_create_attribute(
+			array(
+				'name'         => 'Testbrand',
+				'slug'         => 'testbrand',
+				'type'         => 'select',
+				'order_by'     => 'menu_order',
+				'has_archives' => false,
+			)
+		);
+		self::assertIsInt( $attr_id, 'Precondition: attribute taxonomy created.' );
+
+		// WC registers attribute taxonomies on init — this request predates
+		// the new one, so register it manually for the test's lifetime.
+		register_taxonomy( 'pa_testbrand', array( 'product' ) );
+		$term = wp_insert_term( 'Brit Care', 'pa_testbrand' );
+		self::assertIsArray( $term );
+
+		try {
+			$product = $this->make_product( 'CAT-ATTR-1', '3.00' );
+			$pid     = $product->get_id();
+			wp_set_object_terms( $pid, array( (int) $term['term_id'] ), 'pa_testbrand' );
+
+			$attribute = new \WC_Product_Attribute();
+			$attribute->set_id( (int) $attr_id );
+			$attribute->set_name( 'pa_testbrand' );
+			$attribute->set_options( array( (int) $term['term_id'] ) );
+			$attribute->set_visible( true );
+			$product->set_attributes( array( $attribute ) );
+			$product->save();
+
+			$payload = ( new CatalogPayloadBuilder() )->build( wc_get_product( $pid ), 'u-attr' );
+
+			self::assertArrayHasKey( 'raw_attributes', $payload );
+			self::assertSame(
+				array( 'Brit Care' ),
+				$payload['raw_attributes']['pa_testbrand'],
+				'Wire must carry the term LABEL — a numeric term id here is the pilot bug regressing.'
+			);
+		} finally {
+			wp_delete_term( (int) $term['term_id'], 'pa_testbrand' );
+			wc_delete_attribute( (int) $attr_id );
+			unregister_taxonomy( 'pa_testbrand' );
+		}
+	}
+
 	/**
 	 * @return array<string, string>
 	 */
