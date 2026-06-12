@@ -31,9 +31,11 @@ pilot store has NO SKUs + old orders reference deleted products; catalog was
 silently empty (pre-enqueue drop, no Event Log trace), orders D6-failed on
 empty `items[]` (the 50 red rows), browse events rejected. Fix: synthetic
 `wc-{id}` keys on all three surfaces + empty-items terminal skip + mock now
-enforces items min-1; **2.1.0-beta.2**; LESSONS §2.11. Live-walks 3.2/3.3-orders/3.4-browse
-pending (permission gate), then pilot redeploy + catalog re-backfill + Retry
-all failed. Earlier same day: **P7 upstream auto-update clobber guard** — upstream's
+enforces items min-1; **2.1.0-beta.2**; LESSONS §2.11. Live-walks ALL GREEN
+(catalog 15/15 w/ new lock-proof lever, orders 12/12, browse 13/13); GH
+pre-release **v2.1.0-beta.2-rc.1** published with the pilot ZIP. Next: pilot
+redeploy + catalog re-backfill + Retry all failed. Also: health-notice
+placement fix (wp-header-end). Earlier same day: **P7 upstream auto-update clobber guard** — upstream's
 w.org 2.0.0 would have been offered/auto-applied OVER the fork; fixed with
 `Update URI` header + renumber to **2.1.0-beta.1**; first GH pre-release
 v2.1.0-beta.1-rc.1 with pilot ZIP. Same day, earlier: **P6 RSS feed URL builder** — pilot-prep finding:
@@ -406,6 +408,9 @@ see "Pilot go-live" below.
 - Also in beta.2: health-notice placement fix — `wp-header-end` marker in the
   admin wrapper, so WP relocates notices above the React app instead of into
   the React header next to the tabs (Erkki's screenshot find).
+- GH pre-release **v2.1.0-beta.2-rc.1** published (build `e145607`, ZIP
+  attached, deploy steps in the release notes). Supersedes beta.1-rc.1 for
+  the pilot.
 - Pilot redeploy steps: install the beta.2 ZIP → **catalog backfill re-run**
   (fills the silently-empty catalog) → Event Log **Retry all failed** (flusher
   rebuilds payloads fresh at flush; SKU-less orders heal in place, deleted-
