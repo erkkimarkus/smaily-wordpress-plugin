@@ -49,6 +49,7 @@ where something is.
 | `PLUGIN_IMPLEMENTATION_WP.md` | Plugin developers | **Exists, partially outdated** | WordPress-specific implementation guide. Updated at Phase 3 end (variant A custom queue replaces old AS-native sketch — see `DECISIONS.md` F3-7). |
 | `STYLE_MAPPING.md` | UI developers | **Exists** | Tailwind tokens, color palette, the layered-input pattern, primitive components. |
 | `FIELD_MAPPING.md` | Plugin developers, integration consumers | **Exists** | Canonical field-naming standard (Smaily WC plugin convention is canonical). Required reading for anyone touching subscriber sync. |
+| `UPSTREAM_COMPARISON.md` | Erkki, strategy/merge reviewers | **Written** (2026-06-12) | Point-in-time comparison of upstream 2.0.0 (a 1.6-line min-versions bump on w.org) vs fork 2.1.0-beta.1: features, stacks, version support, code quality, known problems, the version-collision story. Snapshot, not a living register — `UPSTREAM_AUDIT.md` stays the commit-level source of truth. |
 
 ### Internal — Erkki's working drafts
 
