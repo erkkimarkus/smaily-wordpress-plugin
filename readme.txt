@@ -93,6 +93,8 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 * Fixed: stores whose products have no SKUs now sync fully to the recommendation engine. Products without a SKU are keyed by a stable synthetic identifier (wc-<id>) across catalog, order and browse-tracking sync; previously such products were silently skipped and their orders failed to sync.
 * Fixed: orders whose products were later permanently deleted from the store no longer fail repeatedly in the Event Log — they are skipped cleanly (WooCommerce removes the product reference on deletion, so those line items cannot be synced).
 * Fixed: orders with no syncable line items (e.g. fee-only orders) are now skipped cleanly instead of repeatedly failing in the Event Log.
+* Fixed: products sold out at variation level are now correctly marked out-of-stock for the recommendation engine (previously only parent-product stock changes were tracked).
+* Fixed: product attribute values now sync as readable labels instead of internal IDs, enabling brand- and attribute-based recommendation rules. Re-run the catalog import after upgrading to refresh existing data.
 * Fixed: admin health notices now appear at the top of the plugin's Settings and wizard pages (full width, like on other admin pages) instead of overlapping the page header.
 * Fixed: abandoned cart reminders are only sent for recently abandoned carts (24 hours by default) — older carts are expired silently, so re-enabling the feature after a pause can never mass-email historical carts. A failure to send one reminder no longer blocks the rest.
 

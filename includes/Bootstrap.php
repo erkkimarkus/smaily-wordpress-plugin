@@ -355,6 +355,11 @@ final class Bootstrap {
 		);
 		add_action( 'save_post_product', array( $catalog, 'on_save_product' ), 10, 1 );
 		add_action( 'woocommerce_product_set_stock_status', array( $catalog, 'on_stock_change' ), 10, 3 );
+		// Variations fire their OWN stock hook, not the parent's — without
+		// this a variation selling out never refreshes its catalog row's
+		// in_stock and the engine keeps recommending it (found 2026-06-12).
+		// Same ($id, $status, $product) signature; the handler covers both.
+		add_action( 'woocommerce_variation_set_stock_status', array( $catalog, 'on_stock_change' ), 10, 3 );
 		// before_delete_post (not delete_post): the product is still loadable,
 		// so the handler can capture its catalog object before it's gone.
 		add_action( 'before_delete_post', array( $catalog, 'on_delete_product' ), 10, 1 );

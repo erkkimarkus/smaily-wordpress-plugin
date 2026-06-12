@@ -267,6 +267,55 @@ final class RecEngineCatalogTest extends TestCase {
 		return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints() );
 	}
 
+	public function test_variation_stock_change_enqueues_catalog_upsert(): void {
+		// Found 2026-06-12: variations fire woocommerce_variation_set_stock_status,
+		// NOT the parent-product hook — only the parent hook was registered, so
+		// a variation selling out never refreshed its catalog in_stock and the
+		// engine kept recommending it. Assert the REAL registration (Bootstrap
+		// wiring, not a hand-called handler) and the queue row it produces.
+		$this->connected_client(); // seeds is_connected so the gate is open.
+
+		self::assertNotFalse(
+			has_action( 'woocommerce_variation_set_stock_status' ),
+			'Bootstrap must register the catalog handler on the VARIATION stock hook.'
+		);
+		self::assertNotFalse( has_action( 'woocommerce_product_set_stock_status' ) );
+
+		$parent = new \WC_Product_Variable();
+		$parent->set_name( 'Var Stock Parent' );
+		$parent_id                = (int) $parent->save();
+		$this->created_products[] = $parent_id;
+
+		$variation = new \WC_Product_Variation();
+		$variation->set_parent_id( $parent_id );
+		$variation->set_regular_price( '4.00' );
+		$variation->set_manage_stock( false );
+		$variation->set_stock_status( 'instock' );
+		$variation_id             = (int) $variation->save();
+		$this->created_products[] = $variation_id;
+
+		$queue  = new IngestQueue();
+		$before = count( $queue->pending( 200, array( CatalogHookHandler::EVENT_CATALOG_UPSERT ) ) );
+
+		CatalogHookHandler::reset_seen();
+		$loaded = wc_get_product( $variation_id );
+		$loaded->set_stock_status( 'outofstock' );
+		$loaded->save(); // fires woocommerce_variation_set_stock_status through real WC.
+
+		$rows      = $queue->pending( 200, array( CatalogHookHandler::EVENT_CATALOG_UPSERT ) );
+		$entity_ids = array_map(
+			static fn( array $row ): string => (string) $row['entity_id'],
+			$rows
+		);
+
+		self::assertContains(
+			(string) $variation_id,
+			$entity_ids,
+			'A variation stock flip must enqueue a catalog.upsert for THE VARIATION (the engine ingests variations as units).'
+		);
+		self::assertGreaterThan( $before, count( $rows ) );
+	}
+
 	public function test_taxonomy_attribute_wires_term_labels_not_ids(): void {
 		// Engine ask 2026-06-12: a REAL WC taxonomy attribute's get_options()
 		// returns term IDS (`pa_kaubamargid: ["398"]` was what the engine

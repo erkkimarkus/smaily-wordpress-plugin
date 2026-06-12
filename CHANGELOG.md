@@ -36,6 +36,12 @@ rec-engine sync, one of them silently.
 - Catalog live-walk D6 lock-proof lever updated: empty-sku is no longer
   producible through the builder; the proof now uses an over-64-char SKU
   (contract §3 cap).
+- **Variation stock changes now refresh the catalog**: variations fire
+  `woocommerce_variation_set_stock_status`, not the parent-product hook —
+  only the parent hook was registered, so a variation selling out never
+  updated its catalog row's `in_stock` and the engine could keep
+  recommending it. The variation hook is now wired to the same handler
+  (identical signature); integration-tested through a real WC save.
 - **Catalog attributes now wire term LABELS, not term ids** (engine ask
   2026-06-12, their #1 priority): a taxonomy attribute's `get_options()`
   returns term IDS (`pa_kaubamargid: ["398"]`) and a variation's value is
