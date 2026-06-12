@@ -398,8 +398,8 @@ This usually indicates leftover files from a previous plugin version. The fix:
 1. Deactivate Smaily Connect
 2. SSH or FTP into the site
 3. Navigate to `wp-content/plugins/smaily-connect/`
-4. Confirm only the new version's files are present (the `composer.json`
-   should show `2.0.0-beta.1` or later)
+4. Confirm only the new version's files are present (the `Version:` header
+   in `smaily-connect.php` should show `2.1.0-beta.1` or later)
 5. If there are unexpected `.php` files from older versions, delete the entire
    `smaily-connect` directory and re-upload the new ZIP cleanly
 

@@ -13,8 +13,21 @@
  * Plugin Name:          Smaily Connect (BETA)
  * Plugin URI:           https://smaily.com/help/user-manual/smaily-connect-for-wordpress/
  * Text Domain:          smaily-connect
- * Version:              2.0.0-beta.1
+ * Update URI:           https://github.com/erkkimarkus/smaily-wordpress-plugin
+ * Version:              2.1.0-beta.1
 */
+
+/*
+ * Update URI (above) is load-bearing, not informational: the folder name
+ * matches the wordpress.org `smaily-connect` slug, and upstream ships its
+ * own releases there (their 2.0.0 is a 1.x-line WP-7.0 bump, NOT this
+ * codebase). Without this header WordPress would offer — or with
+ * auto-updates enabled, silently apply — upstream's package over this
+ * fork. Any non-wordpress.org value makes core skip w.org updates for
+ * this plugin entirely (WP 5.8+). Do not remove until the fork is merged
+ * back upstream. The 2.1.x numbering exists for the same collision (see
+ * DECISIONS F3-35).
+ */
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,13 +37,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Current plugin version (PSR-4 callers should prefer Smaily\Connect\Constants::version()).
  */
-define( 'SMAILY_CONNECT_VERSION', '2.0.0-beta.1' );
+define( 'SMAILY_CONNECT_VERSION', '2.1.0-beta.1' );
 
 /**
  * Legacy version constant — kept for upstream compatibility (used by older
  * classes that still reference it). New code should use SMAILY_CONNECT_VERSION.
  */
-define( 'SMAILY_CONNECT_PLUGIN_VERSION', '2.0.0-beta.1' );
+define( 'SMAILY_CONNECT_PLUGIN_VERSION', '2.1.0-beta.1' );
 
 /**
  * The name of the plugin.

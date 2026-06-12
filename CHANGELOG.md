@@ -4,7 +4,15 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
-## 2.0.0-beta.1 — in development (feature-complete for pilot 2026-06-09; audited + hardened 2026-06-11)
+## 2.1.0-beta.1 — in development (feature-complete for pilot 2026-06-09; audited + hardened 2026-06-11)
+
+> Version note: this release was developed as 2.0.0-beta.1 and renumbered to
+> 2.1.0-beta.1 on 2026-06-12 — upstream (sendsmaily) released its own,
+> unrelated 2.0.0 on wordpress.org (a 1.x-line WordPress-7.0 compatibility
+> bump), and a lower-versioned fork install would have been offered (or
+> auto-updated into) that package. The plugin also now declares an
+> `Update URI` so wordpress.org updates never apply to the fork. See
+> DECISIONS F3-35.
 
 A major release built **alongside** the 1.x feature set, not replacing it:
 existing installs upgrade in place and legacy behaviour continues until the new

@@ -8,7 +8,9 @@
  *   AES-256-GCM with a random per-message nonce; key = raw-binary
  *   sha256(SECURE_AUTH_KEY). encrypt() always writes this format.
  *
- * - legacy (pre-2.0.0-beta.2): base64( iv(16) || hmac(32) || ciphertext ),
+ * - legacy (pre-GCM dev builds; GCM first ships in 2.1.0-beta.1, the
+ *   release formerly numbered 2.0.0-beta.1 — DECISIONS F3-35):
+ *   base64( iv(16) || hmac(32) || ciphertext ),
  *   AES-256-CBC + HMAC-SHA256 — but the IV was a STATIC prefix of AUTH_KEY
  *   and was stored inside the persisted blob, so every DB dump leaked an
  *   AUTH_KEY prefix and equal plaintexts produced equal ciphertexts.

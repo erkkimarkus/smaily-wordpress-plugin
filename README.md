@@ -2,7 +2,7 @@
 
 A WordPress plugin that integrates WooCommerce with [Smaily](https://smaily.com), an email marketing platform. Sends customer and order data to Smaily for transactional and marketing automation, and connects WooCommerce stores to Smaily's recommendation engine for personalized product suggestions in email campaigns.
 
-**Status:** 2.0.0-beta.1 — **plugin-side feature-complete for the pilot** (2026-06-09; audited + hardened 2026-06-11). Phase 3 and pilot-hardening are done; next is the pilot itself. See [Roadmap](#roadmap).
+**Status:** 2.1.0-beta.1 — **plugin-side feature-complete for the pilot** (2026-06-09; audited + hardened 2026-06-11). Versioned 2.1.x because upstream's own, unrelated 2.0.0 (a 1.x-line WP-7.0 bump) occupies the 2.0.0 slot on wordpress.org. Phase 3 and pilot-hardening are done; next is the pilot itself. See [Roadmap](#roadmap).
 
 This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin). It carries the legacy 1.x code alongside a new 2.0 codebase that coexists with it during the transition. See [Relationship to upstream](#relationship-to-upstream) for details.
 

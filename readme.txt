@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.0.0-beta.1
+Stable tag: 2.1.0-beta.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -88,7 +88,7 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
-= 2.0.0-beta.1 =
+= 2.1.0-beta.1 =
 
 Major update, built alongside the existing 1.x feature set (existing installs upgrade in place; legacy behaviour continues until the new setup wizard is completed):
 
@@ -181,7 +181,7 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 
 == Upgrade Notice ==
 
-= 2.0.0-beta.1 =
+= 2.1.0-beta.1 =
 Major update. Existing settings and behaviour are preserved — legacy subscriber sync continues unchanged until you complete the new setup wizard. The recommendation-engine features are optional and stay off until you connect them. Stored API credentials are automatically re-encrypted with a stronger scheme on upgrade.
 
 = 1.0.0 =

@@ -26,7 +26,10 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-12 (**P6 RSS feed URL builder** — pilot-prep finding:
+_Last updated: 2026-06-12 (**P7 upstream auto-update clobber guard** — upstream's
+w.org 2.0.0 would have been offered/auto-applied OVER the fork; fixed with
+`Update URI` header + renumber to **2.1.0-beta.1**; first GH pre-release
+v2.1.0-beta.1-rc.1 with pilot ZIP. Same day, earlier: **P6 RSS feed URL builder** — pilot-prep finding:
 old 1.6 RSS tab had no new-UI home (2.H.3 side-effect; the feed itself never
 broke). Rebuilt stateless on Integrations step/tab; EnvDetector emits the
 boot-payload `rss` block; DECISIONS F3-34. Previous day 2026-06-11: THREE update groups. **Upstream-merge prep
@@ -353,8 +356,24 @@ see "Pilot go-live" below.
   legacy-classes-loaded seam the unit suite must fake). Follow-up same day:
   README.md "What's new in 2.0" + readme.txt 2.0 feature list + CHANGELOG
   gained the RSS-builder line (user-facing feature, worth surfacing); fresh
-  pilot ZIP cut; first GitHub **pre-release** (v2.0.0-beta.1) published with
-  the ZIP attached — README's Releases install link now actually resolves.
+  pilot ZIP cut.
+
+### Done — P7 upstream auto-update clobber guard: 2.1.0-beta.1 + Update URI (2026-06-12)
+
+- **P7** — release-prep surfaced a **pilot-blocker-class risk**: upstream
+  shipped its own **2.0.0** to wordpress.org (2026-06-03, same
+  `smaily-connect` slug; verified live). Fork at `2.0.0-beta.1` < 2.0.0 →
+  WP would offer (or with auto-updates, silently apply) upstream's 1.x-line
+  package OVER the fork mid-pilot. Fix (DECISIONS **F3-35**): (1)
+  **`Update URI` header** — core skips w.org updates for the plugin entirely
+  (WP 5.8+; primary guard, stays until upstream merge); (2) **renumbered
+  2.0.0-beta.1 → 2.1.0-beta.1** (Erkki's call) across all version literals
+  (header, PHP constants, Stable tag, package.json+lock, test bootstraps,
+  ConstantsTest, CHANGELOG version-note, README, MIGRATION pointer fix).
+  UPSTREAM_AUDIT #128 carries the find. First GitHub **pre-release**
+  (v2.1.0-beta.1-rc.1) with the pilot ZIP attached — README's Releases
+  install link now resolves. NOTE: pilot ZIPs from before this fix
+  (≤ db4e1cd) are vulnerable if installed on a site with auto-updates on.
 
 ### Next — pilot-hardening sequence (in order)
 

@@ -135,6 +135,12 @@ bug-fix'id puudutavad reaalselt meie koodi.
   on WC 6.9 ([[project_pilot_wc_version]]). PHP/WP miinimumide tõstmine on **teadlik otsus**, mitte
   mehaaniline cherry-pick. WP 7.0 forward-compat osad (admin-klassi kohandused) võivad olla väärt
   selektiivset ülevõtmist; miinimumide tõstmist EI tohi pimesi rakendada.
+- **⚠️ LISALEID (2026-06-12, LAHENDATUD):** upstream release'is #128 koodi **versioonina 2.0.0**
+  wordpress.org-i (sama `smaily-connect` slug, 2000+ installi). Kuna fork oli `2.0.0-beta.1`
+  (< 2.0.0), oleks WP pakkunud — auto-update'iga *vaikselt rakendanud* — upstream'i paketi forki
+  ASEMELE keset pilooti. Lahendus (DECISIONS **F3-35**): `Update URI` header (core jätab w.org-i
+  uuendused täielikult vahele, WP 5.8+) + fork renumberdatud **2.1.0-beta.1**. Headerit EI tohi
+  eemaldada enne upstream-merge'i.
 
 ### ⚪ #130 — `aadc7c9` maint: Update phpcs configuration
 - **Diff:** `phpcs.xml` (+3/-2) — WP/PHP testVersion tõus, progress-logimine.

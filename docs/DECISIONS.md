@@ -1794,6 +1794,47 @@ the pilot merchant can't discover the feature).
 the seam the unit suite must fake), `rss-feed-url.test.ts` +
 `RssFeedSection.test.tsx` (vitest).
 
+### F3-35 — Version renumbered 2.0.0-beta.1 → 2.1.0-beta.1 + `Update URI` header (upstream-collision guard)
+
+**Context:** preparing the first GitHub release surfaced that upstream
+(sendsmaily) shipped its own **2.0.0** to wordpress.org on 2026-06-03 (#128 —
+a 1.x-line WP-7.0 compatibility bump, ~2000+ active installs; verified live on
+w.org). Our fork installs into the same `smaily-connect/` folder, so WP's
+update check matches the w.org slug and compares versions:
+`2.0.0-beta.1 < 2.0.0` → the pilot site would be OFFERED upstream's package —
+or, with per-plugin auto-updates on (likely carried over from the 1.6
+install), silently REPLACED by it mid-pilot, deleting the entire rec-engine
+codebase from disk. UPSTREAM_AUDIT had tracked #128 only as a min-versions
+conflict; the auto-update clobber vector was a new find.
+
+**Decision:** two independent guards, both in the same commit. (1)
+**`Update URI: https://github.com/erkkimarkus/smaily-wordpress-plugin`** in
+the plugin header — WP 5.8+ core skips wordpress.org updates entirely for a
+plugin whose Update URI is non-w.org; this is the primary, version-arithmetic-
+independent protection and must stay until the upstream merge. (2)
+**Renumber to 2.1.0-beta.1** (Erkki's call) — clears upstream's 2.0.0 for
+humans and for any pre-5.8-semantics tooling, makes "which code runs here"
+visible at a glance, and the eventual merge-back lands monotonically
+(upstream 2.0.0 → rewrite 2.1.0). All version literals moved in one pass
+(plugin header, both PHP constants, Stable tag, package.json+lock, test
+bootstraps, ConstantsTest, CHANGELOG/README/MIGRATION); CHANGELOG carries a
+version-note explaining the renumber.
+
+**Rationale:** the number bump alone is fragile (upstream's next release
+re-collides); the header alone leaves the confusing "2.0.0-beta.1 vs
+upstream 2.0.0" support story. Together they cover both the machine and the
+human failure modes.
+
+**Alternatives:** slug/folder rename (rejected — breaks the 1.x→2.x in-place
+upgrade path and all of MIGRATION.md); `site_transient_update_plugins` filter
+(rejected — code where a header suffices); leaving 2.0.0-beta.1 + header only
+(rejected — support ambiguity, and beta.1 < 2.0.0 reads as "outdated" in
+every plugin list).
+
+**Relationships:** UPSTREAM_AUDIT #128 (now also carries the clobber note);
+F3-34/P6 (the release-prep that surfaced this); MIGRATION.md §"Class not
+found" (version pointer corrected — composer.json never carried a version).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
