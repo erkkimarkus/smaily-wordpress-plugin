@@ -397,16 +397,22 @@ see "Pilot go-live" below.
   cleanly; id-survives data keys wc-{id} (unit-covered). Mock orders route
   now enforces items min-1 (the divergence that hid this). Version →
   2.1.0-beta.2.
-- **Pending:** live-walks 3.2 (new over-64-char lock-proof lever), 3.3-orders,
-  3.4-browse — blocked on the engine-write permission gate (agent classifier);
-  Erkki runs them or grants the rule. THEN: ZIP + GH pre-release
-  v2.1.0-beta.2-rc.1 → pilot redeploy → **catalog backfill re-run** (fills the
-  silently-empty catalog) → Event Log **Retry all failed** (flusher rebuilds
-  payloads fresh at flush, so the 50 rows heal in place).
-- NB: wp-env carries a LIVE MiuMjau connection right now (fresh token
-  exchanged 2026-06-12 ~15:00). An integration-suite run scrubs it (EnvScrub)
-  — run the walks FIRST, or snapshot/restore the `smly_rec_*` options around
-  the suite.
+- **Live-walks GREEN (run by Erkki, 2026-06-12 ~15:45): 3.2 catalog 15/15
+  (incl. the NEW over-64-char lock-proof lever — live engine D6-rejected it,
+  split held: sent 1 / failed 1), 3.3-orders 12/12, 3.4-browse 13/13.**
+  Engine-write permission stays human-gated (the agent classifier correctly
+  refuses agent-self-granted permission rules; walks run via `!` or a
+  user-added rule).
+- Also in beta.2: health-notice placement fix — `wp-header-end` marker in the
+  admin wrapper, so WP relocates notices above the React app instead of into
+  the React header next to the tabs (Erkki's screenshot find).
+- Pilot redeploy steps: install the beta.2 ZIP → **catalog backfill re-run**
+  (fills the silently-empty catalog) → Event Log **Retry all failed** (flusher
+  rebuilds payloads fresh at flush; SKU-less orders heal in place, deleted-
+  product orders leave the queue as clean skips).
+- NB: wp-env carries a LIVE MiuMjau connection. An integration-suite run
+  scrubs it (EnvScrub) — snapshot/restore the `smly_rec_*` options around the
+  suite (done once already this way).
 
 ### Next — pilot-hardening sequence (in order)
 

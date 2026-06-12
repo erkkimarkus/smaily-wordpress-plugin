@@ -110,15 +110,20 @@ function smaily_connect_render_settings_page(): void {
 }
 
 /**
- * Shared HTML wrapper. The `wrap` class lets WP's default admin notices
- * land above the React tree; the mount node sits inside so React owns
- * its own subtree exclusively.
+ * Shared HTML wrapper. The `wp-header-end` marker is load-bearing: WP core's
+ * common.js relocates `div.notice` admin notices after `.wp-header-end` when
+ * present — WITHOUT it the fallback is the first h1 inside `.wrap`, which is
+ * the REACT app's own flex-header h1, so notices (e.g. the NotificationManager
+ * health notice) got injected INSIDE the header row, squeezed next to the
+ * Settings tabs. With the marker they land here — full-width, above the React
+ * tree, like on every other admin page. Core CSS keeps the hr invisible.
  *
  * @param 'wizard'|'settings' $view
  */
 function smaily_connect_emit_mount( string $view ): void {
 	?>
 	<div class="wrap" id="smaily-connect-wrap">
+		<hr class="wp-header-end">
 		<div
 			id="smaily-connect-app"
 			data-view="<?php echo esc_attr( $view ); ?>"
