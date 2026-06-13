@@ -54,6 +54,25 @@ final class WPMLAdapter implements DetectorInterface {
 		return (int) $translated;
 	}
 
+	public function get_default_language(): string {
+		$default = apply_filters( 'wpml_default_language', null );
+
+		return is_string( $default ) ? $default : '';
+	}
+
+	public function get_canonical_post_id( int $post_id ): int {
+		$default = $this->get_default_language();
+		if ( $default === '' ) {
+			return $post_id;
+		}
+
+		// wpml_object_id resolved into the default language returns the
+		// default-language post itself when $post_id already is it (idempotent).
+		$canonical = $this->get_translated_post_id( $post_id, $default );
+
+		return ( $canonical !== null ) ? $canonical : $post_id;
+	}
+
 	public function get_translated_permalink( int $post_id, string $language ): ?string {
 		$translated_id = $this->get_translated_post_id( $post_id, $language );
 		if ( $translated_id === null ) {

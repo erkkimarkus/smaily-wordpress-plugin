@@ -62,6 +62,22 @@ final class TranslatePressAdapter implements DetectorInterface {
 		return $post_id;
 	}
 
+	public function get_default_language(): string {
+		$settings = get_option( 'trp_settings', array() );
+
+		if ( is_array( $settings ) && isset( $settings['default-language'] ) ) {
+			return (string) $settings['default-language'];
+		}
+
+		return function_exists( 'get_locale' ) ? (string) get_locale() : '';
+	}
+
+	public function get_canonical_post_id( int $post_id ): int {
+		// TP translates rendered HTML, not post records — there is exactly one
+		// underlying record per product, so every post is already canonical.
+		return $post_id;
+	}
+
 	public function get_translated_permalink( int $post_id, string $language ): ?string {
 		$base = get_permalink( $post_id );
 		if ( ! is_string( $base ) ) {

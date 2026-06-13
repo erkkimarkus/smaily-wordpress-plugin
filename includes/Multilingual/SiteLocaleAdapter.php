@@ -35,6 +35,15 @@ final class SiteLocaleAdapter implements DetectorInterface {
 		return $post_id;
 	}
 
+	public function get_default_language(): string {
+		return $this->locale();
+	}
+
+	public function get_canonical_post_id( int $post_id ): int {
+		// Single-language site — every post is its own canonical record.
+		return $post_id;
+	}
+
 	public function get_translated_permalink( int $post_id, string $language ): ?string {
 		$permalink = get_permalink( $post_id );
 

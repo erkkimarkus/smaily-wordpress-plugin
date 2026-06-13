@@ -55,6 +55,31 @@ interface DetectorInterface {
 	public function get_translated_post_id( int $post_id, string $language ): ?int;
 
 	/**
+	 * The site's default/source language code (e.g. Polylang's default
+	 * language, WPML's default language). Empty when it can't be resolved
+	 * or no multilingual plugin is active beyond the site locale.
+	 *
+	 * Used by the catalog enumeration (P1) to pick the canonical language
+	 * for translation collapse — see get_canonical_post_id().
+	 */
+	public function get_default_language(): string;
+
+	/**
+	 * Collapse a possibly-translated product post to its CANONICAL post id —
+	 * the single record the catalog should ingest, identical across every
+	 * language so the synthetic `wc-{id}` key is stable (catalog-correctness
+	 * P1; RECENGINE_API_CONTRACT.md §3 "one row per canonical product").
+	 *
+	 * For WPML/Polylang (translations are separate wp_posts rows) this is the
+	 * default-language translation of $post_id; a default-language post maps to
+	 * itself. For TranslatePress / single-language sites (one record per
+	 * product) it returns $post_id unchanged. Falls back to $post_id whenever
+	 * the canonical can't be resolved (no default language, untranslated /
+	 * language-less post) — a degraded passthrough never DROPS a product.
+	 */
+	public function get_canonical_post_id( int $post_id ): int;
+
+	/**
 	 * Permalink that resolves to the $language version of $post_id.
 	 *
 	 * Single-language sites return get_permalink($post_id) unchanged.

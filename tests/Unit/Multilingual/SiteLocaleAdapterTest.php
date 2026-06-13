@@ -42,6 +42,16 @@ final class SiteLocaleAdapterTest extends TestCase {
 		self::assertSame( 42, ( new SiteLocaleAdapter() )->get_translated_post_id( 42, 'et_EE' ) );
 	}
 
+	public function test_default_language_equals_site_locale(): void {
+		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
+
+		self::assertSame( 'et_EE', ( new SiteLocaleAdapter() )->get_default_language() );
+	}
+
+	public function test_canonical_post_id_returns_the_input_unchanged(): void {
+		self::assertSame( 42, ( new SiteLocaleAdapter() )->get_canonical_post_id( 42 ) );
+	}
+
 	public function test_get_translations_returns_scalar_values_not_lang_keyed_arrays(): void {
 		Functions\when( 'get_locale' )->justReturn( 'en_US' );
 		Functions\when( 'get_permalink' )->justReturn( 'https://example.test/product/42' );

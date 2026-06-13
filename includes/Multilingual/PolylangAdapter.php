@@ -54,6 +54,29 @@ final class PolylangAdapter implements DetectorInterface {
 		return is_int( $translated ) && $translated > 0 ? $translated : null;
 	}
 
+	public function get_default_language(): string {
+		if ( ! function_exists( 'pll_default_language' ) ) {
+			return '';
+		}
+
+		$default = \pll_default_language();
+
+		return is_string( $default ) ? $default : '';
+	}
+
+	public function get_canonical_post_id( int $post_id ): int {
+		$default = $this->get_default_language();
+		if ( $default === '' ) {
+			return $post_id;
+		}
+
+		// pll_get_post( $default_lang_post, $default ) returns the post itself,
+		// so a default-language product maps to its own id (idempotent).
+		$canonical = $this->get_translated_post_id( $post_id, $default );
+
+		return ( $canonical !== null ) ? $canonical : $post_id;
+	}
+
 	public function get_translated_permalink( int $post_id, string $language ): ?string {
 		$translated_id = $this->get_translated_post_id( $post_id, $language );
 		if ( $translated_id === null ) {

@@ -26,7 +26,12 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-12 late (**engine go-live sync done** — results in
+_Last updated: 2026-06-13 (**catalog-correctness series started** — engine brief
+on multilingual translation-duplication + non-products; Erkki picked localization
+model **(B) {lang:value}**; **CC.1 DONE** = behaviour-neutral adapter primitive
+`get_canonical_post_id`/`get_default_language` across all 4 detectors; CC.2 (core,
+SKU-scheme change + §624 purge coordination) next. See the catalog-correctness
+section below. Earlier 2026-06-12 late: **engine go-live sync done** — results in
 docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
 sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
 (the 91% retry-error rate was theirs); pilot needs: connection check after
@@ -475,6 +480,59 @@ see "Pilot go-live" below.
   (cron sweep; 2h–24h window; 1/7d cap; custom-field trigger path; Smaily
   consent authoritative; NO qty needed → v1 needs zero plugin changes).
   Stays 🟡 on both backlogs.
+
+### In progress — catalog-correctness series (CC.1–CC.4, 2026-06-13)
+
+Engine brief `docs/PLUGIN_BRIEF_catalog_correctness.md` (+ design
+`docs/MULTILINGUAL_DESIGN.md`, contract sync `RECENGINE_API_CONTRACT.md` §3
+multilingual / §4 `language` / §620-624 catalog identity): the MiuMjau pilot
+sync emitted **one catalog row per language translation** (Polylang stores each
+translation as its own `wp_posts` row) → duplicate synthetic SKUs the engine
+can't dedupe → language-mixed recommendations; plus non-products (gift cards,
+donation, language-switcher pseudo-product) reached the catalog.
+
+**Erkki decision (2026-06-13): localization model = (B) `{lang:value}` object.**
+Rationale: the expensive part (P1 translation-collapse to a canonical product
+with a stable SKU) is shared by A and B; the engine is fully ready for B
+(per-customer localization via `customers.language`); single-language stores
+degrade gracefully to A (one-key object). Sequence CC.1 → CC.2 → CC.3 with a
+checkpoint between each; CC.4 last (blocked — see below).
+
+- **CC.1 DONE (2026-06-13)** — adapter primitive for canonical resolution.
+  `DetectorInterface` gains `get_default_language()` + `get_canonical_post_id(int)`;
+  implemented across all 4 adapters (Polylang `pll_default_language` +
+  `pll_get_post`; WPML `wpml_default_language` + `wpml_object_id`; TranslatePress
+  / SiteLocale = passthrough, one record per product). Fallback everywhere:
+  unresolvable canonical → return input (**never DROP a product**). No runtime
+  path calls it yet — **behaviour unchanged.** New `PolylangAdapterTest` (covers
+  the real `wc-59221 LV → wc-59199 ET` shampoo case) + SiteLocale +2. Gates:
+  ci:strict exit=0 (331 unit / JS 156), integration OK 108. **Behaviour-neutral.**
+- **CC.2 NEXT** — P1 canonical enumeration (the core, high-risk: changes the SKU
+  scheme). Backfill `enqueue_record` + hook `on_save/stock/delete` resolve the
+  canonical post id **before** `expand()` → load the canonical `WC_Product` →
+  SKU becomes `wc-{canonical_id}` naturally (`SkuResolver`/`expand` unchanged).
+  P4: deleting a translation ≠ deleting the canonical SKU (re-sync canonical
+  instead). **⚠ Go-live coordination:** switching per-translation `wc-{id}` →
+  canonical orphans the old per-language SKUs in the engine — contract §624 says
+  this needs a **one-time manual purge coordinated with the engine team** for
+  MiuMjau at redeploy.
+- **CC.3** — P2 model B payload. `CatalogPayloadBuilder.build` consumes
+  `DetectorFactory::create()->get_translations()` → `{lang:value}` for
+  name/description/product_url; **500-char truncation per language**;
+  single-language → string (= A). CC-8 discipline: move the mock to object form
+  + live-walk the `{lang:value}` shape (the plugin code only follows the already-
+  synced contract here — until CC.3 lands the builder still sends plain strings).
+- **CC.4 — BLOCKED** — P3 non-product filter. Must filter in-source by **WC
+  product type / gift-card-plugin meta** (NOT name/category heuristics — MiuMjau's
+  donation is categorised `kassitoit`, same as real food). Blocked on: **which
+  gift-card + donation plugin does MiuMjau use?** (each has its own product type).
+  Engine sees 8 non-products + `raw_attributes`=null. Engine `recommendable` flag
+  (migration 0039) excludes them defensively by name-match (fragile). See memory
+  `project_catalog_correctness_p3`. Engine bonus-ask: send `raw_attributes`
+  (incl. product type) generally for a fallback signal.
+
+Already done (no work): **P2b `customers.language`** — `CustomerPayloadBuilder`
+already sends ISO 639-1 from `get_user_locale()`.
 
 ### Done — engine ask #1: attribute term labels (2026-06-12 late)
 
