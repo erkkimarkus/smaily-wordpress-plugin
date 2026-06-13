@@ -26,12 +26,15 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-13 (**catalog-correctness series started** — engine brief
-on multilingual translation-duplication + non-products; Erkki picked localization
-model **(B) {lang:value}**; **CC.1 DONE** = behaviour-neutral adapter primitive
-`get_canonical_post_id`/`get_default_language` across all 4 detectors; CC.2 (core,
-SKU-scheme change + §624 purge coordination) next. See the catalog-correctness
-section below. Earlier 2026-06-12 late: **engine go-live sync done** — results in
+_Last updated: 2026-06-13 (**catalog-correctness CC.1 + CC.2 DONE** — multilingual
+translation-duplication fix; Erkki picked model **(B) {lang:value}**. CC.1 =
+behaviour-neutral canonical adapter primitive; **CC.2 = canonical SKU across
+catalog+orders+browse (SkuResolver) + enumeration collapse + P4**, scope grown to
+the whole SKU graph per the engine's order-items correction. MiuMjau = **WPML +
+WCML** (variations auto-resolve). Go-live: engine WIPES the MiuMjau SKU graph +
+plugin full re-backfill (supersedes §624 purge). CC.3 ({lang:value} payload) +
+CC.4 (non-product filter) next. See the catalog-correctness section below.
+Earlier 2026-06-12 late: **engine go-live sync done** — results in
 docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
 sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
 (the 91% retry-error rate was theirs); pilot needs: connection check after
@@ -486,10 +489,28 @@ see "Pilot go-live" below.
 Engine brief `docs/PLUGIN_BRIEF_catalog_correctness.md` (+ design
 `docs/MULTILINGUAL_DESIGN.md`, contract sync `RECENGINE_API_CONTRACT.md` §3
 multilingual / §4 `language` / §620-624 catalog identity): the MiuMjau pilot
-sync emitted **one catalog row per language translation** (Polylang stores each
-translation as its own `wp_posts` row) → duplicate synthetic SKUs the engine
-can't dedupe → language-mixed recommendations; plus non-products (gift cards,
-donation, language-switcher pseudo-product) reached the catalog.
+sync emitted **one catalog row per language translation** (WPML/Polylang store
+each translation as its own `wp_posts` row) → duplicate synthetic SKUs the
+engine can't dedupe → language-mixed recommendations; plus non-products (gift
+cards, donation, language-switcher pseudo-product) reached the catalog.
+
+**MiuMjau's actual plugin = WPML + WooCommerce Multilingual (WCML)** (Erkki
+confirmed, 2026-06-13 — the brief said "Polylang/WPML" generically; the store is
+WPML). `DetectorFactory` picks `WPMLAdapter` via `ICL_SITEPRESS_VERSION`. WCML
+registers `product_variation` as translatable, so `wpml_object_id` (hence
+`get_canonical_post_id`) resolves variations across languages **automatically** —
+no attribute-matching layer needed despite MiuMjau having variable products.
+
+**Engine-coordinated go-live order (engine team, 2026-06-13):** the canonical
+SKU must cover the WHOLE SKU graph, not just catalog — **catalog AND order
+items** (else the reload leaves a catalog↔orders mismatch). Plan: (1) plugin
+canonical scheme to production (catalog + orders both); (2) engine WIPES the
+MiuMjau SKU graph — catalog + orders/order_items + recommendations +
+cadence_curves_customer + co_purchase_edges + browse_events (NOT customers /
+email_events — those are email-keyed and just backfilled 30k events); (3) plugin
+full re-backfill — catalog + order history (+ `{lang:value}` + customers.language);
+(4) engine nightly recompute + clean re-seed. **No surgical orphan purge** — the
+full wipe+re-sync supersedes the §624 manual-purge note.
 
 **Erkki decision (2026-06-13): localization model = (B) `{lang:value}` object.**
 Rationale: the expensive part (P1 translation-collapse to a canonical product
@@ -507,15 +528,35 @@ checkpoint between each; CC.4 last (blocked — see below).
   path calls it yet — **behaviour unchanged.** New `PolylangAdapterTest` (covers
   the real `wc-59221 LV → wc-59199 ET` shampoo case) + SiteLocale +2. Gates:
   ci:strict exit=0 (331 unit / JS 156), integration OK 108. **Behaviour-neutral.**
-- **CC.2 NEXT** — P1 canonical enumeration (the core, high-risk: changes the SKU
-  scheme). Backfill `enqueue_record` + hook `on_save/stock/delete` resolve the
-  canonical post id **before** `expand()` → load the canonical `WC_Product` →
-  SKU becomes `wc-{canonical_id}` naturally (`SkuResolver`/`expand` unchanged).
-  P4: deleting a translation ≠ deleting the canonical SKU (re-sync canonical
-  instead). **⚠ Go-live coordination:** switching per-translation `wc-{id}` →
-  canonical orphans the old per-language SKUs in the engine — contract §624 says
-  this needs a **one-time manual purge coordinated with the engine team** for
-  MiuMjau at redeploy.
+- **CC.2 DONE (2026-06-13)** — canonical SKU across the WHOLE graph + catalog
+  enumeration collapse (P1 + P4). Scope grew from "catalog only" to "catalog +
+  orders + browse" per the engine's whole-SKU-graph correction.
+  - **SkuResolver is now canonical-aware** (`resolve` / `resolve_order_item` gain
+    an optional `?DetectorInterface`, default lazy `DetectorFactory::create()`):
+    a synthetic key collapses its id to the canonical post (`wc-{canonical_id}`);
+    a real SKU is the merchant's key, untouched. Because all THREE wire surfaces
+    go through SkuResolver (`CatalogPayloadBuilder:95`, `OrderPayloadBuilder:183-4`,
+    `StorefrontBeacon:148`), this one change canonicalizes catalog + order items
+    + browse with **zero call-site churn** — orders/browse get it for free.
+  - **Catalog enumeration collapse**: backfill `enqueue_record` SKIPS a
+    translation whose canonical is itself an enumerated published product
+    (stateless skip-if-not-self; `processed_count` still counts every post so
+    progress reaches 100%, `sent` is lower = the collapse); the live hook
+    `on_save/on_stock` re-syncs the canonical; **P4** delete re-syncs the
+    canonical on a translation delete (≠ marking the SKU gone), deletes only on
+    the canonical's own removal. Never a silent drop (draft-canonical → the
+    published post stands in; LESSONS §2.11).
+  - **Variations**: WCML links `product_variation` → `get_canonical_post_id`
+    resolves them automatically; no special code.
+  - Detector injected into CatalogHookHandler + CatalogBackfillJob (Bootstrap
+    `multilingual_detector()`); SkuResolver lazy-loads the same factory instance.
+  - Tests: SkuResolver +4 (canonical/order-item), CatalogHookHandler +3
+    (collapse/P4), `WPMLAdapterTest` +6 (pilot-relevant adapter), integration +2
+    (real-queue collapse + draft-canonical-no-drop, stub detector; live-hook
+    isolation via queue truncate; mock now records `last_catalog_skus`). Gates:
+    ci:strict exit=0 (344 unit / 156 JS), integration OK 110.
+  - **Still single-language content** until CC.3 — CC.2 fixes keys + collapse;
+    `{lang:value}` payload is CC.3.
 - **CC.3** — P2 model B payload. `CatalogPayloadBuilder.build` consumes
   `DetectorFactory::create()->get_translations()` → `{lang:value}` for
   name/description/product_url; **500-char truncation per language**;

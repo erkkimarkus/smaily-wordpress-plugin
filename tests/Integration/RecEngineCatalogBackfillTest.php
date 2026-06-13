@@ -12,6 +12,8 @@ namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
+use Smaily\Connect\Multilingual\DetectorInterface;
+use Smaily\Connect\Multilingual\SiteLocaleAdapter;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\Backfill\AbstractBackfillJob;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CatalogBackfillJob;
@@ -160,12 +162,91 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		self::assertSame( 2, $response->get_data()['total'] );
 	}
 
+	public function test_translations_collapse_to_one_canonical_row(): void {
+		// Two published products; the detector says the higher-id one (the
+		// "translation") collapses to the lower-id one (the "canonical"). The
+		// translation is SKIPPED — exactly one row, keyed on the canonical,
+		// reaches the engine (P1, the core fix).
+		$canonical   = $this->make_product( 'CANON-A' );
+		$translation = $this->make_product( 'TRANS-B' );
+
+		// Creating the products fired the live save_post_product hook (the env
+		// is connected), enqueuing both. Clear that so the assertion sees only
+		// what the BACKFILL enqueues — the unit under test here.
+		$this->truncate_queue();
+
+		$job = $this->job( 100, null, $this->mapping_detector( array( $translation => $canonical ) ) );
+		$job->start();
+
+		$result = $this->run_to_completion( $job );
+
+		self::assertSame( 2, $result['processed'], 'Both posts were walked (progress counts every enumerated post).' );
+		self::assertSame( 1, $result['sent'], 'The translation collapsed into the canonical — one row sent, not two.' );
+		self::assertSame(
+			array( 'CANON-A' ),
+			self::$engine->state()['last_catalog_skus'] ?? array(),
+			'The canonical (default-language) product is the one ingested; the translation was skipped.'
+		);
+	}
+
+	public function test_draft_canonical_does_not_drop_a_published_translation(): void {
+		// Edge: the default-language post is a draft (NOT enumerated), but a
+		// translation is published. Skipping it would drop the product — instead
+		// the published post stands in. No silent drop (LESSONS §2.11).
+		$canonical = $this->make_product( 'DRAFT-A' );
+		wp_update_post(
+			array(
+				'ID'          => $canonical,
+				'post_status' => 'draft',
+			)
+		);
+		$translation = $this->make_product( 'PUB-B' );
+
+		$this->truncate_queue(); // ignore the live-hook rows from creation.
+
+		$job = $this->job( 100, null, $this->mapping_detector( array( $translation => $canonical ) ) );
+		$job->start();
+
+		$result = $this->run_to_completion( $job );
+
+		self::assertSame( 1, $result['sent'], 'The published translation is ingested — not dropped for its draft canonical.' );
+		self::assertSame(
+			array( 'PUB-B' ),
+			self::$engine->state()['last_catalog_skus'] ?? array(),
+			'The published post stands in; its draft default-language canonical is not enumerable.'
+		);
+	}
+
+	/**
+	 * Drive a backfill job to completion, returning the cumulative
+	 * processed/sent/failed across its batches.
+	 *
+	 * @return array{processed: int, sent: int, failed: int}
+	 */
+	private function run_to_completion( CatalogBackfillJob $job ): array {
+		$totals = array(
+			'processed' => 0,
+			'sent'      => 0,
+			'failed'    => 0,
+		);
+		$guard = 0;
+		do {
+			$result              = $job->process_batch();
+			$totals['processed'] += (int) $result['processed'];
+			$totals['sent']      += (int) $result['sent'];
+			$totals['failed']    += (int) $result['failed'];
+		} while ( empty( $result['completed'] ) && ++$guard < 20 );
+
+		return $totals;
+	}
+
 	// --- helpers --------------------------------------------------------
 
-	private function job( int $batch_size = 100, ?IngestQueue $queue = null ): CatalogBackfillJob {
+	private function job( int $batch_size = 100, ?IngestQueue $queue = null, ?DetectorInterface $detector = null ): CatalogBackfillJob {
 		$settings = new RecEngineSettings();
 		$queue    = $queue ?? new IngestQueue();
 		$builder  = new CatalogPayloadBuilder();
+		$detector = $detector ?? new SiteLocaleAdapter(); // single-language passthrough.
 		$flusher  = new IngestFlusher(
 			$queue,
 			$builder,
@@ -176,14 +257,14 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		);
 
 		if ( $batch_size === 100 ) {
-			return new CatalogBackfillJob( $queue, $flusher, $builder );
+			return new CatalogBackfillJob( $queue, $flusher, $builder, $detector );
 		}
 
-		return new class( $queue, $flusher, $builder, $batch_size ) extends CatalogBackfillJob {
+		return new class( $queue, $flusher, $builder, $detector, $batch_size ) extends CatalogBackfillJob {
 			private int $bs;
 
-			public function __construct( IngestQueue $queue, IngestFlusher $flusher, CatalogPayloadBuilder $builder, int $bs ) {
-				parent::__construct( $queue, $flusher, $builder );
+			public function __construct( IngestQueue $queue, IngestFlusher $flusher, CatalogPayloadBuilder $builder, DetectorInterface $detector, int $bs ) {
+				parent::__construct( $queue, $flusher, $builder, $detector );
 				$this->bs = $bs;
 			}
 
@@ -191,6 +272,21 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 				return $this->bs;
 			}
 		};
+	}
+
+	/**
+	 * A detector double that maps the given post ids to canonical ids (missing
+	 * keys pass through). Stands in for WPML/Polylang's translation linkage so
+	 * the collapse logic is exercised without a configured multilingual plugin.
+	 *
+	 * @param array<int, int> $map post id → canonical id.
+	 */
+	private function mapping_detector( array $map ): DetectorInterface {
+		$detector = $this->createMock( DetectorInterface::class );
+		$detector->method( 'get_canonical_post_id' )->willReturnCallback(
+			static fn ( int $id ): int => $map[ $id ] ?? $id
+		);
+		return $detector;
 	}
 
 	private function make_product( string $sku ): int {

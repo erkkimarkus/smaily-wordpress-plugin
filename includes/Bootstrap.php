@@ -25,6 +25,8 @@ use Smaily\Connect\Privacy\ProfilingConsent;
 use Smaily\Connect\Privacy\ProfilingConsentAccount;
 use Smaily\Connect\Integrations\WooCommerce\Hooks as WooHooks;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
+use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Multilingual\Router as MultilingualRouter;
 use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\REST\EndpointRegistry;
@@ -294,7 +296,8 @@ final class Bootstrap {
 				return new CatalogBackfillJob(
 					$this->ingest_queue(),
 					$this->ingest_flusher(),
-					$this->catalog_payload_builder()
+					$this->catalog_payload_builder(),
+					$this->multilingual_detector()
 				);
 			case 'customers': // 3.5.1 rec-engine customer backfill (A-filter).
 				return new CustomerBackfillJob(
@@ -351,7 +354,8 @@ final class Bootstrap {
 		$catalog = new CatalogHookHandler(
 			$this->ingest_queue(),
 			$this->catalog_payload_builder(),
-			$this->rec_engine_settings()
+			$this->rec_engine_settings(),
+			$this->multilingual_detector()
 		);
 		add_action( 'save_post_product', array( $catalog, 'on_save_product' ), 10, 1 );
 		add_action( 'woocommerce_product_set_stock_status', array( $catalog, 'on_stock_change' ), 10, 3 );
@@ -649,6 +653,17 @@ final class Bootstrap {
 		}
 
 		return $this->catalog_builder;
+	}
+
+	/**
+	 * The active multilingual detector (WPML / Polylang / TranslatePress /
+	 * single-language fallback). DetectorFactory caches its decision per
+	 * request, so this is the one shared instance the catalog enumeration uses
+	 * to collapse translations to a canonical product (catalog-correctness P1).
+	 * SkuResolver resolves the same instance lazily for the order/browse SKU.
+	 */
+	public function multilingual_detector(): DetectorInterface {
+		return DetectorFactory::create();
 	}
 
 	public function rec_engine_settings(): RecEngineSettings {

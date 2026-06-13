@@ -309,6 +309,12 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 	}
 	$state['catalog_event_ids']     = $seen;
 	$state['last_catalog_received'] = $received;
+	$state['last_catalog_skus']     = array_map(
+		static function ( $product ) {
+			return isset( $product['sku'] ) ? (string) $product['sku'] : '';
+		},
+		$products
+	);
 	save_state( $state_file, $state );
 
 	$response = array(

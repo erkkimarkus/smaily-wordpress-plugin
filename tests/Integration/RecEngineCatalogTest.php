@@ -13,6 +13,7 @@ namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
+use Smaily\Connect\Multilingual\SiteLocaleAdapter;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
@@ -181,7 +182,7 @@ final class RecEngineCatalogTest extends TestCase {
 		$product_id = (int) $product->get_id();
 
 		// Hook layer.
-		( new CatalogHookHandler( $queue, $builder, $settings ) )->on_save_product( $product_id );
+		( new CatalogHookHandler( $queue, $builder, $settings, new SiteLocaleAdapter() ) )->on_save_product( $product_id );
 
 		$pending = $queue->pending( 10 );
 		self::assertCount( 1, $pending, 'save_post_product must enqueue exactly one catalog row.' );
@@ -230,7 +231,7 @@ final class RecEngineCatalogTest extends TestCase {
 		CatalogHookHandler::reset_seen();
 		$good    = $this->make_product( 'CAT-D6-OK', '9.99' );
 		$bad     = $this->make_product( 'D6ERR-CAT-BAD', '9.99' );
-		$handler = new CatalogHookHandler( $queue, $builder, $settings );
+		$handler = new CatalogHookHandler( $queue, $builder, $settings, new SiteLocaleAdapter() );
 		$handler->on_save_product( (int) $good->get_id() );
 		$handler->on_save_product( (int) $bad->get_id() );
 

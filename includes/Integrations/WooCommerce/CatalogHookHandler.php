@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -23,8 +24,16 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  *
  * Variable products fan out: each variation is its own ingest unit with
  * its own queue row and event_uuid (CatalogPayloadBuilder::expand), so the
- * engine dedups variations independently. SKU-less units are dropped — the
- * engine keys catalog on SKU.
+ * engine dedups variations independently. SKU-less units are NOT dropped —
+ * SkuResolver keys them `wc-{id}` in the builder (F3-36).
+ *
+ * Multilingual collapse (catalog-correctness P1): Polylang/WPML store each
+ * translation as its own product post, so a save/stock/delete arriving for a
+ * translation is first mapped to its CANONICAL (default-language) product via
+ * the DetectorInterface — we always enqueue the canonical so its synthetic
+ * `wc-{canonical_id}` key is stable across languages (one engine row per real
+ * product, RECENGINE_API_CONTRACT.md §3). Single-language sites resolve every
+ * post to itself (passthrough), so this is a no-op there.
  *
  * Gate: enqueue only while a tenant is connected (RecEngineSettings::
  * is_connected). Unlike the email HookHandler's setup_completed gate (which
@@ -34,11 +43,14 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  *
  * Per-request dedupe: save_post_product can fire repeatedly within one
  * request; a static $seen set collapses repeats to a single row per unit.
+ * Because every save resolves to the canonical product first, repeated saves
+ * of different translations collapse to the same canonical units too.
  *
  * Delete capture: the product is still loadable in before_delete_post, so
  * the full catalog object is built and stored in the row now; the flusher
  * stamps in_stock=false + event_id at send time (it can't load a gone
- * product).
+ * product). Deleting a TRANSLATION must NOT remove the canonical SKU (P4) —
+ * see on_delete_product.
  *
  * Not final: tests subclass to stub get_product() while recording enqueues
  * through a doubled IngestQueue.
@@ -54,18 +66,22 @@ class CatalogHookHandler {
 	private IngestQueue $queue;
 	private CatalogPayloadBuilder $builder;
 	private RecEngineSettings $settings;
+	private DetectorInterface $detector;
 
-	public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings ) {
+	public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, DetectorInterface $detector ) {
 		$this->queue    = $queue;
 		$this->builder  = $builder;
 		$this->settings = $settings;
+		$this->detector = $detector;
 	}
 
 	public function on_save_product( int $post_id ): void {
 		if ( ! $this->gate_open() ) {
 			return;
 		}
-		$product = $this->get_product( $post_id );
+		// Saving any translation re-syncs the CANONICAL product, so its
+		// `wc-{canonical_id}` row stays single and current across languages (P1).
+		$product = $this->canonical_product( $post_id );
 		if ( $product === null ) {
 			return;
 		}
@@ -87,7 +103,7 @@ class CatalogHookHandler {
 			return;
 		}
 		$id     = ( $product instanceof \WC_Product ) ? (int) $product->get_id() : (int) $product_id;
-		$loaded = $this->get_product( $id );
+		$loaded = $this->canonical_product( $id );
 		if ( $loaded === null ) {
 			return;
 		}
@@ -100,6 +116,24 @@ class CatalogHookHandler {
 		if ( ! $this->gate_open() ) {
 			return;
 		}
+
+		// P4: deleting a TRANSLATION must NOT remove the canonical SKU — the
+		// product still exists in other languages. Re-sync the canonical
+		// (upsert) so its content drops the deleted language instead of marking
+		// the whole product unavailable. Only the canonical's own deletion (or
+		// a single-language product) marks the row in_stock=false.
+		$canonical_id = $this->detector->get_canonical_post_id( $post_id );
+		if ( $canonical_id > 0 && $canonical_id !== $post_id ) {
+			$canonical = $this->get_product( $canonical_id );
+			if ( $canonical !== null ) {
+				foreach ( $this->builder->expand( $canonical ) as $unit ) {
+					$this->enqueue_upsert( $unit );
+				}
+				return;
+			}
+			// Canonical gone too → fall through and mark this post's units gone.
+		}
+
 		$product = $this->get_product( $post_id );
 		if ( $product === null ) {
 			// Not a product (before_delete_post fires for every post type) or
@@ -109,6 +143,23 @@ class CatalogHookHandler {
 		foreach ( $this->builder->expand( $product ) as $unit ) {
 			$this->enqueue_delete( $unit );
 		}
+	}
+
+	/**
+	 * Resolve a (possibly translated) product post to its canonical
+	 * default-language product, loading it. Falls back to the saved post itself
+	 * when the canonical can't be loaded — never drops a save silently.
+	 */
+	private function canonical_product( int $post_id ): ?\WC_Product {
+		$canonical_id = $this->detector->get_canonical_post_id( $post_id );
+		if ( $canonical_id <= 0 ) {
+			$canonical_id = $post_id;
+		}
+		$product = $this->get_product( $canonical_id );
+		if ( $product === null && $canonical_id !== $post_id ) {
+			$product = $this->get_product( $post_id );
+		}
+		return $product;
 	}
 
 	/**
