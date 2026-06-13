@@ -53,6 +53,12 @@ Engine is at commit `7c202e5`, all fixes deployed to production.
    shows the live total). Confirm your batch logs show `errors: []`.
 5. **Ask the merchant**: is category `live-test-cat` (104 products) a real
    store category or a leftover test category?
+6. **Filter non-product post types out of catalog sync.** The store's
+   multilingual plugin exposes a language-switcher item as a "product"
+   (`wc-49143` · "🇱🇻 Latvian (Latviešu)" · €11.50) and it landed in the
+   engine catalog. Engine-side deletion is pointless (next sync re-upserts
+   it) — the sync should only enumerate real, purchasable products
+   (post_type=product, exclude virtual config artifacts where detectable).
 
 ## FYI, no action
 

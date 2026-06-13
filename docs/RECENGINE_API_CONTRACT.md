@@ -616,6 +616,16 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 
 > The engine has no separate "discount price" field. A discounted product is expressed purely as `price` (the discounted price the customer pays) plus `compare_price` (the higher pre-sale price).
 
+<a name="catalog-identity"></a>
+**Catalog identity, multilingual & lifecycle** (added 2026-06-13):
+
+- **One row per canonical product — collapse translations.** Send exactly one catalog row per real, purchasable product. Do **NOT** send a separate row per language: a multilingual product (WPML/Polylang) must be a **single `sku`** whose translations are carried in the `{lang: value}` object form of `name` / `description` / `product_url` (see *Multilingual variant* above). The `sku` is a **stable canonical key** — keep it identical across languages and across syncs (e.g. the canonical/default-language product id). Emitting one row per translation creates duplicate SKUs that the engine **cannot** dedupe (there is no language tag or parent link), producing language-mixed recommendations.
+- **Real products only.** Do not send non-purchasable artifacts: language-switcher pseudo-products, gift cards, donation items, or virtual config entries. *(The engine additionally derives an internal `recommendable` flag at ingest to defensively exclude such items — see [Engine-internal fields](#engine-internal). The source should still not send them, to avoid catalog bloat.)*
+- **Lifecycle is UPSERT-only — no delete-by-absence.** The engine UPSERTs by `sku`; it never removes a `sku` merely because it stopped appearing in a sync. Removal is explicit: re-send the product with `in_stock=false`. **Consequence when changing the SKU scheme:** if a sender migrates SKUs (e.g. from per-language `wc-<translation_id>` to canonical `wc-<canonical_id>`), the old SKUs are **not** auto-removed — they linger as stale rows. The engine does **not** offer a full-catalog replace/reconcile; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
+
+<a name="engine-internal"></a>
+**Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): computed from `sku`/`category_path`/`name` to exclude test artifacts (`LIVE-*`, `live-test`) and non-products (gift cards, donation items). Recomputed on every upsert, so a corrected sync self-heals. Excluded products are never recommended via any path.
+
 **Response 200 OK** (all products valid):
 ```json
 {
@@ -714,7 +724,7 @@ Batch upload of customers. **Identity is `email`** (W4 / D1): UPSERT by `(tenant
 | `first_name` | string | NO | |
 | `last_name` | string | NO | |
 | `country` | string (ISO 3166-1 alpha-2) | NO | E.g. "EE", "FI", "US". Stored **as sent** — not strictly ISO-validated (N-8). |
-| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru" — used for template rendering. Stored **as sent** — not strictly ISO-validated (N-8). |
+| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru". Drives **per-customer localization** of the recommendation fields pushed to Smaily — `rec_N_name` / `rec_N_description` / `rec_N_link_url` are resolved from the catalog `*_i18n` columns in this language (fallback: `tenant_settings.default_language` → `en` → `default` → first). Also pushed to the Smaily contact's native `language` field for segmentation. Falls back to the tenant default when absent. Stored **as sent** — not strictly ISO-validated (N-8). See `MULTILINGUAL_DESIGN.md`. |
 | `phone` | string | NO | |
 | `first_seen_at` | ISO 8601 | NO | Registration timestamp (if different from row creation). Not overwritten on update (earliest wins). |
 | `external_id` | string | NO | Platform-internal user_id |
