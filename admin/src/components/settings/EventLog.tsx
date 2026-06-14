@@ -185,7 +185,11 @@ export function EventLog(): React.JSX.Element {
                 <th className="py-2 pr-3 font-medium">Status</th>
                 <th className="py-2 pr-3 font-medium">Attempts</th>
                 <th className="py-2 pr-3 font-medium">Last error</th>
-                <th className="py-2 font-medium" />
+                {/* Pinned to the right edge so Retry/Details stay reachable
+                    when the row overflows horizontally (the failed-row case:
+                    the Retry button widens the row and used to push Details
+                    off-screen behind the scroll). */}
+                <th className="sticky right-0 border-l border-border-subtle bg-surface py-2 pl-3 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -219,8 +223,8 @@ export function EventLog(): React.JSX.Element {
                   >
                     {row.last_error || '—'}
                   </td>
-                  <td className="py-2 text-right">
-                    <div className="flex justify-end gap-1">
+                  <td className="sticky right-0 border-l border-border-subtle bg-surface py-2 pl-3 text-right">
+                    <div className="flex justify-end gap-1 whitespace-nowrap">
                       {row.status === 'failed' && (
                         <Button
                           variant="secondary"
