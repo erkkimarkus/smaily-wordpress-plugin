@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.2
+Stable tag: 2.1.0-beta.3
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,13 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.3 =
+
+* Improved: multilingual stores (WPML / Polylang) — a translated product is now a single product in recommendations instead of one per language, so recommendations no longer mix languages or repeat the same item. Each customer sees product names, descriptions and links in their own language.
+* Improved: product variations on multilingual stores are linked across languages (with WooCommerce Multilingual).
+* Improved: gift cards, donations and similar non-products are excluded from recommendations more reliably — the plugin now sends each product's type and virtual/downloadable status so the engine can classify them. (The plugin does not filter your products, so virtual or downloadable goods you genuinely sell are kept.)
+* On multilingual stores, re-run the catalog import after upgrading (coordinate with Smaily for the clean re-sync).
 
 = 2.1.0-beta.2 =
 
@@ -190,6 +197,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.3 =
+Recommended for multilingual stores (WPML / Polylang): translated products are now merged into one recommendation per product — no more language-mixed or duplicated recommendations — with per-language names, descriptions and links. After upgrading, re-run the catalog import; coordinate with Smaily, as the recommendation engine resets the product graph for a clean canonical re-sync.
 
 = 2.1.0-beta.2 =
 Recommended for all stores, essential for stores whose products have no SKUs: product, order and browse sync to the recommendation engine now works without SKUs. After upgrading, re-run the catalog import and use "Retry all failed" in the Event Log to heal previously failed orders.

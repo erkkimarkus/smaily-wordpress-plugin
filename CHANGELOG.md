@@ -4,6 +4,47 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 2.1.0-beta.3 — catalog correctness: multilingual + non-product signal (2026-06-14)
+
+Multilingual catalog correctness (DECISIONS F3-38; sub-PRs CC.1–CC.4). On
+WPML/Polylang stores the recommendation catalog previously got **one row per
+language translation** — duplicate products the engine can't merge, producing
+language-mixed recommendations — and non-products (gift cards, donations,
+language-switcher pseudo-products) leaked in. MiuMjau (the pilot) runs WPML +
+WooCommerce Multilingual.
+
+- **Translations collapse to one canonical product.** Every translation now maps
+  to a single stable key (`wc-{canonical_id}`) across catalog, orders AND
+  browse-tracking, so the engine sees one product, learns on one key, and never
+  recommends the same product twice in different languages. The collapse happens
+  in the catalog enumeration (backfill + live hooks); the synthetic key is
+  canonicalized in the shared `SkuResolver`, so all three surfaces stay
+  consistent. Variations are linked across languages via WooCommerce
+  Multilingual. Deleting one translation re-syncs the canonical product instead
+  of removing it while other languages remain (P4).
+- **Localized content (model B).** `name` / `description` / `product_url` are
+  sent per language as `{lang: value}` (description clamped to 500 chars per
+  language); the engine localizes each customer's recommendations to their
+  language. Single-language stores are unaffected — sent as plain strings, the
+  prior behaviour.
+- **Structural signal for non-product exclusion, not a filter.** Each product
+  now sends `product_type` (incl. gift-card plugin types), `is_virtual` and
+  `is_downloadable`, so the engine reliably classifies and excludes gift
+  cards/donations without name-guessing. The plugin deliberately does NOT filter
+  products itself — "is this recommendable?" is a business-model decision (a
+  digital-goods store sells virtual/downloadable products), so the engine's
+  `recommendable` flag owns the exclusion (DECISIONS F3-38).
+- Multilingual detection runs through the existing `DetectorFactory` (WPML /
+  Polylang / TranslatePress / single-language fallback), so the same wire shape
+  is produced regardless of the i18n plugin. Proven against the real engine:
+  `bin/walk-cc3-multilingual.cjs` 9/9 (the engine accepts the `{lang:value}`
+  object form + the signal fields).
+
+After upgrading on a multilingual store: re-run the catalog import — coordinate
+with Smaily, the recommendation engine resets the product graph (catalog +
+orders + recommendations + cadence + co-purchase + browse) for a clean canonical
+re-sync.
+
 ## 2.1.0-beta.2 — pilot debugging (2026-06-12)
 
 First fixes from real pilot data (DECISIONS F3-36): the pilot store has **no
