@@ -1,9 +1,12 @@
 /**
- * CC.3 live harness — multilingual `{lang:value}` catalog payload against the
- * REAL Smaily rec-engine (the "Smaily Connect test" SANDBOX tenant).
+ * CC.3 + CC.4 live harness — multilingual `{lang:value}` catalog payload AND the
+ * structural signal fields (product_type / is_virtual / is_downloadable) against
+ * the REAL Smaily rec-engine (the "Smaily Connect test" SANDBOX tenant).
  *
  * What this proves that the integration tests (mock engine) can't: the engine's
- * strict Zod ACCEPTS the model-B object form of name / description / product_url
+ * strict Zod ACCEPTS the model-B object form of name / description / product_url,
+ * plus the CC.4 signal fields (incl. a gift-card `product_type` the engine uses
+ * to derive `recommendable`)
  * — the exact mock-vs-live divergence CC-8 exists to catch (the mock validates
  * field types loosely; only the live engine enforces them). A stub detector
  * supplies the per-language translations, so the REAL CatalogPayloadBuilder
@@ -109,6 +112,10 @@ result( 'builder_description_is_lang_object', is_array( $object['description'] ?
 result( 'builder_product_url_is_lang_object', is_array( $object['product_url'] ), 'product_url=' . wp_json_encode( $object['product_url'] ) );
 result( 'builder_category_path_present', isset( $object['category_path'] ) && $object['category_path'] !== '', 'category_path=' . ( $object['category_path'] ?? '' ) );
 
+// CC.4 structural signal — the builder always emits these (engine derives
+// recommendable from product_type; the plugin never excludes — F3-38).
+result( 'builder_emits_structural_signal', isset( $object['product_type'] ) && array_key_exists( 'is_virtual', $object ) && array_key_exists( 'is_downloadable', $object ), 'type=' . ( $object['product_type'] ?? '?' ) . ' virtual=' . wp_json_encode( $object['is_virtual'] ?? null ) . ' downloadable=' . wp_json_encode( $object['is_downloadable'] ?? null ) );
+
 // Send the {lang:value} object to the REAL engine.
 try {
 	$resp      = $client->ingest_catalog( array( $object ) );
@@ -138,6 +145,32 @@ try {
 	result( 'engine_accepts_string_form_too', $processed2 === 1 && count( $errors2 ) === 0, 'processed=' . $processed2 . ' errors=' . wp_json_encode( $errors2 ) );
 } catch ( \Throwable $e ) {
 	result( 'engine_accepts_string_form_too', false, 'EXCEPTION ' . $e->getMessage() );
+}
+
+// CC.4: a gift-card product_type signal must be ACCEPTED on the wire (the
+// engine sets recommendable=false internally — not observable in the ingest
+// response, but a Zod reject of the new fields would be). wp-env has no
+// gift-card plugin, so the type string is supplied directly.
+$gc = array(
+	'event_id'        => wp_generate_uuid4(),
+	'sku'             => 'LIVE-CC3-GC-' . wp_generate_uuid4(),
+	'name'            => 'CC4 Gift Card',
+	'category_path'   => (string) $object['category_path'],
+	'price'           => 25.0,
+	'in_stock'        => true,
+	'product_url'     => 'https://example.test/cc4-gc',
+	'external_id'     => (string) $pid,
+	'product_type'    => 'pw-gift-card',
+	'is_virtual'      => true,
+	'is_downloadable' => false,
+);
+try {
+	$resp3      = $client->ingest_catalog( array( $gc ) );
+	$processed3 = isset( $resp3['processed'] ) ? (int) $resp3['processed'] : -1;
+	$errors3    = ( isset( $resp3['errors'] ) && is_array( $resp3['errors'] ) ) ? $resp3['errors'] : array( '<missing>' );
+	result( 'engine_accepts_product_type_signal', $processed3 === 1 && count( $errors3 ) === 0, 'processed=' . $processed3 . ' errors=' . wp_json_encode( $errors3 ) );
+} catch ( \Throwable $e ) {
+	result( 'engine_accepts_product_type_signal', false, 'EXCEPTION ' . $e->getMessage() );
 }
 
 wp_delete_post( $pid, true );

@@ -122,6 +122,15 @@ class CatalogPayloadBuilder {
 			'in_stock'      => (bool) $product->is_in_stock(),
 			'product_url'   => $this->localized( $translations['product_url'], $this->product_url( $product ) ),
 			'external_id'   => (string) $product->get_id(),
+			// Structural signal (CC.4, contract §3): the engine derives its
+			// `recommendable` exclusion from product_type (gift-card types →
+			// excluded); is_virtual/is_downloadable are stored but never
+			// auto-exclude (a digital-goods store sells those). The plugin
+			// supplies the signal and never makes the exclusion call itself
+			// (DECISIONS F3-38). Always present — every product has a type.
+			'product_type'  => (string) $product->get_type(),
+			'is_virtual'    => (bool) $product->is_virtual(),
+			'is_downloadable' => (bool) $product->is_downloadable(),
 		);
 
 		$compare_price = $this->compare_price( $product );

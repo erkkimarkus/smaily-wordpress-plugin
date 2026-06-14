@@ -29,13 +29,16 @@ table in README is a high-level view; this is the working register.
 _Last updated: 2026-06-14 (**catalog-correctness CC.1 + CC.2 + CC.3 DONE** —
 multilingual fix; model **(B) {lang:value}**. CC.1 = canonical adapter primitive;
 CC.2 = canonical SKU across catalog+orders+browse + enumeration collapse + P4;
-**CC.3 = {lang:value} payload (name/description/product_url), 500-char/lang
-clamp, single-language degrades to scalar** — code+gates green, **live-walk
-PENDING** (needs sandbox + WPML-translated product). MiuMjau = WPML + WCML
-(variations auto-resolve). Go-live: engine WIPES the MiuMjau SKU graph + plugin
-full re-backfill. **CC.4 (non-product filter) next** — still blocked on which
-gift-card/donation plugin MiuMjau uses. See the catalog-correctness section
-below. Earlier 2026-06-12 late: **engine go-live sync done** — results in
+**CC.3 = {lang:value} payload, 500-char/lang clamp; **CC.4 = structural signal
+(product_type/is_virtual/is_downloadable), NOT a filter** (engine owns
+recommendable, F3-38). **CC.1–CC.4 all DONE + live-walked** (sandbox 9/9: engine
+accepts {lang:value} + the signal incl. a gift-card type). MiuMjau = WPML + WCML
+(variations auto-resolve). Catalog-correctness **code-complete**; remaining is
+go-live coordination: deploy → engine WIPES the MiuMjau SKU graph → plugin full
+re-backfill (ship the signal with it) → engine recompute. Open: engine's
+language-switcher `wc-49143` classification (its product_type / a post-49143
+inspection). See the catalog-correctness section below. Earlier 2026-06-12 late:
+**engine go-live sync done** — results in
 docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
 sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
 (the 91% retry-error rate was theirs); pilot needs: connection check after
@@ -582,18 +585,22 @@ checkpoint between each; CC.4 last (blocked — see below).
   flag. **NB: the dev wp-env is now connected to the SANDBOX tenant** (was
   MiuMjau-production — switched via the new token; this is the correct/safe
   state per CLAUDE.md, do not point dev at MiuMjau).
-- **CC.4 — REFRAMED, not building a filter (DECISIONS F3-38, 2026-06-14).**
-  The P3 "non-product filter" is **declined as a plugin-side feature**: "is this
-  recommendable?" is a business-model decision a connector can't make safely
-  (per-client; a `is_virtual()`/category heuristic would drop a legitimate
-  digital-goods store's REAL products). The engine's `recommendable` flag
-  (migration 0039) owns the exclusion — centralized, per-upsert, tunable — and
-  already excludes MiuMjau's non-products (Erkki: they no longer appear in
-  results). **Open question posed to the engine team**
-  (`docs/ENGINE_TEAM_recommendable_signal.md`): confirm the plugin sends *signal*
-  (`product_type` / virtual / downloadable) instead of filtering, and which
-  fields they want. No filter/signal code until they answer; not a go-live
-  blocker (the flag handles MiuMjau today).
+- **CC.4 — DONE: structural signal, not a filter (DECISIONS F3-38, 2026-06-14).**
+  No plugin-side non-product filter (business-model decision a connector can't
+  make safely; the engine's `recommendable` flag owns exclusion). Engine team
+  CONFIRMED the division (commit 37a8f66) + is already consuming the signal
+  (contract §3, migration 0040, `classifyRecommendable`). `CatalogPayloadBuilder`
+  now always emits three top-level fields: `product_type`
+  (`WC_Product::get_type()`, incl. gift-card plugins' custom types — the robust
+  non-product signal), `is_virtual`, `is_downloadable` (stored, never
+  auto-excluding). Builder +2 unit tests; **live-walk 9/9** (the gift-card
+  `product_type: pw-gift-card` send is accepted, `processed=1 errors=[]`). Gates:
+  ci:strict exit=0 (350 unit / 156 JS). Two engine return-questions answered in
+  `docs/ENGINE_TEAM_recommendable_signal.md` (language-switcher `wc-49143` is NOT
+  removed by CC.1–3 — needs its product_type / a post-49143 inspection to decide
+  a targeted drop; MiuMjau's gift-card type string — Erkki to confirm or
+  self-heal on re-backfill). **Ship the signal with the canonical re-backfill**
+  so the post-reload catalog classifies on the first pass.
 
 Already done (no work): **P2b `customers.language`** — `CustomerPayloadBuilder`
 already sends ISO 639-1 from `get_user_locale()`.

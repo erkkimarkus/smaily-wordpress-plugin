@@ -360,6 +360,36 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( 'food', $payload['category_path'], 'A variation must inherit its parent product category.' );
 	}
 
+	// --- structural signal (product_type / virtual / downloadable, CC.4) -----
+
+	public function test_build_emits_structural_signal_fields(): void {
+		$product = $this->fake_product(
+			array(
+				'id'           => 7,
+				'sku'          => 'GC-1',
+				'type'         => 'pw-gift-card',
+				'virtual'      => true,
+				'downloadable' => true,
+			)
+		);
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
+
+		// The engine derives `recommendable` from these — the plugin only
+		// supplies the signal, it never excludes (DECISIONS F3-38).
+		self::assertSame( 'pw-gift-card', $payload['product_type'] );
+		self::assertTrue( $payload['is_virtual'] );
+		self::assertTrue( $payload['is_downloadable'] );
+	}
+
+	public function test_simple_product_signal_defaults(): void {
+		$payload = ( new CatalogPayloadBuilder() )->build( $this->fake_product( array( 'id' => 1, 'sku' => 'S' ) ), 'u' );
+
+		self::assertSame( 'simple', $payload['product_type'] );
+		self::assertFalse( $payload['is_virtual'] );
+		self::assertFalse( $payload['is_downloadable'] );
+	}
+
 	// --- multilingual model B ({lang:value} objects, CC.3) -------------------
 
 	public function test_multilingual_fields_are_sent_as_lang_value_objects(): void {
@@ -509,6 +539,15 @@ final class CatalogPayloadBuilderTest extends TestCase {
 			public function is_type( $type ) {
 				return ( $this->p['type'] ?? 'simple' ) === $type;
 			}
+			public function get_type() {
+				return (string) ( $this->p['type'] ?? 'simple' );
+			}
+			public function is_virtual() {
+				return (bool) ( $this->p['virtual'] ?? false );
+			}
+			public function is_downloadable() {
+				return (bool) ( $this->p['downloadable'] ?? false );
+			}
 			public function get_children( $context = 'view' ) {
 				return $this->p['children'] ?? array();
 			}
@@ -541,6 +580,9 @@ if ( ! class_exists( \WC_Product::class ) ) {
 			public function get_short_description( $context = 'view' ) { return ''; }
 			public function get_image_id( $context = 'view' ) { return 0; }
 			public function is_type( $type ) { return false; }
+			public function get_type() { return 'simple'; }
+			public function is_virtual() { return false; }
+			public function is_downloadable() { return false; }
 			public function get_children( $context = 'view' ) { return array(); }
 			public function get_attributes( $context = 'view' ) { return array(); }
 			public function get_attribute( $name ) { return ''; }

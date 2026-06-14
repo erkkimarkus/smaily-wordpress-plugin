@@ -1966,14 +1966,19 @@ non-products (gift cards, donation items, language-switcher pseudo-products) out
 of catalog sync — call it "CC.4". CC.1–CC.3 (canonical collapse + `{lang:value}`)
 are done and live-walked; this was the last open item.
 
-**Decision (proposed; pending engine confirmation, 2026-06-14):** the plugin
-does **NOT** build a hard non-product filter. Instead the plugin sends *signal*
-(product type / virtual / downloadable) and the **engine's `recommendable` flag
-(migration 0039) owns the exclusion decision**. The exact signal fields + whether
-to ship before go-live are posed to the engine team in
-`docs/ENGINE_TEAM_recommendable_signal.md`. No filter code lands until that
-answer; the `recommendable` flag already excludes MiuMjau's non-products
-(Erkki confirmed they no longer appear in results).
+**Decision (CONFIRMED + implemented, 2026-06-14):** the plugin does **NOT**
+build a hard non-product filter. Instead it sends *signal* — `product_type`
+(`WC_Product::get_type()`, incl. gift-card plugins' custom types), `is_virtual`,
+`is_downloadable` as top-level catalog fields — and the **engine's
+`recommendable` flag (migrations 0039/0040) owns the exclusion decision**. Engine
+team confirmed the division (commit 37a8f66) and consumes the fields
+(`classifyRecommendable`: gift-card types → excluded; virtual/downloadable never
+auto-exclude). `CatalogPayloadBuilder` always emits the three fields; builder
+unit tests + live-walk 9/9 (`bin/walk-cc3-multilingual.cjs` — the engine accepts
+a `pw-gift-card` type). The Q&A + the two engine return-questions
+(language-switcher `wc-49143`; MiuMjau's gift-card type string) are in
+`docs/ENGINE_TEAM_recommendable_signal.md`. Ship the signal with the canonical
+re-backfill so the post-reload catalog classifies first-pass.
 
 **Rationale:** "is this product recommendable?" is a **business-model decision**,
 not a structural one a connector can make safely. (1) It's per-client — MiuMjau's

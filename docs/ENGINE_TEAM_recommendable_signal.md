@@ -70,9 +70,52 @@ exclusion logic in the plugin.
    as a small follow-up (not block go-live), unless you see name-match failing
    for the pilot.
 
+## Resolution (2026-06-14)
+
+Engine team confirmed all three (commit 37a8f66): **plugin sends signal, engine
+decides**. Contract §3 already carries `product_type` / `is_virtual` /
+`is_downloadable`; migration 0040 + `classifyRecommendable` consume them
+(gift-card types → `recommendable=false`; virtual/downloadable never
+auto-exclude). Q3: follow-up, not a go-live blocker.
+
+**Plugin side — SHIPPED (CC.4):** `CatalogPayloadBuilder` now always emits the
+three top-level fields (`product_type` = `WC_Product::get_type()`, incl.
+gift-card plugins' custom types; `is_virtual` / `is_downloadable`). Unit-tested
++ **live-walked 9/9** against the sandbox (`bin/walk-cc3-multilingual.cjs`): the
+engine accepts the fields, incl. a `product_type: pw-gift-card` send
+(`processed=1 errors=[]`). The signal ships with the canonical re-backfill, so
+the post-reload catalog is classified on the first pass.
+
+**Two return-questions answered:**
+
+1. **Language-switcher `wc-49143`** — does CC.1–3 remove it? **No.** CC.2 only
+   collapses translation *duplicates* to a canonical row; it never drops a row by
+   nature. `wc-49143` carries our synthetic `wc-{id}` key, which means it IS a
+   `post_type=product` on the store (that's the only thing our enumeration
+   ingests). So:
+   - The `product_type` signal will now reveal its actual type. **Please
+     classify from that.** If it's a distinguishable artifact type, add it to the
+     exclusion set (same as gift-card types).
+   - If it's a plain `simple` product (a fake "product" the merchant uses as a
+     language link), there is **no structural signal** separating it from a real
+     product — we will NOT add a name/category heuristic (it would harm a real
+     store). That case stays your name-match + the merchant cleaning up the fake
+     product. **To decide:** someone inspect post 49143 in MiuMjau
+     (`post_type` + WC product type). If it's a real Polylang/menu post type
+     (not `product`), it never reached you via us and is a different path.
+
+2. **MiuMjau's gift-card plugin `product_type` string** — we don't have MiuMjau
+   store access from here. Two ways to 100%: (a) Erkki checks MiuMjau (open a
+   gift-card product → its type), or (b) the canonical re-backfill ships
+   `product_type` and you SEE the actual string in the data, then add it to the
+   set (one-pass self-heal). Your current set
+   (`gift-card`/`gift_card`/`pw-gift-card`/`wc_gc`/`gift_certificate`) likely
+   already covers it; (a) just confirms before the reload.
+
 ## Reference
 
-- Plugin position + decision log: `docs/DECISIONS.md` (CC.4), `STATUS.md`
+- Plugin position + decision log: `docs/DECISIONS.md` (F3-38), `STATUS.md`
   (catalog-correctness section).
 - Contract: `RECENGINE_API_CONTRACT.md` §3 (catalog), engine-internal
   `recommendable`.
+- Live-walk: `bin/walk-cc3-multilingual.cjs` (CC.3 + CC.4, 9/9 sandbox).
