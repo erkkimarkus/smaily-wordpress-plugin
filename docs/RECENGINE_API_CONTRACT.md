@@ -606,6 +606,9 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 | `external_id` | string | NO | Plugin/platform internal ID (for debugging/traceability). |
 | `tags` | object | NO | Best-effort mapping (engine uses immediately) |
 | `raw_attributes` | object | NO | Raw platform data. **Currently stored verbatim and not processed** — the AI mapping wizard / `unmapped_attributes` flow is planned, not yet implemented. |
+| `product_type` | string | NO | Platform product type — WC `simple`/`variable`/`grouped`/`external` **plus gift-card plugins' custom types** (`pw-gift-card`, `gift-card`, `gift_card`, `wc_gc`, …). The **robust non-product signal**: the engine derives `recommendable` from this (gift-card types → excluded). Send it; do not hard-filter on it yourself. |
+| `is_virtual` | boolean | NO | WC virtual flag. **Stored as signal, not auto-excluding** — a legitimate digital/virtual-goods store sells these. Lets the engine distinguish a digital store from a config artifact. |
+| `is_downloadable` | boolean | NO | WC downloadable flag. Same semantics as `is_virtual` — stored, not auto-excluding. |
 
 <a name="sale-semantics"></a>
 **Sale semantics** (D2 Variant 1, Shopify convention):
@@ -624,7 +627,7 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 - **Lifecycle is UPSERT-only — no delete-by-absence.** The engine UPSERTs by `sku`; it never removes a `sku` merely because it stopped appearing in a sync. Removal is explicit: re-send the product with `in_stock=false`. **Consequence when changing the SKU scheme:** if a sender migrates SKUs (e.g. from per-language `wc-<translation_id>` to canonical `wc-<canonical_id>`), the old SKUs are **not** auto-removed — they linger as stale rows. The engine does **not** offer a full-catalog replace/reconcile; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
 
 <a name="engine-internal"></a>
-**Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): computed from `sku`/`category_path`/`name` to exclude test artifacts (`LIVE-*`, `live-test`) and non-products (gift cards, donation items). Recomputed on every upsert, so a corrected sync self-heals. Excluded products are never recommended via any path.
+**Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): the engine's **exclusion decision** (a per-store/business-model call the connector must NOT make). Derived primarily from the **`product_type` signal** (gift-card types → excluded), with `sku`/`category_path`/`name` heuristics as fallback (test artifacts `LIVE-*`/`live-test`, name-matched gift cards/donations). `is_virtual`/`is_downloadable` are **stored but do NOT auto-exclude** (digital-goods stores sell those). Recomputed on every upsert, so a corrected sync self-heals; tunable engine-side without redeploying connectors. Excluded products are never recommended via any path. **Division of labour: the connector sends structural signal; the engine owns the exclusion.**
 
 **Response 200 OK** (all products valid):
 ```json

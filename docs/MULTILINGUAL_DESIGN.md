@@ -163,8 +163,13 @@ connector'itele võrdselt.
   tõlgetena (Translate & Adapt / Translations API), MITTE eraldi toodetena →
   duplikatsiooni-risk väiksem. AGA Shopify tiim peab SAMUTI: (a) saatma
   `{lang:value}` sisu (tõmmatud Translations API-st) mitmekeelse poe puhul,
-  (b) saatma kliendi locale → `customers.language`, (c) filtreerima mitte-tooted
-  (Shopify "Gift card" tooteliik!), (d) sünteetilise SKU SKU-ta variantidele
+  (b) saatma kliendi locale → `customers.language`, (c) saatma mitte-toote
+  **SIGNAALI** (mitte filtreerima): Shopify `isGiftCard=true` → `product_type:"gift_card"`
+  (engine välistab selle automaatselt), digi-kaup `requiresShipping=false` →
+  `is_virtual:true` (salvestatakse, EI välista); ÄRA saada draft/archived tooteid
+  (status != active) või saada `in_stock=false`-ga. **NB:** ära pane Shopify vaba-
+  teksti `productType` (merchandising-kategooria) `product_type` välja — see on
+  kategooria/tag, mitte struktuurne tüüp. (d) sünteetilise SKU SKU-ta variantidele
   (stabiilne). Ühe-keelne Shopify pood = stsenaarium A, midagi erilist pole vaja.
 - **Make-flow:** sama leping; mitmekeelsus sõltub sellest, mida flow ehitab.
 
