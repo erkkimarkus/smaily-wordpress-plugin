@@ -39,6 +39,28 @@ describe('BackfillPanel', () => {
     expect(screen.getByText(/no orders to import/i)).toBeInTheDocument();
   });
 
+  it('shows the synced count as an absolute number, not a fraction of raw posts', async () => {
+    // Multilingual catalog: 7794 raw posts (each language a separate post)
+    // collapse to ~1354 canonical products. `sent` (canonical) must NOT be
+    // shown over `total` (raw posts) — that read as a misleading "1354 of 7794".
+    vi.spyOn(api, 'getBackfillStatus').mockResolvedValue({
+      status: 'completed',
+      processed: 7794,
+      sent: 1354,
+      failed: 0,
+      total: 7794,
+      percent: 100,
+      eta_seconds: null,
+      started_at: '2026-06-14 10:00:00',
+      completed_at: '2026-06-14 10:05:00',
+    });
+
+    render(<BackfillPanel jobType="products" label="Products" recordCount={1354} />);
+
+    expect(await screen.findByText(/1354 products synced/i)).toBeInTheDocument();
+    expect(screen.queryByText(/of 7794/i)).not.toBeInTheDocument();
+  });
+
   it('starts the backfill for its own job type on click', async () => {
     const startSpy = vi
       .spyOn(api, 'startBackfill')

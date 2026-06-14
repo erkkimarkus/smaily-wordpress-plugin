@@ -80,10 +80,18 @@ export function BackfillPanel({
             ariaLabel={`${label} backfill progress`}
           />
           <p className="mt-2 text-xs text-text-secondary">
-            {/* Engine-confirmed sent (not just walked) so the count is honest
-                when rows fail; the per-row failures are listed in the Event Log. */}
-            {isRunning && `Synced ${progress.sent} of ${progress.total}.`}
-            {isComplete && `Done — ${progress.sent} of ${progress.total} ${noun} synced.`}
+            {/* Show the engine-confirmed `sent` count as an absolute number, NOT
+                as `sent / total`. For the products domain `total` counts every
+                raw post including each language translation (Polylang/WPML), so a
+                multilingual catalog collapses many posts into one canonical
+                product — `sent` (canonical) over `total` (raw) then reads as a
+                misleading fraction (e.g. "1381 of 7794" ≈ 17% when the catalog is
+                actually ~complete). The bar already conveys completion via
+                `percent` (walked/total, a self-consistent ratio); the count beside
+                it is the honest number of products synced. Per-row failures are
+                listed in the Event Log. */}
+            {isRunning && `Synced ${progress.sent} ${noun} · ${progress.percent}% complete`}
+            {isComplete && `Done — ${progress.sent} ${noun} synced.`}
             {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
             {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
           </p>
