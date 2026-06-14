@@ -1958,6 +1958,45 @@ time dimension); STATUS pilot checklist (CartBounty coexistence decision is
 the merchant's: two abandoned-cart systems on one store = double-reminder
 risk).
 
+### F3-38 — Non-product exclusion is the engine's job (signal, not a connector filter)
+
+**Context:** the catalog-correctness brief (`PLUGIN_BRIEF_catalog_correctness.md`
+§P3 / `PROMPT_woo_plugin_team.md` item 6) asked the plugin to filter
+non-products (gift cards, donation items, language-switcher pseudo-products) out
+of catalog sync — call it "CC.4". CC.1–CC.3 (canonical collapse + `{lang:value}`)
+are done and live-walked; this was the last open item.
+
+**Decision (proposed; pending engine confirmation, 2026-06-14):** the plugin
+does **NOT** build a hard non-product filter. Instead the plugin sends *signal*
+(product type / virtual / downloadable) and the **engine's `recommendable` flag
+(migration 0039) owns the exclusion decision**. The exact signal fields + whether
+to ship before go-live are posed to the engine team in
+`docs/ENGINE_TEAM_recommendable_signal.md`. No filter code lands until that
+answer; the `recommendable` flag already excludes MiuMjau's non-products
+(Erkki confirmed they no longer appear in results).
+
+**Rationale:** "is this product recommendable?" is a **business-model decision**,
+not a structural one a connector can make safely. (1) It's per-client — MiuMjau's
+donation is categorised `kassitoit` (same as real food), its gift cards are a
+specific plugin's type; the next store looks nothing alike. (2) Any structural
+heuristic backfires: a `is_virtual()`/`is_downloadable()`/category filter would
+drop the **real products of a legitimate digital-goods store**. (3) The engine
+flag is the right layer — centralized, recomputed per upsert, self-healing on
+re-sync, tunable without redeploying every connector. Plugin sends signal; engine
+decides — not the reverse.
+
+**Alternatives:** a plugin-side filter keyed on the gift-card plugin's product
+type (rejected as the default — per-client, needs the merchant's plugin identity,
+and only catches gift cards, not the donation case); name/category heuristics
+(rejected — fragile, lossy, false-positives). If the engine insists on a
+connector-side drop for a specific case, we require a robust per-type rule, never
+a name/category guess.
+
+**Relationships:** F3-36 (SkuResolver — the same "engine owns the keying/decision,
+plugin supplies clean data" division); engine `recommendable` (migration 0039,
+defense-in-depth already shipped); CC.1–CC.3 (the correctness work this closes
+out); `ENGINE_TEAM_recommendable_signal.md` (the open question).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

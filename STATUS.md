@@ -582,14 +582,18 @@ checkpoint between each; CC.4 last (blocked — see below).
   flag. **NB: the dev wp-env is now connected to the SANDBOX tenant** (was
   MiuMjau-production — switched via the new token; this is the correct/safe
   state per CLAUDE.md, do not point dev at MiuMjau).
-- **CC.4 — BLOCKED** — P3 non-product filter. Must filter in-source by **WC
-  product type / gift-card-plugin meta** (NOT name/category heuristics — MiuMjau's
-  donation is categorised `kassitoit`, same as real food). Blocked on: **which
-  gift-card + donation plugin does MiuMjau use?** (each has its own product type).
-  Engine sees 8 non-products + `raw_attributes`=null. Engine `recommendable` flag
-  (migration 0039) excludes them defensively by name-match (fragile). See memory
-  `project_catalog_correctness_p3`. Engine bonus-ask: send `raw_attributes`
-  (incl. product type) generally for a fallback signal.
+- **CC.4 — REFRAMED, not building a filter (DECISIONS F3-38, 2026-06-14).**
+  The P3 "non-product filter" is **declined as a plugin-side feature**: "is this
+  recommendable?" is a business-model decision a connector can't make safely
+  (per-client; a `is_virtual()`/category heuristic would drop a legitimate
+  digital-goods store's REAL products). The engine's `recommendable` flag
+  (migration 0039) owns the exclusion — centralized, per-upsert, tunable — and
+  already excludes MiuMjau's non-products (Erkki: they no longer appear in
+  results). **Open question posed to the engine team**
+  (`docs/ENGINE_TEAM_recommendable_signal.md`): confirm the plugin sends *signal*
+  (`product_type` / virtual / downloadable) instead of filtering, and which
+  fields they want. No filter/signal code until they answer; not a go-live
+  blocker (the flag handles MiuMjau today).
 
 Already done (no work): **P2b `customers.language`** — `CustomerPayloadBuilder`
 already sends ISO 639-1 from `get_user_locale()`.
