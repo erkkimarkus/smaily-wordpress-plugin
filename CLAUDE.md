@@ -148,6 +148,49 @@ datetime field goes through IsoDate.
 (Verify exact paths/scripts against the repo — this list is the working set as
 of orders ingest; update if the build evolves.)
 
+### Cutting a release ZIP + GH pre-release (the full local sequence)
+`composer run package` ALONE is not a release — it rsync+zips the working tree
+but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,
+`blocks/*/build/` are gitignored. The CI `release.yml` is INCOMPLETE (it never
+runs the admin vite build and its `compile-translations` step has no wp-cli, so
+it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
+2026-06-14, v2.1.0-beta.3-rc.1):
+1. Bump version in FOUR places: `smaily-connect.php` (Version header +
+   `SMAILY_CONNECT_VERSION` + `SMAILY_CONNECT_PLUGIN_VERSION`), `package.json`,
+   `readme.txt` (Stable tag + Changelog + Upgrade Notice). Also the test pins:
+   `tests/Unit/ConstantsTest.php`, `tests/bootstrap.php`,
+   `tests/phpstan-bootstrap.php` (else ConstantsTest fails). Commit FIRST so
+   `package:hash` stamps a clean (non-`-dirty`) build-hash.
+2. `npm run build:admin && npm run build:client` → `dist/admin/*`,
+   `dist/public/js/beacon.js`.
+3. `composer run install-block-modules && composer run build` → `blocks/*/build/*`
+   (the first installs `blocks/node_modules`; without it `wp-scripts` is missing).
+4. Translations: skip `compile-translations` if no new `__()` strings (host has no
+   wp-cli) — the committed `languages/*.mo`/`*.json` are then current.
+5. `composer install --no-dev --optimize-autoloader` (prod vendor) →
+   `composer run package` → `composer install` (restore dev so tests work again).
+6. VERIFY the ZIP before releasing: version string; required present
+   (`dist/admin/admin.js`, `dist/public/js/beacon.js`, `blocks/*/build/*`,
+   `vendor/autoload.php`, `languages/*.mo`); NOT present (`tests`, `docs`,
+   `node_modules`, `admin/src`, `dist/client`, dev vendor pkgs). `.zipignore`
+   excludes `blocks/node_modules` (583M) — a bloated ZIP means it leaked.
+7. **`gh release create … --repo erkkimarkus/smaily-wordpress-plugin`** — the
+   `--repo` is MANDATORY: `gh` defaults to `upstream` (sendsmaily) and 404s
+   (no write access). Tag convention `v<version>-rc.<N>`, `--prerelease`,
+   `--target main`, attach `smaily-connect.zip`. `release.yml` fires on publish
+   but fails harmlessly (no wp-cli) → does NOT clobber the attached asset
+   (confirmed: prior releases' release.yml runs are all red too).
+
+### CI "Lint and test the codebase" is PRE-EXISTING red on main — not authoritative
+The GH workflow runs `composer run test:php` (= bare `phpunit`, includes the
+Integration suite) in a runner WITHOUT WooCommerce → ~76 "WooCommerce not active"
+errors. It has been red since before the catalog-correctness work (e.g. e22a26b,
+2026-06-12). Do NOT read a red "Lint and test" as "I broke something." The
+authoritative gates are LOCAL: `npm run ci:strict` (unit + static + JS) and
+`sg docker -c "composer run test:integration"` (real WP+WC via wp-env). If you
+touch CI, the fix is to run only `phpunit --testsuite unit` there (or give the
+integration job a wp-env), not to chase the integration errors.
+
 ### Browse browser-timing is NOT live-walk-covered (manual pilot check)
 Browse (3.4) is client-originated telemetry, so unlike catalog/customers/orders
 the live-walk (`bin/walk-3.4-browse.cjs`) proves only the server side:

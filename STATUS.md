@@ -26,18 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-14 (**catalog-correctness CC.1 + CC.2 + CC.3 DONE** —
-multilingual fix; model **(B) {lang:value}**. CC.1 = canonical adapter primitive;
-CC.2 = canonical SKU across catalog+orders+browse + enumeration collapse + P4;
-**CC.3 = {lang:value} payload, 500-char/lang clamp; **CC.4 = structural signal
-(product_type/is_virtual/is_downloadable), NOT a filter** (engine owns
-recommendable, F3-38). **CC.1–CC.4 all DONE + live-walked** (sandbox 9/9: engine
-accepts {lang:value} + the signal incl. a gift-card type). MiuMjau = WPML + WCML
-(variations auto-resolve). Catalog-correctness **code-complete**; remaining is
-go-live coordination: deploy → engine WIPES the MiuMjau SKU graph → plugin full
-re-backfill (ship the signal with it) → engine recompute. Open: engine's
-language-switcher `wc-49143` classification (its product_type / a post-49143
-inspection). See the catalog-correctness section below. Earlier 2026-06-12 late:
+_Last updated: 2026-06-14 (**catalog-correctness CC.1–CC.4 DONE + RELEASED +
+DEPLOYED** — multilingual fix, model **(B) {lang:value}** + structural signal
+(NOT a filter, engine owns `recommendable`, F3-38). Released
+**`v2.1.0-beta.3-rc.1`** (GH pre-release on the fork); Erkki DEPLOYED to MiuMjau;
+**canonical re-sync running; engine team confirmed the data arrives in the correct
+shape.** Go-live sequence: deploy ✓ → engine wipes MiuMjau SKU-graph → full
+re-backfill (signal + customers.language ride along) → engine recompute (in the
+wipe/rebackfill phase, continuing engine-side). CC.1 canonical adapter primitive;
+CC.2 canonical SKU (catalog+orders+browse, via SkuResolver) + collapse + P4; CC.3
+{lang:value} payload (500-char/lang); CC.4 product_type/is_virtual/is_downloadable
+signal. Live-walk **9/9** (`bin/walk-cc3-multilingual.cjs`, sandbox). MiuMjau =
+WPML + WCML (variations auto-resolve). OPEN: language-switcher `wc-49143` classify
+(its product_type from the re-backfill / post-49143 inspection); MiuMjau gift-card
+type string (self-heals on re-backfill); CI "Lint and test" PRE-EXISTING red
+(integration-without-WC, not ours); dev wp-env sandbox conn scrubbed by the last
+integration run (fresh token for future walks). Release/CI notes in CLAUDE.md. See
+the catalog-correctness section below. Earlier 2026-06-12 late:
 **engine go-live sync done** — results in
 docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
 sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
