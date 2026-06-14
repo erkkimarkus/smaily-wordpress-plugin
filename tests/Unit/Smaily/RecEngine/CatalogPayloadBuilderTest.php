@@ -14,6 +14,8 @@ namespace Smaily\Connect\Tests\Unit\Smaily\RecEngine;
 use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
 
 final class CatalogPayloadBuilderTest extends TestCase {
@@ -21,15 +23,27 @@ final class CatalogPayloadBuilderTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		// No multilingual plugin in this process → DetectorFactory resolves the
+		// single-language SiteLocale fallback, so get_translations() returns
+		// scalars and build() uses the product's own fields (the single-language
+		// behaviour these tests assert). Reset to stay deterministic.
+		DetectorFactory::reset();
 
 		Functions\when( 'wp_strip_all_tags' )->alias( static fn( $s ) => strip_tags( (string) $s ) );
 		Functions\when( 'get_permalink' )->justReturn( 'https://shop.test/p/acana-3kg' );
 		Functions\when( 'wp_get_attachment_url' )->justReturn( false );
 		Functions\when( 'get_the_terms' )->justReturn( false );
 		Functions\when( 'get_ancestors' )->justReturn( array() );
+		// SiteLocaleAdapter::get_translations() reads these — stub so they don't
+		// trip Brain\Monkey; their scalar return keeps build() on the
+		// single-language (product-field) path.
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+		Functions\when( 'get_the_title' )->justReturn( '' );
+		Functions\when( 'get_post_field' )->justReturn( '' );
 	}
 
 	protected function tearDown(): void {
+		DetectorFactory::reset();
 		Monkey\tearDown();
 		parent::tearDown();
 	}
@@ -344,6 +358,109 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$payload = ( new CatalogPayloadBuilder() )->build( $variation, 'u' );
 
 		self::assertSame( 'food', $payload['category_path'], 'A variation must inherit its parent product category.' );
+	}
+
+	// --- multilingual model B ({lang:value} objects, CC.3) -------------------
+
+	public function test_multilingual_fields_are_sent_as_lang_value_objects(): void {
+		$builder = new CatalogPayloadBuilder(
+			$this->multilingual_detector(
+				array(
+					'name'        => array(
+						'et' => 'Acana Koer 3kg',
+						'en' => 'Acana Adult Dog 3kg',
+					),
+					'description' => array(
+						'et' => '<p>Premium kuivtoit</p>',
+						'en' => '<p>Premium dry food</p>',
+					),
+					'product_url' => array(
+						'et' => 'https://shop.test/et/acana-3kg',
+						'en' => 'https://shop.test/en/acana-3kg',
+					),
+				)
+			)
+		);
+
+		$payload = $builder->build( $this->fake_product( array( 'id' => 12345, 'sku' => 'ACA-3KG' ) ), 'u' );
+
+		self::assertSame( array( 'et' => 'Acana Koer 3kg', 'en' => 'Acana Adult Dog 3kg' ), $payload['name'] );
+		self::assertSame(
+			array( 'et' => 'https://shop.test/et/acana-3kg', 'en' => 'https://shop.test/en/acana-3kg' ),
+			$payload['product_url']
+		);
+		// Each language is tag-stripped independently.
+		self::assertSame( array( 'et' => 'Premium kuivtoit', 'en' => 'Premium dry food' ), $payload['description'] );
+	}
+
+	public function test_description_is_clamped_to_500_per_language(): void {
+		$builder = new CatalogPayloadBuilder(
+			$this->multilingual_detector(
+				array(
+					'name'        => array( 'et' => 'Nimi', 'en' => 'Name' ),
+					'description' => array(
+						'et' => str_repeat( 'a', 600 ),
+						'en' => 'short',
+					),
+					'product_url' => array( 'et' => 'https://s/et', 'en' => 'https://s/en' ),
+				)
+			)
+		);
+
+		$payload = $builder->build( $this->fake_product( array( 'id' => 1, 'sku' => 'S' ) ), 'u' );
+
+		self::assertSame( 500, strlen( $payload['description']['et'] ) );
+		self::assertSame( 'short', $payload['description']['en'] );
+	}
+
+	public function test_empty_language_values_are_dropped_from_the_object(): void {
+		$builder = new CatalogPayloadBuilder(
+			$this->multilingual_detector(
+				array(
+					'name'        => array( 'et' => 'Nimi', 'en' => '' ),
+					'description' => array( 'et' => '', 'en' => '' ),
+					'product_url' => array( 'et' => 'https://s/et', 'en' => '' ),
+				)
+			)
+		);
+
+		$payload = $builder->build( $this->fake_product( array( 'id' => 1, 'sku' => 'S' ) ), 'u' );
+
+		self::assertSame( array( 'et' => 'Nimi' ), $payload['name'], 'The empty en title is dropped.' );
+		self::assertSame( array( 'et' => 'https://s/et' ), $payload['product_url'] );
+		self::assertArrayNotHasKey( 'description', $payload, 'All-empty description object → field omitted.' );
+	}
+
+	public function test_empty_name_object_falls_back_to_the_product_name(): void {
+		// A REQUIRED field whose every language is empty must not be sent empty —
+		// fall back to the product's own scalar name.
+		$builder = new CatalogPayloadBuilder(
+			$this->multilingual_detector(
+				array(
+					'name'        => array( 'et' => '', 'en' => '' ),
+					'description' => array(),
+					'product_url' => array( 'et' => '', 'en' => '' ),
+				)
+			)
+		);
+
+		$payload = $builder->build(
+			$this->fake_product( array( 'id' => 1, 'sku' => 'S', 'name' => 'Fallback Name' ) ),
+			'u'
+		);
+
+		self::assertSame( 'Fallback Name', $payload['name'] );
+		self::assertSame( 'https://shop.test/p/acana-3kg', $payload['product_url'], 'Falls back to get_permalink scalar.' );
+	}
+
+	/**
+	 * @param array{name: array<string,string>, description: array<string,string>, product_url: array<string,string>} $translations
+	 */
+	private function multilingual_detector( array $translations ): DetectorInterface {
+		$detector = $this->createMock( DetectorInterface::class );
+		$detector->method( 'get_translations' )->willReturn( $translations );
+		$detector->method( 'get_canonical_post_id' )->willReturnArgument( 0 );
+		return $detector;
 	}
 
 	/**

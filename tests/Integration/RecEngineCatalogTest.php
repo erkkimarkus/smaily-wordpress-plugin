@@ -13,6 +13,7 @@ namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
+use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Multilingual\SiteLocaleAdapter;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
@@ -208,6 +209,61 @@ final class RecEngineCatalogTest extends TestCase {
 			array( $uuid ),
 			$received,
 			'End-to-end: the engine received products[].event_id == the queue row event_uuid.'
+		);
+	}
+
+	public function test_multilingual_name_is_sent_as_a_lang_value_object(): void {
+		// CC.3: with a multilingual detector, name/description/product_url go on
+		// the wire as `{lang: value}` objects. Proves the object form survives
+		// the real JSON round-trip to the engine (the mock accepts both forms;
+		// this asserts which one was sent).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$detector = $this->createMock( DetectorInterface::class );
+		$detector->method( 'get_canonical_post_id' )->willReturnArgument( 0 );
+		$detector->method( 'get_translations' )->willReturn(
+			array(
+				'name'        => array( 'et' => 'Eesti nimi', 'en' => 'English name' ),
+				'description' => array( 'et' => 'Eesti kirjeldus', 'en' => 'English description' ),
+				'product_url' => array( 'et' => 'https://shop.test/et/p', 'en' => 'https://shop.test/en/p' ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+		$builder  = new CatalogPayloadBuilder( $detector );
+		$product  = $this->make_product( 'CAT-ML-1', '9.99' );
+
+		// Creating the product fired the live hook (connected) and enqueued a
+		// row via Bootstrap's builder — clear it so only this test's row (built
+		// with the multilingual detector) reaches the engine.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}smly_rec_event_queue" );
+
+		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $product->get_id(), array() );
+
+		$flusher = new IngestFlusher(
+			$queue,
+			$builder,
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		self::assertSame( 1, $flusher->flush()['sent'] );
+
+		$names = self::$engine->state()['last_catalog_names'] ?? array();
+		self::assertSame(
+			array( array( 'et' => 'Eesti nimi', 'en' => 'English name' ) ),
+			$names,
+			'name reached the engine as a {lang:value} object, not a flattened string.'
 		);
 	}
 

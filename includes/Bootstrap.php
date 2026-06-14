@@ -649,7 +649,7 @@ final class Bootstrap {
 
 	public function catalog_payload_builder(): CatalogPayloadBuilder {
 		if ( $this->catalog_builder === null ) {
-			$this->catalog_builder = new CatalogPayloadBuilder();
+			$this->catalog_builder = new CatalogPayloadBuilder( $this->multilingual_detector() );
 		}
 
 		return $this->catalog_builder;

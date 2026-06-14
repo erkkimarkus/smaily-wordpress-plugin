@@ -315,6 +315,15 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		},
 		$products
 	);
+	// CC.3: record name as-sent (string OR {lang:value} object) so a test can
+	// assert the multilingual shape reached the wire — the mock accepts both
+	// forms but must not silently mask which one was sent.
+	$state['last_catalog_names'] = array_map(
+		static function ( $product ) {
+			return $product['name'] ?? null;
+		},
+		$products
+	);
 	save_state( $state_file, $state );
 
 	$response = array(

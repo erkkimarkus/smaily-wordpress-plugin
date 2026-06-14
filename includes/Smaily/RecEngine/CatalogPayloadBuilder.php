@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily\RecEngine;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
 use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
 
@@ -46,10 +48,15 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
  * REQUIRED fields (sku, name, category_path, price, in_stock,
  * product_url) plus event_id and external_id are always present.
  *
- * Single-language only in this sub-PR — name/description/product_url are
- * sent as plain strings. The multilingual object form (RECENGINE §3) is
- * a later sub-PR (3.3+); the engine accepts both and wraps a bare string
- * as {default: "..."} internally.
+ * Multilingual (catalog-correctness CC.3, model B): name/description/
+ * product_url are sent as a `{lang: value}` object when the site is
+ * multilingual (the DetectorInterface returns per-language translations),
+ * else as a plain string (single-language stores degrade to model A — the
+ * engine wraps a bare string as {default: "..."} internally). The detector
+ * runs on the CANONICAL product (catalog enumeration already collapsed
+ * translations, CC.2), so get_translations() returns every language's
+ * title/excerpt/permalink keyed by locale. description is clamped to 500
+ * chars PER LANGUAGE (contract §3).
  *
  * Not final: tests subclass to stub the WP/WC taxonomy reads. Same
  * rationale as SubscriberPayloadBuilder and Smaily\Client.
@@ -58,6 +65,20 @@ class CatalogPayloadBuilder {
 
 	/** Contract caps `description` at 500 chars. */
 	private const DESCRIPTION_MAX = 500;
+
+	/** Multilingual detector; lazily the active one when not injected. */
+	private ?DetectorInterface $detector;
+
+	public function __construct( ?DetectorInterface $detector = null ) {
+		$this->detector = $detector;
+	}
+
+	private function detector(): DetectorInterface {
+		if ( $this->detector === null ) {
+			$this->detector = DetectorFactory::create();
+		}
+		return $this->detector;
+	}
 
 	/**
 	 * Expand a product into the ingestable units it represents.
@@ -88,16 +109,18 @@ class CatalogPayloadBuilder {
 	 * @return array<string, mixed>
 	 */
 	public function build( \WC_Product $product, string $event_uuid ): array {
+		$translations = $this->detector()->get_translations( (int) $product->get_id() );
+
 		$payload = array(
 			// queue.event_uuid → wire body.event_id. The one rename that
 			// carries the row's idempotency key to the engine, per-product.
 			'event_id'      => $event_uuid,
-			'sku'           => SkuResolver::resolve( $product ),
-			'name'          => (string) $product->get_name(),
+			'sku'           => SkuResolver::resolve( $product, $this->detector() ),
+			'name'          => $this->localized( $translations['name'], (string) $product->get_name() ),
 			'category_path' => $this->primary_category_path( $product ),
 			'price'         => (float) $product->get_price(),
 			'in_stock'      => (bool) $product->is_in_stock(),
-			'product_url'   => $this->product_url( $product ),
+			'product_url'   => $this->localized( $translations['product_url'], $this->product_url( $product ) ),
 			'external_id'   => (string) $product->get_id(),
 		);
 
@@ -111,8 +134,8 @@ class CatalogPayloadBuilder {
 			$payload['on_sale_until'] = $on_sale_until;
 		}
 
-		$description = $this->description( $product );
-		if ( $description !== '' ) {
+		$description = $this->localized_description( $product, $translations['description'] );
+		if ( $description !== '' && $description !== array() ) {
 			$payload['description'] = $description;
 		}
 
@@ -158,14 +181,66 @@ class CatalogPayloadBuilder {
 		return IsoDate::to_z( (int) $date->getTimestamp() );
 	}
 
+	/**
+	 * A REQUIRED string field (name, product_url) as the engine's `{lang: value}`
+	 * object when the detector supplied per-language translations, else the
+	 * single scalar. Empty per-language entries are dropped; an all-empty map
+	 * falls back to the scalar so a required field is never sent empty
+	 * (RECENGINE_API_CONTRACT.md §3 — `name`/`product_url` non-empty).
+	 *
+	 * @param array<string, string>|string $translated get_translations() field.
+	 *
+	 * @return array<string, string>|string
+	 */
+	private function localized( $translated, string $fallback ) {
+		if ( is_array( $translated ) ) {
+			$map = array_filter(
+				array_map( 'strval', $translated ),
+				static fn ( string $value ): bool => $value !== ''
+			);
+			if ( $map !== array() ) {
+				return $map;
+			}
+		}
+		return $fallback;
+	}
+
+	/**
+	 * description as a `{lang: value}` object (each language clamped to 500
+	 * chars) when multilingual, else the single clamped string. Returns '' /
+	 * array() when there's nothing to send so build() omits the OPTIONAL field.
+	 *
+	 * @param array<string, string>|string $translated get_translations() value.
+	 *
+	 * @return array<string, string>|string
+	 */
+	private function localized_description( \WC_Product $product, $translated ) {
+		if ( is_array( $translated ) ) {
+			$map = array();
+			foreach ( $translated as $lang => $raw ) {
+				$clamped = $this->clamp_description( (string) $raw );
+				if ( $clamped !== '' ) {
+					$map[ (string) $lang ] = $clamped;
+				}
+			}
+			return $map;
+		}
+		return $this->description( $product );
+	}
+
 	private function description( \WC_Product $product ): string {
-		$raw  = (string) $product->get_short_description();
+		return $this->clamp_description( (string) $product->get_short_description() );
+	}
+
+	/**
+	 * Strip tags, trim, and cap at the contract's 500-char ceiling so the
+	 * engine doesn't reject or silently truncate. Applied per language.
+	 */
+	private function clamp_description( string $raw ): string {
 		$text = trim( (string) wp_strip_all_tags( $raw ) );
 		if ( $text === '' ) {
 			return '';
 		}
-		// Respect the contract's 500-char ceiling so the engine doesn't
-		// reject or silently truncate.
 		if ( function_exists( 'mb_substr' ) ) {
 			return mb_substr( $text, 0, self::DESCRIPTION_MAX );
 		}

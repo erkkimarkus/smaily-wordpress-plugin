@@ -26,15 +26,16 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-13 (**catalog-correctness CC.1 + CC.2 DONE** — multilingual
-translation-duplication fix; Erkki picked model **(B) {lang:value}**. CC.1 =
-behaviour-neutral canonical adapter primitive; **CC.2 = canonical SKU across
-catalog+orders+browse (SkuResolver) + enumeration collapse + P4**, scope grown to
-the whole SKU graph per the engine's order-items correction. MiuMjau = **WPML +
-WCML** (variations auto-resolve). Go-live: engine WIPES the MiuMjau SKU graph +
-plugin full re-backfill (supersedes §624 purge). CC.3 ({lang:value} payload) +
-CC.4 (non-product filter) next. See the catalog-correctness section below.
-Earlier 2026-06-12 late: **engine go-live sync done** — results in
+_Last updated: 2026-06-14 (**catalog-correctness CC.1 + CC.2 + CC.3 DONE** —
+multilingual fix; model **(B) {lang:value}**. CC.1 = canonical adapter primitive;
+CC.2 = canonical SKU across catalog+orders+browse + enumeration collapse + P4;
+**CC.3 = {lang:value} payload (name/description/product_url), 500-char/lang
+clamp, single-language degrades to scalar** — code+gates green, **live-walk
+PENDING** (needs sandbox + WPML-translated product). MiuMjau = WPML + WCML
+(variations auto-resolve). Go-live: engine WIPES the MiuMjau SKU graph + plugin
+full re-backfill. **CC.4 (non-product filter) next** — still blocked on which
+gift-card/donation plugin MiuMjau uses. See the catalog-correctness section
+below. Earlier 2026-06-12 late: **engine go-live sync done** — results in
 docs/ENGINE_TEAM_PILOT_SYNC_RESULTS.md; MiuMjau IS the pilot tenant (walks →
 sandbox from now on, CLAUDE.md updated); engine fixed 2 catalog-ingest bugs
 (the 91% retry-error rate was theirs); pilot needs: connection check after
@@ -557,12 +558,24 @@ checkpoint between each; CC.4 last (blocked — see below).
     ci:strict exit=0 (344 unit / 156 JS), integration OK 110.
   - **Still single-language content** until CC.3 — CC.2 fixes keys + collapse;
     `{lang:value}` payload is CC.3.
-- **CC.3** — P2 model B payload. `CatalogPayloadBuilder.build` consumes
-  `DetectorFactory::create()->get_translations()` → `{lang:value}` for
-  name/description/product_url; **500-char truncation per language**;
-  single-language → string (= A). CC-8 discipline: move the mock to object form
-  + live-walk the `{lang:value}` shape (the plugin code only follows the already-
-  synced contract here — until CC.3 lands the builder still sends plain strings).
+- **CC.3 DONE (code+gates; live-walk PENDING) (2026-06-14)** — model B
+  `{lang:value}` payload. `CatalogPayloadBuilder` takes an optional
+  `DetectorInterface` (Bootstrap injects it; lazy factory default).
+  `build()` calls `get_translations()` once: **array form → `{lang:value}`**
+  for name/description/product_url; **string form (single-language) → the
+  product's own scalar fields** (model A, unchanged behaviour). description is
+  tag-stripped + **clamped to 500 chars PER LANGUAGE**; empty per-language
+  entries dropped; an all-empty REQUIRED field falls back to the scalar so it's
+  never sent empty. SkuResolver gets the same detector for the canonical SKU.
+  Tests: builder +4 (object form / per-lang clamp / empty-drop / scalar
+  fallback), integration +1 (`{lang:value}` name survives the real Client→mock
+  JSON round-trip; mock now records `last_catalog_names`). Gates: ci:strict
+  exit=0 (348 unit / 156 JS), integration OK 111.
+  **⚠ CC-8 live-walk PENDING** — the mock accepts both shapes (loose), only the
+  live engine's strict Zod validates `{lang:value}`. Needs a connected SANDBOX
+  tenant + a WPML-translated product (Erkki: setup token + test data). Until the
+  live-walk runs, CC.3 is code-complete but not contract-proven against the real
+  engine (the exact failure mode CC-8 exists to catch — see LESSONS §2.7/§2.9).
 - **CC.4 — BLOCKED** — P3 non-product filter. Must filter in-source by **WC
   product type / gift-card-plugin meta** (NOT name/category heuristics — MiuMjau's
   donation is categorised `kassitoit`, same as real food). Blocked on: **which
