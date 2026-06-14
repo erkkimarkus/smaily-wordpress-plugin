@@ -283,6 +283,11 @@ function ConnectedView({
             jobType="products"
             label="Products"
             recordCount={state.env.storeTotals.products}
+            countNote={
+              state.env.detectedLanguages.length > 1
+                ? `Counts one entry per language (${state.env.detectedLanguages.length} detected). Translations are merged into a single product during import, so the synced total will be lower.`
+                : undefined
+            }
           />
           <BackfillPanel
             jobType="customers"

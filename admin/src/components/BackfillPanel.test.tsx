@@ -39,6 +39,19 @@ describe('BackfillPanel', () => {
     expect(screen.getByText(/no orders to import/i)).toBeInTheDocument();
   });
 
+  it('renders the multilingual count note under the record count when provided', () => {
+    render(
+      <BackfillPanel
+        jobType="products"
+        label="Products"
+        recordCount={7794}
+        countNote="Counts one entry per language (6 detected). Translations are merged into a single product during import, so the synced total will be lower."
+      />,
+    );
+    expect(screen.getByText(/7794 products to import/i)).toBeInTheDocument();
+    expect(screen.getByText(/one entry per language \(6 detected\)/i)).toBeInTheDocument();
+  });
+
   it('shows the synced count as an absolute number, not a fraction of raw posts', async () => {
     // Multilingual catalog: 7794 raw posts (each language a separate post)
     // collapse to ~1354 canonical products. `sent` (canonical) must NOT be

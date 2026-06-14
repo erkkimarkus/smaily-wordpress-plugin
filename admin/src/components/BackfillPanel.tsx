@@ -10,6 +10,13 @@ interface BackfillPanelProps {
   label: string;
   /** How many records exist (the button is disabled at 0). */
   recordCount: number;
+  /**
+   * Optional clarification under the record count. Used for the products
+   * domain on multilingual stores, where `recordCount` counts one post per
+   * language but the import collapses translations into one product each — so
+   * the synced total is lower by design and the raw count needs explaining.
+   */
+  countNote?: string;
   /** Poll interval; Settings uses 30s, the wizard 5s. */
   intervalMs?: number;
 }
@@ -28,6 +35,7 @@ export function BackfillPanel({
   jobType,
   label,
   recordCount,
+  countNote,
   intervalMs,
 }: BackfillPanelProps): React.JSX.Element {
   const { progress, pollError, start, cancel } = useBackfillProgress({
@@ -52,6 +60,9 @@ export function BackfillPanel({
               ? `${recordCount} ${noun} to import into the engine.`
               : `No ${noun} to import.`}
           </p>
+          {countNote && recordCount > 0 && (
+            <p className="mt-0.5 text-xs text-text-tertiary">{countNote}</p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button
