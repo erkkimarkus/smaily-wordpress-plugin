@@ -84,10 +84,25 @@ Mechanics (unchanged): the setup-token is **one-time** (consumed on
 exchange) and connections get scrubbed by integration test runs (snapshot/
 restore the `smly_rec_*` options around a suite run to keep one alive). When
 a live-walk reports `is_connected = 0`:
-- Ask the user to mint a fresh SANDBOX token into `/tmp/smaily_re_setup_token`
-  (plain token, secret-safe file method).
+- Ask the user to mint a fresh SANDBOX token (or a full setup URL
+  `https://<engine>/setup/<token>`) into a `/tmp/smaily_re_setup_*` file
+  (plain token/URL, secret-safe file method).
 - Exchange it via the plugin's real SetupExchange + store() path (F3-12).
 - Never echo the token; delete temp files after.
+
+**Secret-safe exchange mechanic (used CC.3, 2026-06-14).** The exchange runs
+inside the wp-env cli container (`wp eval-file`), which can't read the host
+`/tmp`. Bridge the token WITHOUT putting it on any command line: write a
+container-visible PHP that reads the URL from STDIN (`trim(fgets(STDIN))`),
+calls `SetupExchange::parse_setup_url()` → `exchange()` → `$settings->store()`,
+and prints only NON-secret fields (kind, tenant_name, connected). Pipe the file
+in: `cat /tmp/smaily_re_setup_url | sg docker -c "docker exec -i <cli> wp
+eval-file <script> --allow-root"`. `docker exec -i` forwards stdin; the token
+never appears in args/output. **Always print the resulting `tenant_name` and
+abort any send if it's `MiuMjau`** — the dev wp-env can be left pointing at
+production. `bin/walk-cc3-multilingual.cjs` bakes this safety gate in
+(`sandbox_tenant_not_production`); after CC.3 the dev env is connected to the
+"Smaily Connect test" SANDBOX — keep it there.
 
 ### woocommerce-stubs are PHPStan-only
 `woocommerce-stubs` is in the PHPStan config, NOT the runtime autoload. In unit

@@ -558,7 +558,7 @@ checkpoint between each; CC.4 last (blocked — see below).
     ci:strict exit=0 (344 unit / 156 JS), integration OK 110.
   - **Still single-language content** until CC.3 — CC.2 fixes keys + collapse;
     `{lang:value}` payload is CC.3.
-- **CC.3 DONE (code+gates; live-walk PENDING) (2026-06-14)** — model B
+- **CC.3 DONE (code+gates+live-walk) (2026-06-14)** — model B
   `{lang:value}` payload. `CatalogPayloadBuilder` takes an optional
   `DetectorInterface` (Bootstrap injects it; lazy factory default).
   `build()` calls `get_translations()` once: **array form → `{lang:value}`**
@@ -571,11 +571,17 @@ checkpoint between each; CC.4 last (blocked — see below).
   fallback), integration +1 (`{lang:value}` name survives the real Client→mock
   JSON round-trip; mock now records `last_catalog_names`). Gates: ci:strict
   exit=0 (348 unit / 156 JS), integration OK 111.
-  **⚠ CC-8 live-walk PENDING** — the mock accepts both shapes (loose), only the
-  live engine's strict Zod validates `{lang:value}`. Needs a connected SANDBOX
-  tenant + a WPML-translated product (Erkki: setup token + test data). Until the
-  live-walk runs, CC.3 is code-complete but not contract-proven against the real
-  engine (the exact failure mode CC-8 exists to catch — see LESSONS §2.7/§2.9).
+  **CC-8 live-walk DONE (2026-06-14)** — `bin/walk-cc3-multilingual.cjs`, **7/7
+  against the "Smaily Connect test" SANDBOX**: the real engine's strict Zod
+  **accepts the `{lang:value}` object** form of name/description/product_url
+  (processed=1, errors=[]) AND the single-language string form (model A). A stub
+  detector feeds the REAL CatalogPayloadBuilder, so it emits the same wire bytes
+  the WPML/Polylang path would — the engine can't tell the source, so the wire
+  contract is proven regardless of i18n plugin (no need to configure Polylang in
+  wp-env). Test SKUs `LIVE-CC3-*` → excluded by the engine's `recommendable`
+  flag. **NB: the dev wp-env is now connected to the SANDBOX tenant** (was
+  MiuMjau-production — switched via the new token; this is the correct/safe
+  state per CLAUDE.md, do not point dev at MiuMjau).
 - **CC.4 — BLOCKED** — P3 non-product filter. Must filter in-source by **WC
   product type / gift-card-plugin meta** (NOT name/category heuristics — MiuMjau's
   donation is categorised `kassitoit`, same as real food). Blocked on: **which
