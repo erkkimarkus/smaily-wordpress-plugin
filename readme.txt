@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.3
+Stable tag: 2.1.0-beta.4
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,12 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.4 =
+
+* Fixed: deleting draft or never-published products (including the temporary "auto-draft" entries WordPress cleans up automatically) no longer creates failed catalog events in the Event Log. Such products were never sent to the recommendation engine, so there is nothing to remove.
+* Fixed: the catalog import progress on multilingual stores now shows the true number of products synced (e.g. "1354 products synced") instead of a misleading fraction that compared products against the per-language post count.
+* Fixed: the Event Log's Retry and Details buttons stay visible on narrow screens and on failed rows — they are no longer pushed off the right edge.
 
 = 2.1.0-beta.3 =
 
@@ -197,6 +203,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.4 =
+Recommended maintenance update: stops failed catalog events for draft/auto-draft products in the Event Log, shows the true synced-product count during catalog import on multilingual stores, and keeps the Event Log's Retry/Details actions reachable. No re-import required.
 
 = 2.1.0-beta.3 =
 Recommended for multilingual stores (WPML / Polylang): translated products are now merged into one recommendation per product — no more language-mixed or duplicated recommendations — with per-language names, descriptions and links. After upgrading, re-run the catalog import; coordinate with Smaily, as the recommendation engine resets the product graph for a clean canonical re-sync.
