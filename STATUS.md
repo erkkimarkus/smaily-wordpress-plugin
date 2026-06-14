@@ -26,9 +26,14 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-14 (**catalog-correctness CC.1–CC.4 DONE + RELEASED +
-DEPLOYED**; **CC.5 catalog.delete auto-draft-burst fix** — skip never-published
-artifacts whose removal object the engine 400s, F3-39 / LESSONS §2.12.
+_Last updated: 2026-06-14 (**`2.1.0-beta.4-rc.1` RELEASED** — GH pre-release on
+the fork, bundles three fixes on top of beta.3: **CC.5 catalog.delete
+auto-draft-burst fix** (skip never-published artifacts whose removal object the
+engine 400s, F3-39 / LESSONS §2.12), Event Log actions column pinned right
+(Retry/Details stay reachable), and backfill progress showing the honest
+synced-product count instead of the misleading multilingual sent/raw-total
+fraction. Awaiting Erkki's install to MiuMjau. — Prior: **catalog-correctness
+CC.1–CC.4 DONE + RELEASED + DEPLOYED**;
 multilingual fix, model **(B) {lang:value}** + structural signal
 (NOT a filter, engine owns `recommendable`, F3-38). Released
 **`v2.1.0-beta.3-rc.1`** (GH pre-release on the fork); Erkki DEPLOYED to MiuMjau;
