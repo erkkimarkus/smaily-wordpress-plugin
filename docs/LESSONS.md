@@ -366,6 +366,43 @@ is invisible. So:
   fails on a data-shape assumption, immediately audit every OTHER surface
   sharing that assumption for the silent version of the same failure.
 
+### 2.12 An incremental hook must inherit the backfill's eligibility filter (catalog.delete auto-draft burst)
+
+The catalog **backfill** enumerates `post_status = 'publish'` products only
+(`CatalogBackfillJob`). The incremental **hooks** (`CatalogHookHandler` on
+`save_post_product` / `before_delete_post`) inherited no such filter — they fired
+for a product post of *any* status. WordPress's daily auto-draft GC
+(`wp_scheduled_auto_draft_delete`) deletes piles of `AUTO-DRAFT` product posts at
+once; each fired `before_delete_post` → `catalog.delete` carrying an object with an
+empty `category_path` (auto-drafts have no category) and sometimes empty
+`product_url`. The engine has no delete-by-key — removal is an UPSERT with
+`in_stock=false` that must pass `ProductSchema` (both fields REQUIRED non-empty) —
+so every one became a permanently-failed `d6_item_error` row. A burst of identical
+red rows in the pilot's Event Log (2026-06-14, all within one second) was the tell.
+
+**The general lesson:** when a system has a one-time **backfill** and a live
+**incremental** path feeding the same sink, the incremental path must apply the
+**same eligibility filter** as the backfill — otherwise it emits records the
+backfill would never have produced, and the sink rejects them. The asymmetry is
+easy to miss because the backfill's filter is an explicit `WHERE post_status =
+'publish'` while the hook's "filter" is the *absence* of one.
+
+- **A removal of a never-ingested record is a no-op, not an error.** The artifact
+  was never sent (backfill is publish-only), so there is nothing to remove. The
+  fix skips it *before enqueue* — which looks like a §2.11 silent pre-enqueue drop
+  but is the opposite case: §2.11 warns against dropping records that **should** be
+  sent and would otherwise vanish without trace; here the record **cannot** and
+  **should not** be sent (a non-product the engine is contract-guaranteed to 400),
+  and the existing `on_delete_product` already silently returns for non-product
+  post types. The distinguishing test is "would the pipeline ever have ingested
+  this?" — if no, a pre-enqueue skip loses no signal.
+- **Don't generalise the skip to the upsert path.** An empty `category_path` on a
+  *published* product is a real merchant-data gap the engine *should* surface as a
+  failed row (`CatalogPayloadBuilder::primary_category_path()` documents this
+  intent). A blanket wire-level guard would have suppressed that signal. The guard
+  belongs only where the record is provably non-ingestable — the delete of a
+  never-published artifact, not the upsert of a real-but-incomplete one.
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs

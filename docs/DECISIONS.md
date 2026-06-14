@@ -2002,6 +2002,47 @@ plugin supplies clean data" division); engine `recommendable` (migration 0039,
 defense-in-depth already shipped); CC.1–CC.3 (the correctness work this closes
 out); `ENGINE_TEAM_recommendable_signal.md` (the open question).
 
+### F3-39 — catalog.delete skips objects with empty REQUIRED fields (auto-draft GC burst)
+
+**Context:** the pilot's Event Log showed a burst of failed `catalog.delete` rows
+(2026-06-14, all within one second), each `d6_item_error field=category_path` or
+`field=product_url: String must contain at least 1 character(s)`. Root cause: the
+catalog backfill is `publish`-only (`CatalogBackfillJob`), but `CatalogHookHandler`
+fired `catalog.delete` for *any* deleted product post — including the `AUTO-DRAFT`
+products WordPress's daily auto-draft GC (`wp_scheduled_auto_draft_delete`) purges
+in bulk. Those have an empty `category_path` and were never ingested.
+
+**Decision (implemented, 2026-06-14):** `CatalogHookHandler::enqueue_delete()` skips
+a removal whose captured object has a blank `category_path` **or** `product_url`
+(`removable()` helper; the multilingual `{lang:value}` empty-array form counts as
+blank). The engine has no delete-by-key — removal is an UPSERT with `in_stock=false`
+that must pass `ProductSchema` (both fields REQUIRED non-empty, §3) — so such a row
+can only ever 400. The skip is silent, mirroring the existing non-product
+early-return in `on_delete_product()`.
+
+**Rationale:** a never-published artifact was never sent (backfill is publish-only),
+so there is nothing to remove — the `catalog.delete` is a no-op the engine rejects.
+The guard is **delete-only by design**: an empty `category_path` on a *published*
+product is an intended merchant-data-gap signal the engine surfaces on the upsert
+path (`CatalogPayloadBuilder::primary_category_path()` docblock), so a wire-level
+guard covering upserts would suppress real signal. See LESSONS §2.12 (the
+backfill-vs-incremental eligibility asymmetry) and the §2.11 contrast (this is a
+*correct* pre-enqueue drop — the record cannot and should not be sent).
+
+**Alternatives:** (a) a `post_status`-based filter on the delete hook (rejected as
+primary — a published-then-trashed product is status `trash` at
+`before_delete_post`, needing `_wp_trash_meta_status` archaeology to tell it from a
+never-published draft; the required-field check captures the same intent more
+directly); (b) a minimal sku-only delete payload (rejected — the engine's
+UPSERT-only lifecycle requires the full `ProductSchema` even for removal, §3
+"Lifecycle is UPSERT-only"); (c) a wire-level guard in `IngestFlusher::row_to_object`
+covering both paths (rejected — would suppress the published-product data-gap
+signal, above).
+
+**Relationships:** CC.1–CC.4 / F3-38 (the catalog-correctness work this follows);
+F3-36 (LESSONS §2.11 — silent pre-enqueue drops, the contrasting case);
+`CatalogBackfillJob` (the publish-only filter the hook now mirrors in spirit).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

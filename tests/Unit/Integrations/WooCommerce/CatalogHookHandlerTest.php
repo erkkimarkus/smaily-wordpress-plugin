@@ -171,6 +171,34 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertSame( CatalogHookHandler::EVENT_CATALOG_DELETE, $queue->enqueued[0]['type'] );
 	}
 
+	// --- never-published-artifact delete skip (the auto-draft GC burst) ------
+
+	public function test_delete_of_object_with_blank_category_path_is_not_enqueued(): void {
+		// WordPress's daily auto-draft GC deletes piles of AUTO-DRAFT products,
+		// firing before_delete_post. They have an empty category_path and were
+		// never ingested (backfill is publish-only) — enqueuing a catalog.delete
+		// the engine is guaranteed to 400 only litters the Event Log. Skip it.
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 60233, 'wc-60233', '', 'https://miumjau.test/?post_type=product&p=60233' );
+		$handler = $this->handler( $queue, true, array( 60233 => $product ), array( $product ) );
+
+		$handler->on_delete_product( 60233 );
+
+		self::assertSame( array(), $queue->enqueued, 'A removal object with an empty category_path is contract-guaranteed to 400 — not enqueued.' );
+	}
+
+	public function test_delete_of_object_with_blank_product_url_is_not_enqueued(): void {
+		// product_url is the other REQUIRED non-empty field; an abandoned draft
+		// whose permalink resolves empty is likewise skipped.
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 27695, 'wc-27695', 'food/dry', '' );
+		$handler = $this->handler( $queue, true, array( 27695 => $product ), array( $product ) );
+
+		$handler->on_delete_product( 27695 );
+
+		self::assertSame( array(), $queue->enqueued, 'A removal object with an empty product_url is contract-guaranteed to 400 — not enqueued.' );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	private function fake_queue(): IngestQueue {
@@ -226,7 +254,16 @@ final class CatalogHookHandlerTest extends TestCase {
 				return $this->units;
 			}
 			public function build( \WC_Product $product, string $event_uuid ): array {
-				return array( 'sku' => (string) $product->get_sku(), 'event_id' => $event_uuid, 'in_stock' => true );
+				$object = array( 'sku' => (string) $product->get_sku(), 'event_id' => $event_uuid, 'in_stock' => true );
+				// The real builder always carries category_path + product_url; the
+				// delete guard (removable()) keys on them, so mirror them here. A
+				// fake_product exposes them via smly_* accessors (defaults non-empty,
+				// blank for the never-published-artifact skip cases).
+				if ( method_exists( $product, 'smly_category_path' ) ) {
+					$object['category_path'] = $product->smly_category_path();
+					$object['product_url']   = $product->smly_product_url();
+				}
+				return $object;
 			}
 		};
 
@@ -246,19 +283,29 @@ final class CatalogHookHandlerTest extends TestCase {
 		};
 	}
 
-	private function fake_product( int $id, string $sku ): \WC_Product {
-		return new class( $id, $sku ) extends \WC_Product {
+	private function fake_product( int $id, string $sku, string $category_path = 'food/dry', string $product_url = 'https://shop.test/p' ): \WC_Product {
+		return new class( $id, $sku, $category_path, $product_url ) extends \WC_Product {
 			private int $id;
 			private string $sku;
-			public function __construct( int $id, string $sku ) {
-				$this->id  = $id;
-				$this->sku = $sku;
+			private string $category_path;
+			private string $product_url;
+			public function __construct( int $id, string $sku, string $category_path, string $product_url ) {
+				$this->id            = $id;
+				$this->sku           = $sku;
+				$this->category_path = $category_path;
+				$this->product_url   = $product_url;
 			}
 			public function get_id( $context = 'view' ) {
 				return $this->id;
 			}
 			public function get_sku( $context = 'view' ) {
 				return $this->sku;
+			}
+			public function smly_category_path(): string {
+				return $this->category_path;
+			}
+			public function smly_product_url(): string {
+				return $this->product_url;
 			}
 		};
 	}

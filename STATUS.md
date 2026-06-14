@@ -27,7 +27,9 @@ If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
 _Last updated: 2026-06-14 (**catalog-correctness CC.1–CC.4 DONE + RELEASED +
-DEPLOYED** — multilingual fix, model **(B) {lang:value}** + structural signal
+DEPLOYED**; **CC.5 catalog.delete auto-draft-burst fix** — skip never-published
+artifacts whose removal object the engine 400s, F3-39 / LESSONS §2.12.
+multilingual fix, model **(B) {lang:value}** + structural signal
 (NOT a filter, engine owns `recommendable`, F3-38). Released
 **`v2.1.0-beta.3-rc.1`** (GH pre-release on the fork); Erkki DEPLOYED to MiuMjau;
 **canonical re-sync running; engine team confirmed the data arrives in the correct
@@ -606,6 +608,19 @@ checkpoint between each; CC.4 last (blocked — see below).
   a targeted drop; MiuMjau's gift-card type string — Erkki to confirm or
   self-heal on re-backfill). **Ship the signal with the canonical re-backfill**
   so the post-reload catalog classifies on the first pass.
+
+- **CC.5 — catalog.delete skips never-published artifacts (DECISIONS F3-39,
+  2026-06-14).** Pilot Event Log showed a burst of failed `catalog.delete` rows
+  (`d6_item_error field=category_path` / `product_url: String must contain at
+  least 1 character(s)`) — WordPress's daily auto-draft GC purging `AUTO-DRAFT`
+  products fired `before_delete_post` → `catalog.delete` with empty REQUIRED
+  fields the engine 400s. Root cause: the backfill is `publish`-only but the
+  delete hook filtered nothing (LESSONS §2.12). Fix: `CatalogHookHandler::
+  enqueue_delete()` skips a removal whose object has blank `category_path` or
+  `product_url` (`removable()` helper). Delete-only by design — the upsert path
+  still surfaces an empty `category_path` on a *published* product as an intended
+  merchant-data-gap signal. +2 unit tests. Pre-existing failed rows are cleared
+  manually (retry can't fix them).
 
 Already done (no work): **P2b `customers.language`** — `CustomerPayloadBuilder`
 already sends ISO 639-1 from `get_user_locale()`.

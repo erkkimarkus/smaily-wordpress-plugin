@@ -189,7 +189,44 @@ class CatalogHookHandler {
 		// Capture the full object now (still loadable); event_uuid is generated
 		// at enqueue, so the flusher stamps event_id + in_stock=false at send.
 		$object = $this->builder->build( $unit, '' );
+
+		// Skip a removal the engine is contract-guaranteed to 400: the engine has
+		// no delete-by-key — removal is an UPSERT with in_stock=false that must
+		// pass ProductSchema (category_path + product_url are REQUIRED non-empty,
+		// RECENGINE_API_CONTRACT.md §3). A never-published artifact (auto-draft,
+		// abandoned draft) has them empty and was never ingested anyway (the
+		// backfill is publish-only) — there is nothing to remove. WordPress's
+		// daily auto-draft GC fires before_delete_post for piles of these at once;
+		// without this guard each becomes a permanently-failed d6_item_error row
+		// (the catalog.delete burst Erkki saw, 2026-06-14). Skipping silently
+		// mirrors the non-product early-return in on_delete_product().
+		//
+		// NOT applied to the upsert path: an empty category_path on a PUBLISHED
+		// product is an intended merchant-data-gap signal the engine surfaces via
+		// the Event Log — see CatalogPayloadBuilder::primary_category_path().
+		if ( ! $this->removable( $object ) ) {
+			return;
+		}
+
 		$this->queue->enqueue( self::EVENT_CATALOG_DELETE, (string) $unit->get_id(), array( 'object' => $object ) );
+	}
+
+	/**
+	 * Whether a captured catalog object carries the engine's REQUIRED non-empty
+	 * removal fields (category_path + product_url). product_url may be the
+	 * multilingual `{lang: value}` object form, so an empty array counts as blank
+	 * just like an empty string.
+	 *
+	 * @param array<string, mixed> $object
+	 */
+	private function removable( array $object ): bool {
+		$category_path = (string) ( $object['category_path'] ?? '' );
+		if ( $category_path === '' ) {
+			return false;
+		}
+		$product_url = $object['product_url'] ?? '';
+		$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
+		return $has_url;
 	}
 
 	private function already_seen( string $event_type, int $product_id ): bool {
