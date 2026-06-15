@@ -328,7 +328,7 @@ final class NotificationManager {
 
 		if ( $key === 'engine_down' ) {
 			return __(
-				'Smaily Connect: the recommendation engine has been unreachable for over an hour — sync is queued and will resume automatically when it recovers.',
+				'Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers.',
 				'smaily-connect'
 			);
 		}

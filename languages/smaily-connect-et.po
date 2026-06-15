@@ -27,8 +27,8 @@ msgstr "https://smaily.com/help/user-manual/smaily-connect-for-wordpress/"
 
 #. Description of the plugin
 #: smaily-connect.php:5
-msgid "Connect your WooCommerce shop to Smaily for email marketing, automation, and personalised recommendations. (BETA: extended e-commerce sync and recommendations engine integration.)"
-msgstr "Ühenda oma WooCommerce'i pood Smailyga e-posti turunduse, automatiseerimise ja personaalsete soovituste jaoks. (BETA: laiendatud e-poe sünkroonimine ja soovitusmootori integratsioon.)"
+msgid "Connect your WooCommerce shop to Smaily for email marketing, automation, and personalised recommendations. (BETA: extended e-commerce sync and Smaily Campaign Intelligence integration.)"
+msgstr "Ühenda oma WooCommerce'i pood Smailyga e-posti turunduse, automatiseerimise ja personaalsete soovituste jaoks. (BETA: laiendatud e-poe sünkroonimine ja Smaily Campaign Intelligence integratsioon.)"
 
 #. Author of the plugin
 #: smaily-connect.php:4
@@ -618,8 +618,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: includes/Notifications/NotificationManager.php:330
-msgid "Smaily Connect: the recommendation engine has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
-msgstr "Smaily Connect: soovitusmootor on olnud kättesaamatu üle tunni — sünkroonimine on järjekorras ja jätkub automaatselt, kui ühendus taastub."
+msgid "Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
+msgstr "Smaily Connect: Smaily Campaign Intelligence on olnud kättesaamatu üle tunni — sünkroonimine on järjekorras ja jätkub automaatselt, kui ühendus taastub."
 
 #: includes/Notifications/NotificationManager.php:337
 msgid "Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers."
@@ -639,16 +639,16 @@ msgstr "Peida"
 
 #: includes/Privacy/GdprHandler.php:104
 #: includes/Privacy/GdprHandler.php:117
-msgid "Smaily recommendation data"
-msgstr "Smaily soovituste andmed"
+msgid "Smaily Campaign Intelligence data"
+msgstr "Smaily Campaign Intelligence andmed"
 
 #: includes/Privacy/ProfilingConsentAccount.php:78
 msgid "Your recommendation preferences have been saved."
 msgstr "Sinu soovituste eelistused on salvestatud."
 
 #: includes/Privacy/ProfilingConsentAccount.php:97
-msgid "Personalised recommendations"
-msgstr "Personaalsed soovitused"
+msgid "Smaily Campaign Intelligence"
+msgstr "Smaily Campaign Intelligence"
 
 #: includes/Privacy/ProfilingConsentAccount.php:99
 msgid "We use your browsing and purchase history to personalise the product recommendations in our emails. You can turn this off at any time — you will still receive our emails."
@@ -679,8 +679,8 @@ msgid "You do not have permission to view the event log."
 msgstr "Sul ei ole õigust sündmuste logi vaadata."
 
 #: includes/REST/RecEngineEndpoint.php:121
-msgid "You do not have permission to manage the recommendation engine."
-msgstr "Sul ei ole õigust soovitusmootorit hallata."
+msgid "You do not have permission to manage Campaign Intelligence."
+msgstr "Sul ei ole õigust Campaign Intelligence'i hallata."
 
 #: includes/REST/RecEngineEndpoint.php:137
 msgid "Paste the full setup URL from your Smaily admin (it ends in /setup/<token>)."
@@ -699,12 +699,12 @@ msgid "Setup token not recognised. Verify the URL is correct."
 msgstr "Seadistustokenit ei tuntud ära. Kontrolli, et URL on õige."
 
 #: includes/REST/RecEngineEndpoint.php:209
-msgid "The recommendation engine did not respond. Try again in a few minutes."
-msgstr "Soovitusmootor ei vastanud. Proovi mõne minuti pärast uuesti."
+msgid "Smaily Campaign Intelligence did not respond. Try again in a few minutes."
+msgstr "Smaily Campaign Intelligence ei vastanud. Proovi mõne minuti pärast uuesti."
 
 #: includes/REST/RecEngineEndpoint.php:222
-msgid "The recommendation engine is not configured. Finish setup first."
-msgstr "Soovitusmootor on seadistamata. Lõpeta kõigepealt seadistamine."
+msgid "Smaily Campaign Intelligence is not configured. Finish setup first."
+msgstr "Smaily Campaign Intelligence on seadistamata. Lõpeta kõigepealt seadistamine."
 
 #: includes/REST/RecEngineEndpoint.php:235
 msgid "Stored rec-engine configuration is incomplete. Re-run setup."

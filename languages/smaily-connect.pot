@@ -27,7 +27,7 @@ msgstr ""
 
 #. Description of the plugin
 #: smaily-connect.php:5
-msgid "Connect your WooCommerce shop to Smaily for email marketing, automation, and personalised recommendations. (BETA: extended e-commerce sync and recommendations engine integration.)"
+msgid "Connect your WooCommerce shop to Smaily for email marketing, automation, and personalised recommendations. (BETA: extended e-commerce sync and Smaily Campaign Intelligence integration.)"
 msgstr ""
 
 #. Author of the plugin
@@ -618,7 +618,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: includes/Notifications/NotificationManager.php:330
-msgid "Smaily Connect: the recommendation engine has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
+msgid "Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
 msgstr ""
 
 #: includes/Notifications/NotificationManager.php:337
@@ -639,7 +639,7 @@ msgstr ""
 
 #: includes/Privacy/GdprHandler.php:104
 #: includes/Privacy/GdprHandler.php:117
-msgid "Smaily recommendation data"
+msgid "Smaily Campaign Intelligence data"
 msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:78
@@ -647,7 +647,7 @@ msgid "Your recommendation preferences have been saved."
 msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:97
-msgid "Personalised recommendations"
+msgid "Smaily Campaign Intelligence"
 msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:99
@@ -679,7 +679,7 @@ msgid "You do not have permission to view the event log."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:121
-msgid "You do not have permission to manage the recommendation engine."
+msgid "You do not have permission to manage Campaign Intelligence."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:137
@@ -699,11 +699,11 @@ msgid "Setup token not recognised. Verify the URL is correct."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:209
-msgid "The recommendation engine did not respond. Try again in a few minutes."
+msgid "Smaily Campaign Intelligence did not respond. Try again in a few minutes."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:222
-msgid "The recommendation engine is not configured. Finish setup first."
+msgid "Smaily Campaign Intelligence is not configured. Finish setup first."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:235

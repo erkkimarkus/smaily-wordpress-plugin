@@ -29,7 +29,7 @@ Transform your **WordPress website, WooCommerce store, Contact Form 7 and Elemen
 
 **Smarter Email Campaigns** – Segment your audience and send **relevant offers, tailored product updates, and engaging content** that keeps subscribers interested and active.
 
-**Personalized Product Recommendations** – Connect your WooCommerce store to the Smaily recommendation engine and use shopper-specific product suggestions in your email campaigns.
+**Personalized Product Recommendations** – Connect your WooCommerce store to Smaily Campaign Intelligence and use shopper-specific product suggestions in your email campaigns.
 
 **Easy, Fast & Code-Free Setup** – No tech skills needed! A **guided setup wizard** walks you through connecting your Smaily account and configuring every integration.
 
@@ -39,7 +39,7 @@ Version 2.0 is a major update built alongside the proven 1.x feature set:
 
 * **Setup wizard** – a guided, step-by-step first-run experience: connect your Smaily account, configure subscriber sync, WooCommerce automations, and form integrations.
 * **Modern admin** – a redesigned, mobile-friendly settings interface.
-* **Recommendation engine (WooCommerce)** – optionally connect your store to the Smaily recommendation engine. The plugin syncs your product catalog, customers and orders so the engine can generate personalized product recommendations for your email campaigns.
+* **Campaign Intelligence (WooCommerce)** – optionally connect your store to Smaily Campaign Intelligence. The plugin syncs your product catalog, customers and orders so it can generate personalized product recommendations for your email campaigns.
 * **Browse tracking (opt-in)** – an optional storefront beacon records browsing activity (product views, searches, cart events) to improve recommendations. It is **off by default**, requires the site admin to enable it, and only runs for shoppers who have given cookie consent (WP Consent API compatible, e.g. CookieYes).
 * **Privacy built in** – integrates with the WordPress Privacy tools (personal data export and erasure), and shoppers can opt out of recommendation profiling from their WooCommerce My Account page.
 * **Reliability you can see** – background work runs on durable queues (Action Scheduler); an Event Log shows every sync event, failed items can be retried from the UI, and health notices warn you proactively when a connected service is unreachable.
@@ -63,7 +63,7 @@ This plugin uses [Smaily Public API](https://smaily.com/help/api/) to communicat
 - updating user subscription status when unsubscribing from newsletters
 - reading and writing the shopper's recommendation-profiling consent preference
 
-If you connect the optional **Smaily recommendation engine** (a Smaily-operated service; the connection is established with a one-time setup token issued for your account), the plugin additionally sends the following WooCommerce data to the engine so it can compute personalized product recommendations:
+If you connect the optional **Smaily Campaign Intelligence** (a Smaily-operated service; the connection is established with a one-time setup token issued for your account), the plugin additionally sends the following WooCommerce data to it so it can compute personalized product recommendations:
 
 - product catalog data (titles, prices, categories, stock status, product URLs)
 - customer records (email address, name, registration date)
@@ -87,6 +87,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.5 =
+
+* Renamed: the recommendation-engine feature is now called **Smaily Campaign Intelligence** throughout the admin (the Campaign Intelligence tab and setup step, the connection screen, health notices, and privacy data labels). This is a display-name change only — your data, connection and settings are unaffected, and no re-import is needed.
 
 = 2.1.0-beta.4 =
 
@@ -203,6 +207,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.5 =
+Naming update only: the recommendation engine is now called Smaily Campaign Intelligence in the plugin interface. No data, connection or settings changes; no re-import required.
 
 = 2.1.0-beta.4 =
 Recommended maintenance update: stops failed catalog events for draft/auto-draft products in the Event Log, shows the true synced-product count during catalog import on multilingual stores, and keeps the Event Log's Retry/Details actions reachable. No re-import required.

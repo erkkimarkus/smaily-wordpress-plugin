@@ -101,7 +101,7 @@ class GdprHandler {
 	 */
 	public function register_exporter( array $exporters ): array {
 		$exporters[ self::EXPORTER_ID ] = array(
-			'exporter_friendly_name' => __( 'Smaily recommendation data', 'smaily-connect' ),
+			'exporter_friendly_name' => __( 'Smaily Campaign Intelligence data', 'smaily-connect' ),
 			'callback'               => array( $this, 'export' ),
 		);
 		return $exporters;
@@ -114,7 +114,7 @@ class GdprHandler {
 	 */
 	public function register_eraser( array $erasers ): array {
 		$erasers[ self::ERASER_ID ] = array(
-			'eraser_friendly_name' => __( 'Smaily recommendation data', 'smaily-connect' ),
+			'eraser_friendly_name' => __( 'Smaily Campaign Intelligence data', 'smaily-connect' ),
 			'callback'             => array( $this, 'erase' ),
 		);
 		return $erasers;
@@ -188,7 +188,7 @@ class GdprHandler {
 
 		// Activity arrays — one item per row.
 		$sections = array(
-			'browse_events'   => 'Browse events (recommendation engine)',
+			'browse_events'   => 'Browse events (Campaign Intelligence)',
 			'recommendations' => 'Recommendations shown',
 			'email_events'    => 'Email interaction signals',
 			'visitor_tokens'  => 'Visitor tokens',

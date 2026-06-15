@@ -94,7 +94,7 @@ final class ProfilingConsentAccount {
 
 		?>
 		<section class="smly-profiling-consent">
-			<h3><?php esc_html_e( 'Personalised recommendations', 'smaily-connect' ); ?></h3>
+			<h3><?php esc_html_e( 'Smaily Campaign Intelligence', 'smaily-connect' ); ?></h3>
 			<p>
 				<?php esc_html_e( 'We use your browsing and purchase history to personalise the product recommendations in our emails. You can turn this off at any time — you will still receive our emails.', 'smaily-connect' ); ?>
 			</p>

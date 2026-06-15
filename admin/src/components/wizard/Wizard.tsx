@@ -24,7 +24,7 @@ const STEP_LABELS: Array<{ label: string; description: string }> = [
   { label: 'Connect', description: 'Smaily credentials' },
   { label: 'Subscribers', description: 'Field mapping + backfill' },
   { label: 'WooCommerce', description: 'Automation triggers' },
-  { label: 'Recommendations', description: 'Optional (rec-engine)' },
+  { label: 'Campaign Intelligence', description: 'Optional' },
   { label: 'Integrations', description: 'Elementor / CF7 / Blocks' },
   { label: 'Done', description: 'Summary + finish' },
 ];

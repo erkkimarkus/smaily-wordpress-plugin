@@ -94,7 +94,7 @@ export function Step6Done({
           </Button>
           {state.recEngineConnection.kind === 'success' && (
             <Button variant="secondary" type="button" onClick={onOpenRecEngineDashboard}>
-              Open Recommendations dashboard →
+              Open Campaign Intelligence dashboard →
             </Button>
           )}
         </div>
@@ -160,7 +160,7 @@ function computeSummary(state: WizardState): SummaryItem[] {
   // Step 4 — recommendations ---------------------------------------------
   const recActiveCount = Object.values(state.recEngineFeatures).filter(Boolean).length;
   items.push({
-    label: 'Recommendations engine',
+    label: 'Campaign Intelligence',
     active: state.recEngineConnection.kind === 'success',
     detail:
       state.recEngineConnection.kind === 'success'

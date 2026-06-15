@@ -91,7 +91,7 @@ describe('Settings — tab routing + dirty + save', () => {
     expect(screen.queryByLabelText(/subdomain/i)).not.toBeInTheDocument();
   });
 
-  it('locks Subscribers / WooCommerce / Recommendations until connected and bounces hash deep-links back', async () => {
+  it('locks Subscribers / WooCommerce / Campaign Intelligence until connected and bounces hash deep-links back', async () => {
     render(<Settings />);
 
     // Banner explains the lock.
@@ -100,7 +100,7 @@ describe('Settings — tab routing + dirty + save', () => {
     // PillTabs render the locked tabs as disabled buttons.
     expect(screen.getByRole('tab', { name: /subscribers/i })).toBeDisabled();
     expect(screen.getByRole('tab', { name: /woocommerce/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /recommendations/i })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: /campaign intelligence/i })).toBeDisabled();
     // Connection + Integrations stay accessible.
     expect(screen.getByRole('tab', { name: /^connection$/i })).not.toBeDisabled();
     expect(screen.getByRole('tab', { name: /integrations/i })).not.toBeDisabled();

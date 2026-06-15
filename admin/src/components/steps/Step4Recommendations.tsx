@@ -51,10 +51,10 @@ export function Step4Recommendations({
             Step 4 of 6
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-text-primary">
-            Personalised recommendations
+            Campaign Intelligence
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Sync product, customer, and order data to the Smaily recommendation engine for
+            Sync product, customer, and order data to Smaily Campaign Intelligence for
             personalised product recommendations in your campaigns. Optional — you can come back
             and set this up later.
           </p>
@@ -110,7 +110,7 @@ function SetupCard({
   };
 
   return (
-    <Card title="Connect your recommendations engine">
+    <Card title="Connect Smaily Campaign Intelligence">
       <p className="text-sm text-text-secondary">
         Paste the setup URL from your Smaily admin → Recommendations. The link looks like{' '}
         <span className="font-mono text-xs">https://&lt;host&gt;/setup/&lt;token&gt;</span> and is
@@ -183,8 +183,8 @@ function ConnectedView({
 
   const tenantName =
     state.recEngineConnection.kind === 'success'
-      ? state.recEngineConnection.message ?? 'Smaily recommendations engine'
-      : 'Smaily recommendations engine';
+      ? state.recEngineConnection.message ?? 'Smaily Campaign Intelligence'
+      : 'Smaily Campaign Intelligence';
 
   const [pingStatus, setPingStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [pingMessage, setPingMessage] = useState<string>('');
@@ -206,7 +206,7 @@ function ConnectedView({
 
   const handleDisconnect = async (): Promise<void> => {
     const confirmed = window.confirm(
-      'Disconnect the recommendations engine? The plugin will stop syncing data; existing campaigns on the engine side continue to work until you remove them there.',
+      'Disconnect Smaily Campaign Intelligence? The plugin will stop syncing data; existing campaigns on the engine side continue to work until you remove them there.',
     );
     if (!confirmed) {
       return;

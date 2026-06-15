@@ -1,6 +1,6 @@
 # Smaily Connect
 
-A WordPress plugin that integrates WooCommerce with [Smaily](https://smaily.com), an email marketing platform. Sends customer and order data to Smaily for transactional and marketing automation, and connects WooCommerce stores to Smaily's recommendation engine for personalized product suggestions in email campaigns.
+A WordPress plugin that integrates WooCommerce with [Smaily](https://smaily.com), an email marketing platform. Sends customer and order data to Smaily for transactional and marketing automation, and connects WooCommerce stores to Smaily Campaign Intelligence for personalized product suggestions in email campaigns.
 
 **Status:** 2.1.0-beta.1 — **plugin-side feature-complete for the pilot** (2026-06-09; audited + hardened 2026-06-11). Versioned 2.1.x because upstream's own, unrelated 2.0.0 (a 1.x-line WP-7.0 bump) occupies the 2.0.0 slot on wordpress.org. Phase 3 and pilot-hardening are done; next is the pilot itself. See [Roadmap](#roadmap).
 
@@ -14,7 +14,7 @@ The 2.0 rewrite (built alongside the legacy 1.x code, not replacing it) introduc
 
 - **Modern admin UI** — React + Tailwind, mobile-first, replaces the legacy WordPress admin pages
 - **Setup wizard** — guided first-run experience for connecting the plugin to a Smaily account
-- **Recommendation engine integration** — connects to Smaily's recommendation engine for product suggestions in email campaigns, with full attribution flow (`product_url` + UTM + recommendation tokens)
+- **Campaign Intelligence integration** — connects to Smaily Campaign Intelligence for product suggestions in email campaigns, with full attribution flow (`product_url` + UTM + recommendation tokens)
 - **Action Scheduler** for background work — replaces WP-Cron for reliability under load
 - **Idempotent data ingestion** — products, customers, and orders are sent with per-record `event_id`s so retries never duplicate
 - **Comprehensive WooCommerce coverage** — product changes, customer registrations, order events, and consent-gated browse activity
@@ -37,9 +37,9 @@ Legacy 1.x code preserved; new 2.0 code activates alongside it. Existing 1.x ins
 
 Setup wizard for first-run connection. New mobile-first admin UI. Subscriber sync, abandoned cart, welcome series, and first-order triggers configurable through the new UI. Payload builders and the Smaily API client are in place.
 
-### Phase 3 — Recommendation engine integration ✓
+### Phase 3 — Campaign Intelligence integration ✓
 
-The plugin connects to Smaily's recommendation engine and feeds it product, customer, order, and browse data so the engine can produce personalized recommendations in email campaigns.
+The plugin connects to Smaily Campaign Intelligence and feeds it product, customer, order, and browse data so it can produce personalized recommendations in email campaigns.
 
 | Sub-area | Status | Notes |
 |----------|--------|-------|
@@ -99,8 +99,8 @@ If you have the legacy `sendsmaily/smaily-wordpress-plugin` (1.x) already instal
 The plugin has three main layers:
 
 1. **WordPress integration layer** — hooks into WooCommerce events (product changes, customer registrations, orders), exposes admin pages, manages settings, runs background jobs via Action Scheduler.
-2. **Domain layer** — payload builders translate WordPress/WooCommerce data into the canonical wire format that Smaily and the recommendation engine expect.
-3. **Transport layer** — HTTP clients send payloads to Smaily's marketing API and the recommendation engine, with idempotent retry, queue-backed durability, and exponential backoff.
+2. **Domain layer** — payload builders translate WordPress/WooCommerce data into the canonical wire format that Smaily and Campaign Intelligence expect.
+3. **Transport layer** — HTTP clients send payloads to Smaily's marketing API and Campaign Intelligence, with idempotent retry, queue-backed durability, and exponential backoff.
 
 The 2.0 code lives under the `Smaily\Connect` namespace. The legacy 1.x code lives under `Smaily_Connect` and continues to function until the new setup wizard is completed.
 
@@ -118,7 +118,7 @@ All project documentation lives in [`docs/`](docs/). Start with the index.
 | [`docs/MIGRATION.md`](docs/MIGRATION.md) | Pilot clients upgrading from 1.x | Step-by-step upgrade procedure |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Maintainers, contributors | Every significant architectural decision with rationale |
 | [`docs/LESSONS.md`](docs/LESSONS.md) | Maintainers | Lessons learned during development, especially around boundaries and testing discipline |
-| [`docs/RECENGINE_API_CONTRACT.md`](docs/RECENGINE_API_CONTRACT.md) | Plugin + engine developers | The canonical contract between the plugin and the recommendation engine |
+| [`docs/RECENGINE_API_CONTRACT.md`](docs/RECENGINE_API_CONTRACT.md) | Plugin + engine developers | The canonical contract between the plugin and Campaign Intelligence |
 | [`docs/WP7_COMPAT.md`](docs/WP7_COMPAT.md) | Maintainers | WordPress 7.0 compatibility notes and the Abilities API strategy |
 
 ---
@@ -157,7 +157,7 @@ The integration test suite covers the boundary cases where unit tests can mislea
 
 ### Live engine testing
 
-The catalog end-to-end scenarios can be driven against a live deployed recommendation engine (rather than the in-repo mock). This is gated on `RECENGINE_LIVE=1` and requires a connected tenant in the wp-env database (run a real setup-exchange first):
+The catalog end-to-end scenarios can be driven against a live deployed Campaign Intelligence instance (rather than the in-repo mock). This is gated on `RECENGINE_LIVE=1` and requires a connected tenant in the wp-env database (run a real setup-exchange first):
 
 ```bash
 RECENGINE_LIVE=1 node bin/walk-3.2.cjs
@@ -203,7 +203,7 @@ This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://gith
 **What the fork adds:**
 
 - A new `Smaily\Connect` namespace with the 2.0 codebase
-- The setup wizard, mobile-first admin UI, recommendation engine integration, and the design described in the Roadmap above
+- The setup wizard, mobile-first admin UI, Campaign Intelligence integration, and the design described in the Roadmap above
 - Comprehensive documentation in `docs/`
 
 **What the fork preserves:**
@@ -231,4 +231,4 @@ For issues, questions, or feedback during the beta period, please reach out thro
 
 ## Acknowledgments
 
-Built in collaboration with the Smaily recommendation engine team. The architectural discipline reflected in this codebase — mandatory live testing before ZIP, mock-vs-real verification, contract sync between plugin and engine repos, decision documents capturing reasoning — comes from the lessons documented in `docs/LESSONS.md` over the course of Phase 2 and Phase 3 development.
+Built in collaboration with the Smaily Campaign Intelligence team. The architectural discipline reflected in this codebase — mandatory live testing before ZIP, mock-vs-real verification, contract sync between plugin and engine repos, decision documents capturing reasoning — comes from the lessons documented in `docs/LESSONS.md` over the course of Phase 2 and Phase 3 development.

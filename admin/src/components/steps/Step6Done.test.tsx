@@ -48,7 +48,7 @@ describe('Step6Done', () => {
     render(<Step6Done state={wizardInitialState} />);
 
     expect(
-      screen.queryByRole('button', { name: /open recommendations dashboard/i }),
+      screen.queryByRole('button', { name: /open campaign intelligence dashboard/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe('Step6Done', () => {
 
     expect(screen.getByRole('button', { name: /open smaily dashboard/i })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /open recommendations dashboard/i }),
+      screen.getByRole('button', { name: /open campaign intelligence dashboard/i }),
     ).toBeInTheDocument();
   });
 });

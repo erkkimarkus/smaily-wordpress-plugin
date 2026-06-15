@@ -4,6 +4,20 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 2.1.0-beta.5 — product rename: Smaily Campaign Intelligence (2026-06-15)
+
+Display-name change only — no contract, data, or behaviour change. The
+recommendation-engine product is now **Smaily Campaign Intelligence** (short
+form **Campaign Intelligence**) across all user-facing plugin surfaces: the
+Settings / wizard tab and step, the connection + data-sync screens, the Step-6
+summary, admin health notices, GDPR export/erasure data labels, the My Account
+profiling section, the plugin header description, README and readme.txt.
+Internal identifiers (option keys, REST routes, `recEngine` / `rec_engine`
+symbols), the engine API contract, endpoint paths and headers are unchanged.
+The Estonian translations (`.po` / `.pot` / `.mo`) were updated to match — the
+brand name stays in English. Supersedes the short-lived "Smaily Intelligence
+Engine" name (`docs/ENGINE_TEAM_product_name.md`).
+
 ## 2.1.0-beta.3 — catalog correctness: multilingual + non-product signal (2026-06-14)
 
 Multilingual catalog correctness (DECISIONS F3-38; sub-PRs CC.1–CC.4). On

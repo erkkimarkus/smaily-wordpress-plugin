@@ -118,7 +118,7 @@ class RecEngineEndpoint {
 		if ( ! current_user_can( Constants::CAPABILITY ) ) {
 			return new WP_Error(
 				'smaily_connect_forbidden',
-				__( 'You do not have permission to manage the recommendation engine.', 'smaily-connect' ),
+				__( 'You do not have permission to manage Campaign Intelligence.', 'smaily-connect' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -206,7 +206,7 @@ class RecEngineEndpoint {
 						'error'     => 'engine_unreachable',
 						'message'   => $result->reason !== ''
 							? $result->reason
-							: __( 'The recommendation engine did not respond. Try again in a few minutes.', 'smaily-connect' ),
+							: __( 'Smaily Campaign Intelligence did not respond. Try again in a few minutes.', 'smaily-connect' ),
 					),
 					502
 				);
@@ -219,7 +219,7 @@ class RecEngineEndpoint {
 				array(
 					'ok'      => false,
 					'error'   => 'not_configured',
-					'message' => __( 'The recommendation engine is not configured. Finish setup first.', 'smaily-connect' ),
+					'message' => __( 'Smaily Campaign Intelligence is not configured. Finish setup first.', 'smaily-connect' ),
 				),
 				503
 			);
