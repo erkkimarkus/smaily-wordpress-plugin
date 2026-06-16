@@ -60,9 +60,9 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
 
 **Base URL**: varies by deployment environment, available as `engine_base_url` in the setup-exchange response.
 
-**Production base URL** (first pilot): `https://re-erkkimarkus-projects.vercel.app`
+**Production base URL**: `https://intelligence.smaily.com`
 
-> The previous pilot deploy `re-seven-indol.vercel.app` is retired (sub-PR 3.0 connectivity test caught the dead URL). All URL examples below use the current production base.
+> The engine serves from its production domain `https://intelligence.smaily.com`. Earlier pilot preview deploys are retired (the previous alias still resolves for existing installs). The runtime base always comes from `engine_base_url` in the setup-exchange response, so installs auto-adapt to the live host regardless of this static default; all URL examples below use the current production base.
 
 **Path prefix**: ALL plugin-to-engine requests use the `/api` prefix, including setup-exchange itself (`/api/setup/exchange`, NOT `/setup/exchange`). An earlier draft of spec v1.0 documented setup without `/api` — that was a defect fixed in sub-PR 3.1.2. The engine's actual route table serves everything under `/api/*`. The centralized constants list lives on the plugin side at `Smaily\Connect\Smaily\RecEngine\Client::PATH_*`.
 
@@ -103,7 +103,7 @@ The setup endpoint (`POST /api/setup/exchange`) is the **only** unauthenticated 
 ```json
 {
   "error": "api_key_revoked",
-  "regenerate_url": "https://re-erkkimarkus-projects.vercel.app/setup/regenerate/{tenant_id}",
+  "regenerate_url": "https://intelligence.smaily.com/setup/regenerate/{tenant_id}",
   "message": "Your API key was revoked. Use the regenerate URL to obtain a new one."
 }
 ```
@@ -368,7 +368,7 @@ POST /api/v1/ingest/catalog
 
 Setup-token exchange. **Unauthenticated endpoint** (the only one).
 
-**Use case**: after tenant creation in the admin UI, Erkki gets a setup URL (e.g. `https://re-erkkimarkus-projects.vercel.app/setup/abc123xyz`). The client pastes this URL into the plugin's Settings; the plugin extracts the token (`abc123xyz`) and calls this endpoint to obtain its technical configuration.
+**Use case**: after tenant creation in the admin UI, Erkki gets a setup URL (e.g. `https://intelligence.smaily.com/setup/abc123xyz`). The client pastes this URL into the plugin's Settings; the plugin extracts the token (`abc123xyz`) and calls this endpoint to obtain its technical configuration.
 
 **URL**: `POST /api/setup/exchange`
 
@@ -406,20 +406,20 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
   "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
   "tenant_name": "Erkki Pood",
   "api_key": "sk_8f3k2a4e1c4d8a9b2f7e3d1a6c8b9e0f",
-  "engine_base_url": "https://re-erkkimarkus-projects.vercel.app",
+  "engine_base_url": "https://intelligence.smaily.com",
   "engine_version": "1.0.0",
   "endpoints": {
-    "ingest_ping":       "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/ping",
-    "ingest_catalog":    "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog",
-    "ingest_customers":  "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/customers",
-    "ingest_orders":     "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/orders",
-    "ingest_browse":     "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse",
-    "identity_merge":    "https://re-erkkimarkus-projects.vercel.app/api/v1/identity/merge",
-    "customer_export":   "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}/export",
-    "customer_delete":   "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}",
-    "customer_opt_out":  "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}/opt-out",
-    "recommendations_preview": "https://re-erkkimarkus-projects.vercel.app/api/v1/recommendations/preview",
-    "recommendations_issue":   "https://re-erkkimarkus-projects.vercel.app/api/v1/recommendations/issue"
+    "ingest_ping":       "https://intelligence.smaily.com/api/v1/ingest/ping",
+    "ingest_catalog":    "https://intelligence.smaily.com/api/v1/ingest/catalog",
+    "ingest_customers":  "https://intelligence.smaily.com/api/v1/ingest/customers",
+    "ingest_orders":     "https://intelligence.smaily.com/api/v1/ingest/orders",
+    "ingest_browse":     "https://intelligence.smaily.com/api/v1/ingest/browse",
+    "identity_merge":    "https://intelligence.smaily.com/api/v1/identity/merge",
+    "customer_export":   "https://intelligence.smaily.com/api/v1/customer/{email}/export",
+    "customer_delete":   "https://intelligence.smaily.com/api/v1/customer/{email}",
+    "customer_opt_out":  "https://intelligence.smaily.com/api/v1/customer/{email}/opt-out",
+    "recommendations_preview": "https://intelligence.smaily.com/api/v1/recommendations/preview",
+    "recommendations_issue":   "https://intelligence.smaily.com/api/v1/recommendations/issue"
   },
   "config": {
     "tracking_cookie_name": "smaily_rec_uid",
@@ -449,7 +449,7 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
 {
   "error": "setup_token_expired_or_used",
   "message": "This setup token has expired or has already been used. Ask the engine administrator to generate a new one.",
-  "regenerate_url": "https://re-erkkimarkus-projects.vercel.app/admin/tenants/{tenant_id}/regenerate-setup-token",
+  "regenerate_url": "https://intelligence.smaily.com/admin/tenants/{tenant_id}/regenerate-setup-token",
   "request_id": "req_..."
 }
 ```
@@ -1365,13 +1365,13 @@ v2.0 plans multi-tenant single-WP (agencies + WPMU + WC Multistore). The API des
 
 **Test connection**:
 ```bash
-curl -X GET https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/ping \
+curl -X GET https://intelligence.smaily.com/api/v1/ingest/ping \
   -H "Authorization: Bearer sk_..."
 ```
 
 **Catalog upload**:
 ```bash
-curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog \
+curl -X POST https://intelligence.smaily.com/api/v1/ingest/catalog \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -1391,7 +1391,7 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog \
 
 **Browse event**:
 ```bash
-curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
+curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{

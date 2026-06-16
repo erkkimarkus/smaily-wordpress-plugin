@@ -36,9 +36,9 @@ Dokument konsolideerib varasema dialoogi (`RECENGINE_API_ANALYSIS.md` + `RECENGI
 
 **Base URL**: erineb deploy-keskkonnas, kättesaadav `engine_base_url` setup-response'is.
 
-**Production base URL** (esimene pilot): `https://re-erkkimarkus-projects.vercel.app`
+**Production base URL**: `https://intelligence.smaily.com`
 
-> Eelmine pilootdeploy `re-seven-indol.vercel.app` on aegunud (sub-PR 3.0 connectivity-test tuvastas dead-URL'i). Kõik URL-näited allpool on uuendatud.
+> Mootor töötab oma produktsiooni-domeenil `https://intelligence.smaily.com`. Varasemad pilot-preview-deploy'd on aegunud (vana alias resolvib endiselt olemasolevate installide jaoks). Runtime base tuleb alati setup-response'i `engine_base_url` väljast, seega installid kohanduvad live-hostiga sõltumata sellest staatilisest default'ist; kõik URL-näited allpool kasutavad praegust produktsiooni-base'i.
 
 **Path-prefiks**: KÕIK plugin-poolt mootorile saadetavad request'id kasutavad `/api` prefiksit, sh setup-exchange ise (`/api/setup/exchange`, mitte `/setup/exchange`). Spec v1.0 eelmine versioon dokumenteeris setup'i ilma `/api`-ta — see oli viga, mille sub-PR 3.1.2 paikkas. Engine'i tegelik route-tabel pakub kõike `/api/*` all. Tsentraliseeritud konstantide list elab plugin'i poolel `Smaily\Connect\Smaily\RecEngine\Client::PATH_*` peal.
 
@@ -79,7 +79,7 @@ API-key on tenant-tasandi, omandatud `POST /api/setup/exchange` käigus. **API-k
 ```json
 {
   "error": "api_key_revoked",
-  "regenerate_url": "https://re-erkkimarkus-projects.vercel.app/setup/regenerate/{tenant_id}",
+  "regenerate_url": "https://intelligence.smaily.com/setup/regenerate/{tenant_id}",
   "message": "Your API key was revoked. Click the regenerate URL to obtain a new one."
 }
 ```
@@ -262,7 +262,7 @@ X-RateLimit-Reset: 2026-05-19T10:15:28Z
 
 Setup-token exchange. **Autentimata endpoint** (ainus).
 
-**Use-case**: pärast tenant create'imist admin UI's, Erkki saab setup URL-i (näit. `https://re-erkkimarkus-projects.vercel.app/setup/abc123xyz`). Plugin'i seadetes klient kleebib URL-i, plugin extract'b token'i (`abc123xyz`) ja kutsub seda endpoint'i tehnilise config'i saamiseks.
+**Use-case**: pärast tenant create'imist admin UI's, Erkki saab setup URL-i (näit. `https://intelligence.smaily.com/setup/abc123xyz`). Plugin'i seadetes klient kleebib URL-i, plugin extract'b token'i (`abc123xyz`) ja kutsub seda endpoint'i tehnilise config'i saamiseks.
 
 **URL**: `POST /api/setup/exchange`
 
@@ -300,18 +300,18 @@ User-Agent: <plugin-identifier>/<version>  (näit. "SmailyRecEngine-WooPlugin/0.
   "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
   "tenant_name": "Erkki Pood",
   "api_key": "sk_8f3k2a4e1c4d8a9b2f7e3d1a6c8b9e0f",
-  "engine_base_url": "https://re-erkkimarkus-projects.vercel.app",
+  "engine_base_url": "https://intelligence.smaily.com",
   "engine_version": "1.0.0",
   "endpoints": {
-    "ping":       "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/ping",
-    "catalog":    "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog",
-    "customers":  "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/customers",
-    "orders":     "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/orders",
-    "browse":     "https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse",
-    "identity_merge": "https://re-erkkimarkus-projects.vercel.app/api/v1/identity/merge",
-    "customer_export": "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}/export",
-    "customer_delete": "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}",
-    "customer_opt_out": "https://re-erkkimarkus-projects.vercel.app/api/v1/customer/{email}/opt-out"
+    "ping":       "https://intelligence.smaily.com/api/v1/ingest/ping",
+    "catalog":    "https://intelligence.smaily.com/api/v1/ingest/catalog",
+    "customers":  "https://intelligence.smaily.com/api/v1/ingest/customers",
+    "orders":     "https://intelligence.smaily.com/api/v1/ingest/orders",
+    "browse":     "https://intelligence.smaily.com/api/v1/ingest/browse",
+    "identity_merge": "https://intelligence.smaily.com/api/v1/identity/merge",
+    "customer_export": "https://intelligence.smaily.com/api/v1/customer/{email}/export",
+    "customer_delete": "https://intelligence.smaily.com/api/v1/customer/{email}",
+    "customer_opt_out": "https://intelligence.smaily.com/api/v1/customer/{email}/opt-out"
   },
   "config": {
     "tracking_cookie_name": "smaily_rec_uid",
@@ -339,7 +339,7 @@ User-Agent: <plugin-identifier>/<version>  (näit. "SmailyRecEngine-WooPlugin/0.
 {
   "error": "setup_token_expired_or_used",
   "message": "This setup token has expired or has already been used. Ask the engine administrator to generate a new one.",
-  "regenerate_url": "https://re-erkkimarkus-projects.vercel.app/admin/tenants/{tenant_id}/regenerate-setup-token",
+  "regenerate_url": "https://intelligence.smaily.com/admin/tenants/{tenant_id}/regenerate-setup-token",
   "request_id": "req_..."
 }
 ```
@@ -1156,13 +1156,13 @@ V2.0-s plaanis multi-tenant single-WP (agentuurid + WPMU + WC Multistore), aga A
 
 **Test connection**:
 ```bash
-curl -X GET https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/ping \
+curl -X GET https://intelligence.smaily.com/api/v1/ingest/ping \
   -H "Authorization: Bearer sk_..."
 ```
 
 **Catalog upload**:
 ```bash
-curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog \
+curl -X POST https://intelligence.smaily.com/api/v1/ingest/catalog \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -1181,7 +1181,7 @@ curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/catalog \
 
 **Browse event**:
 ```bash
-curl -X POST https://re-erkkimarkus-projects.vercel.app/api/v1/ingest/browse \
+curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
   -d '{

@@ -34,11 +34,14 @@ final class Constants {
 	/**
 	 * Recommendation-engine setup-token exchange endpoint.
 	 *
-	 * BETA: points to the Vercel preview deployment of the rec-engine.
-	 * Production migrations bump this constant in a one-line plugin update.
-	 * Per-site overrides are possible through the smaily_connect_setup_url filter.
+	 * Points to the engine's production domain. This is only the STATIC default
+	 * used for the very first exchange; the engine returns its live
+	 * engine_base_url in the setup-exchange response, so installs auto-adapt if
+	 * the host ever moves. Production migrations bump this constant in a one-line
+	 * plugin update. Per-site overrides are possible through the
+	 * smaily_connect_setup_url filter.
 	 */
-	public const SETUP_BASE_URL = 'https://re-seven-indol.vercel.app/setup/exchange';
+	public const SETUP_BASE_URL = 'https://intelligence.smaily.com/setup/exchange';
 
 	/**
 	 * REST namespace exposed by the plugin (e.g. /wp-json/smaily-connect/v1/...).

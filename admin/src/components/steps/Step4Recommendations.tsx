@@ -132,7 +132,7 @@ function SetupCard({
               setError(null);
             }
           }}
-          placeholder="https://re-...vercel.app/setup/..."
+          placeholder="https://intelligence.smaily.com/setup/..."
           autoComplete="off"
         />
       </div>

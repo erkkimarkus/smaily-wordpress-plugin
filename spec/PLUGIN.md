@@ -131,7 +131,7 @@ Version: 2.0.0-beta.1
         ▼                 ▼
 ┌─────────────────┐   ┌─────────────────────────────────────────┐
 │ Smaily API      │   │ Rec-Engine API                          │
-│ (subdomain.     │   │ (recengine.smaily.com or similar)       │
+│ (subdomain.     │   │ (intelligence.smaily.com or similar)    │
 │  sendsmaily.net)│   │ Bearer-token auth, multi-platform       │
 └─────────────────┘   └─────────────────────────────────────────┘
 ```
@@ -458,15 +458,15 @@ Body:
 
 **The plugin stores all of these values** in `wp_options`, encrypted (`autoload=false`). **Do not hardcode** any URL, cookie name, or URL-parameter name anywhere in the plugin code — always read from config.
 
-**The engine base URL is variable**: during the pilot `https://re-seven-indol.vercel.app` (Vercel preview); for the production version it changes. The plugin handles this transparently — when the engine migrates, the client does a new setup-token exchange and the config updates.
+**The engine base URL is variable**: the production engine is `https://intelligence.smaily.com`, but the plugin must not assume it. The plugin handles migration transparently — when the engine moves, the client does a new setup-token exchange and the config updates.
 
-**Setup-URL override mechanism**: for the first setup call (when there's no `engine_base_url` in config yet) the plugin needs a starting URL. Default: `https://re-seven-indol.vercel.app/setup/exchange` at the constant level in a `Constants` class. **Override mechanism via a filter**:
+**Setup-URL override mechanism**: for the first setup call (when there's no `engine_base_url` in config yet) the plugin needs a starting URL. Default: `https://intelligence.smaily.com/setup/exchange` at the constant level in a `Constants` class. **Override mechanism via a filter**:
 
 ```php
 // Filter: smaily_connect_setup_url
 $setup_url = apply_filters(
     'smaily_connect_setup_url',
-    'https://re-seven-indol.vercel.app/setup/exchange'
+    'https://intelligence.smaily.com/setup/exchange'
 );
 ```
 
@@ -899,7 +899,7 @@ An end-to-end test that must work before the client goes live:
 
 1. **Geist vs Inter font** — STYLE_MAPPING.md assumes Inter (the most likely Smaily choice). If Smaily uses a different font, a switch is needed before Phase 2 starts. Decided based on Variant 3 (my estimates), needs confirmation in the pilot-client review phase.
 2. **The exact hex values of the Smaily design system** — STYLE_MAPPING.md uses estimated values (the Variant 3 choice based on the logo `#E91E63` + a UI screenshot). Needs a check at the end of Phase 2 in the pilot-client review phase.
-3. **Production engine_base_url** — currently a Vercel preview (`re-seven-indol.vercel.app`). Production migration before or after the pilot client go-live? Code must know that the URL is **variable** and that all references come from the setup response.
+3. **Production engine_base_url** — the engine runs at `https://intelligence.smaily.com`. Code must still know that the URL is **variable** and that all references come from the setup response.
 4. **Email notification opt-in default** — are critical-level notifications (API revoke, engine connection-down >1h) sent to the admin email by default, or must the client opt in? My lean: on by default for the critical level (the user must know when the plugin stops working), with an opt-out in Settings. See §13a.
 
 ## 18. Sync with RECENGINE_API_CONTRACT v1.0 (v0.4/v0.5 change log)

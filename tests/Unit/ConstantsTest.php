@@ -41,7 +41,7 @@ final class ConstantsTest extends TestCase {
 		Functions\when( 'apply_filters' )->returnArg( 2 );
 
 		self::assertSame(
-			'https://re-seven-indol.vercel.app/setup/exchange',
+			'https://intelligence.smaily.com/setup/exchange',
 			Constants::setup_url()
 		);
 	}
@@ -72,6 +72,6 @@ final class ConstantsTest extends TestCase {
 	}
 
 	public function test_version_helper_reflects_define(): void {
-		self::assertSame( '2.1.0-beta.5', Constants::version() );
+		self::assertSame( '2.1.0-beta.6', Constants::version() );
 	}
 }

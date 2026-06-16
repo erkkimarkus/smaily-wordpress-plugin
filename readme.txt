@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.4
+Stable tag: 2.1.0-beta.6
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.6 =
+
+* Changed: Smaily Campaign Intelligence now connects to its production address `https://intelligence.smaily.com` for new connections. Existing connections keep working unchanged — no settings change is required. To move an existing store onto the new address, reconnect using a fresh setup link from Smaily.
 
 = 2.1.0-beta.5 =
 
@@ -207,6 +211,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.6 =
+Safe update: new Campaign Intelligence connections use the production address https://intelligence.smaily.com. Existing connections are unaffected and keep working — no settings change and no re-import required. To move an existing store onto the new address, reconnect with a fresh setup link from Smaily.
 
 = 2.1.0-beta.5 =
 Naming update only: the recommendation engine is now called Smaily Campaign Intelligence in the plugin interface. No data, connection or settings changes; no re-import required.

@@ -68,7 +68,7 @@ class SetupExchange {
 	 * Split a pasted setup URL into (base_url, token).
 	 *
 	 * Accepts:
-	 *   - full URL: "https://re-example.vercel.app/setup/abc123"
+	 *   - full URL: "https://intelligence.smaily.com/setup/abc123"
 	 *   - bare token: "abc123" → returns ['base' => '', 'token' => 'abc123']
 	 *
 	 * @return array{base: string, token: string}

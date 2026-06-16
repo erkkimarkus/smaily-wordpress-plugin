@@ -10,7 +10,7 @@ import { apiRequest, ApiError } from './client';
  */
 
 export interface SetupExchangeRequest {
-  /** Full pasted setup URL, e.g. "https://re-...vercel.app/setup/<token>". */
+  /** Full pasted setup URL, e.g. "https://intelligence.smaily.com/setup/<token>". */
   setupUrl: string;
 }
 

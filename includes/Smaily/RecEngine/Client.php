@@ -97,7 +97,7 @@ class Client {
 
 	/**
 	 * @param string                $api_key      Bearer key, e.g. "sk_8f3k2a...".
-	 * @param string                $base_url     Engine origin, e.g. "https://re-example.vercel.app".
+	 * @param string                $base_url     Engine origin, e.g. "https://intelligence.smaily.com".
 	 * @param array<string, string> $endpoints    RecEngineSettings::endpoints() — the engine's own
 	 *                                            URL map (source of truth for paths). Empty when a
 	 *                                            caller only needs base_url + PATH_* constants (ping).

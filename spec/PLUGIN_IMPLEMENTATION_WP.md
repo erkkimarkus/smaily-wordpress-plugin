@@ -312,7 +312,7 @@ class SettingsPage {
 namespace Smaily\RecEngine\Setup;
 
 class SetupTokenExchange {
-    private const SETUP_BASE_URL = 'https://re-seven-indol.vercel.app/setup/exchange';
+    private const SETUP_BASE_URL = 'https://intelligence.smaily.com/setup/exchange';
     
     public function exchange(string $token) {
         // Hard-coded engine base URL for first call (no engine_base_url in config yet)

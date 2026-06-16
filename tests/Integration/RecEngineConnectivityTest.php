@@ -43,13 +43,12 @@ use PHPUnit\Framework\TestCase;
  */
 final class RecEngineConnectivityTest extends TestCase {
 
-	// Faas-3 pilot engine — currently live at the Erkki staging deploy.
-	// RECENGINE_API_CONTRACT.md §1 quotes a different URL (re-seven-indol)
-	// that's no longer reachable; this constant tracks the active
-	// engine and the contract doc will be updated separately. CI / local
-	// runs can override via the RECENGINE_BASE_URL env var when the
-	// staging URL rotates again.
-	private const DEFAULT_BASE = 'https://re-erkkimarkus-projects.vercel.app';
+	// Production engine, served from its public domain. This constant tracks
+	// the active engine and matches the base URL documented in
+	// RECENGINE_API_CONTRACT.md §1. Earlier pilot preview deploys are retired.
+	// CI / local runs can override via the RECENGINE_BASE_URL env var if the
+	// host ever changes.
+	private const DEFAULT_BASE = 'https://intelligence.smaily.com';
 	private const PING_PATH    = '/api/v1/ingest/ping';
 
 	public function test_engine_ping_returns_401_without_auth(): void {

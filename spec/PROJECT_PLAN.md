@@ -336,7 +336,7 @@ Scope optional: `feat(wizard):`, `fix(beacon):`, etc.
 7. **`includes/Bootstrap.php`** singleton-pattern, hookide registreerimine
 8. **`includes/Activation.php`** — DB-migrations, default options
 9. **`includes/Deactivation.php`** — cron'id maha, AS jätta alles
-10. **`includes/Constants.php`** — plugin-tasandi konstandid, sh `SETUP_BASE_URL = 'https://re-seven-indol.vercel.app/setup/exchange'`. Production-migratsiooni puhul muudetakse konstandi-väärtus uue plugin-versiooniga. Plugin'i koodi kasutus: `apply_filters('smaily_connect_setup_url', Constants::SETUP_BASE_URL)` — filter võimaldab per-site override-i.
+10. **`includes/Constants.php`** — plugin-tasandi konstandid, sh `SETUP_BASE_URL = 'https://intelligence.smaily.com/setup/exchange'`. Production-migratsiooni puhul muudetakse konstandi-väärtus uue plugin-versiooniga. Plugin'i koodi kasutus: `apply_filters('smaily_connect_setup_url', Constants::SETUP_BASE_URL)` — filter võimaldab per-site override-i.
 
 **Implementatsiooni-noot:** PLUGIN_IMPLEMENTATION_WP.md koodinäide `SetupTokenExchange::SETUP_BASE_URL` private const'na on **liiga jäik**. Meie versioon kasutab filtrit, et production-migratsiooni puhul saaks Erkki ühe rea PR-iga uuendada ja klient saab plugin-update'i kaudu (mitte iga klient kirjutab uut tokenit). Vt PLUGIN.md §8.
 

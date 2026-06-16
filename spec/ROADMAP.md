@@ -426,7 +426,7 @@ Tabelid:
 
 #### 4.4. App Proxy + beacon
 
-Shopify Theme App Extension installib `beacon.js`-i theme'i. Beacon'i URL on Shopify App Proxy (`/apps/smaily/beacon`), mis Shopify forwardib `https://smaily-shopify-app.vercel.app/proxy/beacon` peale. Server-side proxy lisab Authorization header'i ja saadab `https://recengine.smaily.com/api/v1/ingest/browse`.
+Shopify Theme App Extension installib `beacon.js`-i theme'i. Beacon'i URL on Shopify App Proxy (`/apps/smaily/beacon`), mis Shopify forwardib `https://smaily-shopify-app.vercel.app/proxy/beacon` peale. Server-side proxy lisab Authorization header'i ja saadab `https://intelligence.smaily.com/api/v1/ingest/browse`.
 
 `beacon.js` koodist tähtsam osa on **identne WP-versiooniga** — `@smaily/recengine-client` annab kogu loogika.
 

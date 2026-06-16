@@ -4,6 +4,23 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 2.1.0-beta.6 — engine default URL → intelligence.smaily.com (2026-06-16)
+
+The recommendation engine moved to its production domain
+**`https://intelligence.smaily.com`** (migrated from the earlier
+`*.vercel.app` preview deploys). Updated every **static** reference to the
+new host: the `Constants::SETUP_BASE_URL` default used for the first
+setup-exchange, the connection-screen setup-URL placeholder, code-comment
+examples, the API contract base/setup/`engine_base_url`/curl examples, and the
+integration connectivity-test base. No contract, data, field, header
+(`X-Engine-Version`), or setup-token-flow change — only the host.
+
+The runtime path is unchanged and self-adapting: the engine returns its live
+`engine_base_url` in the setup-exchange response and the plugin extracts the
+host from whatever setup URL the merchant pastes, so existing installs keep
+working without action. The old `*.vercel.app` alias still resolves and is
+still accepted — the new URL is only a default, not a hard requirement.
+
 ## 2.1.0-beta.5 — product rename: Smaily Campaign Intelligence (2026-06-15)
 
 Display-name change only — no contract, data, or behaviour change. The

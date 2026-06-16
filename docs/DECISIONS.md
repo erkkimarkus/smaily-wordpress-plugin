@@ -691,7 +691,7 @@ Documented in RECENGINE_TODO.md P0 (engine-team work item).
 ### F3-4: Setup-token UI = full URL, not just the token
 
 **Context:** Step 4 UI needs a setup token. Two variants: the user pastes (a) just
-the token or (b) the full URL `https://re-...vercel.app/setup/<token>`.
+the token or (b) the full URL `https://intelligence.smaily.com/setup/<token>`.
 
 **Decision:** **the full URL**. The plugin parses it: host = base_url, what comes
 after `/setup/` = token.
