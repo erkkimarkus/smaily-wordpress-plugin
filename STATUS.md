@@ -26,8 +26,21 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-14 (**`2.1.0-beta.4-rc.1` RELEASED** — GH pre-release on
-the fork, bundles three fixes on top of beta.3: **CC.5 catalog.delete
+_Last updated: 2026-06-16 (**`2.1.0-beta.6-rc.1` RELEASED** — GH pre-release on
+the fork (build `b99eb15`, ZIP attached): engine **default URL →
+`https://intelligence.smaily.com`** (migrated off the `*.vercel.app` preview
+host). Static-reference-only change — the `Constants::SETUP_BASE_URL` default,
+the connection-screen setup-URL placeholder, contract
+base/setup/`engine_base_url`/curl examples, and the integration
+connectivity-test base. **No contract/data/field/header (`X-Engine-Version`)
+change**; the runtime path self-adapts (engine returns its live
+`engine_base_url`, plugin derives the host from the pasted setup URL) and the
+old `*.vercel.app` alias still resolves — existing installs need no action.
+Prior: **`2.1.0-beta.5-rc.1` RELEASED** — display-name change only, the
+rec-engine product renamed **Smaily Campaign Intelligence** across user-facing
+surfaces (internal identifiers, REST routes, contract, endpoints unchanged; ET
+translations updated). Prior: **`2.1.0-beta.4-rc.1` RELEASED** — GH pre-release
+on the fork, bundles three fixes on top of beta.3: **CC.5 catalog.delete
 auto-draft-burst fix** (skip never-published artifacts whose removal object the
 engine 400s, F3-39 / LESSONS §2.12), Event Log actions column pinned right
 (Retry/Details stay reachable), and backfill progress showing the honest
