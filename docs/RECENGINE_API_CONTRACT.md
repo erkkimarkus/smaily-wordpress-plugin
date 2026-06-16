@@ -1,17 +1,18 @@
 # Smaily Recommendation Engine — API Contract v1.0
 
-**Version**: 1.0.0
+**Version**: 1.0.1
 **Published**: 2026-05-19
-**Last updated**: 2026-05-22 (translation + event_id coverage + dedup window correction)
+**Last updated**: 2026-06-16 (production domain → intelligence.smaily.com; tri-repo sync)
 **Status**: Stable — basis for plugin implementation
 
 ---
 
 ## Document location and synchronization
 
-This contract lives in two repositories and must stay byte-for-byte synchronized:
-- `plugin-repo/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect WordPress plugin)
-- `engine-repo/docs/RECENGINE_API_CONTRACT.md` (rec engine)
+This contract lives in three repositories and must stay byte-for-byte synchronized:
+- `connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — WooCommerce plugin)
+- `shopify-connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — Shopify app)
+- `re/docs/RECENGINE_API_CONTRACT.md` (rec engine)
 
 When proposing a change (either side):
 1. Discuss in shared channel before implementing
