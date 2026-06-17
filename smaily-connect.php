@@ -14,7 +14,7 @@
  * Plugin URI:           https://smaily.com/help/user-manual/smaily-connect-for-wordpress/
  * Text Domain:          smaily-connect
  * Update URI:           https://github.com/erkkimarkus/smaily-wordpress-plugin
- * Version:              2.1.0-beta.6
+ * Version:              2.1.0-beta.7
 */
 
 /*
@@ -37,13 +37,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Current plugin version (PSR-4 callers should prefer Smaily\Connect\Constants::version()).
  */
-define( 'SMAILY_CONNECT_VERSION', '2.1.0-beta.6' );
+define( 'SMAILY_CONNECT_VERSION', '2.1.0-beta.7' );
 
 /**
  * Legacy version constant — kept for upstream compatibility (used by older
  * classes that still reference it). New code should use SMAILY_CONNECT_VERSION.
  */
-define( 'SMAILY_CONNECT_PLUGIN_VERSION', '2.1.0-beta.6' );
+define( 'SMAILY_CONNECT_PLUGIN_VERSION', '2.1.0-beta.7' );
 
 /**
  * The name of the plugin.

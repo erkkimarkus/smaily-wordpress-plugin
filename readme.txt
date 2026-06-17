@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.6
+Stable tag: 2.1.0-beta.7
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.7 =
+
+* Fixed: products you move to the Trash that customers had previously ordered are now kept in Campaign Intelligence as out-of-stock, instead of disappearing. The recommendation engine still learns from that purchase history (so those customers keep getting the right kind of suggestions) but won't recommend a trashed product. Restoring a product from the Trash marks it available again. After updating, re-run the product import (Campaign Intelligence → Import existing data → Products) so products already in the Trash are picked up.
 
 = 2.1.0-beta.6 =
 
@@ -211,6 +215,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.7 =
+Recommended update: previously-ordered products you move to the Trash are now kept in Campaign Intelligence as out-of-stock so the engine keeps learning from them (rather than disappearing). Re-run the product import after updating (Campaign Intelligence → Import existing data → Products) to pick up products already in the Trash.
 
 = 2.1.0-beta.6 =
 Safe update: new Campaign Intelligence connections use the production address https://intelligence.smaily.com. Existing connections are unaffected and keep working — no settings change and no re-import required. To move an existing store onto the new address, reconnect with a fresh setup link from Smaily.
