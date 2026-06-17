@@ -92,6 +92,20 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertCount( 1, $queue->enqueued, 'Repeated save_post_product in one request collapses to a single row.' );
 	}
 
+	public function test_save_during_trashing_is_skipped_so_it_does_not_clobber_the_removal(): void {
+		// Trashing fires wp_trash_post (→ catalog.delete, in_stock=false) AND then
+		// save_post (wp_update_post → status=trash). on_save_product must skip the
+		// trash transition, else its upsert re-marks the product in_stock=true and
+		// undoes the removal.
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, 'TRASHING-1' );
+		$handler = $this->handler( $queue, true, array( 100 => $product ), array( $product ), null, array( 100 => 'trash' ) );
+
+		$handler->on_save_product( 100 );
+
+		self::assertSame( array(), $queue->enqueued, 'A save fired by trashing must not upsert — the trash/delete path owns the in_stock=false removal.' );
+	}
+
 	public function test_delete_enqueues_catalog_delete_with_captured_object(): void {
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 100, 'GONE-1' );
@@ -231,8 +245,9 @@ final class CatalogHookHandlerTest extends TestCase {
 	/**
 	 * @param array<int, \WC_Product> $products_by_id get_product() lookup table.
 	 * @param array<int, \WC_Product> $expand_units   builder->expand() result.
+	 * @param array<int, string>      $status_map     post id → status ('publish' default).
 	 */
-	private function handler( IngestQueue $queue, bool $connected, array $products_by_id, array $expand_units, ?DetectorInterface $detector = null ): CatalogHookHandler {
+	private function handler( IngestQueue $queue, bool $connected, array $products_by_id, array $expand_units, ?DetectorInterface $detector = null, array $status_map = array() ): CatalogHookHandler {
 		$settings = new class( $connected ) extends RecEngineSettings {
 			private bool $connected;
 			public function __construct( bool $connected ) {
@@ -269,16 +284,25 @@ final class CatalogHookHandlerTest extends TestCase {
 
 		$detector = $detector ?? $this->detector( array() );
 
-		return new class( $queue, $builder, $settings, $detector, $products_by_id ) extends CatalogHookHandler {
+		return new class( $queue, $builder, $settings, $detector, $products_by_id, $status_map ) extends CatalogHookHandler {
 			/** @var array<int, \WC_Product> */
 			private array $products_by_id;
-			/** @param array<int, \WC_Product> $products_by_id */
-			public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, DetectorInterface $detector, array $products_by_id ) {
+			/** @var array<int, string> */
+			private array $status_map;
+			/**
+			 * @param array<int, \WC_Product> $products_by_id
+			 * @param array<int, string>      $status_map
+			 */
+			public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, DetectorInterface $detector, array $products_by_id, array $status_map ) {
 				parent::__construct( $queue, $builder, $settings, $detector );
 				$this->products_by_id = $products_by_id;
+				$this->status_map     = $status_map;
 			}
 			protected function get_product( int $product_id ): ?\WC_Product {
 				return $this->products_by_id[ $product_id ] ?? null;
+			}
+			protected function post_status( int $post_id ): string {
+				return $this->status_map[ $post_id ] ?? 'publish';
 			}
 		};
 	}

@@ -217,6 +217,36 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		);
 	}
 
+	public function test_trashed_product_is_backfilled_as_in_stock_false(): void {
+		// A product a customer once bought but the merchant later trashed must
+		// STAY in the engine catalog so its order-history join / training survives
+		// — sent in_stock=false (can't be recommended), never dropped. The
+		// published product alongside it still backfills with its real stock.
+		$live    = $this->make_product( 'BF-LIVE-1' );          // published.
+		$trashed = $this->make_categorized_product( 'BF-TRASH-1' ); // → trashed below.
+		wp_trash_post( $trashed );
+
+		// Trashing fired the live wp_trash_post hook → a catalog.delete row.
+		// Clear it so the assertion sees only what the BACKFILL enqueues.
+		$this->truncate_queue();
+		RecEngineMockServer::reset();
+
+		$job = $this->job();
+		$job->start();
+		$this->run_to_completion( $job );
+
+		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
+		self::assertArrayHasKey( 'BF-TRASH-1', $in_stock, 'The trashed product is kept in the catalog, not dropped from the sync.' );
+		self::assertFalse( $in_stock['BF-TRASH-1'], 'A trashed product reaches the engine in_stock=false — joinable but unrecommendable.' );
+		self::assertTrue( $in_stock['BF-LIVE-1'] ?? null, 'A published product still backfills with its real (in_stock=true) state.' );
+	}
+
+	// The is_removable guard (a category-less trashed product is skipped, not sent
+	// as a 400-bound row) is covered robustly by the unit test
+	// CatalogBackfillJobTest::test_trashed_product_with_blank_category_path_is_skipped
+	// — not repeated here, where WooCommerce's auto-assigned "Uncategorized" makes
+	// a genuinely category-less fixture fragile.
+
 	/**
 	 * Drive a backfill job to completion, returning the cumulative
 	 * processed/sent/failed across its batches.
@@ -305,11 +335,30 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		return $id;
 	}
 
+	/**
+	 * A product with a real product_cat term assigned, so its catalog object
+	 * carries a non-empty category_path and survives the removal guard when
+	 * trashed (the engine requires category_path non-empty).
+	 */
+	private function make_categorized_product( string $sku ): int {
+		$cat = term_exists( 'bf-trash-cat', 'product_cat' );
+		if ( ! $cat ) {
+			$cat = wp_insert_term( 'BF Trash Cat', 'product_cat', array( 'slug' => 'bf-trash-cat' ) );
+		}
+		$term_id = (int) ( is_array( $cat ) ? $cat['term_id'] : $cat );
+
+		$id = $this->make_product( $sku );
+		wp_set_object_terms( $id, array( $term_id ), 'product_cat' );
+		return $id;
+	}
+
 	private function delete_all_products(): void {
 		$ids = get_posts(
 			array(
 				'post_type'      => 'product',
-				'post_status'    => 'any',
+				// 'any' EXCLUDES 'trash' — list statuses explicitly so trashed
+				// products (this suite creates them) don't leak across tests.
+				'post_status'    => array( 'publish', 'pending', 'draft', 'auto-draft', 'future', 'private', 'trash' ),
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
 			)

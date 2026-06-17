@@ -26,7 +26,30 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-16 (**`2.1.0-beta.6-rc.1` RELEASED** — GH pre-release on
+_Last updated: 2026-06-17 (**Trashed products kept in catalog as `in_stock=false`
+(F3-40)** — engine-team 2026-06-17 brief, Teema 2: ~4% of pilot order lines had no
+`catalog.sku` match (~567 rows / ~265 customers) → species un-inferable from
+purchases. Erkki traced them to the WordPress **trash** (not permanent delete).
+Root cause: trashing fires NO catalog hook (`before_delete_post` is
+permanent-delete-only; trashing routes via `wp_update_post`), and the backfill was
+`publish`-only → trashed-but-once-bought products go missing/stale and orphan the
+`order_items.sku ↔ catalog.sku` join. Fix (A+B, the engine's "send `in_stock=false`,
+don't drop" rule): `Bootstrap` binds `wp_trash_post → on_delete_product` +
+`untrashed_post → on_save_product`; `CatalogBackfillJob` enumerates `publish`+`trash`,
+sending trashed products as `in_stock=false` (kept for the join/training, not
+recommended — the engine has no delete-by-key, so a `catalog.delete` row IS an
+`in_stock=false` upsert). `is_removable` extracted to a shared static (F3-39 guard
+reused on both paths). **Caught + guarded a real clobber bug** (live-hook integration
+test, not review): `wp_trash_post()` also fires `save_post_product` → `on_save_product`,
+which re-upserted `in_stock=true` and undid the removal — `on_save_product` now
+early-returns on a `trash`-status save. Permanently-deleted products remain
+unrecoverable (no WC data) — accepted. Gates: **ci:strict exit=0 (unit 359, JS 158);
+integration OK 113**. DECISIONS F3-40; CLAUDE.md trash note. **Not yet released** —
+needs version bump + ZIP + a pilot catalog re-backfill to populate the trashed rows.
+Brief's Teema 1 (order statuses: custom `label printed`/`shipped` etc. dropped by the
+5-key `STATUS_MAP`) = client fixes WC-side, no plugin change; Teema 3 (browse beacon
+0 events) = pilot config (toggle now on + CookieYes installed + marketing consent
+given), watching for engine browse traffic. Prior: **`2.1.0-beta.6-rc.1` RELEASED** — GH pre-release on
 the fork (build `b99eb15`, ZIP attached): engine **default URL →
 `https://intelligence.smaily.com`** (migrated off the `*.vercel.app` preview
 host). Static-reference-only change — the `Constants::SETUP_BASE_URL` default,
@@ -642,6 +665,24 @@ checkpoint between each; CC.4 last (blocked — see below).
 
 Already done (no work): **P2b `customers.language`** — `CustomerPayloadBuilder`
 already sends ISO 639-1 from `get_user_locale()`.
+
+- **F3-40 — trashed products kept in catalog as `in_stock=false` (2026-06-17,
+  engine brief Teema 2).** ~4% of pilot order lines had no `catalog.sku` match;
+  Erkki traced them to the WordPress **trash**. Trashing fires no catalog hook
+  (`before_delete_post` is permanent-delete-only) and the backfill was
+  `publish`-only, so trashed-but-bought products orphan the join. Fix (A+B):
+  `Bootstrap` binds `wp_trash_post → on_delete_product` + `untrashed_post →
+  on_save_product`; `CatalogBackfillJob` enumerates `publish`+`trash`, sending
+  trashed products as `in_stock=false` (kept for the join/training; engine has no
+  delete-by-key, so `catalog.delete` ≡ `in_stock=false` upsert). `is_removable`
+  → shared static (reuses the F3-39 guard on both paths). Guarded a real clobber
+  bug: `wp_trash_post()` also fires `save_post_product`, which re-upserted
+  `in_stock=true` → `on_save_product` now skips a `trash`-status save (caught by
+  the new integration test). Permanently-deleted products stay unrecoverable
+  (no WC data). Gates: ci:strict exit=0 (unit 359, JS 158); integration OK 113.
+  **Not yet released** — needs version bump + ZIP + a pilot catalog re-backfill.
+  (Brief Teema 1 = client fixes order statuses WC-side, no plugin change; Teema 3
+  browse = pilot config now corrected, watching engine traffic.)
 
 ### Done — engine ask #1: attribute term labels (2026-06-12 late)
 

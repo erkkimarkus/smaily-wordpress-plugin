@@ -2043,6 +2043,61 @@ signal, above).
 F3-36 (LESSONS §2.11 — silent pre-enqueue drops, the contrasting case);
 `CatalogBackfillJob` (the publish-only filter the hook now mirrors in spirit).
 
+### F3-40 — Trashed products stay in the catalog as `in_stock=false` (pilot orphan-join fix)
+
+**Context:** an engine-team data audit (2026-06-17) found ~4% of pilot order lines
+had no matching `catalog.sku` (~567 rows, ~265 customers) → those customers' species
+can't be inferred from purchases → they get a balanced (wrong) mix. Erkki traced a
+chunk of the missing product ids to the WordPress **trash** (not permanent deletion).
+Mechanism: the catalog backfill is `publish`-only, and **trashing fires no catalog
+hook** — `before_delete_post` is permanent-delete-only, and trashing routes through
+`wp_update_post`, not a delete. So a trashed-but-once-bought product is neither
+re-sent nor removed; its engine catalog row goes missing (if it was trashed before
+the first ingest) or stale. The engine never deletes-by-absence (contract §3), so the
+fix is to *keep* the row, marked unavailable — not to drop it.
+
+**Decision (implemented, 2026-06-17):** a trashed product is kept in the engine
+catalog as an `in_stock=false` UPSERT (the engine has no delete-by-key, so a
+`catalog.delete` row IS an `in_stock=false` upsert — `IngestFlusher::row_to_object`
+stamps it), so its order-history join / model training survives but it can't be
+recommended. Two paths, both reusing the existing removal machinery:
+- **Live (A+B / hooks):** `Bootstrap` binds `wp_trash_post → on_delete_product`
+  (in_stock=false) and `untrashed_post → on_save_product` (re-sync real stock).
+- **Backfill (A):** `CatalogBackfillJob` enumerates `publish` **and** `trash`; a
+  published post upserts (flusher loads fresh), a trashed post enqueues a
+  `catalog.delete` carrying its captured object, guarded by the now-shared
+  `CatalogHookHandler::is_removable` (a blank `category_path`/`product_url` removal
+  the engine would 400 is skipped, F3-39).
+
+**The clobber guard (the subtle part):** `wp_trash_post()` calls `wp_update_post()`
+to set status `trash`, which fires `save_post_product` → `on_save_product` AFTER the
+removal was enqueued — re-upserting the product as `in_stock=true` and undoing the
+removal. `on_save_product` now early-returns when the saved post's status is `trash`
+(the trash/delete path owns a trashed post). Untrash restores the status *first*,
+then fires `untrashed_post`, so a restored product is correctly NOT skipped. This was
+caught by the new live-hook integration test, not in review — the two hooks firing on
+one trash is non-obvious.
+
+**Scope / known limits:** this closes the **trash** gap, not the hard-delete one — a
+*permanently* deleted product's data is gone from WC, so no catalog row can be built
+(the engine must tolerate such order lines; it already does, it just can't infer from
+them). Multilingual: the collapse keys on a *published* canonical only, so a published
+translation of a trashed default-language product is kept (stands in as in_stock=true);
+a fully-trashed multilingual product may emit a harmless duplicate `in_stock=false`
+per language (idempotent on the engine's SKU upsert). After deploy the pilot needs a
+**catalog re-backfill** so existing trashed products enter the graph.
+
+**Alternatives:** (a) include all non-publish statuses (draft/private) — rejected,
+drafts are not real sales and would add noise; trash is the precise, merchant-driven
+"discontinued" signal. (b) a wire-level `in_stock=false` stamp in the flusher for any
+non-publish row — rejected, the `catalog.delete` event already carries that semantics
+cleanly. (c) guard `on_save_product` on the canonical product's status instead of the
+saved post's — rejected, it drops a published translation whose canonical is trashed.
+
+**Relationships:** F3-39 (the `is_removable` guard this shares + extends to the
+backfill); F3-36 / LESSONS §2.11 (never a silent drop — a trashed product is kept,
+not dropped); the engine-team 2026-06-17 brief (Teema 2, the orphan-join evidence).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

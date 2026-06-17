@@ -121,6 +121,23 @@ Event Log trace), D6-failed orders, rejected browse events. If you add a new
 SKU surface, use the resolver; if a record still can't be keyed, make it
 observable (terminal skip), never a silent pre-enqueue drop (LESSONS §2.11).
 
+### Trashing a product fires NO catalog hook — it's kept as `in_stock=false`
+`before_delete_post` is **permanent-delete-only**; trashing routes through
+`wp_update_post`, so a trashed product fires neither the delete nor (usefully)
+the save hook. Left alone, a trashed-but-once-bought product silently keeps a
+stale engine catalog row or has none — its order lines orphan the
+`order_items.sku ↔ catalog.sku` join (the 2026-06-17 pilot ~4% miss, F3-40).
+The fix keeps it in the graph as `in_stock=false` (engine has no delete-by-key;
+a `catalog.delete` row IS an `in_stock=false` upsert): `Bootstrap` binds
+`wp_trash_post → on_delete_product` and `untrashed_post → on_save_product`, and
+`CatalogBackfillJob` enumerates `publish` **and** `trash`. **Trap (cost a green→
+red integration cycle):** `wp_trash_post()` then calls `wp_update_post(trash)`,
+which fires `save_post_product` → `on_save_product` AFTER the removal — re-upserting
+`in_stock=true` and undoing it. `on_save_product` early-returns when the saved
+post's status is `trash`; don't remove that guard. A *permanently* deleted
+product can't be recovered (no WC data to build a row) — that's accepted, not a
+bug. After any change here the pilot needs a catalog re-backfill.
+
 ### Use the IsoDate helper for datetimes — never raw format
 The engine's strict Zod `.datetime()` requires Z-suffix (`Y-m-d\TH:i:s\Z`), NOT
 `+00:00`. Raw `gmdate('c')` / `$date->format('c')` produces `+00:00` and the

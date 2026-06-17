@@ -324,6 +324,16 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		},
 		$products
 	);
+	// Record in_stock per sku so a test can assert a trashed product was sent as
+	// in_stock=false (the catalog.delete → in_stock=false stamp), not dropped.
+	$in_stock_by_sku = array();
+	foreach ( $products as $product ) {
+		$sku = isset( $product['sku'] ) ? (string) $product['sku'] : '';
+		if ( $sku !== '' ) {
+			$in_stock_by_sku[ $sku ] = ! empty( $product['in_stock'] );
+		}
+	}
+	$state['last_catalog_in_stock'] = $in_stock_by_sku;
 	save_state( $state_file, $state );
 
 	$response = array(

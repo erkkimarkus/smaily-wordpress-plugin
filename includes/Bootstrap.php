@@ -367,6 +367,16 @@ final class Bootstrap {
 		// before_delete_post (not delete_post): the product is still loadable,
 		// so the handler can capture its catalog object before it's gone.
 		add_action( 'before_delete_post', array( $catalog, 'on_delete_product' ), 10, 1 );
+		// Trashing is NOT a delete — before_delete_post never fires for it, so a
+		// trashed product would silently keep its stale (in_stock=true) engine row
+		// while it can no longer be bought. Route trash through the same removal
+		// path: the engine keeps the SKU (no delete-by-key) as an in_stock=false
+		// UPSERT, so order-history joins / training survive but it stops being
+		// recommended. Untrash re-syncs real stock via the normal upsert path.
+		// (Trash disabled, EMPTY_TRASH_DAYS=0 → trashing IS a permanent delete →
+		// before_delete_post already covers it.)
+		add_action( 'wp_trash_post', array( $catalog, 'on_delete_product' ), 10, 1 );
+		add_action( 'untrashed_post', array( $catalog, 'on_save_product' ), 10, 1 );
 
 		// Rec-engine customer ingest (Phase 3.3.3). Self-gates on
 		// is_connected() like catalog; enqueues every registered user

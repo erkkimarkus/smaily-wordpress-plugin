@@ -46,11 +46,18 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  * Because every save resolves to the canonical product first, repeated saves
  * of different translations collapse to the same canonical units too.
  *
- * Delete capture: the product is still loadable in before_delete_post, so
- * the full catalog object is built and stored in the row now; the flusher
- * stamps in_stock=false + event_id at send time (it can't load a gone
- * product). Deleting a TRANSLATION must NOT remove the canonical SKU (P4) —
- * see on_delete_product.
+ * Removal capture (trash + permanent delete): the product is still loadable
+ * in both wp_trash_post and before_delete_post, so the full catalog object is
+ * built and stored in the row now; the flusher stamps in_stock=false + event_id
+ * at send time (it can't load a gone product). This is NOT a hard removal — the
+ * engine has no delete-by-key, so a catalog.delete row is sent as an UPSERT with
+ * in_stock=false (RECENGINE_API_CONTRACT.md §3, "Removal is explicit: re-send
+ * with in_stock=false"). The SKU row therefore SURVIVES in the engine catalog so
+ * its order-history join (and model training) is preserved — the product is just
+ * marked unavailable, so it can't be recommended. Trashing and untrashing share
+ * this path: trash → on_delete_product (in_stock=false), untrash → on_save_product
+ * (re-sync real stock). Removing a TRANSLATION must NOT remove the canonical SKU
+ * (P4) — see on_delete_product.
  *
  * Not final: tests subclass to stub get_product() while recording enqueues
  * through a doubled IngestQueue.
@@ -77,6 +84,14 @@ class CatalogHookHandler {
 
 	public function on_save_product( int $post_id ): void {
 		if ( ! $this->gate_open() ) {
+			return;
+		}
+		// Trashing a product fires save_post (wp_trash_post → wp_update_post) AFTER
+		// wp_trash_post already enqueued the in_stock=false removal — re-syncing
+		// here would clobber it back to in_stock=true. The trash/delete path owns a
+		// trashed post; skip it. (Untrash restores the status FIRST, then fires
+		// untrashed_post → here, so a restored product is correctly NOT skipped.)
+		if ( $this->post_status( $post_id ) === 'trash' ) {
 			return;
 		}
 		// Saving any translation re-syncs the CANONICAL product, so its
@@ -112,15 +127,22 @@ class CatalogHookHandler {
 		}
 	}
 
+	/**
+	 * A product left the catalog — trashed (wp_trash_post) or permanently
+	 * deleted (before_delete_post). Both routes land here because the engine
+	 * treats removal identically: an in_stock=false UPSERT that keeps the SKU
+	 * row (so order-history joins / training survive), never a hard delete. The
+	 * product is still loadable in both hooks, so enqueue_delete captures it.
+	 */
 	public function on_delete_product( int $post_id ): void {
 		if ( ! $this->gate_open() ) {
 			return;
 		}
 
-		// P4: deleting a TRANSLATION must NOT remove the canonical SKU — the
+		// P4: removing a TRANSLATION must NOT remove the canonical SKU — the
 		// product still exists in other languages. Re-sync the canonical
-		// (upsert) so its content drops the deleted language instead of marking
-		// the whole product unavailable. Only the canonical's own deletion (or
+		// (upsert) so its content drops the removed language instead of marking
+		// the whole product unavailable. Only the canonical's own removal (or
 		// a single-language product) marks the row in_stock=false.
 		$canonical_id = $this->detector->get_canonical_post_id( $post_id );
 		if ( $canonical_id > 0 && $canonical_id !== $post_id ) {
@@ -204,7 +226,7 @@ class CatalogHookHandler {
 		// NOT applied to the upsert path: an empty category_path on a PUBLISHED
 		// product is an intended merchant-data-gap signal the engine surfaces via
 		// the Event Log — see CatalogPayloadBuilder::primary_category_path().
-		if ( ! $this->removable( $object ) ) {
+		if ( ! self::is_removable( $object ) ) {
 			return;
 		}
 
@@ -217,9 +239,14 @@ class CatalogHookHandler {
 	 * multilingual `{lang: value}` object form, so an empty array counts as blank
 	 * just like an empty string.
 	 *
+	 * Public + static so the catalog backfill reuses the SAME guard when it
+	 * sends a trashed product as in_stock=false — a removal object the engine is
+	 * contract-guaranteed to 400 (blank category_path / product_url) must be
+	 * skipped on BOTH paths, not just the live hook.
+	 *
 	 * @param array<string, mixed> $object
 	 */
-	private function removable( array $object ): bool {
+	public static function is_removable( array $object ): bool {
 		$category_path = (string) ( $object['category_path'] ?? '' );
 		if ( $category_path === '' ) {
 			return false;
@@ -251,5 +278,13 @@ class CatalogHookHandler {
 		}
 		$product = wc_get_product( $product_id );
 		return $product instanceof \WC_Product ? $product : null;
+	}
+
+	/**
+	 * The post's status slug ('publish' / 'trash' / …). Protected so tests can
+	 * drive the save-during-trashing guard without WordPress.
+	 */
+	protected function post_status( int $post_id ): string {
+		return (string) get_post_status( $post_id );
 	}
 }

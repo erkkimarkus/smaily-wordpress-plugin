@@ -306,6 +306,65 @@ final class RecEngineCatalogTest extends TestCase {
 		self::assertSame( array(), $queue->pending( 10 ), 'Both rows reached a terminal state.' );
 	}
 
+	public function test_trash_keeps_product_in_stock_false_and_untrash_restores(): void {
+		// Trashing is NOT a delete (before_delete_post never fires for it), so
+		// Bootstrap routes wp_trash_post → on_delete_product: the product stays in
+		// the engine catalog as an in_stock=false UPSERT (kept for the order-history
+		// join), not dropped. Untrash re-syncs it back to in_stock=true.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		self::assertNotFalse( has_action( 'wp_trash_post' ), 'Bootstrap must route product trashing through the catalog handler.' );
+		self::assertNotFalse( has_action( 'untrashed_post' ), 'Bootstrap must re-sync a product on untrash.' );
+
+		// A category is required for the removal (engine needs category_path).
+		$product = $this->make_categorized_product( 'CAT-TRASH-1', '7.50' );
+		$pid     = (int) $product->get_id();
+
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue(); // ignore the create-time save-hook row.
+
+		// --- Trash → catalog.delete (flusher stamps in_stock=false) ---
+		wp_trash_post( $pid );
+		self::assertSame( 'trash', get_post_status( $pid ), 'Precondition: the product is trashed, not permanently deleted.' );
+
+		$queue = new IngestQueue();
+		self::assertCount(
+			1,
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_DELETE ) ),
+			'Trashing enqueues a catalog.delete (kept as in_stock=false), not nothing.'
+		);
+
+		$this->flush_catalog( $queue );
+		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
+		self::assertFalse( $in_stock['CAT-TRASH-1'] ?? null, 'A trashed product reaches the engine in_stock=false — kept for the join, not recommended.' );
+
+		// --- Untrash → catalog.upsert (real stock = in_stock=true) ---
+		RecEngineMockServer::reset();
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue();
+
+		wp_untrash_post( $pid );
+		// Some WP versions restore an untrashed post to 'draft'; force publish so
+		// is_in_stock() reflects a live product (status doesn't gate in_stock, but
+		// keep the fixture realistic).
+		wp_update_post( array( 'ID' => $pid, 'post_status' => 'publish' ) );
+
+		self::assertNotEmpty(
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_UPSERT ) ),
+			'Untrashing re-syncs the product as a catalog.upsert.'
+		);
+
+		$this->flush_catalog( $queue );
+		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
+		self::assertTrue( $in_stock['CAT-TRASH-1'] ?? null, 'Untrash restores in_stock=true — the product is sellable again.' );
+	}
+
 	/**
 	 * Seed a connected tenant pointed at the mock and build a Client from
 	 * the stored settings (api_key + base_url + endpoints map).
@@ -458,5 +517,44 @@ final class RecEngineCatalogTest extends TestCase {
 		$loaded = wc_get_product( $id );
 		self::assertInstanceOf( \WC_Product::class, $loaded );
 		return $loaded;
+	}
+
+	/**
+	 * A product with a real product_cat term so its catalog object carries a
+	 * non-empty category_path — required for the trash/delete removal to pass
+	 * is_removable (the engine rejects a blank category_path).
+	 */
+	private function make_categorized_product( string $sku, string $price ): \WC_Product {
+		$cat = term_exists( 'rec-trash-cat', 'product_cat' );
+		if ( ! $cat ) {
+			$cat = wp_insert_term( 'Rec Trash Cat', 'product_cat', array( 'slug' => 'rec-trash-cat' ) );
+		}
+		$term_id = (int) ( is_array( $cat ) ? $cat['term_id'] : $cat );
+
+		$product = $this->make_product( $sku, $price );
+		wp_set_object_terms( (int) $product->get_id(), array( $term_id ), 'product_cat' );
+
+		$loaded = wc_get_product( (int) $product->get_id() );
+		self::assertInstanceOf( \WC_Product::class, $loaded );
+		return $loaded;
+	}
+
+	private function flush_catalog( IngestQueue $queue ): void {
+		$settings = new RecEngineSettings();
+		$flusher  = new IngestFlusher(
+			$queue,
+			new CatalogPayloadBuilder(),
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		$flusher->flush();
+	}
+
+	private function truncate_queue(): void {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}smly_rec_event_queue" );
 	}
 }
