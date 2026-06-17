@@ -41,8 +41,10 @@ names (classes, `beacon.ts`, `window.smailyConnectBeacon`, `beaconUrl` key) keep
 "beacon" on purpose (not browser-visible). Whether a blocker still catches `/relay` is
 a **manual browser check** (200 with blocker on); the integration test only proves the
 server dispatches `/relay`. Gates: ci:strict exit=0 (unit 359, JS 158); integration OK
-113. DECISIONS F3-41; CLAUDE.md beacon-naming note. Ships in **2.1.0-beta.8** (release
-in progress). Prior: **Trashed products kept in catalog as `in_stock=false`
+113. DECISIONS F3-41; CLAUDE.md beacon-naming note. **Released `v2.1.0-beta.8-rc.1`**
+(GH pre-release on the fork, build `e85bb2a`, ZIP attached; cumulative — includes the
+F3-40 trash fix). Pilot: install → product re-import → confirm `POST …/v1/relay` = 200
+with an ad-blocker on. Prior: **Trashed products kept in catalog as `in_stock=false`
 (F3-40)** — engine-team 2026-06-17 brief, Teema 2: ~4% of pilot order lines had no
 `catalog.sku` match (~567 rows / ~265 customers) → species un-inferable from
 purchases. Erkki traced them to the WordPress **trash** (not permanent delete).
