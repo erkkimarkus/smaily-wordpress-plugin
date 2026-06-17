@@ -44,8 +44,9 @@ test, not review): `wp_trash_post()` also fires `save_post_product` → `on_save
 which re-upserted `in_stock=true` and undid the removal — `on_save_product` now
 early-returns on a `trash`-status save. Permanently-deleted products remain
 unrecoverable (no WC data) — accepted. Gates: **ci:strict exit=0 (unit 359, JS 158);
-integration OK 113**. DECISIONS F3-40; CLAUDE.md trash note. **Not yet released** —
-needs version bump + ZIP + a pilot catalog re-backfill to populate the trashed rows.
+integration OK 113**. DECISIONS F3-40; CLAUDE.md trash note. **Released
+`v2.1.0-beta.7-rc.1`** (GH pre-release on the fork, build `bd8b9cb`, ZIP attached);
+pilot still needs a **catalog re-backfill after install** to populate the trashed rows.
 Brief's Teema 1 (order statuses: custom `label printed`/`shipped` etc. dropped by the
 5-key `STATUS_MAP`) = client fixes WC-side, no plugin change; Teema 3 (browse beacon
 0 events) = pilot config (toggle now on + CookieYes installed + marketing consent
@@ -680,7 +681,8 @@ already sends ISO 639-1 from `get_user_locale()`.
   `in_stock=true` → `on_save_product` now skips a `trash`-status save (caught by
   the new integration test). Permanently-deleted products stay unrecoverable
   (no WC data). Gates: ci:strict exit=0 (unit 359, JS 158); integration OK 113.
-  **Not yet released** — needs version bump + ZIP + a pilot catalog re-backfill.
+  Released **`v2.1.0-beta.7-rc.1`** (GH pre-release, build `bd8b9cb`, ZIP attached);
+  pilot needs a catalog re-backfill after install.
   (Brief Teema 1 = client fixes order statuses WC-side, no plugin change; Teema 3
   browse = pilot config now corrected, watching engine traffic.)
 
