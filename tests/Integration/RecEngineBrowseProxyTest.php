@@ -1,6 +1,7 @@
 <?php
 /**
- * Integration: the public POST /beacon proxy (BeaconEndpoint, 3.4.0).
+ * Integration: the public POST /relay proxy (BeaconEndpoint, 3.4.0; route
+ * renamed off /beacon in F3-41 to dodge ad-block filter lists).
  *
  * @package Smaily\Connect\Tests\Integration
  */
@@ -31,7 +32,7 @@ use Smaily\Connect\Tests\Integration\Support\RestRequestHelper;
  *   - The abuse model end-to-end: a junk event_type / id-less event is a 400
  *     that never reaches the engine; exceeding the per-session window is a 429.
  *
- * The /beacon route is registered unconditionally (so it dispatches like any
+ * The /relay route is registered unconditionally (so it dispatches like any
  * other route); the connected+enabled gate lives in the handler.
  */
 final class RecEngineBrowseProxyTest extends TestCase {
@@ -60,7 +61,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		$this->connect_to_mock();
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, false );
 
-		$response = RestRequestHelper::post( '/beacon', array( 'events' => array() ) );
+		$response = RestRequestHelper::post( '/relay', array( 'events' => array() ) );
 
 		self::assertSame( 404, $response->get_status(), 'Disabled browse-tracking ⇒ a bare 404.' );
 		// The hard gate runs BEFORE the engine — nothing was forwarded.
@@ -71,7 +72,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		// track_browsing on, but the engine is not connected.
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, true );
 
-		$response = RestRequestHelper::post( '/beacon', array( 'events' => array() ) );
+		$response = RestRequestHelper::post( '/relay', array( 'events' => array() ) );
 
 		self::assertSame( 404, $response->get_status(), 'Not connected ⇒ 404 even with tracking on.' );
 	}
@@ -80,7 +81,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		$this->enable_beacon();
 
 		$response = RestRequestHelper::post(
-			'/beacon',
+			'/relay',
 			array(
 				'events' => array(
 					array( 'event_id' => 'b1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z' ),
@@ -109,10 +110,10 @@ final class RecEngineBrowseProxyTest extends TestCase {
 			),
 		);
 
-		$first = RestRequestHelper::post( '/beacon', $batch );
+		$first = RestRequestHelper::post( '/relay', $batch );
 		self::assertSame( 1, $first->get_data()['processed'] );
 
-		$second = RestRequestHelper::post( '/beacon', $batch );
+		$second = RestRequestHelper::post( '/relay', $batch );
 		self::assertSame( 0, $second->get_data()['processed'], 'A resent event_id processes nothing new.' );
 		self::assertSame( 1, $second->get_data()['deduplicated'], 'It is counted as deduplicated (transport dedup).' );
 	}
@@ -121,7 +122,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		$this->enable_beacon();
 
 		$response = RestRequestHelper::post(
-			'/beacon',
+			'/relay',
 			array(
 				'events' => array(
 					array( 'event_id' => 'x1', 'event_type' => 'hack_attempt' ),
@@ -141,7 +142,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		$this->enable_beacon();
 
 		$response = RestRequestHelper::post(
-			'/beacon',
+			'/relay',
 			array(
 				'events' => array(
 					array( 'event_type' => 'product_view' ),
@@ -171,9 +172,9 @@ final class RecEngineBrowseProxyTest extends TestCase {
 			return array( 'events' => array( array( 'event_id' => $id, 'event_type' => 'product_view', 'session_id' => 'rl' ) ) );
 		};
 
-		self::assertSame( 200, RestRequestHelper::post( '/beacon', $batch( 'rl1' ) )->get_status() );
-		self::assertSame( 200, RestRequestHelper::post( '/beacon', $batch( 'rl2' ) )->get_status() );
-		$third = RestRequestHelper::post( '/beacon', $batch( 'rl3' ) );
+		self::assertSame( 200, RestRequestHelper::post( '/relay', $batch( 'rl1' ) )->get_status() );
+		self::assertSame( 200, RestRequestHelper::post( '/relay', $batch( 'rl2' ) )->get_status() );
+		$third = RestRequestHelper::post( '/relay', $batch( 'rl3' ) );
 		self::assertSame( 429, $third->get_status(), 'The 3rd request in the window exceeds the per-session ceiling of 2.' );
 		self::assertSame( 'rate_limited', $third->get_data()['error'] );
 
@@ -196,7 +197,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
 
 		$response = RestRequestHelper::post(
-			'/beacon',
+			'/relay',
 			array(
 				'events' => array(
 					array( 'event_id' => 'pf-1', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'customer_email' => 'out@example.com' ),
@@ -218,7 +219,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
 
 		$response = RestRequestHelper::post(
-			'/beacon',
+			'/relay',
 			array(
 				'events' => array(
 					array( 'event_id' => 'pf-only', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'customer_email' => 'out@example.com' ),

@@ -16,7 +16,7 @@ use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
 
 /**
- * Enqueues `beacon.js` on storefront pages and prints a `window.smailyConnectBeacon`
+ * Enqueues `sc-runtime.js` on storefront pages and prints a `window.smailyConnectBeacon`
  * boot blob (config + page context) just before it, mirroring the admin bundle's
  * `wp_add_inline_script` pattern.
  *
@@ -35,7 +35,17 @@ use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
  */
 class StorefrontBeacon {
 
-	public const HANDLE = 'smaily-connect-beacon';
+	/**
+	 * Script handle + shipped filename are deliberately NOT "beacon": the word
+	 * matches EasyPrivacy ad-block filter lists, which blocked the storefront
+	 * request for real users (the proxy route is renamed `/beacon` → `/relay`
+	 * for the same reason). Consent gating is unchanged — only the name that
+	 * tripped the filter is neutral now (F3-41).
+	 */
+	public const HANDLE = 'smaily-connect-runtime';
+
+	/** Shipped bundle basename (vite entry key `public/js/sc-runtime`). */
+	private const SCRIPT_FILE = 'sc-runtime.js';
 
 	private RecEngineSettings $settings;
 
@@ -66,12 +76,12 @@ class StorefrontBeacon {
 		}
 
 		$rel_dir = 'dist/public/js';
-		$file    = SMAILY_CONNECT_PLUGIN_PATH . $rel_dir . '/beacon.js';
+		$file    = SMAILY_CONNECT_PLUGIN_PATH . $rel_dir . '/' . self::SCRIPT_FILE;
 		if ( ! file_exists( $file ) ) {
 			return;
 		}
 
-		$src     = plugins_url( $rel_dir . '/beacon.js', SMAILY_CONNECT_PLUGIN_FILE );
+		$src     = plugins_url( $rel_dir . '/' . self::SCRIPT_FILE, SMAILY_CONNECT_PLUGIN_FILE );
 		$version = (string) filemtime( $file );
 
 		wp_enqueue_script( self::HANDLE, $src, array(), $version, true );
@@ -103,7 +113,7 @@ class StorefrontBeacon {
 		$config = $this->settings->config();
 
 		return array(
-			'beaconUrl'      => esc_url_raw( rest_url( 'smaily-connect/v1/beacon' ) ),
+			'beaconUrl'      => esc_url_raw( rest_url( 'smaily-connect/v1/relay' ) ),
 			'cookieNames'    => array(
 				'visitor' => $this->config_string( $config, 'tracking_cookie_name', 'smaily_rec_uid' ),
 				'session' => $this->config_string( $config, 'session_cookie_name', 'smaily_anon_sid' ),

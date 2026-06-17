@@ -2098,6 +2098,53 @@ saved post's — rejected, it drops a published translation whose canonical is t
 backfill); F3-36 / LESSONS §2.11 (never a silent drop — a trashed product is kept,
 not dropped); the engine-team 2026-06-17 brief (Teema 2, the orphan-join evidence).
 
+### F3-41 — Browse beacon renamed off "beacon" to dodge ad-block filter lists
+
+**Context:** the engine saw zero real browse events from the pilot (Teema 3). After
+the two-gate config was fixed (track-browsing toggle on + CookieYes marketing
+consent), Erkki found the storefront request only succeeded with the **ad-blocker
+off** — with it on the beacon POST was blocked (surfaced as a 404/failed request).
+The cause is the literal word **"beacon"**, which is on EasyPrivacy (and similar)
+ad-block filter lists. It appeared in two browser-visible places: the script URL
+`dist/public/js/beacon.js` and the proxy route `/wp-json/smaily-connect/v1/beacon`.
+Both were blocked by name.
+
+**Decision (implemented, 2026-06-17):** rename the two browser-facing names to neutral
+strings — the shipped script is **`dist/public/js/sc-runtime.js`** (vite entry key
+`public/js/sc-runtime`, source file `public/js/beacon.ts` unchanged) and the proxy
+route is **`/relay`** (`BeaconEndpoint::ROUTE`, `StorefrontBeacon` `beaconUrl`, the
+`EndpointRegistry` listing, the browse live-walk, and the integration tests). The
+script HANDLE became `smaily-connect-runtime`. **Internal names are deliberately NOT
+touched** — the PHP classes (`StorefrontBeacon`, `BeaconEndpoint`), the JS source
+files (`beacon.ts`/`beacon-core.ts`), the `window.smailyConnectBeacon` boot global,
+and the `beaconUrl` config key all keep their names: they are not browser-visible as
+URLs/requests, so renaming them is churn with no ad-block benefit.
+
+**Consent is unchanged — this is not consent evasion.** The beacon stays first-party
+(the merchant's own store + recommendation engine) and fully consent-gated (the admin
+track-browsing toggle + the WP Consent API `marketing` category). The rename only
+removes a filename/path that a *blunt, name-based* filter rule false-flagged; it does
+not bypass the user's consent choice, fire without consent, or hide what the beacon
+does.
+
+**Scope / limits:** no rename is bulletproof against every list — some aggressive
+rules block `/wp-json/` analytics-ish patterns broadly — but it clears the specific
+EasyPrivacy match the pilot hit. Confirming the storefront POST now returns 200 with
+a blocker enabled is a **manual browser check** (not automatable; the integration
+test only proves the server side dispatches `/relay`). The engine contract is
+untouched — `/api/v1/ingest/browse` is engine-side; only the plugin's internal WP
+proxy name changed.
+
+**Alternatives:** (a) route the POST through `admin-ajax.php` (core, rarely blocked)
+— rejected, the tracker-ish `action` param can still be matched and it abandons the
+clean REST namespace; (b) inline the script to avoid an external `.js` request —
+rejected, larger change, and the POST URL would still need renaming; (c) leave it and
+document the ad-blocker caveat — rejected, browse is the cold-start amplifier the
+pilot needs working.
+
+**Relationships:** 3.4 browse-beacon (the surface this renames); the engine-team
+2026-06-17 brief (Teema 3, the zero-events evidence); CLAUDE.md "Browse" note.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

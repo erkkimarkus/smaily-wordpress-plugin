@@ -154,9 +154,11 @@ final class EndpointRegistry {
 			// The public browse-beacon proxy. Registered unconditionally; the
 			// gate (connected + browse-tracking on) lives in the handler, which
 			// 404s when disabled (BeaconEndpoint hard-gates before any work).
+			// Path is `/relay`, not `/beacon` — the latter trips ad-block filter
+			// lists and was blocked for real users (F3-41).
 			array(
 				'method' => 'POST',
-				'path'   => '/beacon',
+				'path'   => '/relay',
 			),
 		);
 	}

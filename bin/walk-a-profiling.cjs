@@ -107,7 +107,7 @@ result( 'may_profile_false_when_out', $profiling->may_profile( $email ) === fals
 
 // --- 4. beacon-stop: opted-out browse event is dropped, not forwarded -----
 update_option( 'smly_plus_rec_track_browsing', true );
-$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/beacon' );
+$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/relay' );
 $req->set_body_params( array( 'events' => array( array(
 	'event_id' => 'walk-' . time(), 'event_type' => 'product_view', 'session_id' => 'walk-s', 'event_ts' => IsoDate::to_z( time() ), 'customer_email' => $email,
 ) ) ) );

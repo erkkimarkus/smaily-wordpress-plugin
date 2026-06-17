@@ -26,7 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-17 (**Trashed products kept in catalog as `in_stock=false`
+_Last updated: 2026-06-17 (**Browse beacon renamed off "beacon" → `/relay` +
+`sc-runtime.js` (F3-41)** — engine-team brief Teema 3: zero real browse events. After
+the two-gate config was fixed (toggle on + CookieYes marketing consent), Erkki found
+the storefront POST only succeeded with the **ad-blocker off** — the word "beacon" is
+on EasyPrivacy filter lists and blocked both browser-visible names: the script
+`dist/public/js/beacon.js` and the route `/wp-json/smaily-connect/v1/beacon`. Fix:
+neutral names — script `dist/public/js/sc-runtime.js` (vite entry key only; source
+`public/js/beacon.ts` unchanged), route `/relay` (`BeaconEndpoint::ROUTE`,
+`StorefrontBeacon` beaconUrl, `EndpointRegistry`, browse live-walk, integration tests),
+handle `smaily-connect-runtime`. **Consent unchanged** — first-party + WP-Consent-API
+marketing-gated; only the filter-tripping name is neutral, not the consent. Internal
+names (classes, `beacon.ts`, `window.smailyConnectBeacon`, `beaconUrl` key) keep
+"beacon" on purpose (not browser-visible). Whether a blocker still catches `/relay` is
+a **manual browser check** (200 with blocker on); the integration test only proves the
+server dispatches `/relay`. Gates: ci:strict exit=0 (unit 359, JS 158); integration OK
+113. DECISIONS F3-41; CLAUDE.md beacon-naming note. Ships in **2.1.0-beta.8** (release
+in progress). Prior: **Trashed products kept in catalog as `in_stock=false`
 (F3-40)** — engine-team 2026-06-17 brief, Teema 2: ~4% of pilot order lines had no
 `catalog.sku` match (~567 rows / ~265 customers) → species un-inferable from
 purchases. Erkki traced them to the WordPress **trash** (not permanent delete).

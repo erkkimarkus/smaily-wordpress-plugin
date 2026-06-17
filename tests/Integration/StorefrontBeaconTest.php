@@ -65,7 +65,8 @@ final class StorefrontBeaconTest extends TestCase {
 		EnvSeed::connect();
 		$config = $this->beacon()->beacon_config();
 
-		self::assertStringContainsString( '/smaily-connect/v1/beacon', (string) $config['beaconUrl'] );
+		self::assertStringContainsString( '/smaily-connect/v1/relay', (string) $config['beaconUrl'] );
+		self::assertStringNotContainsString( 'beacon', (string) $config['beaconUrl'], 'The proxy URL must not carry "beacon" (ad-block filter lists, F3-41).' );
 		// Names come from the seeded engine config (EnvSeed::fixture_config).
 		self::assertSame( 'smaily_anon_sid', $config['cookieNames']['session'] );
 		self::assertSame( 'smaily_rec_uid', $config['cookieNames']['visitor'] );

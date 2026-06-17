@@ -22,8 +22,8 @@ import { resolve } from 'node:path';
  * API surface fully signed (each method throws "Not implemented") so the
  * API contour is locked at the start of Phase 2 rather than redesigned
  * later. Mailstone 2 extracts this file unchanged into
- * @smaily/recengine-client; the WP-wrapper (public/js/beacon.js) stays
- * in the plugin.
+ * @smaily/recengine-client; the WP-wrapper (public/js/beacon.ts, shipped as
+ * dist/public/js/sc-runtime.js) stays in the plugin.
  */
 export default defineConfig({
   plugins: [react()],
@@ -37,17 +37,22 @@ export default defineConfig({
       // Both entries are side-effect apps (admin renders React; beacon boots
       // the storefront tracker). Neither is consumed as a library, so let
       // Rollup drop unused exports — the built bundles then carry no top-level
-      // `export`, which is what lets beacon.js load as a classic <script>
+      // `export`, which is what lets sc-runtime.js load as a classic <script>
       // (StorefrontBeacon enqueues it without type="module").
       preserveEntrySignatures: false,
 
       input: {
         'admin/admin': resolve(__dirname, 'admin/src/index.tsx'),
         // beacon.ts inlines RecEngineClient (rec-engine-client.ts is NOT a
-        // separate entry, so there is no shared chunk and beacon.js has no
+        // separate entry, so there is no shared chunk and the bundle has no
         // top-level `import`). The lib stays as source for the Milestone-2
-        // npm extraction.
-        'public/js/beacon': resolve(__dirname, 'public/js/beacon.ts'),
+        // npm extraction. The OUTPUT is deliberately named `sc-runtime.js` (not
+        // `beacon.js`): the source name `beacon` matches EasyPrivacy ad-block
+        // filter lists, which blocked the storefront request for real users
+        // (the route is renamed off `/beacon` → `/relay` for the same reason).
+        // The entry-key IS the output basename (`[name].js`), so the source file
+        // keeps its name and only the shipped filename changes (F3-41).
+        'public/js/sc-runtime': resolve(__dirname, 'public/js/beacon.ts'),
       },
       output: {
         entryFileNames: '[name].js',

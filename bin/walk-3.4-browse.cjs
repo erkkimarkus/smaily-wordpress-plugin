@@ -78,7 +78,7 @@ function browse_event( $type, $extra = array() ) {
 
 // In-process dispatch to the public /beacon proxy → BeaconEndpoint → live engine.
 function dispatch_beacon( $events ) {
-	$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/beacon' );
+	$req = new WP_REST_Request( 'POST', '/smaily-connect/v1/relay' );
 	$req->set_header( 'Content-Type', 'application/json' );
 	$req->set_param( 'events', $events );
 	$resp = rest_get_server()->dispatch( $req );

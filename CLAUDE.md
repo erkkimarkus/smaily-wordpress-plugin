@@ -208,6 +208,21 @@ authoritative gates are LOCAL: `npm run ci:strict` (unit + static + JS) and
 touch CI, the fix is to run only `phpunit --testsuite unit` there (or give the
 integration job a wp-env), not to chase the integration errors.
 
+### Browse beacon ships as `sc-runtime.js` + `/relay` — NOT "beacon" (ad-block lists)
+The storefront beacon's two browser-visible names are deliberately neutral: the
+script is `dist/public/js/sc-runtime.js` (vite entry key `public/js/sc-runtime`,
+source file still `public/js/beacon.ts`) and the proxy route is
+`/wp-json/smaily-connect/v1/relay` (`BeaconEndpoint::ROUTE`). The word **"beacon"**
+is on EasyPrivacy ad-block filter lists and was blocked for real pilot users (the
+POST 404'd until the ad-blocker was disabled — F3-41). Do NOT rename these back to
+"beacon", and don't introduce new browser-facing tracker-keyword names (track,
+collect, analytics, pixel, telemetry…). Internal names (the `StorefrontBeacon` /
+`BeaconEndpoint` classes, `beacon.ts`/`beacon-core.ts`, `window.smailyConnectBeacon`,
+the `beaconUrl` config key) keep "beacon" on purpose — they're not browser-visible,
+so renaming them is churn for no benefit. Whether a blocker still catches `/relay` is
+a **manual browser check** (200 with the blocker on); the integration test only proves
+the server dispatches `/relay`.
+
 ### Browse browser-timing is NOT live-walk-covered (manual pilot check)
 Browse (3.4) is client-originated telemetry, so unlike catalog/customers/orders
 the live-walk (`bin/walk-3.4-browse.cjs`) proves only the server side:

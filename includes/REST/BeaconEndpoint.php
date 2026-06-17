@@ -1,6 +1,6 @@
 <?php
 /**
- * Public browse-beacon proxy: POST /wp-json/smaily-connect/v1/beacon.
+ * Public browse-beacon proxy: POST /wp-json/smaily-connect/v1/relay.
  *
  * @package Smaily\Connect\REST
  */
@@ -64,7 +64,13 @@ use WP_REST_Response;
  */
 class BeaconEndpoint {
 
-	public const ROUTE = '/beacon';
+	/**
+	 * Route is `/relay`, NOT `/beacon`: "beacon" matches EasyPrivacy ad-block
+	 * filter lists, which blocked the storefront POST for real users. The proxy
+	 * is first-party + consent-gated; only the name that tripped the filter is
+	 * neutral now (the script file is `sc-runtime.js` for the same reason, F3-41).
+	 */
+	public const ROUTE = '/relay';
 
 	/** Option flag (master browse gate) written by SettingsEndpoint. */
 	public const OPTION_TRACK_BROWSING = 'smly_plus_rec_track_browsing';
