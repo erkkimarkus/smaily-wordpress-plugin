@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.7
+Stable tag: 2.1.0-beta.8
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.8 =
+
+* Fixed: the browse-tracking script now loads for visitors who use ad/tracking blockers. Its filename and endpoint were renamed off a generic name that common blocker lists flagged, which had stopped browse events from being recorded for those visitors. Browse tracking is otherwise unchanged — it still only runs when you've enabled it and the shopper has given cookie/marketing consent.
 
 = 2.1.0-beta.7 =
 
@@ -215,6 +219,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.8 =
+Recommended update if you use Campaign Intelligence browse tracking: the storefront tracking script and its endpoint were renamed so common ad/tracking blockers no longer block them by name, so browse events are recorded for more visitors. No settings change; consent rules are unchanged.
 
 = 2.1.0-beta.7 =
 Recommended update: previously-ordered products you move to the Trash are now kept in Campaign Intelligence as out-of-stock so the engine keeps learning from them (rather than disappearing). Re-run the product import after updating (Campaign Intelligence → Import existing data → Products) to pick up products already in the Trash.
