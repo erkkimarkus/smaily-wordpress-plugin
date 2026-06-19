@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.9
+Stable tag: 2.1.0-beta.10
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.10 =
+
+* Improved: the Event Log's "Details" view now shows the exact request sent to Campaign Intelligence and the engine's response, instead of an empty payload — making sync issues far easier to diagnose. An event that was skipped without being sent is now clearly marked as such.
+* Changed: removed the old plugin settings screen — all configuration lives in the setup wizard and Settings (which use the same underlying options). Your subscription widget and the Plugins-page "Settings" link are unchanged.
 
 = 2.1.0-beta.9 =
 
@@ -224,6 +229,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.10 =
+Recommended update: the Event Log's Details view now records exactly what was sent to Campaign Intelligence and the engine's reply (previously empty), for much easier diagnosis. Internal cleanup removed the old settings screen — configuration lives in the setup wizard and Settings, using the same options; your subscription widget and settings are unchanged.
 
 = 2.1.0-beta.9 =
 Recommended update: fixes orders that silently never reached Campaign Intelligence — orders in custom WooCommerce statuses (e.g. "label printed"/"shipped") and orders containing a since-deleted product are now sent. Re-run the order import after updating (Campaign Intelligence → Import existing data → Orders) to backfill orders that were skipped before.
