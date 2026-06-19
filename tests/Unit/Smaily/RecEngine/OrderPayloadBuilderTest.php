@@ -1,9 +1,9 @@
 <?php
 /**
  * OrderPayloadBuilder tests — WC_Order → §5 wire object, the WC→enum status
- * mapping (on-hold→processing; pending/failed/custom → not ingested), line
- * items, the IsoDate `Z` datetime, attribution-from-meta, and the F2-10
- * omission policy.
+ * mapping (on-hold→processing; pending/failed/draft/trash → not ingested;
+ * custom statuses default THROUGH as `processing` — F3-42), line items, the
+ * IsoDate `Z` datetime, attribution-from-meta, and the F2-10 omission policy.
  *
  * WC objects are PHPUnit mocks (the woocommerce-stubs are loaded), so the
  * method signatures match without hand-rolled shims.
@@ -59,13 +59,18 @@ final class OrderPayloadBuilderTest extends TestCase {
 		return array(
 			array( 'completed', 'completed' ),
 			array( 'processing', 'processing' ),
-			array( 'on-hold', 'processing' ),     // placed, payment pending → a purchase intent
+			array( 'on-hold', '' ),               // payment not captured → NOT a sale (F3-42, was processing)
 			array( 'cancelled', 'cancelled' ),
 			array( 'refunded', 'refunded' ),
 			array( 'pending', '' ),               // not a confirmed purchase → skipped
 			array( 'failed', '' ),
 			array( 'checkout-draft', '' ),
-			array( 'shipped', '' ),               // a custom status → not mapped
+			array( 'draft', '' ),                 // WP draft → not a sale
+			array( 'auto-draft', '' ),            // order being created → not a sale
+			array( 'trash', '' ),                 // trashed order → not a sale
+			array( 'shipped', 'processing' ),     // custom status DEFAULTS THROUGH as a sale (F3-42)
+			array( 'label-printed', 'processing' ), // the pilot's custom fulfilment status → a sale
+			array( 'wc-shipped', 'processing' ),  // 'wc-' prefix normalised on a custom status too
 			array( 'wc-completed', 'completed' ), // 'wc-' prefix normalised
 		);
 	}
@@ -207,20 +212,25 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 'wc-433', $payload['items'][1]['sku'] );
 	}
 
-	public function test_unkeyable_line_is_dropped_and_items_can_end_empty(): void {
-		// A deleted-product line with no stored ids at all cannot be keyed —
-		// dropped. With every line dropped, items[] is empty; the FLUSHER
-		// terminal-skips such orders (engine requires items min 1).
+	public function test_deleted_line_with_zeroed_ids_keys_from_order_item_id_never_dropped(): void {
+		// The zeroed-id case (current WC permanent delete): the product doesn't
+		// load AND product_id/variation_id are 0. The line MUST NOT be dropped —
+		// that would empty items[] and silently lose the whole order (#58922,
+		// F3-43). It keys on the order-item id (`wc-oi-{id}`) so the order still
+		// ingests; the snapshot qty/total come from the line item.
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
-				'items'  => array( $this->mock_item( '', 1, '5.00', '5.00', array( 'product' => null ) ) ),
+				'items'  => array( $this->mock_item( '', 2, '14.00', '14.00', array( 'product' => null, 'item_id' => 5512 ) ) ),
 			)
 		);
 
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
-		self::assertSame( array(), $payload['items'] );
+		self::assertCount( 1, $payload['items'], 'A deleted-product line is kept, never dropped — the order is never lost.' );
+		self::assertSame( 'wc-oi-5512', $payload['items'][0]['sku'] );
+		self::assertSame( 2, $payload['items'][0]['qty'] );
+		self::assertSame( 14.0, $payload['items'][0]['line_total'] );
 	}
 
 	// --- doubles -------------------------------------------------------------
@@ -279,6 +289,7 @@ final class OrderPayloadBuilderTest extends TestCase {
 
 		$item = $this->createMock( \WC_Order_Item_Product::class );
 		$item->method( 'get_product' )->willReturn( $product );
+		$item->method( 'get_id' )->willReturn( (int) ( $opts['item_id'] ?? 7777 ) );
 		$item->method( 'get_product_id' )->willReturn( (int) ( $opts['product_id'] ?? 0 ) );
 		$item->method( 'get_variation_id' )->willReturn( (int) ( $opts['variation_id'] ?? 0 ) );
 		$item->method( 'get_quantity' )->willReturn( $qty );
@@ -297,6 +308,7 @@ if ( ! class_exists( \WC_Order_Item_Product::class ) ) {
 	eval(
 		<<<'PHP'
 		class WC_Order_Item_Product {
+			public function get_id() { return 0; }
 			public function get_product() { return null; }
 			public function get_product_id( $context = 'view' ) { return 0; }
 			public function get_variation_id( $context = 'view' ) { return 0; }

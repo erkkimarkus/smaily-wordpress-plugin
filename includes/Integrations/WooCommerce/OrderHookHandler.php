@@ -27,18 +27,19 @@ use Smaily\Connect\Smaily\RecEngine\OrderPayloadBuilder;
  *   map_status($to) !== ''            (the target is a sale state)
  *   AND map_status($from) !== map_status($to)   (the engine status actually changed)
  *
- * So:
+ * So (map_status: the sale states + ANY custom status → a sale; pending /
+ * on-hold / failed / draft / trash → '' — F3-42):
  *   - pending → processing : enqueue (first time it's a sale)
- *   - on-hold → processing : skip (both map to engine `processing` — no change)
+ *   - pending → label-printed (custom) : enqueue (custom statuses are a sale)
+ *   - on-hold → processing : enqueue (on-hold is '' → the engine status changed)
  *   - processing → completed / cancelled / refunded : enqueue
- *   - processing → pending : skip (target isn't a sale — don't send pending)
+ *   - processing → on-hold / pending : skip (target isn't a sale — don't send)
  *
  * The engine UPSERTs on `(tenant_id, external_order_id)` and fully replaces
  * the order on re-ingest, so a later status change overwrites the stored
- * order. This also covers the on-hold cancellation risk: if an on-hold order
- * is cancelled, on-hold(→processing) → cancelled is an engine-status change →
- * enqueue. (Status mapping itself, incl. on-hold→processing, lives in
- * OrderPayloadBuilder::map_status — F3-22.)
+ * order. A cancelled / refunded transition from any sale state is an
+ * engine-status change → enqueue. (Status mapping itself lives in
+ * OrderPayloadBuilder::map_status — F3-22 / F3-42.)
  *
  * Gate: enqueue only while a rec-engine tenant is connected
  * (RecEngineSettings::is_connected), independent of the email-sync wizard

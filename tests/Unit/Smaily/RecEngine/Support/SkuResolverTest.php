@@ -57,8 +57,12 @@ final class SkuResolverTest extends TestCase {
 		self::assertSame( 'wc-432', SkuResolver::resolve_order_item( $this->item( 432, 0 ) ) );
 	}
 
-	public function test_order_item_without_ids_is_unkeyable(): void {
-		self::assertSame( '', SkuResolver::resolve_order_item( $this->item( 0, 0 ) ) );
+	public function test_order_item_without_ids_keys_from_order_item_id(): void {
+		// Deleted product, both ids zeroed (current WC). NEVER '' (F3-43) — that
+		// would drop the line and silently lose the whole order (#58922). Keys on
+		// the order-item id so the order still ingests.
+		self::assertSame( 'wc-oi-8001', SkuResolver::resolve_order_item( $this->item( 0, 0 ) ) );
+		self::assertSame( 'wc-oi-4242', SkuResolver::resolve_order_item( $this->item( 0, 0, 4242 ) ) );
 	}
 
 	public function test_skuless_product_canonicalizes_via_detector(): void {
@@ -115,8 +119,9 @@ final class SkuResolverTest extends TestCase {
 		return $product;
 	}
 
-	private function item( int $product_id, int $variation_id ): \WC_Order_Item_Product {
+	private function item( int $product_id, int $variation_id, int $item_id = 8001 ): \WC_Order_Item_Product {
 		$item = $this->createMock( \WC_Order_Item_Product::class );
+		$item->method( 'get_id' )->willReturn( $item_id );
 		$item->method( 'get_product_id' )->willReturn( $product_id );
 		$item->method( 'get_variation_id' )->willReturn( $variation_id );
 		return $item;

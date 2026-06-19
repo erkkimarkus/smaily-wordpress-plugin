@@ -34,22 +34,26 @@ final class OrderBackfillJobTest extends TestCase {
 		self::assertSame( 'status', $spec['status_col'] );
 	}
 
-	public function test_mapped_statuses_are_the_single_source_for_the_filter(): void {
-		$statuses = OrderPayloadBuilder::mapped_wc_statuses();
+	public function test_non_sale_statuses_are_the_single_source_for_the_filter(): void {
+		// The backfill filters `status NOT IN (non-sale)`, so its single source is
+		// the DENYLIST of non-sale statuses (F3-42). Sale + custom statuses are
+		// NOT denylisted, so the backfill includes them.
+		$non_sale = OrderPayloadBuilder::non_sale_wc_statuses();
 
-		// Exactly the sale states map_status() accepts — no pending/failed/draft.
-		self::assertContains( 'completed', $statuses );
-		self::assertContains( 'processing', $statuses );
-		self::assertContains( 'on-hold', $statuses );
-		self::assertContains( 'cancelled', $statuses );
-		self::assertContains( 'refunded', $statuses );
-		self::assertNotContains( 'pending', $statuses );
-		self::assertNotContains( 'failed', $statuses );
+		self::assertContains( 'pending', $non_sale );
+		self::assertContains( 'failed', $non_sale );
+		self::assertContains( 'trash', $non_sale );
+		self::assertNotContains( 'completed', $non_sale );
+		self::assertNotContains( 'shipped', $non_sale, 'A custom status is a sale now — not denylisted.' );
 
-		// Every listed status maps to a non-empty engine status (drift guard).
 		$builder = new OrderPayloadBuilder();
-		foreach ( $statuses as $status ) {
-			self::assertNotSame( '', $builder->map_status( $status ), "{$status} must map to a non-empty engine status." );
+
+		// Drift guard: every denylisted status maps to '' (excluded / skipped).
+		foreach ( $non_sale as $status ) {
+			self::assertSame( '', $builder->map_status( $status ), "{$status} must be excluded (map to '')." );
 		}
+
+		// A custom status is NOT denylisted and maps to a non-empty sale enum.
+		self::assertSame( 'processing', $builder->map_status( 'label-printed' ), 'A custom status defaults through as a sale (F3-42).' );
 	}
 }

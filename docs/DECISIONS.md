@@ -2145,6 +2145,90 @@ pilot needs working.
 **Relationships:** 3.4 browse-beacon (the surface this renames); the engine-team
 2026-06-17 brief (Teema 3, the zero-events evidence); CLAUDE.md "Browse" note.
 
+### F3-42 — Order status mapping: custom statuses default THROUGH as a sale; on-hold is not a sale
+
+**Context:** the engine-team 2026-06-19 brief (order #58922 + the earlier Teema 1)
+found orders in WooCommerce **custom statuses** never reached the engine. The plugin
+mapped WC status → engine enum with a 5-key **allowlist** (`completed`, `processing`,
+`on-hold`, `cancelled`, `refunded`); any status absent from it — including every
+merchant/shipping-plugin custom status like `label-printed` / `shipped` / `pakikaart-
+prinditud` — mapped to `''` and was **silently dropped** (the live hook skipped it AND
+the backfill's `status IN (allowlist)` filter excluded it). The engine accepts only the
+strict enum `completed|processing|cancelled|refunded`, so a raw custom status can't pass
+through verbatim.
+
+**Decision (implemented, 2026-06-19, reverses part of F3-22):** invert the model to a
+**denylist**. `map_status()` returns `''` ONLY for an explicit non-sale set
+(`pending`, `on-hold`, `failed`, `checkout-draft`, `draft`, `auto-draft`, `trash`);
+everything else maps to a sale — the explicit `STATUS_MAP` entries
+(`completed`/`processing`/`cancelled`/`refunded`) keep their target, and **any other
+(custom/unknown) status defaults to `processing`** (`DEFAULT_SALE_STATUS`). Conservative
+default: a confirmed purchase *in progress*, not `completed`, so a custom fulfilment
+state isn't over-claimed as finished; if the order later truly completes, the live hook
+re-sends it as `completed`. The order backfill's single-source filter flips to
+`OrderPayloadBuilder::non_sale_wc_statuses()` and `status NOT IN (denylist)` (CC-9 — the
+hook and backfill still can't drift); the flusher's `map_status===''` skip is the safety
+net for any non-sale status the SQL prefixing doesn't catch.
+
+**on-hold reversal:** F3-22 mapped `on-hold → processing` ("purchase intent"). The engine
+team's brief states on-hold is **not yet a sale** ("pole veel müük" — payment not
+captured). Decision (Erkki, 2026-06-19): **follow the engine — on-hold is non-sale**
+(moved into the denylist). Safe: an on-hold order that gets paid transitions to
+processing/completed and is sent then; one that never pays is correctly never sent.
+
+**Residual risk (accepted):** a FUTURE merchant with a custom **non-sale** status (e.g.
+`quote-requested`, `fraud-review`) would have those sent as a sale. MiuMjau's custom
+statuses are fulfilment (label-printed/shipped = real paid sales), so it's safe for the
+pilot; a small `apply_filters` on the map can tune it later if a real client needs it
+(not built now — no added complexity for the pilot).
+
+**Alternatives:** (a) a per-merchant filterable status map — rejected for now as added
+complexity the pilot doesn't need (the denylist default covers MiuMjau); (b) keep the
+allowlist and tell the merchant to use only standard statuses — that was the prior
+"client fixes WC-side" punt (Teema 1), and it kept biting (#58922) because merchants use
+custom shipping statuses as terminal states.
+
+**Relationships:** F3-22 (the status mapping this reverses for on-hold + customs); the
+engine-team 2026-06-19 brief; CC-9 (the hook↔backfill single-source rule preserved);
+F3-43 (the same brief's deleted-product fix, below).
+
+### F3-43 — A deleted-product order line is kept (never dropped) so the order is never lost
+
+**Context:** same 2026-06-19 brief, the #58922 symptom. A guest order with a **deleted**
+product was marked **"sent"** by the plugin but **never reached the engine** (no POST at
+all). Root cause: `OrderPayloadBuilder::items()` keyed each line via `SkuResolver`; for a
+deleted product whose stored ids current WC **zeroes** on permanent deletion,
+`resolve_order_item()` returned `''` and the line was **dropped**. Every line dropping →
+empty `items[]` → `OrderFlusher::row_to_object` returned `null` → `AbstractD6Flusher`
+**`mark_sent()`** the row WITHOUT POSTing (the F3-36 "terminal skip"). So the order
+silently vanished AND showed "sent". This is the F3-36 design working as written — but a
+"clean skip" is still **silent loss** of the order's RFM/tier value.
+
+**Decision (implemented, 2026-06-19, reverses F3-36 for the deleted-line case):** a
+product line is **NEVER dropped**. `SkuResolver::resolve_order_item()` no longer returns
+`''`: when both stored ids are zeroed it keys the line on the **order-item id**
+(`wc-oi-{item_id}`) — guaranteed non-empty and unique (chosen over the brief's literal
+`wc-{product_id}`=`wc-0`, which would collide across deleted lines). The qty / unit_price
+/ line_total already come from the line-item **snapshot**, which survives product
+deletion, so the line is fully serialisable. The `wc-oi-…` key won't match a catalog row
+(no item-level species inference), but the order **ingests** (RFM / tier) — the accepted
+trade-off; the order surviving is what matters. `items()` drops its `sku===''` guard.
+
+**Scope:** this closes the *deleted-product line* gap. The flusher's empty-items
+terminal-skip REMAINS, but now only fires for a genuinely **product-less** order (only
+shipping/fee lines) — the only remaining empty-`items[]` case. Permanently-deleted
+products still have no catalog row (F3-36); the order line keys synthetically regardless.
+
+**Silent-"sent" note:** the engine's D6 `errors[]` → `mark_failed` path (F3-18 /
+AbstractD6Flusher) was already correct — #58922 never hit it because the terminal skip
+`mark_sent` before any POST. Fixing this means the order now POSTs; a genuine engine
+rejection is then marked FAILED + retryable, as designed. (Storing the real request
+payload + response in the Event Log — the brief's Problem 3 — is a separate follow-up.)
+
+**Relationships:** F3-36 (SkuResolver + the terminal-skip this reverses for deleted
+lines); F3-18 (the D6 errors path that already marks FAILED); the engine-team 2026-06-19
+brief (#58922); LESSONS §2.11 (never a silent drop — now upheld for orders too).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

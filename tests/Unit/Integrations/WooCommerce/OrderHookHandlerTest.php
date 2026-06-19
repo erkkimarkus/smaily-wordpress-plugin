@@ -43,16 +43,6 @@ final class OrderHookHandlerTest extends TestCase {
 		self::assertSame( OrderFlusher::AS_GROUP, $queue->enqueued[0]['flush_group'] );
 	}
 
-	public function test_on_hold_to_processing_skips_same_engine_status(): void {
-		$queue   = $this->fake_queue();
-		$handler = $this->handler( $queue, true );
-
-		// Both on-hold and processing map to engine `processing` → no change.
-		$handler->on_order_status_changed( 55, 'on-hold', 'processing' );
-
-		self::assertSame( array(), $queue->enqueued, 'Engine status unchanged → no redundant UPSERT.' );
-	}
-
 	public function test_processing_to_completed_enqueues(): void {
 		$queue   = $this->fake_queue();
 		$handler = $this->handler( $queue, true );
@@ -86,6 +76,52 @@ final class OrderHookHandlerTest extends TestCase {
 		$handler = $this->handler( $queue, true );
 
 		$handler->on_order_status_changed( 55, 'pending', 'failed' );
+
+		self::assertSame( array(), $queue->enqueued );
+	}
+
+	public function test_pending_to_custom_status_enqueues_as_a_sale(): void {
+		// A custom fulfilment status (a shipping plugin's `label-printed` /
+		// `shipped`) now defaults THROUGH as a sale (F3-42), where the old 5-key
+		// allowlist dropped it — so entering it from a non-sale status enqueues.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		$handler->on_order_status_changed( 55, 'pending', 'label-printed' );
+
+		self::assertCount( 1, $queue->enqueued, 'A custom status is a sale now — entering it from pending enqueues.' );
+	}
+
+	public function test_custom_status_to_completed_enqueues(): void {
+		// The pilot case: label-printed → completed. to=completed (sale),
+		// from=label-printed (now a sale → processing), engine status changes →
+		// enqueue (the order finally reaches the engine as completed).
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		$handler->on_order_status_changed( 55, 'label-printed', 'completed' );
+
+		self::assertCount( 1, $queue->enqueued );
+	}
+
+	public function test_on_hold_to_processing_enqueues_now_that_on_hold_is_non_sale(): void {
+		// F3-42 reversal of F3-22: on-hold maps to '' (payment not captured →
+		// not a sale). So on-hold → processing is a real engine-status change
+		// ('' → processing) → enqueue, where it used to be skipped.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		$handler->on_order_status_changed( 55, 'on-hold', 'processing' );
+
+		self::assertCount( 1, $queue->enqueued );
+	}
+
+	public function test_processing_to_on_hold_skips_non_sale_target(): void {
+		// on-hold is not a sale (F3-42) → a transition INTO it isn't sent.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		$handler->on_order_status_changed( 55, 'processing', 'on-hold' );
 
 		self::assertSame( array(), $queue->enqueued );
 	}

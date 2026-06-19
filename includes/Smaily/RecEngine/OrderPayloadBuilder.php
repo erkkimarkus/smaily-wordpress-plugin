@@ -52,18 +52,55 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
 class OrderPayloadBuilder {
 
 	/**
-	 * WC order status → engine status enum. A WC status absent here is not a
-	 * confirmed purchase and is not ingested (see map_status()).
+	 * WC order status → engine status enum, for the statuses with a SPECIFIC
+	 * target. A sale status NOT listed here — a merchant's custom fulfilment
+	 * status (e.g. a shipping plugin's `label-printed` / `shipped`) — is still a
+	 * confirmed purchase: it falls through to DEFAULT_SALE_STATUS rather than
+	 * being dropped. Only NON_SALE_STATUSES are excluded. See map_status().
 	 *
 	 * @var array<string, string>
 	 */
 	private const STATUS_MAP = array(
 		'completed'  => 'completed',
 		'processing' => 'processing',
-		'on-hold'    => 'processing',
 		'cancelled'  => 'cancelled',
 		'refunded'   => 'refunded',
 	);
+
+	/**
+	 * WC statuses that are NOT a confirmed purchase — never ingested (map to '').
+	 * This is the DENYLIST: everything else (the STATUS_MAP entries AND any
+	 * custom/unknown status) is treated as a sale. This deliberately defaults
+	 * custom statuses THROUGH (DECISIONS F3-42) — the old 5-key allowlist
+	 * silently dropped every custom status, so the pilot's `label-printed`
+	 * orders never reached the engine. `on-hold` is here (NOT a sale — payment
+	 * not yet captured), per the engine team's 2026-06-19 brief, reversing
+	 * F3-22's on-hold→processing; when payment clears the order moves to
+	 * processing/completed and is sent then. Single source (CC-9) for the order
+	 * backfill's SQL filter, which enumerates `status NOT IN` this list.
+	 *
+	 * @var string[]
+	 */
+	private const NON_SALE_STATUSES = array(
+		'pending',         // payment not received yet.
+		'on-hold',         // awaiting payment (BACS / cheque) — not yet a sale (F3-42).
+		'failed',          // payment failed.
+		'checkout-draft',  // WC Blocks draft order, never placed.
+		'draft',           // WP draft.
+		'auto-draft',      // WP auto-draft (order being created in admin).
+		'trash',           // trashed order.
+	);
+
+	/**
+	 * Engine enum for a sale status with no explicit STATUS_MAP entry — a
+	 * merchant's custom fulfilment status. Conservative: `processing` (a
+	 * confirmed purchase in progress), NOT `completed`, so a custom state isn't
+	 * over-claimed as finished; if the order later truly completes, the live
+	 * hook re-sends it as `completed`. The engine `status` is a strict enum, so
+	 * a custom WC status can't pass through verbatim — it must resolve to a
+	 * valid enum, and this is it. (DECISIONS F3-42.)
+	 */
+	private const DEFAULT_SALE_STATUS = 'processing';
 
 	/** Order-meta keys the email HookHandler stamps the attribution cookies into. */
 	private const META_REC_ID        = '_smaily_rec_id';
@@ -118,27 +155,35 @@ class OrderPayloadBuilder {
 	}
 
 	/**
-	 * Map a WC order status to the engine enum, or '' when the status is not a
-	 * confirmed purchase (pending / failed / draft) or is custom/unknown. The
-	 * OrderHookHandler uses this to decide whether to enqueue at all. WC's
-	 * get_status() returns the un-prefixed slug, but a 'wc-' prefix is
-	 * normalised defensively.
+	 * Map a WC order status to the engine enum. Returns '' ONLY for a NON-sale
+	 * status (NON_SALE_STATUSES: pending / failed / draft / trash / …) so the
+	 * order is skipped; every other status — the explicit STATUS_MAP entries AND
+	 * any custom/unknown status — resolves to a sale enum (custom statuses → the
+	 * conservative DEFAULT_SALE_STATUS). The OrderHookHandler uses this to decide
+	 * whether to enqueue at all. WC's get_status() returns the un-prefixed slug,
+	 * but a 'wc-' prefix is normalised defensively. (DECISIONS F3-42.)
 	 */
 	public function map_status( string $wc_status ): string {
 		$key = ( strpos( $wc_status, 'wc-' ) === 0 ) ? substr( $wc_status, 3 ) : $wc_status;
-		return self::STATUS_MAP[ $key ] ?? '';
+		if ( $key === '' || in_array( $key, self::NON_SALE_STATUSES, true ) ) {
+			return '';
+		}
+		return self::STATUS_MAP[ $key ] ?? self::DEFAULT_SALE_STATUS;
 	}
 
 	/**
-	 * The un-prefixed WC statuses that map to a non-empty engine status — the
-	 * orders worth ingesting. Single source (CC-9) for the order backfill's SQL
-	 * status filter (3.5.2): the enumeration filters on exactly the statuses
-	 * map_status() accepts, so the two can't drift (no duplicated status list).
+	 * The un-prefixed WC statuses that are NOT a confirmed purchase — the cohort
+	 * order ingest EXCLUDES. Single source (CC-9) for the order backfill's SQL
+	 * status filter (3.5.2): the backfill enumerates orders whose status is NOT
+	 * in this list (so it picks up custom sale statuses too), mirroring
+	 * map_status()'s denylist rule — the two can't drift. The flusher's own
+	 * map_status==='' skip is the safety net for any status the SQL prefixing
+	 * doesn't catch. (DECISIONS F3-42.)
 	 *
-	 * @return string[] e.g. ['completed', 'processing', 'on-hold', 'cancelled', 'refunded'].
+	 * @return string[] e.g. ['pending', 'failed', 'checkout-draft', 'draft', 'auto-draft', 'trash'].
 	 */
-	public static function mapped_wc_statuses(): array {
-		return array_keys( self::STATUS_MAP );
+	public static function non_sale_wc_statuses(): array {
+		return self::NON_SALE_STATUSES;
 	}
 
 	private function ordered_at( \WC_Order $order ): string {
@@ -159,15 +204,17 @@ class OrderPayloadBuilder {
 	 * are skipped (only product lines). The engine keys order items on SKU
 	 * (§5 `items[].sku` is required); SkuResolver (F3-36) supplies it — the
 	 * real SKU when set, else the synthetic `wc-{id}` key, so a store that
-	 * never set SKUs stays fully ingestable. A DELETED product's line keys
-	 * from the id WC stored on the item when that survives; current WC zeroes
-	 * it on permanent deletion (empirical, WC 10.7), making the line
-	 * unkeyable (resolver returns '') → dropped. An order whose every line drops would
-	 * wire an empty items[] — the engine rejects that (min 1); OrderFlusher
-	 * terminal-skips such rows instead of sending them. unit_price is the
-	 * pre-discount per-unit price (subtotal / qty); line_total is the
-	 * post-discount total; the per-line discount is subtotal − total
-	 * (omitted when zero).
+	 * never set SKUs stays fully ingestable. A DELETED product keeps its line:
+	 * qty / totals come from the line-item SNAPSHOT (which survives deletion),
+	 * and the SKU keys from the stored product/variation id, or — when current
+	 * WC has zeroed those (empirical, WC 10.7) — from the order-item id
+	 * (`wc-oi-{item_id}`). So a product line is NEVER dropped (F3-43, reversing
+	 * F3-36): the order is never silently lost for one unkeyable line. An order
+	 * with NO product lines at all (only shipping/fee) still wires an empty
+	 * items[] and OrderFlusher terminal-skips it (engine requires min 1) — that
+	 * is the only remaining empty-items case. unit_price is the pre-discount
+	 * per-unit price (subtotal / qty); line_total is the post-discount total;
+	 * the per-line discount is subtotal − total (omitted when zero).
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -178,13 +225,13 @@ class OrderPayloadBuilder {
 				continue;
 			}
 
+			// SkuResolver never returns '' for an order line (F3-43) — a deleted
+			// product whose ids are zeroed keys on the order-item id — so a
+			// product line is always serialised, never dropped.
 			$product = $item->get_product();
 			$sku     = ( $product instanceof \WC_Product )
 				? SkuResolver::resolve( $product )
 				: SkuResolver::resolve_order_item( $item );
-			if ( $sku === '' ) {
-				continue;
-			}
 
 			$qty      = (int) $item->get_quantity();
 			$subtotal = (float) $item->get_subtotal();

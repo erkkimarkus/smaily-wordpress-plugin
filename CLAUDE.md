@@ -121,6 +121,27 @@ Event Log trace), D6-failed orders, rejected browse events. If you add a new
 SKU surface, use the resolver; if a record still can't be keyed, make it
 observable (terminal skip), never a silent pre-enqueue drop (LESSONS §2.11).
 
+### Order status: custom statuses go THROUGH; deleted-product lines are NEVER dropped (F3-42/F3-43)
+Two pilot data-loss fixes (engine brief 2026-06-19, order #58922) that flip
+earlier decisions — don't re-revert them:
+- **Status mapping is a DENYLIST, not an allowlist.** `OrderPayloadBuilder::
+  map_status()` sends `''` (skip) ONLY for `pending`/`on-hold`/`failed`/
+  `checkout-draft`/`draft`/`auto-draft`/`trash`; **every other status — incl.
+  any custom shipping status (`label-printed`, `shipped`, …) — defaults to a
+  sale (`processing`)**. The old 5-key allowlist silently dropped custom
+  statuses (the orders never reached the engine). `on-hold` is now NON-sale
+  (reverses F3-22, per the engine team — payment not captured). The order
+  backfill mirrors this: `status NOT IN (non_sale_wc_statuses())` (CC-9 single
+  source). Engine `status` is a strict enum (`completed|processing|cancelled|
+  refunded`) — a custom status must MAP to one, never pass through raw.
+- **A deleted-product order line is never dropped.** `SkuResolver::
+  resolve_order_item()` never returns `''` — when current WC has zeroed the
+  stored ids it keys on the order-item id (`wc-oi-{item_id}`), so the line (and
+  the whole order) is never silently lost (#58922 was marked "sent" with no
+  POST because an empty `items[]` terminal-skipped + `mark_sent`). The empty-
+  items terminal skip now only fires for a genuinely product-less order
+  (shipping/fee only). Reverses F3-36's drop-the-line for the deleted case.
+
 ### Trashing a product fires NO catalog hook — it's kept as `in_stock=false`
 `before_delete_post` is **permanent-delete-only**; trashing routes through
 `wp_update_post`, so a trashed product fires neither the delete nor (usefully)

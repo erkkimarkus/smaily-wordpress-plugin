@@ -26,7 +26,14 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-19 (**F3-40 trash fix now live-walked 7/7 against the sandbox**
+_Last updated: 2026-06-19 (**Order sync data-loss fixes (F3-42/F3-43)** — engine brief
+order #58922: a guest order with a deleted product was marked "sent" but never POSTed.
+F3-43: a deleted-product line is never dropped (keys `wc-oi-{item_id}`) so the order isn't
+lost; F3-42: custom WC statuses (label-printed/shipped) default through as a sale
+(denylist), on-hold now non-sale (reverses F3-22). ci:strict exit=0; integration OK 113;
+live-walk 7/7 (`bin/walk-f3-43-orders.cjs`). The brief's Problem 2 (errors[]→FAILED) was
+already built (F3-18); Problem 3 (store request/response in Event Log) is a deferred
+follow-up. Prior: **F3-40 trash fix now live-walked 7/7 against the sandbox**
 (`bin/walk-f3-40-trash.cjs`) — trash → `catalog.delete` with the clobber guard live
 (`delete=1 upsert=0`), the engine ACCEPTS `in_stock=false`, untrash → `in_stock=true`
 accepted, backfill trashed → delete accepted. Closes the mock-only gap F3-40 shipped
@@ -724,6 +731,40 @@ already sends ISO 639-1 from `get_user_locale()`.
   cleared on retry**, not a wire-shape bug in the fix (the happy path is engine-clean).
   (Not live-covered, by design: the `is_removable` skip of a category-less trashed
   product — WC auto-assigns "Uncategorized", fragile live — is unit-tested.)
+
+### Done — Order sync correctness: custom statuses + deleted-product lines (F3-42/F3-43, 2026-06-19)
+
+**Engine brief 2026-06-19 (order #58922):** a guest order with a DELETED product was
+marked "sent" but **never reached the engine** (no POST). Read-only investigation
+cross-checked the brief against our docs/contract; two real data-loss fixes, one
+already-solved (not rebuilt), one deferred:
+- **F3-43 (P1, the #58922 cause):** `OrderPayloadBuilder::items()` DROPPED a line whose
+  deleted product had zeroed ids → empty `items[]` → `OrderFlusher` terminal-skip →
+  `mark_sent` WITHOUT POSTing (silent loss). Fix: `SkuResolver::resolve_order_item()`
+  never returns '' — a zeroed-id line keys on the order-item id (`wc-oi-{item_id}`), so a
+  product line is never dropped and the order is never lost. Reverses F3-36's
+  drop-for-deleted; the empty-items terminal-skip now only guards a genuinely
+  product-less order (shipping/fee only).
+- **F3-42 (status mapping):** custom WC statuses (`label-printed`/`shipped`/…) were
+  silently dropped by the 5-key allowlist (the order never reached the engine — the
+  earlier Teema 1). Flipped to a DENYLIST: custom statuses default through as
+  `processing`; the backfill mirrors via `status NOT IN (non_sale_wc_statuses())` (CC-9).
+  **on-hold → non-sale** (reverses F3-22, per the engine team — payment not captured;
+  sent when it moves to processing/completed).
+- **Already solved (NOT rebuilt):** the engine's `200 {errors:[…]}` per-item →
+  `mark_failed` path (F3-18 / AbstractD6Flusher). #58922 bypassed it via the terminal-skip
+  `mark_sent`; the F3-43 fix makes the order POST so the existing D6 path handles any
+  rejection.
+- **Deferred (separate follow-up):** the brief's Problem 3 — store the real request
+  payload + HTTP response in the Event Log Details (order/catalog rows enqueue an empty
+  payload by design → `Payload: []`). Schema + flusher + admin-UI; not in this sub-PR.
+- Gates: **ci:strict exit=0 (unit, JS 158); integration OK 113; live-walk 7/7**
+  (`bin/walk-f3-43-orders.cjs`, sandbox — a custom-status order → engine accepts as
+  `processing`; a deleted-product order on WC 10.7 (zeroes the ids) →
+  `items:[{sku:"wc-oi-…"}]` → engine accepts). DECISIONS F3-42/F3-43; CLAUDE.md
+  order-status note. Engine-side: the team will log per-item rejects to an
+  `import_errors` table; a WC-completed-vs-engine data audit is suggested for other
+  silently-missing orders.
 
 ### Done — Settings plugin-link opens the new UI, not the legacy view (Task 2 Faas 1, 2026-06-19)
 

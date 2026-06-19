@@ -118,15 +118,13 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 'wc-' . $product->get_id(), $payloads[0]['items'][0]['sku'] );
 	}
 
-	public function test_deleted_product_order_is_terminal_skipped(): void {
-		// The pilot's failed orders referenced already-deleted products.
-		// Empirical (this env, WC 10.7): permanent product deletion ZEROES
-		// the order items' _product_id reference — the line is unkeyable, so
-		// an order whose every product was deleted builds an empty items[]
-		// and must be terminal-skipped (never sent, never red in the Event
-		// Log). If a WC version leaves the id intact, the resolver keys the
-		// line wc-{id} instead and the order ingests — both paths are valid;
-		// the unit suite covers the id-survives case.
+	public function test_deleted_product_order_is_kept_and_sent_not_dropped(): void {
+		// F3-43 (engine brief #58922): the pilot's failed orders referenced
+		// already-deleted products. Empirical (this env, WC 10.7): permanent
+		// product deletion ZEROES the order items' _product_id reference. The
+		// order must NOT be dropped — that empties items[] and the whole order is
+		// silently lost (marked "sent" with no POST). The line keys on the
+		// order-item id (wc-oi-{id}) so the order ingests; the engine accepts it.
 		$product = $this->make_skuless_product( '9.00' );
 		$pid     = $product->get_id();
 		$this->make_order( 'deleted-product@example.test', 'completed', $product );
@@ -136,9 +134,14 @@ final class RecEngineOrdersTest extends TestCase {
 
 		$stats = $this->flusher()->flush();
 
-		self::assertSame( 1, $stats['skipped'], 'stats: ' . wp_json_encode( $stats ) );
-		self::assertSame( 0, $stats['sent'] );
-		self::assertSame( 0, $stats['failed'], 'A deleted-product order must not fail — it leaves the queue cleanly.' );
+		self::assertSame( 1, $stats['sent'], 'A deleted-product order is kept + sent, never dropped. stats: ' . wp_json_encode( $stats ) );
+		self::assertSame( 0, $stats['skipped'] );
+		self::assertSame( 0, $stats['failed'] );
+
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertNotEmpty( $payloads[0]['items'], 'items[] must be non-empty — the line is kept from the snapshot.' );
+		self::assertStringStartsWith( 'wc-oi-', (string) $payloads[0]['items'][0]['sku'], 'A zeroed-id deleted line keys on the order-item id.' );
 	}
 
 	public function test_order_with_no_product_lines_is_terminal_skipped(): void {

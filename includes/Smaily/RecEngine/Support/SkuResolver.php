@@ -48,13 +48,14 @@ use Smaily\Connect\Multilingual\DetectorInterface;
  * Synthetic-key properties: `wc-{canonical_id}` is stable for the product's
  * lifetime and fits the engine's 64-char cap (ids are ints). Deleted products:
  * current WC ZEROES the order items' product/variation reference on permanent
- * deletion (verified empirically on WC 10.7 — `_product_id` becomes 0), so
- * those lines are unkeyable → resolve_order_item() returns '' → the line
- * drops and an all-deleted order is terminal-skipped by OrderFlusher. On a
- * WC version where the id survives, the line keys `wc-{canonical_id}` and
- * ingests — both outcomes are correct; neither is a send-and-fail. (A deleted
- * post may not resolve a canonical via the detector → it keys `wc-{stored_id}`,
- * the same lossy-history case F3-36 already documents.)
+ * deletion (verified empirically on WC 10.7 — `_product_id` becomes 0). When the
+ * id survives, the line keys `wc-{canonical_id}` and ingests; when it's zeroed,
+ * resolve_order_item() keys the line on the order-item id (`wc-oi-{item_id}`) so
+ * the line is NEVER dropped — an order must never silently vanish for one
+ * unkeyable line (F3-43, reversing F3-36's drop+terminal-skip). The fallback
+ * key won't match a catalog row (no item-level inference), but the order still
+ * ingests. (A deleted post may not resolve a canonical via the detector → it
+ * keys `wc-{stored_id}`, the same lossy-history case F3-36 already documents.)
  *
  * Documented trade-off (F3-36): if a merchant later assigns a real SKU to a
  * product that already ingested under `wc-{id}`, the key changes — the
@@ -88,13 +89,20 @@ final class SkuResolver {
 	 * Engine key for an order line whose product no longer loads (deleted):
 	 * synthesised from the id WC stored on the line item at purchase time.
 	 * Prefers the variation id (catalog ingests variations as the units) and
-	 * falls back to the parent product id. Returns '' when the item carries
-	 * no usable id — the caller must drop such a line, it cannot be keyed.
-	 * The id is canonicalized so an order placed against a translated product
-	 * keys the SAME `wc-{canonical_id}` the catalog ingested (engine-side join).
-	 * NB: on current WC the zeroed-reference deleted-product outcome is COMMON
-	 * (returns ''); the id-survives path exists for WC versions/data where the
-	 * reference is intact.
+	 * falls back to the parent product id. The id is canonicalized so an order
+	 * placed against a translated product keys the SAME `wc-{canonical_id}` the
+	 * catalog ingested (engine-side join).
+	 *
+	 * NEVER returns '' (F3-43): when current WC has zeroed BOTH ids on permanent
+	 * deletion, this keys the line on the order-item id (`wc-oi-{item_id}`) — a
+	 * unique, non-empty fallback so the line is never dropped and the whole order
+	 * never silently vanishes for one unkeyable line (engine brief 2026-06-19).
+	 * That key won't match a catalog row, so item-level inference can't apply,
+	 * but the order still ingests (RFM / tier) — the accepted trade-off, because
+	 * the order surviving is what matters. This supersedes F3-36's "unkeyable
+	 * line is dropped → all-deleted order is terminal-skipped" for deleted lines;
+	 * the flusher's empty-items skip now only guards a genuinely product-less
+	 * order (only shipping/fee lines).
 	 *
 	 * @param DetectorInterface|null $detector Multilingual detector; defaults to
 	 *        the active one. Inject for tests / call-site determinism.
@@ -105,7 +113,9 @@ final class SkuResolver {
 			$id = (int) $item->get_product_id();
 		}
 		if ( $id <= 0 ) {
-			return '';
+			// Deleted product, ids zeroed — key on the order-item id (always > 0
+			// on a saved line) so the order is never dropped. (F3-43.)
+			return self::SYNTHETIC_PREFIX . 'oi-' . (string) $item->get_id();
 		}
 		return self::SYNTHETIC_PREFIX . (string) self::canonical_id( $id, $detector );
 	}
