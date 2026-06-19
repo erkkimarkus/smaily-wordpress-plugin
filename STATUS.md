@@ -26,7 +26,13 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-19 (**Event Log stores the real request + engine response
+_Last updated: 2026-06-19 (**Faas 2: legacy admin settings-page removed (F3-45)** — the
+redundant legacy `Admin` settings page + `Settings`/`Renderer`/`Sanitizer` + partials +
+`smaily-admin.css/js` deleted; the subscription **widget** and Plugins-page **Settings
+link** relocated (100% preserved); `Notices`/`Notice_Registry` KEPT (1.3.0 upgrade notice).
+Hard constraint honoured: must not break the ~2000 installs — new UI owns the same option
+keys, kept integrations unchanged. ci:strict exit=0; integration OK 114. Prior:
+**Event Log stores the real request + engine response
 (Problem 3 / F3-44)** — Details showed `Payload: []`; now order/catalog/Smaily rows store
 the exact JSON sent + the engine reply (`sent_payload` / `last_response`, migration 007,
 both queues), never the auth header; a terminal-skip records `outcome:"skipped"` (exposes
@@ -737,6 +743,26 @@ already sends ISO 639-1 from `get_user_locale()`.
   (Not live-covered, by design: the `is_removable` skip of a category-less trashed
   product — WC auto-assigns "Uncategorized", fragile live — is unit-tested.)
 
+### Done — Faas 2: legacy admin settings-page removed (F3-45, 2026-06-19)
+
+Constraint (Erkki): **must not break the ~2000 existing installs** — only remove what's
+unneeded under the new plugin or trivially replaceable with 100% functionality preserved.
+A per-file audit BEFORE deleting found the legacy `Admin` class is NOT pure views:
+- **Removed** (redundant + non-navigable): `admin/smaily-admin.class.php`,
+  `smaily-admin-{settings,renderer,sanitizer}.class.php`, the `smaily-admin-*.php`
+  settings partials, `admin/css|js/smaily-admin.*`, the credentials hook (a REST no-op),
+  and the now-moot hide-legacy-menu shim.
+- **Relocated** into `smaily.class.php::init_classes` (merchants lose nothing): the
+  subscription widget (`widgets_init`) + the Plugins-page Settings link (→ the new UI).
+- **Kept** (live dependents): `Notices` + `Notice_Registry` + `partials/notices/*` (the
+  1.3.0 CF7 upgrade notice still calls `Notice_Registry::add_notice`!), `Widget`, the WC
+  integrations, `Cypher`, `Options`, `Rss`, `Cart`, CF7 / Elementor.
+- **No config stranded:** the new `SettingsEndpoint` reads + writes the SAME legacy option
+  keys (credentials / subscriber-sync / abandoned-cart) the old page used, and the kept
+  integrations read those keys. Fixed a stale `@param Admin` doc in `smaily-api.class.php`.
+- Gates: **ci:strict exit=0 (unit 377, JS 158); integration OK 114** (plugin boots with the
+  legacy admin gone). No wire change → no live-walk. DECISIONS F3-45.
+
 ### Done — Event Log stores the real request + engine response (Problem 3 / F3-44, 2026-06-19)
 
 **Engine brief 2026-06-19, Problem 3:** the Event Log "Details" showed `Payload: []` —
@@ -802,13 +828,7 @@ already-solved (not rebuilt), one deferred:
   `admin/wizard.php`), which self-redirects to the wizard when
   `smly_plus_setup_completed` is false (wizard-first gate) — correct in both
   states. PHPCS exit=0; ci:strict exit=0 (unit 359, JS 158).
-- **Faas 1 of the legacy cleanup.** Faas 2 — removing the legacy admin VIEW layer
-  (`smaily-admin*.class.php`, `admin/partials/*`, `admin/css|js/smaily-admin.*`,
-  the `new Admin()` at `includes/smaily.class.php:269` + its requires, and the
-  then-dead hide-legacy-menu shim) — is a SEPARATE sub-PR, pending a per-file
-  dependency audit + go-ahead. KEEP (live non-view dependents): `Cypher`,
-  `Options`, `Rss`, `Cart`, `Subscriber_Synchronization` / `Cron` /
-  `Data_Handler` / `Profile_Settings`, CF7 / Elementor admin.
+- **Faas 1 of the legacy cleanup.** **Faas 2 is now DONE (F3-45, below).**
 
 ### Done — engine ask #1: attribute term labels (2026-06-12 late)
 

@@ -7,13 +7,11 @@
  * data-view="wizard". State hydration happens client-side via
  * `window.smailyConnectBoot` (set by wp_localize_script below).
  *
- * Coexistence note: the legacy Smaily admin (smaily-admin.class.php)
- * still owns its own top-level menu page. This new mount lives as a
- * SIBLING entry — Phase 4 swaps the parent when the React tree replaces
- * legacy admin UI wholesale. Until then the merchant sees both:
- *
- *   Smaily            (legacy menu, current pilot)
- *   Smaily Connect    (this menu — BETA fork wizard + settings)
+ * The legacy Smaily admin settings PAGE was removed (F3-45) — this is now the
+ * ONLY admin UI. The legacy non-view stack (WooCommerce integrations, the
+ * subscription widget, upgrade notices) still loads, but all configuration lives
+ * here; the new Settings page reads/writes the same legacy option keys, so the
+ * kept integrations keep working unchanged.
  *
  * @package Smaily\Connect
  */
@@ -225,19 +223,5 @@ function smaily_connect_enqueue_admin_bundle( string $hook_suffix ): void {
 	);
 }
 
-/**
- * Remove the legacy top-level "Smaily" menu (slug 'smaily-connect',
- * registered by admin/smaily-admin.class.php). Run at admin_menu
- * priority 99 so we land AFTER the legacy registration at priority
- * 10. The submenu pages registered under that slug fall away with
- * the parent — WP's menu globals key them by parent slug.
- *
- * Why a separate function: keeps the legacy file untouched (the
- * Smaily_Connect\Includes\Smaily_Connect_Admin class is upstream
- * code; we want a clean merge-back path) and confines the visibility
- * change to one toggle line in Bootstrap. Phase 4 removes legacy
- * admin wholesale; until then this function is the surgical knife.
- */
-function smaily_connect_hide_legacy_menu(): void {
-	remove_menu_page( 'smaily-connect' );
-}
+// smaily_connect_hide_legacy_menu() was removed in F3-45: the legacy admin that
+// registered the old "smaily-connect" menu is gone, so there's nothing to hide.

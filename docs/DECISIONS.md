@@ -2275,6 +2275,51 @@ decision this works around); F3-18 (the D6 errors path); 3.10.0 (the Event Log t
 extends); the engine-team 2026-06-19 brief (Problem 3); F3-43 (the silent-"sent"
 the skip marker now exposes).
 
+### F3-45 — Legacy admin settings-PAGE removed; widget + Settings link relocated (Faas 2)
+
+**Context:** the legacy `Smaily_Connect\Admin` settings page is redundant — all
+configuration now happens in the new wizard/Settings UI. Removing the legacy view
+layer (Faas 2; Faas 1 was the F1 Settings-link repoint). **Hard constraint (Erkki):
+must not break the ~2000 existing installs** — only remove what's unneeded under the
+new plugin or trivially replaceable with 100% functionality preserved.
+
+**Audit (per-file, before any deletion) — the legacy `Admin` class was NOT pure views:**
+- It also registered two LIVE behaviors: the **subscription widget** (a classic
+  `WP_Widget` merchants may have placed) and the **Plugins-page "Settings" link**
+  (F1 repointed it to the new UI). Deleting `Admin` would silently drop both.
+- Its `validate_api_credentials_after_save` hook **early-exits on `REST_REQUEST`**, so
+  it did nothing for the new UI's saves — it only served the legacy form. Dead with the page.
+- `Notices` + `Notice_Registry` are **NOT dead**: `migrations/upgrade-1-3-0.php` calls
+  `Notice_Registry::add_notice()` for the CF7 upgrade notice. Removing them would break
+  the 1.3.0 upgrade path. **Kept.**
+- **No config is stranded:** the new `SettingsEndpoint` reads AND writes the SAME legacy
+  option keys the old page used (`smaily_connect_api_credentials`, `_subscriber_sync_*`,
+  `_abandoned_cart_*`), and `EnvDetector` feeds them to the new wizard. The kept legacy
+  integrations (`Subscriber_Synchronization` / `Cron` / `Cart`) keep reading those keys —
+  now written by the new UI.
+
+**Decision (implemented, 2026-06-19):**
+- **Removed** (redundant + non-navigable view layer): `admin/smaily-admin.class.php`,
+  `smaily-admin-{settings,renderer,sanitizer}.class.php`, the `smaily-admin-*.php`
+  settings partials, `admin/css|js/smaily-admin.*`, the dead `validate_api_credentials`
+  hook, and the now-moot hide-legacy-menu shim (2.H.3 — nothing left to hide).
+- **Relocated** (so merchants lose nothing) into `smaily.class.php::init_classes`: the
+  `widgets_init` → `register_widget(new Widget(...))` and the `plugin_action_links`
+  Settings link (→ `admin.php?page=smaily-connect-settings`).
+- **Kept** (live dependents): `Notices` + `Notice_Registry` + `partials/notices/*` +
+  `smaily-admin-notice.php` (1.3.0 upgrade notice), `Widget`, the WooCommerce integration
+  classes, `Cypher`, `Options`, `Rss`, `Cart`, CF7 / Elementor.
+- Fixed a stale `@param Admin` docblock in `smaily-api.class.php` (the only other `Admin`
+  reference — a doc-only leftover; the constructor never took an Admin).
+
+**Safety:** every removed piece is either unreachable under the new plugin (the legacy
+menu is hidden + the Settings link points at the new UI) or redundant (new UI owns the
+same option keys). The two live behaviors are preserved verbatim. Gates: ci:strict
+exit=0; integration OK 114 (the plugin boots with the legacy admin gone).
+
+**Relationships:** F1 (the Settings-link repoint this completes); 2.H.3 (legacy-menu
+hide, now removed as moot); the coexistence model (`setup_completed`) — untouched.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

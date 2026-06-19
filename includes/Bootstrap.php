@@ -219,17 +219,9 @@ final class Bootstrap {
 			add_action( 'admin_menu', 'smaily_connect_register_admin_pages' );
 			add_action( 'admin_enqueue_scripts', 'smaily_connect_enqueue_admin_bundle' );
 
-			// Hide the legacy "Smaily" top-level menu now that the new
-			// "Smaily Connect" menu carries Setup wizard + Settings.
-			// Erkki's 2.H.3 decision: two menus on staging are confusing,
-			// pull the trigger before Phase 3 ships rec-engine UI on top.
-			//
-			// Priority 99 runs AFTER the legacy admin's admin_menu
-			// callback (default priority 10), so remove_menu_page sees a
-			// registered slug and actually removes it. Data layer is
-			// untouched — Settings\Credentials still reads the legacy
-			// wp_options keys for Mode B/C default credentials.
-			add_action( 'admin_menu', 'smaily_connect_hide_legacy_menu', 99 );
+			// The legacy "Smaily" top-level menu no longer needs hiding: the
+			// legacy admin that registered it was removed (F3-45). The new
+			// "Smaily Connect" menu (Setup wizard + Settings) is the only one.
 		}
 	}
 

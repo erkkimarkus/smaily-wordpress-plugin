@@ -1,12 +1,12 @@
 <?php
 
-use Smaily_Connect\Admin;
 use Smaily_Connect\Admin\Notices;
 use Smaily_Connect\Includes\API;
 use Smaily_Connect\Includes\Blocks;
 use Smaily_Connect\Includes\Helper;
 use Smaily_Connect\Includes\Lifecycle;
 use Smaily_Connect\Includes\Options;
+use Smaily_Connect\Includes\Widget;
 use Smaily_Connect\Integrations\CF7\Admin as Smaily_CF7_Admin;
 use Smaily_Connect\Integrations\CF7\Public_Base as Smaily_CF7_Public;
 use Smaily_Connect\Integrations\Elementor\Admin as Elementor_Admin;
@@ -35,15 +35,6 @@ class Smaily_Connect {
 	 * @var    string $version The current version of the plugin.
 	 */
 	protected $version;
-
-	/**
-	 * Admin class instance.
-	 *
-	 *
-	 * @access private
-	 * @var    Admin $admin Admin class instance.
-	 */
-	protected $admin;
 
 	/**
 	 * Admin_Notices class instance.
@@ -221,10 +212,6 @@ class Smaily_Connect {
 	 */
 	private function load_dependencies() {
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-notices.class.php';
-		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-renderer.class.php';
-		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-sanitizer.class.php';
-		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin-settings.class.php';
-		require_once SMAILY_CONNECT_PLUGIN_PATH . 'admin/smaily-admin.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'blocks/newsletter-signup/smaily-integration.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-api.class.php';
 		require_once SMAILY_CONNECT_PLUGIN_PATH . 'includes/smaily-blocks.class.php';
@@ -266,8 +253,26 @@ class Smaily_Connect {
 	 * @access private
 	 */
 	private function init_classes() {
-		$this->admin = new Admin( $this->options, $this->plugin_name, $this->version );
-		$this->admin->register_hooks();
+		// The legacy admin settings PAGE was removed (F3-45) — configuration now
+		// lives in the new wizard / Settings UI, which reads + writes the SAME
+		// legacy option keys, so the kept WooCommerce integrations keep working
+		// unchanged. Two live behaviors the old Admin class also carried are
+		// preserved here so merchants lose nothing:
+		// 1) the subscription widget (a classic WP_Widget merchants may have placed).
+		add_action(
+			'widgets_init',
+			function (): void {
+				register_widget( new Widget( $this->options ) );
+			}
+		);
+		// 2) the Plugins-page "Settings" link — now points at the new Settings page.
+		add_filter(
+			'plugin_action_links_' . plugin_basename( SMAILY_CONNECT_PLUGIN_FILE ),
+			static function ( array $links ): array {
+				array_unshift( $links, '<a href="admin.php?page=smaily-connect-settings">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>' );
+				return $links;
+			}
+		);
 
 		$this->admin_notices = new Notices();
 		$this->admin_notices->register_hooks();
