@@ -203,6 +203,11 @@ final class IngestFlusherTest extends TestCase {
 			public function record_attempt( int $id, string $error, int $retry_in_seconds = 60 ): void {
 				$this->attempts[] = array( 'id' => $id, 'error' => $error, 'retry' => $retry_in_seconds );
 			}
+			/** @var array<int, array{sent: ?string, response: ?string}> */
+			public array $exchanges = array();
+			public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {
+				$this->exchanges[ $id ] = array( 'sent' => $sent_payload, 'response' => $last_response );
+			}
 		};
 	}
 

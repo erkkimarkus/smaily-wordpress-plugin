@@ -79,6 +79,56 @@ final class FlusherTest extends TestCase {
 		self::assertSame( array( 1 ), $queue->marked_sent );
 	}
 
+	public function test_contact_sync_records_the_exchange_from_the_client(): void {
+		// F3-44: the Flusher stores what the Client sent + the Smaily reply, read
+		// from the Client's last_exchange() (populated in Client::request()).
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 7,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'email' => 'a@b.c', 'fields' => array( 'first_name' => 'Alice' ) ) ),
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )->willReturn( array() );
+		$client->method( 'last_exchange' )->willReturn(
+			array(
+				'request'  => array( 'method' => 'POST', 'endpoint' => 'contact', 'body' => array( array( 'email' => 'a@b.c' ) ) ),
+				'response' => array( 'http' => 200, 'body' => array( 'code' => 101 ) ),
+			)
+		);
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client );
+		$flusher->flush();
+
+		self::assertArrayHasKey( 7, $queue->exchanges );
+		self::assertStringContainsString( '"endpoint":"contact"', (string) $queue->exchanges[7]['sent'] );
+		self::assertStringContainsString( '"http":200', (string) $queue->exchanges[7]['response'] );
+	}
+
+	public function test_no_call_records_a_skip_exchange(): void {
+		// A missing-email contact.sync makes no HTTP call → the exchange records a
+		// skip (sent=null, outcome=skipped) so the row isn't a bare "sent" (F3-44).
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 9,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'email' => '', 'fields' => array() ) ),
+				),
+			)
+		);
+
+		$flusher = new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $this->createMock( Client::class ) );
+		$flusher->flush();
+
+		self::assertNull( $queue->exchanges[9]['sent'] );
+		self::assertStringContainsString( '"outcome":"skipped"', (string) $queue->exchanges[9]['response'] );
+	}
+
 	public function test_automation_event_routes_through_automation_router(): void {
 		$queue = $this->fake_queue(
 			array(
@@ -275,6 +325,11 @@ final class FlusherTest extends TestCase {
 
 			public function record_attempt( int $id, string $error ): void {
 				$this->attempts[] = compact( 'id', 'error' );
+			}
+			/** @var array<int, array{sent: ?string, response: ?string}> */
+			public array $exchanges = array();
+			public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {
+				$this->exchanges[ $id ] = array( 'sent' => $sent_payload, 'response' => $last_response );
 			}
 		};
 	}

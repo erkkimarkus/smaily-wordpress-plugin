@@ -87,6 +87,53 @@ final class ClientTest extends TestCase {
 		$client->trigger_automation( 42, array( array( 'email' => 'a@b.c' ) ) );
 	}
 
+	public function test_last_exchange_captures_request_and_response_without_auth(): void {
+		// F3-44: request() records the exchange (method/endpoint/body + reply) so
+		// the Smaily Flusher can store it in the Event Log — NEVER the auth header.
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"code":101}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"code":101}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$client = new Client( 'demo', 'user', 'pass' );
+		self::assertNull( $client->last_exchange(), 'No exchange before the first request.' );
+
+		$client->trigger_automation( 42, array( array( 'email' => 'a@b.c' ) ) );
+
+		$exchange = $client->last_exchange();
+		self::assertIsArray( $exchange );
+		self::assertSame( 'POST', $exchange['request']['method'] );
+		self::assertSame( 'autoresponder', $exchange['request']['endpoint'] );
+		self::assertSame( 42, $exchange['request']['body']['autoresponder'] );
+		self::assertSame( 200, $exchange['response']['http'] );
+		self::assertSame( array( 'code' => 101 ), $exchange['response']['body'] );
+
+		// The Basic-auth credentials must NEVER appear in the recorded exchange.
+		$json = (string) json_encode( $exchange );
+		self::assertStringNotContainsString( 'Authorization', $json );
+		self::assertStringNotContainsString( base64_encode( 'user:pass' ), $json );
+	}
+
+	public function test_last_exchange_records_a_failed_response(): void {
+		// On a non-2xx the response is still captured (before the throw), so the
+		// Event Log shows what the engine actually replied (F3-44).
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"error":"bad"}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 422 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"error":"bad"}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$client = new Client( 'demo', 'user', 'pass' );
+
+		try {
+			$client->trigger_automation( 42, array( array( 'email' => 'a@b.c' ) ) );
+		} catch ( ApiException $e ) {
+			unset( $e );
+		}
+
+		$exchange = $client->last_exchange();
+		self::assertSame( 422, $exchange['response']['http'] );
+	}
+
 	public function test_request_includes_basic_auth_header(): void {
 		$captured_args = null;
 		Functions\when( 'wp_remote_get' )->alias(

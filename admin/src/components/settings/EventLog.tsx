@@ -280,6 +280,18 @@ export function EventLog(): React.JSX.Element {
   );
 }
 
+/** Pretty-print a JSON string for display; returns it raw if it isn't JSON, '' if empty. */
+function prettyJson(raw: string): string {
+  if (raw === '') {
+    return '';
+  }
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 function EventDetailModal({
   detail,
   onClose,
@@ -287,13 +299,10 @@ function EventDetailModal({
   detail: EventDetailResponse;
   onClose: () => void;
 }): React.JSX.Element {
-  const { event, payload } = detail;
-  let pretty = payload;
-  try {
-    pretty = JSON.stringify(JSON.parse(payload), null, 2);
-  } catch {
-    // Non-JSON payload (shouldn't happen) — show it raw.
-  }
+  const { event, payload, sent_payload, last_response } = detail;
+  const sent = prettyJson(sent_payload);
+  const response = prettyJson(last_response);
+  const enqueued = prettyJson(payload);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -345,9 +354,21 @@ function EventDetailModal({
           </div>
         )}
         <div className="mt-3">
-          <p className="text-xs font-medium text-text-tertiary">Payload</p>
+          <p className="text-xs font-medium text-text-tertiary">Request sent to the engine</p>
           <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
-            {pretty}
+            {sent !== '' ? sent : '— nothing recorded (not sent, or the row predates this version)'}
+          </pre>
+        </div>
+        <div className="mt-3">
+          <p className="text-xs font-medium text-text-tertiary">Engine response</p>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
+            {response !== '' ? response : '—'}
+          </pre>
+        </div>
+        <div className="mt-3">
+          <p className="text-xs font-medium text-text-tertiary">Enqueued payload</p>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
+            {enqueued}
           </pre>
         </div>
       </div>

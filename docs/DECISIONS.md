@@ -2229,6 +2229,52 @@ payload + response in the Event Log — the brief's Problem 3 — is a separate 
 lines); F3-18 (the D6 errors path that already marks FAILED); the engine-team 2026-06-19
 brief (#58922); LESSONS §2.11 (never a silent drop — now upheld for orders too).
 
+### F3-44 — Event Log stores the real request payload + engine response per row
+
+**Context:** the engine-team 2026-06-19 brief, Problem 3. The Event Log "Details"
+panel showed `Payload: []` for every row — order/catalog rows enqueue an EMPTY
+payload (the flusher builds the wire object fresh at send, F3-8), so the stored
+`payload` column is empty, and only a short `last_error` code is kept. So a merchant
+(or we) couldn't answer "what did we actually send, and what did the engine reply?"
+— and the #58922 terminal-skip read a bare "sent" with no trace it never POSTed.
+
+**Decision (implemented, 2026-06-19):** capture the send-time exchange per row, on
+BOTH durable queues, and surface it in Details.
+- **Schema (migration 007):** two nullable `LONGTEXT` columns on
+  `smly_rec_event_queue` AND `smly_plus_event_queue` — `sent_payload` (the exact
+  JSON POSTed; null when nothing was sent) and `last_response` (a small JSON
+  summary `{http, outcome, error?}`). A new `IngestQueue::store_exchange` /
+  `EventQueue::store_exchange` writes them (separate from `mark_*()` so those
+  signatures — and the test doubles overriding them — stay unchanged).
+- **Rec-engine capture (clean):** `AbstractD6Flusher` is the single choke point —
+  after `send($objects)` each row has its sent object + the batch response. It
+  stores `accepted` / `rejected{error}` / `http_error` per row, and on a
+  terminal-skip stores `sent_payload=null, last_response={outcome:"skipped"}` (the
+  visibility fix for the silent "sent").
+- **Smaily capture:** the legacy queue is dispatch-based, so the `Smaily\Client`
+  records its `last_exchange()` in the single `request()` chokepoint and the
+  `Flusher` reads it (via `try/finally`, so a throwing call is still captured) and
+  stores it; a no-call event records a skip marker.
+- **NEVER stores the Authorization header** — only method/endpoint/body + reply.
+- **All rows, success included** (the brief wants "what landed", not just failures),
+  each field **trimmed to ~10 KB**; pruned with the row by `QueueJanitor` (sent 30 d
+  / failed 90 d), so the table stays bounded.
+- **Details UI:** the modal shows **"Request sent to the engine"** + **"Engine
+  response"** (pretty-printed) above the enqueued payload; `/events/detail` returns
+  the two fields ('' for pre-migration rows / not-yet-flushed rows).
+
+**PII note:** `sent_payload` carries the same data already in WC (email / order
+fields); it's transient + janitor-pruned — no new GDPR surface beyond the queue.
+
+**Already solved, NOT rebuilt:** the per-item `errors[]` → `mark_failed` split
+(F3-18) was correct; this adds the *visibility* layer on top, it doesn't change the
+state machine.
+
+**Relationships:** F3-8 (why order/catalog rows enqueue empty — the build-fresh
+decision this works around); F3-18 (the D6 errors path); 3.10.0 (the Event Log this
+extends); the engine-team 2026-06-19 brief (Problem 3); F3-43 (the silent-"sent"
+the skip marker now exposes).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

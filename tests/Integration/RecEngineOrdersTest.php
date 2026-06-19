@@ -100,6 +100,32 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 0, $stats['failed'] );
 	}
 
+	public function test_flush_records_the_send_exchange_on_the_row(): void {
+		// F3-44 end-to-end: after a real flush the row carries the exact JSON
+		// POSTed + the engine reply (migration 007 columns, store_exchange write).
+		global $wpdb;
+		$product = $this->make_product( 'ORD-SKU-EX', '7.00' );
+		$oid     = $this->make_order( 'exchange@example.test', 'completed', $product );
+
+		$this->flusher()->flush();
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT sent_payload, last_response, status FROM {$wpdb->prefix}smly_rec_event_queue WHERE entity_id = %s AND event_type = %s",
+				(string) $oid,
+				OrderFlusher::EVENT_ORDER_UPSERT
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		self::assertIsArray( $row );
+		self::assertSame( 'sent', $row['status'] );
+		self::assertStringContainsString( '"external_order_id":"' . $oid . '"', (string) $row['sent_payload'], 'The exact wire object is stored.' );
+		self::assertStringContainsString( '"outcome":"accepted"', (string) $row['last_response'] );
+	}
+
 	public function test_skuless_product_order_ingests_with_synthetic_key(): void {
 		// F3-36 (pilot find): the pilot store has no SKUs at all. The order
 		// must still ingest, keyed wc-{product id} by SkuResolver — before

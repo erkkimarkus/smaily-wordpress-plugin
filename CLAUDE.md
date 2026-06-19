@@ -142,6 +142,19 @@ earlier decisions — don't re-revert them:
   items terminal skip now only fires for a genuinely product-less order
   (shipping/fee only). Reverses F3-36's drop-the-line for the deleted case.
 
+### Event Log "Details" shows the real request + engine response (F3-44)
+Order/catalog/Smaily queue rows enqueue an EMPTY `payload` (the flusher builds the
+wire object fresh at send), so Details used to show `Payload: []`. The flushers now
+store the send-time exchange per row via `IngestQueue` / `EventQueue::store_exchange`:
+`sent_payload` (the exact JSON POSTed; NULL on a terminal skip) + `last_response`
+(`{http, outcome, error?}`). Migration 007 added both columns to BOTH queues. Rules
+that must hold: **never store the Authorization header** — the Smaily `Client` captures
+the exchange in `request()` from method/endpoint/body + reply, NOT the auth `$args`;
+the Smaily `Flusher` reads `Client::last_exchange()` in a `try/finally` so a throwing
+call is still captured; fields trim to ~10 KB and are janitor-pruned. A terminal-skip
+stores `last_response={outcome:"skipped"}` — that's how you tell a row marked "sent"
+that never actually POSTed (the #58922 confusion). Stored for ALL rows, success too.
+
 ### Trashing a product fires NO catalog hook — it's kept as `in_stock=false`
 `before_delete_post` is **permanent-delete-only**; trashing routes through
 `wp_update_post`, so a trashed product fires neither the delete nor (usefully)

@@ -38,10 +38,30 @@ class Client {
 	private string $username;
 	private string $password;
 
+	/**
+	 * The last HTTP exchange — request {method, endpoint, body} + reply
+	 * {http, body} — for the Event Log "Details" (F3-44). NEVER holds the
+	 * Authorization header. Null until the first request() in this instance.
+	 *
+	 * @var array<string, mixed>|null
+	 */
+	private ?array $last_exchange = null;
+
 	public function __construct( string $subdomain, string $username, string $password ) {
 		$this->subdomain = $subdomain;
 		$this->username  = $username;
 		$this->password  = $password;
+	}
+
+	/**
+	 * The last HTTP exchange this Client made (request body + reply), or null
+	 * if it hasn't sent anything. The Smaily Flusher reads this after a dispatch
+	 * to record what was sent + what came back (F3-44). Excludes the auth header.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function last_exchange(): ?array {
+		return $this->last_exchange;
 	}
 
 	/**
@@ -189,6 +209,17 @@ class Client {
 	private function request( string $method, string $endpoint, array $data ) {
 		$url = sprintf( 'https://%s.sendsmaily.net/api/%s.php', $this->subdomain, $endpoint );
 
+		// Record the request for the Event Log (F3-44) — method/endpoint/body
+		// only, NEVER the Authorization header. The reply is filled in below.
+		$this->last_exchange = array(
+			'request'  => array(
+				'method'   => $method,
+				'endpoint' => $endpoint,
+				'body'     => $data,
+			),
+			'response' => null,
+		);
+
 		$args = array(
 			'headers'    => array(
 				'Authorization' => 'Basic ' . base64_encode( $this->username . ':' . $this->password ),
@@ -205,6 +236,7 @@ class Client {
 		}
 
 		if ( is_wp_error( $response ) ) {
+			$this->last_exchange['response'] = array( 'error' => $response->get_error_message() );
 			throw new ApiException(
 				'Smaily HTTP transport error: ' . $response->get_error_message(),
 				0
@@ -213,6 +245,11 @@ class Client {
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+		$this->last_exchange['response'] = array(
+			'http' => $code,
+			'body' => $body,
+		);
 
 		if ( $code < 200 || $code >= 300 ) {
 			throw new ApiException(

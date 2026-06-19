@@ -27,8 +27,16 @@ export interface EventsListResponse {
 
 export interface EventDetailResponse {
   event: EventRow;
-  /** The full stored payload JSON for the drill-down view. */
+  /** The stored ENQUEUE payload JSON (often empty `[]` for order/catalog rows). */
   payload: string;
+  /**
+   * The exact request body POSTed to the engine (F3-44). Empty when nothing was
+   * sent (a terminal skip — see last_response.outcome) or for rows enqueued
+   * before this shipped / not yet flushed.
+   */
+  sent_payload: string;
+  /** A small JSON summary of the engine reply: `{ http, outcome, error? }` (F3-44). */
+  last_response: string;
 }
 
 export interface EventsListFilters {

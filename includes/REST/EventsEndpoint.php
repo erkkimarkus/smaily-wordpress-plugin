@@ -179,8 +179,14 @@ class EventsEndpoint {
 
 		return new WP_REST_Response(
 			array(
-				'event'   => $this->shape_row( $row ),
-				'payload' => isset( $row['payload'] ) ? (string) $row['payload'] : '',
+				'event'         => $this->shape_row( $row ),
+				'payload'       => isset( $row['payload'] ) ? (string) $row['payload'] : '',
+				// The send-time exchange (F3-44): exactly what was POSTed + the
+				// engine reply. Empty for rows enqueued before this shipped, or
+				// not-yet-flushed rows. sent_payload is null/empty when nothing
+				// was POSTed (a terminal skip) — see last_response.outcome.
+				'sent_payload'  => isset( $row['sent_payload'] ) ? (string) $row['sent_payload'] : '',
+				'last_response' => isset( $row['last_response'] ) ? (string) $row['last_response'] : '',
 			),
 			200
 		);

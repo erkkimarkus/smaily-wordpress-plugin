@@ -26,7 +26,12 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-19 (**Order sync data-loss fixes (F3-42/F3-43)** — engine brief
+_Last updated: 2026-06-19 (**Event Log stores the real request + engine response
+(Problem 3 / F3-44)** — Details showed `Payload: []`; now order/catalog/Smaily rows store
+the exact JSON sent + the engine reply (`sent_payload` / `last_response`, migration 007,
+both queues), never the auth header; a terminal-skip records `outcome:"skipped"` (exposes
+the silent "sent"). ci:strict exit=0 (unit 377, JS 158); integration OK 114. Prior:
+**Order sync data-loss fixes (F3-42/F3-43)** — engine brief
 order #58922: a guest order with a deleted product was marked "sent" but never POSTed.
 F3-43: a deleted-product line is never dropped (keys `wc-oi-{item_id}`) so the order isn't
 lost; F3-42: custom WC statuses (label-printed/shipped) default through as a sale
@@ -731,6 +736,26 @@ already sends ISO 639-1 from `get_user_locale()`.
   cleared on retry**, not a wire-shape bug in the fix (the happy path is engine-clean).
   (Not live-covered, by design: the `is_removable` skip of a category-less trashed
   product — WC auto-assigns "Uncategorized", fragile live — is unit-tested.)
+
+### Done — Event Log stores the real request + engine response (Problem 3 / F3-44, 2026-06-19)
+
+**Engine brief 2026-06-19, Problem 3:** the Event Log "Details" showed `Payload: []` —
+order/catalog rows enqueue an empty payload (built fresh at send, F3-8) and only a short
+`last_error` was kept, so "what did we send / what did the engine reply?" was
+un-answerable, and a terminal-skip read a bare "sent" with no trace it never POSTed. Fix
+(BOTH queues, per Erkki):
+- **Migration 007** adds `sent_payload` + `last_response` (nullable LONGTEXT) to
+  `smly_rec_event_queue` AND `smly_plus_event_queue`; a new `store_exchange()` on each
+  queue writes them (separate from `mark_*` → no churn to existing overrides).
+- **Rec-engine:** `AbstractD6Flusher` (single choke point) records per row
+  accepted / rejected{error} / http_error; a terminal-skip → `sent_payload=null,
+  last_response={outcome:"skipped"}` (exposes the silent "sent").
+- **Smaily:** `Client::last_exchange()` captured in the `request()` chokepoint; the
+  `Flusher` reads it via try/finally (captured even when the call throws) and stores it.
+- **Never stores the Authorization header**; all rows incl. success; ~10 KB trim;
+  janitor-pruned. Details modal now shows **Request sent** + **Engine response**.
+- Gates: **ci:strict exit=0 (unit 377, JS 158); integration OK 114**. No wire-contract
+  change (stored locally) → no live-walk needed. DECISIONS F3-44; CLAUDE.md note.
 
 ### Done — Order sync correctness: custom statuses + deleted-product lines (F3-42/F3-43, 2026-06-19)
 

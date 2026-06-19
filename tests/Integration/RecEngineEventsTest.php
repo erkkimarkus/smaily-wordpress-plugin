@@ -56,15 +56,18 @@ final class RecEngineEventsTest extends TestCase {
 		$wpdb->insert(
 			$this->rec_table(),
 			array(
-				'event_type'   => 'order.upsert',
-				'entity_id'    => '42',
-				'event_uuid'   => wp_generate_uuid4(),
-				'payload'      => '{"order_id":42}',
-				'created_at'   => $now,
-				'attempts'     => 5,
-				'max_attempts' => 5,
-				'last_error'   => 'http_503 service_unavailable',
-				'status'       => 'failed',
+				'event_type'    => 'order.upsert',
+				'entity_id'     => '42',
+				'event_uuid'    => wp_generate_uuid4(),
+				'payload'       => '{"order_id":42}',
+				'created_at'    => $now,
+				'attempts'      => 5,
+				'max_attempts'  => 5,
+				'last_error'    => 'http_503 service_unavailable',
+				'status'        => 'failed',
+				// F3-44: the send-time exchange the flusher records.
+				'sent_payload'  => '{"external_order_id":"42","status":"completed"}',
+				'last_response' => '{"http":503,"outcome":"http_error","error_code":"service_unavailable"}',
 			)
 		);
 
@@ -157,6 +160,10 @@ final class RecEngineEventsTest extends TestCase {
 		self::assertSame( 'order.upsert', $detail['event']['event_type'] );
 		self::assertStringContainsString( 'order_id', $detail['payload'] );
 		self::assertSame( 'http_503 service_unavailable', $detail['event']['last_error'] );
+		// F3-44: the send-time exchange comes back so "Details" can show what was
+		// sent + the engine reply (migration 007 added the columns).
+		self::assertStringContainsString( 'external_order_id', $detail['sent_payload'] );
+		self::assertStringContainsString( '"outcome":"http_error"', $detail['last_response'] );
 	}
 
 	public function test_pagination_caps_per_page(): void {

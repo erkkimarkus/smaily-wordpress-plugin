@@ -174,6 +174,27 @@ class EventQueue {
 	}
 
 	/**
+	 * Persist the send-time exchange for a row: the exact request body sent
+	 * (`sent_payload`, null when nothing was sent) and a small JSON summary of
+	 * the Smaily reply (`last_response`). Written by the Flusher after dispatch
+	 * so the Event Log "Details" shows what we sent and what came back (F3-44).
+	 * NEVER carries the Authorization header.
+	 */
+	public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {
+		global $wpdb;
+		$wpdb->update(
+			$this->table_name(),
+			array(
+				'sent_payload'  => $sent_payload,
+				'last_response' => $last_response,
+			),
+			array( 'id' => $id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
 	 * Revive terminally-`failed` rows back to `pending` so the recurring flush
 	 * re-attempts them (3.10.1 Event Log recovery). Resets the attempt counter +
 	 * last_error. `$ids` null = every failed row; otherwise only the given ids.

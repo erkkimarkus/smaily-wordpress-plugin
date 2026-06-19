@@ -47,6 +47,9 @@ class AutomationRouter {
 
 	private WorkflowResolverInterface $resolver;
 
+	/** The Client used by the last trigger_automation() that reached the API (F3-44). */
+	private ?Client $last_client = null;
+
 	/**
 	 * @param WorkflowResolverInterface           $resolver       Workflow lookup strategy.
 	 * @param callable(string $account_key): Client $client_factory Returns a configured Client
@@ -55,6 +58,18 @@ class AutomationRouter {
 	public function __construct( WorkflowResolverInterface $resolver, callable $client_factory ) {
 		$this->resolver       = $resolver;
 		$this->client_factory = $client_factory;
+	}
+
+	/**
+	 * The last HTTP exchange of the most recent trigger_automation() that
+	 * reached Smaily, or null when the last call short-circuited before any
+	 * request (no email / no workflow mapped). The Flusher records it in the
+	 * Event Log (F3-44).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function last_exchange(): ?array {
+		return $this->last_client !== null ? $this->last_client->last_exchange() : null;
 	}
 
 	/**
@@ -84,6 +99,10 @@ class AutomationRouter {
 		array $contact_data,
 		array $additional_fields = array()
 	): bool {
+		// Reset so last_exchange() reflects THIS call — null if it short-circuits
+		// before any HTTP request (no email / no workflow mapped) — F3-44.
+		$this->last_client = null;
+
 		$email = isset( $contact_data['email'] ) ? (string) $contact_data['email'] : '';
 		if ( $email === '' ) {
 			return false;
@@ -108,7 +127,8 @@ class AutomationRouter {
 			$additional_fields
 		);
 
-		$client = ( $this->client_factory )( $match->account_key );
+		$client            = ( $this->client_factory )( $match->account_key );
+		$this->last_client = $client;
 
 		// Let ApiException bubble up — the Flusher (sub-PR 5.C) uses it to
 		// distinguish transient failures (retry) from terminal skips

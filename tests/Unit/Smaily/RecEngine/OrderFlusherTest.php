@@ -144,6 +144,52 @@ final class OrderFlusherTest extends TestCase {
 		self::assertSame( array(), $queue->failed );
 	}
 
+	public function test_exchange_recorded_for_an_accepted_row(): void {
+		// F3-44: the flusher records the exact object it POSTed + the engine
+		// reply, so the Event Log "Details" can show them (no more empty payload).
+		$queue = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$flush = $this->fake_flusher( $queue, $this->d6_client( array( 'ok' => true, 'processed' => 1, 'deduplicated' => 0, 'errors' => array() ) ), true, array( 100 => true ) );
+
+		$flush->flush();
+
+		self::assertArrayHasKey( 1, $queue->exchanges );
+		self::assertNotNull( $queue->exchanges[1]['sent'], 'The exact POSTed object is recorded.' );
+		self::assertNotSame( '', (string) $queue->exchanges[1]['sent'] );
+		self::assertStringContainsString( '"outcome":"accepted"', (string) $queue->exchanges[1]['response'] );
+		self::assertStringContainsString( '"http":200', (string) $queue->exchanges[1]['response'] );
+	}
+
+	public function test_exchange_records_the_error_for_a_d6_rejected_row(): void {
+		$queue  = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ), $this->upsert_row( 2, 101, 'u2' ) ) );
+		$client = $this->d6_client(
+			array(
+				'ok'           => true,
+				'processed'    => 1,
+				'deduplicated' => 0,
+				'errors'       => array( array( 'index' => 1, 'field' => 'status', 'message' => 'Invalid enum value' ) ),
+			)
+		);
+		$flush  = $this->fake_flusher( $queue, $client, true, array( 100 => true, 101 => true ) );
+
+		$flush->flush();
+
+		self::assertStringContainsString( '"outcome":"rejected"', (string) $queue->exchanges[2]['response'] );
+		self::assertStringContainsString( 'status', (string) $queue->exchanges[2]['response'] );
+		self::assertNotNull( $queue->exchanges[2]['sent'], 'A rejected row still records what was sent.' );
+	}
+
+	public function test_exchange_records_a_skip_when_nothing_was_posted(): void {
+		// A terminal-skip row (empty items) is marked sent but never POSTed — the
+		// exchange makes that visible: sent=null, response outcome=skipped (F3-44).
+		$queue = $this->fake_queue( array( $this->upsert_row( 1, 100, 'u1' ) ) );
+		$flush = $this->fake_flusher( $queue, $this->d6_client( array() ), true, array( 100 => true ), 'completed', false );
+
+		$flush->flush();
+
+		self::assertNull( $queue->exchanges[1]['sent'], 'Nothing was POSTed → no sent payload.' );
+		self::assertStringContainsString( '"outcome":"skipped"', (string) $queue->exchanges[1]['response'] );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	/**
@@ -179,6 +225,11 @@ final class OrderFlusherTest extends TestCase {
 			}
 			public function record_attempt( int $id, string $error, int $retry_in_seconds = 60 ): void {
 				$this->attempts[] = array( 'id' => $id, 'error' => $error, 'retry' => $retry_in_seconds );
+			}
+			/** @var array<int, array{sent: ?string, response: ?string}> */
+			public array $exchanges = array();
+			public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {
+				$this->exchanges[ $id ] = array( 'sent' => $sent_payload, 'response' => $last_response );
 			}
 		};
 	}

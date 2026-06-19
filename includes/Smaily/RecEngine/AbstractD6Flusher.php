@@ -46,6 +46,9 @@ abstract class AbstractD6Flusher {
 	 */
 	private const RETRY_BACKOFF = array( 60, 300, 900, 3600, 21600 );
 
+	/** Cap (chars) on each stored exchange field so the queue stays bounded (F3-44). */
+	private const EXCHANGE_MAX = 10000;
+
 	protected IngestQueue $queue;
 	protected RecEngineSettings $settings;
 
@@ -128,8 +131,11 @@ abstract class AbstractD6Flusher {
 			$object = $this->row_to_object( $row );
 
 			if ( $object === null ) {
-				// Terminal skip — mark sent so the row leaves the queue.
+				// Terminal skip — mark sent so the row leaves the queue. Record
+				// the skip (nothing was POSTed) so the Event Log doesn't read a
+				// bare "sent" with no trace of what happened (F3-44).
 				$this->queue->mark_sent( $id );
+				$this->queue->store_exchange( $id, null, $this->skip_response() );
 				++$stats['skipped'];
 				continue;
 			}
@@ -144,11 +150,11 @@ abstract class AbstractD6Flusher {
 
 		try {
 			$response = $this->send( $objects );
-			$this->apply_d6_response( $response, $batch_rows, $stats );
+			$this->apply_d6_response( $response, $batch_rows, $objects, $stats );
 		} catch ( ApiException $e ) {
 			$terminal = $this->is_terminal( $e );
-			foreach ( $batch_rows as $row ) {
-				$this->handle_failure( $row, $e, $terminal, $stats );
+			foreach ( $batch_rows as $index => $row ) {
+				$this->handle_failure( $row, $objects[ $index ], $e, $terminal, $stats );
 			}
 		}
 
@@ -161,9 +167,10 @@ abstract class AbstractD6Flusher {
 	 *
 	 * @param array<string, mixed>                                            $response
 	 * @param array<int, array<string, mixed>>                                $batch_rows
+	 * @param array<int, array<string, mixed>>                                $objects    Wire objects, index-aligned with $batch_rows.
 	 * @param array{processed:int,sent:int,failed:int,retried:int,skipped:int} $stats
 	 */
-	private function apply_d6_response( array $response, array $batch_rows, array &$stats ): void {
+	private function apply_d6_response( array $response, array $batch_rows, array $objects, array &$stats ): void {
 		$errors = ( isset( $response['errors'] ) && is_array( $response['errors'] ) ) ? $response['errors'] : array();
 
 		$failed_index = array();
@@ -176,10 +183,9 @@ abstract class AbstractD6Flusher {
 				continue;
 			}
 			$failed_index[ $index ] = true;
-			$this->queue->mark_failed(
-				(int) ( $batch_rows[ $index ]['id'] ?? 0 ),
-				$this->item_error_message( $error )
-			);
+			$id                     = (int) ( $batch_rows[ $index ]['id'] ?? 0 );
+			$this->queue->mark_failed( $id, $this->item_error_message( $error ) );
+			$this->queue->store_exchange( $id, $this->trim_json( $objects[ $index ] ?? null ), $this->response_json( 200, 'rejected', $error ) );
 			++$stats['failed'];
 		}
 
@@ -187,7 +193,9 @@ abstract class AbstractD6Flusher {
 			if ( isset( $failed_index[ $index ] ) ) {
 				continue;
 			}
-			$this->queue->mark_sent( (int) ( $row['id'] ?? 0 ) );
+			$id = (int) ( $row['id'] ?? 0 );
+			$this->queue->mark_sent( $id );
+			$this->queue->store_exchange( $id, $this->trim_json( $objects[ $index ] ?? null ), $this->response_json( 200, 'accepted' ) );
 			++$stats['sent'];
 		}
 
@@ -234,21 +242,36 @@ abstract class AbstractD6Flusher {
 
 	/**
 	 * @param array<string, mixed>                                            $row
+	 * @param array<string, mixed>                                            $object The wire object this row sent.
 	 * @param array{processed:int,sent:int,failed:int,retried:int,skipped:int} $stats
 	 */
-	private function handle_failure( array $row, ApiException $e, bool $terminal, array &$stats ): void {
+	private function handle_failure( array $row, array $object, ApiException $e, bool $terminal, array &$stats ): void {
 		$id       = (int) ( $row['id'] ?? 0 );
 		$attempts = (int) ( $row['attempts'] ?? 0 );
 		$max      = (int) ( $row['max_attempts'] ?? IngestQueue::DEFAULT_MAX_ATTEMPTS );
 		$message  = sprintf( 'http_%d %s', $e->getCode(), $e->error_code() );
 
+		$sent     = $this->trim_json( $object );
+		$response = $this->trim_text(
+			(string) wp_json_encode(
+				array(
+					'http'       => $e->getCode(),
+					'outcome'    => 'http_error',
+					'error_code' => $e->error_code(),
+					'message'    => $e->getMessage(),
+				)
+			)
+		);
+
 		if ( $terminal || $attempts + 1 >= $max ) {
 			$this->queue->mark_failed( $id, $message );
+			$this->queue->store_exchange( $id, $sent, $response );
 			++$stats['failed'];
 			return;
 		}
 
 		$this->queue->record_attempt( $id, $message, $this->backoff_seconds( $attempts + 1 ) );
+		$this->queue->store_exchange( $id, $sent, $response );
 		++$stats['retried'];
 	}
 
@@ -260,5 +283,56 @@ abstract class AbstractD6Flusher {
 	private function backoff_seconds( int $attempt ): int {
 		$index = max( 0, min( $attempt - 1, count( self::RETRY_BACKOFF ) - 1 ) );
 		return self::RETRY_BACKOFF[ $index ];
+	}
+
+	/**
+	 * JSON-encode + cap a value for the stored `sent_payload` (F3-44). Returns
+	 * '' for null / unencodable so the column stores an empty string, not a
+	 * literal "null".
+	 *
+	 * @param mixed $value
+	 */
+	private function trim_json( $value ): string {
+		if ( $value === null ) {
+			return '';
+		}
+		$json = wp_json_encode( $value );
+		return is_string( $json ) ? $this->trim_text( $json ) : '';
+	}
+
+	/** Cap a string at EXCHANGE_MAX chars, flagging the truncation. */
+	private function trim_text( string $text ): string {
+		return strlen( $text ) <= self::EXCHANGE_MAX
+			? $text
+			: substr( $text, 0, self::EXCHANGE_MAX ) . '…[truncated]';
+	}
+
+	/** `last_response` for a terminal-skip row — nothing was POSTed. */
+	private function skip_response(): string {
+		return (string) wp_json_encode(
+			array(
+				'outcome' => 'skipped',
+				'note'    => 'row not in a sendable state (entity gone, no longer a confirmed sale, or no product lines) — nothing was POSTed',
+			)
+		);
+	}
+
+	/**
+	 * `last_response` JSON for a per-item D6 outcome (accepted / rejected).
+	 *
+	 * @param array<string, mixed>|null $error D6 errors[] entry for a rejected row.
+	 */
+	private function response_json( int $http, string $outcome, ?array $error = null ): string {
+		$payload = array(
+			'http'    => $http,
+			'outcome' => $outcome,
+		);
+		if ( $error !== null ) {
+			$payload['error'] = array(
+				'field'   => isset( $error['field'] ) ? (string) $error['field'] : '',
+				'message' => isset( $error['message'] ) ? (string) $error['message'] : '',
+			);
+		}
+		return $this->trim_text( (string) wp_json_encode( $payload ) );
 	}
 }

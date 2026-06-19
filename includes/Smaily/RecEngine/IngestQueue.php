@@ -247,6 +247,29 @@ class IngestQueue {
 	}
 
 	/**
+	 * Persist the send-time exchange for a row: the exact request body POSTed
+	 * (`sent_payload`, null when nothing was sent — e.g. a terminal skip) and a
+	 * small JSON summary of the engine reply (`last_response`). Written by the
+	 * flusher when a row reaches a terminal/retry state so the Event Log
+	 * "Details" can show what we sent and what came back (F3-44). NEVER carries
+	 * the Authorization header. Separate from mark_*() so those signatures (and
+	 * the test doubles overriding them) stay unchanged.
+	 */
+	public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {
+		global $wpdb;
+		$wpdb->update(
+			$this->table_name(),
+			array(
+				'sent_payload'  => $sent_payload,
+				'last_response' => $last_response,
+			),
+			array( 'id' => $id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
 	 * Revive terminally-`failed` rows back to `pending` so the recurring flushers
 	 * re-attempt them (3.10.1, the recovery half of the Event Log). Resets the
 	 * attempt counter + clears the retry-park + last_error so the row starts

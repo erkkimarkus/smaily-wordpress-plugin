@@ -50,11 +50,23 @@ final class Flusher {
 
 	public const DEFAULT_BATCH_SIZE = 50;
 
+	/** Cap (chars) on each stored exchange field so the queue stays bounded (F3-44). */
+	private const EXCHANGE_MAX = 10000;
+
 	private EventQueue $queue;
 	private AutomationRouter $router;
 
 	/** @var callable(string $account_key): Client */
 	private $client_factory;
+
+	/**
+	 * The HTTP exchange (request + reply) of the event currently being
+	 * dispatched, captured even when the call throws (try/finally), for the
+	 * Event Log (F3-44). Null when nothing was POSTed.
+	 *
+	 * @var array<string, mixed>|null
+	 */
+	private ?array $current_exchange = null;
 
 	/**
 	 * @param callable(string $account_key): Client $client_factory
@@ -84,6 +96,9 @@ final class Flusher {
 			$id   = (int) ( $event['id'] ?? 0 );
 			$type = (string) ( $event['event_type'] ?? '' );
 
+			// Reset so the stored exchange reflects THIS event (F3-44).
+			$this->current_exchange = null;
+
 			try {
 				$payload = $this->decode_payload( (string) ( $event['payload'] ?? '' ) );
 				$this->dispatch( $type, $payload );
@@ -97,6 +112,10 @@ final class Flusher {
 				$this->queue->record_attempt( $id, $e->getMessage() );
 				++$stats['retried'];
 			}
+
+			// Record what was actually sent + the reply, whatever the outcome —
+			// the dispatch captured it (try/finally) even when the call threw (F3-44).
+			$this->record_exchange( $id );
 		}
 
 		return $stats;
@@ -150,7 +169,13 @@ final class Flusher {
 	private function dispatch_contact_sync( string $email, array $fields ): void {
 		$row    = array_merge( array( 'email' => $email ), $fields );
 		$client = ( $this->client_factory )( 'default' );
-		$client->upsert_subscribers( array( $row ) );
+		try {
+			$client->upsert_subscribers( array( $row ) );
+		} finally {
+			// Capture even when upsert throws — the Client records the exchange
+			// before throwing (F3-44).
+			$this->current_exchange = $client->last_exchange();
+		}
 	}
 
 	/**
@@ -168,7 +193,13 @@ final class Flusher {
 		// Either return path is acceptable for us — the false case still
 		// has mark_sent semantics, which is what flush() does after
 		// dispatch() returns without throwing.
-		$this->router->trigger_automation( $trigger, $contact_data, $fields );
+		try {
+			$this->router->trigger_automation( $trigger, $contact_data, $fields );
+		} finally {
+			// null when the router short-circuited before any request (no
+			// workflow) — record_exchange() then stores a skip marker (F3-44).
+			$this->current_exchange = $this->router->last_exchange();
+		}
 	}
 
 	/**
@@ -188,5 +219,46 @@ final class Flusher {
 		}
 
 		return $decoded;
+	}
+
+	/**
+	 * Persist the just-dispatched row's exchange (F3-44): the request body +
+	 * Smaily reply captured in $current_exchange, or a "skipped" marker when
+	 * nothing was POSTed (missing email, no workflow mapped, or a decode failure).
+	 */
+	private function record_exchange( int $id ): void {
+		if ( $this->current_exchange === null ) {
+			$this->queue->store_exchange(
+				$id,
+				null,
+				(string) wp_json_encode(
+					array(
+						'outcome' => 'skipped',
+						'note'    => 'no API call (missing email, no workflow mapped, or payload decode failure) — nothing was sent',
+					)
+				)
+			);
+			return;
+		}
+
+		$request  = $this->current_exchange['request'] ?? null;
+		$response = $this->current_exchange['response'] ?? null;
+		$this->queue->store_exchange( $id, $this->trim_json( $request ), $this->trim_json( $response ) );
+	}
+
+	/**
+	 * JSON-encode + cap a value for an exchange column. '' for null / unencodable.
+	 *
+	 * @param mixed $value
+	 */
+	private function trim_json( $value ): string {
+		if ( $value === null ) {
+			return '';
+		}
+		$json = wp_json_encode( $value );
+		if ( ! is_string( $json ) ) {
+			return '';
+		}
+		return strlen( $json ) <= self::EXCHANGE_MAX ? $json : substr( $json, 0, self::EXCHANGE_MAX ) . '…[truncated]';
 	}
 }
