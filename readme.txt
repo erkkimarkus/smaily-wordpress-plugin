@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.8
+Stable tag: 2.1.0-beta.9
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 2.1.0-beta.9 =
+
+* Fixed: orders that previously never reached Campaign Intelligence are now sent. (1) Orders in a custom WooCommerce status — for example a shipping plugin's "label printed" or "shipped" — are now treated as sales instead of being silently skipped. (2) An order that contains a product you later deleted is no longer dropped: the line is kept from the order's saved details so the whole order still reaches the engine (that one deleted item just won't drive product-level recommendations). On-hold orders are not counted as a sale until payment is captured — they're sent once they move to processing or completed. After updating, re-run the order import (Campaign Intelligence → Import existing data → Orders) to pick up orders that were skipped before.
+* Fixed: the "Settings" link under Smaily Connect on the Plugins page now opens the current plugin screen instead of the old module's settings page.
 
 = 2.1.0-beta.8 =
 
@@ -219,6 +224,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 2.1.0-beta.9 =
+Recommended update: fixes orders that silently never reached Campaign Intelligence — orders in custom WooCommerce statuses (e.g. "label printed"/"shipped") and orders containing a since-deleted product are now sent. Re-run the order import after updating (Campaign Intelligence → Import existing data → Orders) to backfill orders that were skipped before.
 
 = 2.1.0-beta.8 =
 Recommended update if you use Campaign Intelligence browse tracking: the storefront tracking script and its endpoint were renamed so common ad/tracking blockers no longer block them by name, so browse events are recorded for more visitors. No settings change; consent rules are unchanged.
