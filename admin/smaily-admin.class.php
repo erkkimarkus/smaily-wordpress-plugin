@@ -382,8 +382,14 @@ class Admin {
 	 * @return array Updated array of links
 	 */
 	public function settings_link( $links ) {
-		// receive all current links and add custom link to the list.
-		$settings_link = '<a href="admin.php?page=' . esc_attr( $this->plugin_name ) . '">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>';
+		// Point at the NEW plugin's Settings page (slug `smaily-connect-settings`,
+		// registered in admin/wizard.php), NOT the legacy `$this->plugin_name`
+		// slug ('smaily-connect') — that legacy menu is hidden but its page route
+		// still renders the OLD settings view, which is why "Settings" from the
+		// Plugins list opened the legacy module. The new Settings page itself
+		// self-redirects to the setup wizard when setup isn't completed
+		// (wizard-first gate), so this link is correct in both states.
+		$settings_link = '<a href="admin.php?page=smaily-connect-settings">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>';
 		// Settings before disable.
 		array_unshift( $links, $settings_link );
 		return $links;

@@ -31,7 +31,10 @@ _Last updated: 2026-06-19 (**F3-40 trash fix now live-walked 7/7 against the san
 (`delete=1 upsert=0`), the engine ACCEPTS `in_stock=false`, untrash → `in_stock=true`
 accepted, backfill trashed → delete accepted. Closes the mock-only gap F3-40 shipped
 with, and confirms the 2026-06-18 pilot log errors were pre-existing orphan rows
-cleared on retry, not a bug in the fix. ci:strict exit=0 (unit 359, JS 158). Prior:
+cleared on retry, not a bug in the fix. ci:strict exit=0 (unit 359, JS 158). Also:
+the Plugins-list **"Settings" link repointed from the legacy view to the new UI**
+(`smaily-connect-settings`; Task 2 Faas 1) — the legacy view-layer teardown is a
+separate pending sub-PR. Prior:
 **Browse beacon renamed off "beacon" → `/relay` +
 `sc-runtime.js` (F3-41)** — engine-team brief Teema 3: zero real browse events. After
 the two-gate config was fixed (toggle on + CookieYes marketing consent), Erkki found
@@ -721,6 +724,25 @@ already sends ISO 639-1 from `get_user_locale()`.
   cleared on retry**, not a wire-shape bug in the fix (the happy path is engine-clean).
   (Not live-covered, by design: the `is_removable` skip of a category-less trashed
   product — WC auto-assigns "Uncategorized", fragile live — is unit-tested.)
+
+### Done — Settings plugin-link opens the new UI, not the legacy view (Task 2 Faas 1, 2026-06-19)
+
+- Pilot-reported bug: the "Settings" action link on the Plugins list opened the
+  OLD module's setup view. Root cause: legacy `Smaily_Connect\Admin`
+  (`admin/smaily-admin.class.php:386`) linked to `admin.php?page=smaily-connect`
+  (its `$this->plugin_name` slug). That legacy menu is hidden (`remove_menu_page`,
+  `Bootstrap.php:232`) but its page ROUTE still renders the legacy settings view.
+  Fix: repoint to `admin.php?page=smaily-connect-settings` (the new Settings page,
+  `admin/wizard.php`), which self-redirects to the wizard when
+  `smly_plus_setup_completed` is false (wizard-first gate) — correct in both
+  states. PHPCS exit=0; ci:strict exit=0 (unit 359, JS 158).
+- **Faas 1 of the legacy cleanup.** Faas 2 — removing the legacy admin VIEW layer
+  (`smaily-admin*.class.php`, `admin/partials/*`, `admin/css|js/smaily-admin.*`,
+  the `new Admin()` at `includes/smaily.class.php:269` + its requires, and the
+  then-dead hide-legacy-menu shim) — is a SEPARATE sub-PR, pending a per-file
+  dependency audit + go-ahead. KEEP (live non-view dependents): `Cypher`,
+  `Options`, `Rss`, `Cart`, `Subscriber_Synchronization` / `Cron` /
+  `Data_Handler` / `Profile_Settings`, CF7 / Elementor admin.
 
 ### Done — engine ask #1: attribute term labels (2026-06-12 late)
 
