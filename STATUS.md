@@ -26,7 +26,13 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-17 (**Browse beacon renamed off "beacon" → `/relay` +
+_Last updated: 2026-06-19 (**F3-40 trash fix now live-walked 7/7 against the sandbox**
+(`bin/walk-f3-40-trash.cjs`) — trash → `catalog.delete` with the clobber guard live
+(`delete=1 upsert=0`), the engine ACCEPTS `in_stock=false`, untrash → `in_stock=true`
+accepted, backfill trashed → delete accepted. Closes the mock-only gap F3-40 shipped
+with, and confirms the 2026-06-18 pilot log errors were pre-existing orphan rows
+cleared on retry, not a bug in the fix. ci:strict exit=0 (unit 359, JS 158). Prior:
+**Browse beacon renamed off "beacon" → `/relay` +
 `sc-runtime.js` (F3-41)** — engine-team brief Teema 3: zero real browse events. After
 the two-gate config was fixed (toggle on + CookieYes marketing consent), Erkki found
 the storefront POST only succeeded with the **ad-blocker off** — the word "beacon" is
@@ -703,6 +709,18 @@ already sends ISO 639-1 from `get_user_locale()`.
   pilot needs a catalog re-backfill after install.
   (Brief Teema 1 = client fixes order statuses WC-side, no plugin change; Teema 3
   browse = pilot config now corrected, watching engine traffic.)
+  **Live-walk 7/7 (2026-06-19, `bin/walk-f3-40-trash.cjs`, sandbox)** — closes the
+  mock-only gap F3-40 shipped with (it had only ci:strict + mock-integration; per
+  CLAUDE.md a catalog wire-shape change isn't done until live-walked). Proven against
+  the real engine through the real code: trash → exactly one `catalog.delete` and NO
+  upsert (the clobber guard live: `delete=1 upsert=0`), the engine **ACCEPTS
+  `in_stock=false`** (`processed=1 errors=[]`); untrash → `catalog.upsert`, engine
+  accepts `in_stock=true`; the backfill's trashed-product branch
+  (`enqueue_record` → `enqueue_unavailable`) → `catalog.delete` the engine accepts.
+  This also confirms the 2026-06-18 pilot log errors were **pre-existing orphan rows
+  cleared on retry**, not a wire-shape bug in the fix (the happy path is engine-clean).
+  (Not live-covered, by design: the `is_removable` skip of a category-less trashed
+  product — WC auto-assigns "Uncategorized", fragile live — is unit-tested.)
 
 ### Done — engine ask #1: attribute term labels (2026-06-12 late)
 
