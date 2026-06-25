@@ -1,5 +1,7 @@
 import { type LabelHTMLAttributes, type ReactNode } from 'react';
 
+import { __ } from '@admin/lib/i18n';
+
 import { cn } from '../../utils/cn';
 
 export interface LabelProps extends LabelHTMLAttributes<HTMLLabelElement> {
@@ -41,7 +43,7 @@ export function Label({
         </span>
       )}
       {optional && (
-        <span className="ml-1 text-xs font-normal text-text-tertiary">(optional)</span>
+        <span className="ml-1 text-xs font-normal text-text-tertiary">{__( '(optional)', 'smaily-connect' )}</span>
       )}
     </label>
   );

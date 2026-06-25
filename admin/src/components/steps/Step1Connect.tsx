@@ -1,5 +1,6 @@
 import { useCallback, type Dispatch } from 'react';
 
+import { __, sprintf } from '@admin/lib/i18n';
 import {
   emptyCredentials,
   idleAsync,
@@ -68,14 +69,16 @@ export function Step1Connect({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
-            Step 1 of 6
+            { __( 'Step 1 of 6', 'smaily-connect' ) }
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-text-primary">
-            Connect your Smaily account
+            { __( 'Connect your Smaily account', 'smaily-connect' ) }
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Enter the credentials from your Smaily admin → Settings → API. We&apos;ll verify them
-            before saving — nothing is persisted until you click Continue.
+            { __(
+              'Enter the credentials from your Smaily admin → Settings → API. We\'ll verify them before saving — nothing is persisted until you click Continue.',
+              'smaily-connect',
+            ) }
           </p>
         </div>
       )}
@@ -96,7 +99,7 @@ export function Step1Connect({
           one default Smaily account, so this block stays for them. */}
       {!isModeA && (
         <CredentialBlock
-          title="Smaily API credentials"
+          title={ __( 'Smaily API credentials', 'smaily-connect' ) }
           credentials={state.smailyCredentials}
           connection={state.smailyConnection}
           onCredentialsChange={onDefaultCredentialsChange}
@@ -119,8 +122,11 @@ export function Step1Connect({
           ))}
 
           <Card
-            title="Default fallback account"
-            description="Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
+            title={ __( 'Default fallback account', 'smaily-connect' ) }
+            description={ __(
+              "Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale).",
+              'smaily-connect',
+            ) }
           >
             <FallbackPicker state={state} dispatch={dispatch} />
           </Card>
@@ -149,8 +155,16 @@ function PerLanguageBlock({
 
   return (
     <CredentialBlock
-      title={`Account for ${humaniseLocale(language)}`}
-      description={`Contacts with the ${humaniseLocale(language)} locale will sync to this Smaily account.`}
+      title={sprintf(
+        // translators: %s is a locale code, e.g. en-US.
+        __( 'Account for %s', 'smaily-connect' ),
+        humaniseLocale(language),
+      )}
+      description={sprintf(
+        // translators: %s is a locale code, e.g. en-US.
+        __( 'Contacts with the %s locale will sync to this Smaily account.', 'smaily-connect' ),
+        humaniseLocale(language),
+      )}
       credentials={credentials}
       connection={connection}
       onCredentialsChange={(payload) => {

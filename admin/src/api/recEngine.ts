@@ -1,3 +1,5 @@
+import { __ } from '@admin/lib/i18n';
+
 import { apiRequest, ApiError } from './client';
 
 /**
@@ -62,7 +64,7 @@ export async function setupExchange(
     return {
       connected: false,
       error: 'engine_unreachable',
-      message: err instanceof Error ? err.message : 'Network error',
+      message: err instanceof Error ? err.message : __( 'Network error', 'smaily-connect' ),
     };
   }
 }
@@ -97,7 +99,7 @@ export async function pingEngine(signal?: AbortSignal): Promise<PingResponse> {
     return {
       ok: false,
       error: 'network_error',
-      message: err instanceof Error ? err.message : 'Network error',
+      message: err instanceof Error ? err.message : __( 'Network error', 'smaily-connect' ),
     };
   }
 }

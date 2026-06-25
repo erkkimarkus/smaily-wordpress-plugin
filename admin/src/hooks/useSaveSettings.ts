@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
+import { __ } from '@admin/lib/i18n';
+
 import { ApiError } from '../api/client';
 import {
   saveSettings,
@@ -104,7 +106,7 @@ export function useSaveSettings(options: UseSaveSettingsOptions = {}): UseSaveSe
       }
 
       setStatus('error');
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      const message = err instanceof Error ? err.message : __( 'Unknown error', 'smaily-connect' );
       setError(message);
       onErrorRef.current?.(message, request);
     }
@@ -123,7 +125,7 @@ export function useSaveSettings(options: UseSaveSettingsOptions = {}): UseSaveSe
 
 function formatErrors(errors: SaveSettingsResponse['errors']): string {
   if (errors.length === 0) {
-    return 'Save failed.';
+    return __( 'Save failed.', 'smaily-connect' );
   }
   return errors.map((e) => `${e.field}: ${e.message}`).join('; ');
 }

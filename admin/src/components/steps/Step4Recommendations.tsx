@@ -9,6 +9,7 @@ import {
 import { type WizardAction, type WizardState } from '../../state/types';
 import { Banner, Button, Card, Input, Label, Toggle } from '../primitives';
 import { BackfillPanel } from '../BackfillPanel';
+import { __, sprintf } from '@admin/lib/i18n';
 
 export interface Step4RecommendationsProps {
   state: WizardState;
@@ -48,15 +49,16 @@ export function Step4Recommendations({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
-            Step 4 of 6
+            {__('Step 4 of 6', 'smaily-connect')}
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-text-primary">
-            Campaign Intelligence
+            {__('Campaign Intelligence', 'smaily-connect')}
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Sync product, customer, and order data to Smaily Campaign Intelligence for
-            personalised product recommendations in your campaigns. Optional — you can come back
-            and set this up later.
+            {__(
+              'Sync product, customer, and order data to Smaily Campaign Intelligence for personalised product recommendations in your campaigns. Optional — you can come back and set this up later.',
+              'smaily-connect',
+            )}
           </p>
         </div>
       )}
@@ -110,17 +112,16 @@ function SetupCard({
   };
 
   return (
-    <Card title="Connect Smaily Campaign Intelligence">
+    <Card title={__('Connect Smaily Campaign Intelligence', 'smaily-connect')}>
       <p className="text-sm text-text-secondary">
-        Paste the setup URL from your Smaily admin → Recommendations. The link looks like{' '}
-        <span className="font-mono text-xs">https://&lt;host&gt;/setup/&lt;token&gt;</span> and is
-        single-use — once accepted, the engine generates a long-lived API key the plugin stores
-        encrypted on this site.
+        {__('Paste the setup URL from your Smaily admin → Recommendations. The link looks like', 'smaily-connect')}{' '}
+        <span className="font-mono text-xs">https://&lt;host&gt;/setup/&lt;token&gt;</span>{' '}
+        {__('and is single-use — once accepted, the engine generates a long-lived API key the plugin stores encrypted on this site.', 'smaily-connect')}
       </p>
 
       <div className="mt-4 space-y-2">
         <Label htmlFor="rec-engine-setup-url" required>
-          Setup URL
+          {__('Setup URL', 'smaily-connect')}
         </Label>
         <Input
           id="rec-engine-setup-url"
@@ -145,7 +146,7 @@ function SetupCard({
           loading={status === 'pending'}
           disabled={setupUrl.trim() === ''}
         >
-          Connect
+          {__('Connect', 'smaily-connect')}
         </Button>
       </div>
 
@@ -161,7 +162,7 @@ function SetupCard({
                 rel="noopener noreferrer"
                 className="underline"
               >
-                Regenerate the link
+                {__('Regenerate the link', 'smaily-connect')}
               </a>
               .
             </>
@@ -183,8 +184,8 @@ function ConnectedView({
 
   const tenantName =
     state.recEngineConnection.kind === 'success'
-      ? state.recEngineConnection.message ?? 'Smaily Campaign Intelligence'
-      : 'Smaily Campaign Intelligence';
+      ? state.recEngineConnection.message ?? __('Smaily Campaign Intelligence', 'smaily-connect')
+      : __('Smaily Campaign Intelligence', 'smaily-connect');
 
   const [pingStatus, setPingStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [pingMessage, setPingMessage] = useState<string>('');
@@ -196,7 +197,12 @@ function ConnectedView({
     if (result.ok) {
       setPingStatus('success');
       setPingMessage(
-        `Engine v${result.engineVersion} responded — tenant status: ${result.tenantStatus || 'active'}.`,
+        sprintf(
+          /* translators: 1: engine version, 2: tenant status. */
+          __('Engine v%1$s responded — tenant status: %2$s.', 'smaily-connect'),
+          result.engineVersion,
+          result.tenantStatus || __('active', 'smaily-connect'),
+        ),
       );
     } else {
       setPingStatus('error');
@@ -206,7 +212,10 @@ function ConnectedView({
 
   const handleDisconnect = async (): Promise<void> => {
     const confirmed = window.confirm(
-      'Disconnect Smaily Campaign Intelligence? The plugin will stop syncing data; existing campaigns on the engine side continue to work until you remove them there.',
+      __(
+        'Disconnect Smaily Campaign Intelligence? The plugin will stop syncing data; existing campaigns on the engine side continue to work until you remove them there.',
+        'smaily-connect',
+      ),
     );
     if (!confirmed) {
       return;
@@ -214,7 +223,7 @@ function ConnectedView({
     await disconnectEngine();
     dispatch({
       type: 'TEST_REC_ENGINE_CONNECTION_FAILURE',
-      payload: { error: 'Disconnected.' },
+      payload: { error: __('Disconnected.', 'smaily-connect') },
     });
     // FAILURE reset is the cleanest existing action; the UI immediately
     // collapses to the SetupCard since recEngineConnection.kind !== 'success'.
@@ -231,10 +240,11 @@ function ConnectedView({
 
   return (
     <>
-      <Card title="Engine connection">
+      <Card title={__('Engine connection', 'smaily-connect')}>
         <div className="flex items-center justify-between gap-4">
           <Banner tone="success" className="flex-1">
-            <span className="font-medium">✓ Connected</span> as{' '}
+            <span className="font-medium">✓ {__('Connected', 'smaily-connect')}</span>{' '}
+            {__('as', 'smaily-connect')}{' '}
             <span className="font-mono">{tenantName}</span>
           </Banner>
           <div className="flex shrink-0 gap-2">
@@ -244,10 +254,10 @@ function ConnectedView({
               onClick={() => void handlePing()}
               loading={pingStatus === 'pending'}
             >
-              Test connection
+              {__('Test connection', 'smaily-connect')}
             </Button>
             <Button variant="ghost" type="button" onClick={() => void handleDisconnect()}>
-              Disconnect
+              {__('Disconnect', 'smaily-connect')}
             </Button>
           </div>
         </div>
@@ -262,61 +272,86 @@ function ConnectedView({
       </Card>
 
       <Card
-        title="Data synchronisation"
-        description="While connected, the engine learns from your joined order, customer, and product data — all three sync automatically."
+        title={__('Data synchronisation', 'smaily-connect')}
+        description={__(
+          'While connected, the engine learns from your joined order, customer, and product data — all three sync automatically.',
+          'smaily-connect',
+        )}
       >
         <p className="text-sm text-text-secondary">
-          Syncing starts as soon as you connect and runs in the background — there&apos;s
-          nothing to switch on per data type. Use <span className="font-medium">Import
-          existing data</span> below to seed history into the engine; future changes sync on
-          their own. Browsing telemetry is the one exception — it&apos;s opt-in and configured
-          separately below.
+          {__(
+            "Syncing starts as soon as you connect and runs in the background — there's nothing to switch on per data type. Use",
+            'smaily-connect',
+          )}{' '}
+          <span className="font-medium">{__('Import existing data', 'smaily-connect')}</span>{' '}
+          {__(
+            "below to seed history into the engine; future changes sync on their own. Browsing telemetry is the one exception — it's opt-in and configured separately below.",
+            'smaily-connect',
+          )}
         </p>
       </Card>
 
       <Card
-        title="Import existing data"
-        description="The toggles above sync future changes. Import your existing catalog, customers, and orders into the engine once so recommendations have history to learn from. Runs in the background in batches."
+        title={__('Import existing data', 'smaily-connect')}
+        description={__(
+          'The toggles above sync future changes. Import your existing catalog, customers, and orders into the engine once so recommendations have history to learn from. Runs in the background in batches.',
+          'smaily-connect',
+        )}
       >
         <div className="space-y-3">
           <BackfillPanel
             jobType="products"
-            label="Products"
+            label={__('Products', 'smaily-connect')}
             recordCount={state.env.storeTotals.products}
             countNote={
               state.env.detectedLanguages.length > 1
-                ? `Counts one entry per language (${state.env.detectedLanguages.length} detected). Translations are merged into a single product during import, so the synced total will be lower.`
+                ? sprintf(
+                    /* translators: %d: number of detected languages. */
+                    __(
+                      'Counts one entry per language (%d detected). Translations are merged into a single product during import, so the synced total will be lower.',
+                      'smaily-connect',
+                    ),
+                    state.env.detectedLanguages.length,
+                  )
                 : undefined
             }
           />
           <BackfillPanel
             jobType="customers"
-            label="Customers"
+            label={__('Customers', 'smaily-connect')}
             recordCount={state.env.storeTotals.customers}
           />
           <BackfillPanel
             jobType="orders"
-            label="Orders"
+            label={__('Orders', 'smaily-connect')}
             recordCount={state.env.storeTotals.orders}
           />
         </div>
       </Card>
 
       <Card
-        title="Browsing telemetry"
-        description="Tracks product / category views to power 'similar products' recommendations."
+        title={__('Browsing telemetry', 'smaily-connect')}
+        description={__(
+          "Tracks product / category views to power 'similar products' recommendations.",
+          'smaily-connect',
+        )}
       >
         <Toggle
           name="rec-track-browsing"
           checked={state.recEngineFeatures.trackBrowsing}
           onChange={toggle('trackBrowsing')}
-          label="Track browsing behaviour"
-          description="Requires marketing consent (WP Consent API / Cookiebot / Complianz / CookieYes)."
+          label={__('Track browsing behaviour', 'smaily-connect')}
+          description={__(
+            'Requires marketing consent (WP Consent API / Cookiebot / Complianz / CookieYes).',
+            'smaily-connect',
+          )}
         />
         {state.recEngineFeatures.trackBrowsing && (
           <Banner tone="warning" className="mt-4">
-            Browsing telemetry only fires when the visitor has granted marketing consent. If your
-            site doesn&apos;t have a consent banner installed, the beacon won&apos;t collect events.
+            {__(
+              "Browsing telemetry only fires when the visitor has granted marketing consent. If your site doesn't have a consent banner installed, the beacon won't collect events.",
+              'smaily-connect',
+            )}
           </Banner>
         )}
       </Card>
@@ -327,13 +362,13 @@ function ConnectedView({
 function errorTitle(failure: SetupExchangeFailure): string {
   switch (failure.error) {
     case 'invalid_setup_url':
-      return 'Setup URL not recognised';
+      return __('Setup URL not recognised', 'smaily-connect');
     case 'token_expired_or_used':
-      return 'Setup link already used';
+      return __('Setup link already used', 'smaily-connect');
     case 'token_not_found':
-      return 'Setup link not found';
+      return __('Setup link not found', 'smaily-connect');
     case 'engine_unreachable':
     default:
-      return 'Engine unreachable';
+      return __('Engine unreachable', 'smaily-connect');
   }
 }

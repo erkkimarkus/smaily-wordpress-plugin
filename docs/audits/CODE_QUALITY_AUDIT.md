@@ -133,8 +133,9 @@ code sends (`readme.txt` `== External services ==`); no `var_dump`/`print_r`/
 8. Housekeeping: remove the ~25 stray `smaily-connect-*.zip` from the repo root (gitignored cruft).
 
 **At upstream merge (separate effort):**
-- **W-3** — remove the `Update URI` header (not allowed on wordpress.org).
-- **W-5 / W-7** — inline-script → enqueue; React i18n (reviewer-expected for a hosted plugin).
+- **W-3** — remove the `Update URI` header (not allowed on wordpress.org). Still pending — it is the fork's clobber-guard, removed only at the actual submission.
+- ~~**W-5**~~ — **DONE (2026-06-25):** the admin-notice dismiss moved from an inline `<script>` to an enqueued `admin/js/notice-dismiss.js` (E2E-verified).
+- ~~**W-7**~~ — **DONE (2026-06-25):** the React admin UI is fully internationalized (~244 strings / 24 files wrapped with a `wp.i18n` shim; `wp_set_script_translations` wired; reproducible `bin/build-i18n.sh`; Playwright-verified Estonian render). Full ET translation of the `.po` is the remaining content task.
 - Reconcile with upstream #119 (it already added ABSPATH guards to its copies of
   the shared legacy files) and #120/#128/#132 — see `UPSTREAM_COMPARISON.md`.
 

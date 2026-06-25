@@ -2,6 +2,7 @@ import type React from 'react';
 import { type BackfillJobType } from '../api/backfill';
 import { useBackfillProgress } from '../hooks/useBackfillProgress';
 import { Button, ProgressBar } from './primitives';
+import { __, _n, sprintf } from '@admin/lib/i18n';
 
 interface BackfillPanelProps {
   /** Rec-engine domain to backfill: 'products' | 'customers' | 'orders'. */
@@ -57,8 +58,17 @@ export function BackfillPanel({
           <p className="text-sm font-medium text-text-primary">{label}</p>
           <p className="mt-0.5 text-xs text-text-tertiary">
             {recordCount > 0
-              ? `${recordCount} ${noun} to import into the engine.`
-              : `No ${noun} to import.`}
+              ? sprintf(
+                  /* translators: 1: record count, 2: lowercased domain noun (e.g. products). */
+                  __('%1$d %2$s to import into the engine.', 'smaily-connect'),
+                  recordCount,
+                  noun,
+                )
+              : sprintf(
+                  /* translators: %s: lowercased domain noun (e.g. products). */
+                  __('No %s to import.', 'smaily-connect'),
+                  noun,
+                )}
           </p>
           {countNote && recordCount > 0 && (
             <p className="mt-0.5 text-xs text-text-tertiary">{countNote}</p>
@@ -73,11 +83,11 @@ export function BackfillPanel({
             loading={isRunning && progress.processed === 0}
             type="button"
           >
-            {isRunning ? 'Importing…' : 'Import now'}
+            {isRunning ? __('Importing…', 'smaily-connect') : __('Import now', 'smaily-connect')}
           </Button>
           {isRunning && (
             <Button variant="ghost" size="sm" onClick={() => void cancel()} type="button">
-              Cancel
+              {__('Cancel', 'smaily-connect')}
             </Button>
           )}
         </div>
@@ -88,7 +98,11 @@ export function BackfillPanel({
           <ProgressBar
             percent={progress.percent}
             tone={hasFailed ? 'danger' : isComplete ? 'success' : 'brand'}
-            ariaLabel={`${label} backfill progress`}
+            ariaLabel={sprintf(
+              /* translators: %s: domain label (e.g. Products). */
+              __('%s backfill progress', 'smaily-connect'),
+              label,
+            )}
           />
           <p className="mt-2 text-xs text-text-secondary">
             {/* Show the engine-confirmed `sent` count as an absolute number, NOT
@@ -101,27 +115,65 @@ export function BackfillPanel({
                 `percent` (walked/total, a self-consistent ratio); the count beside
                 it is the honest number of products synced. Per-row failures are
                 listed in the Event Log. */}
-            {isRunning && `Synced ${progress.sent} ${noun} · ${progress.percent}% complete`}
-            {isComplete && `Done — ${progress.sent} ${noun} synced.`}
-            {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
-            {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
+            {isRunning &&
+              sprintf(
+                /* translators: 1: synced count, 2: lowercased domain noun, 3: percent complete. */
+                __('Synced %1$d %2$s · %3$d%% complete', 'smaily-connect'),
+                progress.sent,
+                noun,
+                progress.percent,
+              )}
+            {isComplete &&
+              sprintf(
+                /* translators: 1: synced count, 2: lowercased domain noun. */
+                __('Done — %1$d %2$s synced.', 'smaily-connect'),
+                progress.sent,
+                noun,
+              )}
+            {hasFailed &&
+              (progress.error
+                ? sprintf(
+                    /* translators: %s: error message. */
+                    __('Backfill failed: %s', 'smaily-connect'),
+                    progress.error,
+                  )
+                : __('Backfill failed.', 'smaily-connect'))}
+            {wasCancelled && __('Backfill cancelled. Re-run when ready.', 'smaily-connect')}
           </p>
           {progress.failed > 0 && (isRunning || isComplete) && (
             <p className="mt-1 text-xs text-danger-fg">
-              {progress.failed} {progress.failed === 1 ? 'record' : 'records'} failed to
-              sync — see the Event Log for details.
+              {sprintf(
+                /* translators: %d: number of records that failed to sync. */
+                _n(
+                  '%d record failed to sync — see the Event Log for details.',
+                  '%d records failed to sync — see the Event Log for details.',
+                  progress.failed,
+                  'smaily-connect',
+                ),
+                progress.failed,
+              )}
             </p>
           )}
           {(isComplete || wasCancelled || hasFailed) && progress.completedAt && (
             <p className="mt-1 text-xs text-text-tertiary">
-              Last run finished {formatLastRun(progress.completedAt)}.
+              {sprintf(
+                /* translators: %s: localized date/time of the last run. */
+                __('Last run finished %s.', 'smaily-connect'),
+                formatLastRun(progress.completedAt),
+              )}
             </p>
           )}
         </div>
       )}
 
       {pollError && (
-        <p className="mt-3 text-xs text-danger">Couldn&apos;t check status: {pollError}</p>
+        <p className="mt-3 text-xs text-danger">
+          {sprintf(
+            /* translators: %s: status-check error message. */
+            __("Couldn't check status: %s", 'smaily-connect'),
+            pollError,
+          )}
+        </p>
       )}
     </div>
   );

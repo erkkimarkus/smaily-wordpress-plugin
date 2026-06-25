@@ -1,5 +1,6 @@
 import { type Dispatch } from 'react';
 
+import { __ } from '@admin/lib/i18n';
 import { type WizardAction, type WizardState } from '../../state/types';
 import { Label, NumberInput } from '../primitives';
 import { AutomationSection } from './AutomationSection';
@@ -36,12 +37,14 @@ export function Step3WooCommerce({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
-            Step 3 of 6
+            { __( 'Step 3 of 6', 'smaily-connect' ) }
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">WooCommerce automations</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'WooCommerce automations', 'smaily-connect' ) }</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Map each trigger to a Smaily workflow. Multi-language sites pick a workflow per
-            language; single-language sites pick one workflow per trigger.
+            { __(
+              'Map each trigger to a Smaily workflow. Multi-language sites pick a workflow per language; single-language sites pick one workflow per trigger.',
+              'smaily-connect',
+            ) }
           </p>
         </div>
       )}
@@ -50,8 +53,8 @@ export function Step3WooCommerce({
         state={state}
         dispatch={dispatch}
         trigger="welcome"
-        title="Welcome email"
-        description="Sent when a new contact subscribes (registration, created_customer, subscription-form)."
+        title={ __( 'Welcome email', 'smaily-connect' ) }
+        description={ __( 'Sent when a new contact subscribes (registration, created_customer, subscription-form).', 'smaily-connect' ) }
         isEnabled={state.welcomeEnabled}
         onEnabledChange={(enabled) => dispatch({ type: 'SET_WELCOME_ENABLED', payload: enabled })}
       />
@@ -60,8 +63,8 @@ export function Step3WooCommerce({
         state={state}
         dispatch={dispatch}
         trigger="first_order"
-        title="First-order email"
-        description="Sent the first time a customer completes an order (wc_get_customer_order_count === 1)."
+        title={ __( 'First-order email', 'smaily-connect' ) }
+        description={ __( 'Sent the first time a customer completes an order (wc_get_customer_order_count === 1).', 'smaily-connect' ) }
         isEnabled={state.firstOrderEnabled}
         onEnabledChange={(enabled) =>
           dispatch({ type: 'SET_FIRST_ORDER_ENABLED', payload: enabled })
@@ -72,15 +75,15 @@ export function Step3WooCommerce({
         state={state}
         dispatch={dispatch}
         trigger="abandoned_cart"
-        title="Abandoned-cart reminder"
-        description="Fires when a cart has been idle for the cutoff time. Action Scheduler ticks every 15 minutes."
+        title={ __( 'Abandoned-cart reminder', 'smaily-connect' ) }
+        description={ __( 'Fires when a cart has been idle for the cutoff time. Action Scheduler ticks every 15 minutes.', 'smaily-connect' ) }
         isEnabled={state.abandonedCartEnabled}
         onEnabledChange={(enabled) =>
           dispatch({ type: 'SET_ABANDONED_CART_ENABLED', payload: enabled })
         }
         extras={
           <div className="mt-4">
-            <Label htmlFor="smly-cart-cutoff">Cutoff time</Label>
+            <Label htmlFor="smly-cart-cutoff">{ __( 'Cutoff time', 'smaily-connect' ) }</Label>
             <div className="mt-1 w-40">
               <NumberInput
                 id="smly-cart-cutoff"
@@ -96,7 +99,7 @@ export function Step3WooCommerce({
               />
             </div>
             <p className="mt-1 text-xs text-text-tertiary">
-              Minimum 10 minutes. The cron job evaluates carts older than this.
+              { __( 'Minimum 10 minutes. The cron job evaluates carts older than this.', 'smaily-connect' ) }
             </p>
           </div>
         }

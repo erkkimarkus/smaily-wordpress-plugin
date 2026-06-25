@@ -20,6 +20,7 @@ import {
   type WizardState,
 } from '../../state/types';
 import { wizardReducer } from '../../state/wizard-reducer';
+import { __, sprintf } from '@admin/lib/i18n';
 import { Banner, Button, PillTabs } from '../primitives';
 import {
   Step1Connect,
@@ -42,12 +43,12 @@ export interface SettingsProps {
 }
 
 const TABS: Array<{ value: SettingsTabKey | 'integrations' | 'events'; label: string }> = [
-  { value: 'connection', label: 'Connection' },
-  { value: 'subscribers', label: 'Subscribers' },
-  { value: 'woocommerce', label: 'WooCommerce' },
-  { value: 'recommendations', label: 'Campaign Intelligence' },
-  { value: 'integrations', label: 'Integrations' },
-  { value: 'events', label: 'Event Log' },
+  { value: 'connection', label: __('Connection', 'smaily-connect') },
+  { value: 'subscribers', label: __('Subscribers', 'smaily-connect') },
+  { value: 'woocommerce', label: __('WooCommerce', 'smaily-connect') },
+  { value: 'recommendations', label: __('Campaign Intelligence', 'smaily-connect') },
+  { value: 'integrations', label: __('Integrations', 'smaily-connect') },
+  { value: 'events', label: __('Event Log', 'smaily-connect') },
 ];
 
 type AnyTab = SettingsTabKey | 'integrations' | 'events';
@@ -97,7 +98,15 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
           action.payload !== 'A';
         if (hasAccountsToLose) {
           const confirmed = window.confirm(
-            `Switching to Mode ${action.payload} will discard the ${rawState.perLanguageAccounts.length} per-language credential set(s) you've configured. Continue?`,
+            sprintf(
+              // translators: %1$s is the target mode letter, %2$d is the number of credential sets.
+              __(
+                'Switching to Mode %1$s will discard the %2$d per-language credential set(s) you\'ve configured. Continue?',
+                'smaily-connect',
+              ),
+              action.payload,
+              rawState.perLanguageAccounts.length,
+            ),
           );
           if (!confirmed) {
             return;
@@ -162,7 +171,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
   }, [activeTab, rawState, save]);
 
   const handleDiscard = useCallback((): void => {
-    if (!window.confirm('Discard unsaved changes and reload from the server?')) {
+    if (!window.confirm(__('Discard unsaved changes and reload from the server?', 'smaily-connect'))) {
       return;
     }
     window.location.reload();
@@ -181,9 +190,9 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
       <div className="mx-auto max-w-5xl space-y-6 p-6">
         <header className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Smaily Connect — Settings</h1>
+            <h1 className="text-2xl font-semibold">{__('Smaily Connect — Settings', 'smaily-connect')}</h1>
             <p className="mt-1 text-sm text-text-secondary">
-              Manage your Smaily integration. Each tab saves independently.
+              {__('Manage your Smaily integration. Each tab saves independently.', 'smaily-connect')}
             </p>
           </div>
 
@@ -201,29 +210,32 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
                     ? '•'
                     : undefined,
                 disabled: isLocked,
-                title: isLocked ? 'Connect to Smaily first to unlock this tab.' : undefined,
+                title: isLocked
+                  ? __('Connect to Smaily first to unlock this tab.', 'smaily-connect')
+                  : undefined,
               };
             })}
             value={activeTab}
             onChange={(next) => setActiveTab(next as AnyTab)}
-            ariaLabel="Settings tabs"
+            ariaLabel={__('Settings tabs', 'smaily-connect')}
           />
         </header>
 
         {!isConnected && (
-          <Banner tone="warning" title="Smaily connection required">
-            Subscribers, WooCommerce, and Campaign Intelligence are locked until your
-            Smaily credentials authenticate. Fix the connection on the
-            Connection tab to unlock them.
+          <Banner tone="warning" title={__('Smaily connection required', 'smaily-connect')}>
+            {__(
+              'Subscribers, WooCommerce, and Campaign Intelligence are locked until your Smaily credentials authenticate. Fix the connection on the Connection tab to unlock them.',
+              'smaily-connect',
+            )}
           </Banner>
         )}
         {saveStatus === 'error' && saveError !== null && (
-          <Banner tone="danger" title="Save failed">
+          <Banner tone="danger" title={__('Save failed', 'smaily-connect')}>
             {saveError}
           </Banner>
         )}
         {saveStatus === 'success' && (
-          <Banner tone="success">Settings saved.</Banner>
+          <Banner tone="success">{__('Settings saved.', 'smaily-connect')}</Banner>
         )}
 
         <main>
@@ -260,7 +272,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
               onClick={handleDiscard}
               disabled={!tabIsDirty}
             >
-              Discard changes
+              {__('Discard changes', 'smaily-connect')}
             </Button>
             <Button
               variant="primary"
@@ -269,7 +281,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
               disabled={!tabIsDirty}
               loading={saveStatus === 'pending'}
             >
-              Save changes
+              {__('Save changes', 'smaily-connect')}
             </Button>
           </footer>
         )}

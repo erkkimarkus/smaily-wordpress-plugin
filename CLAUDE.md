@@ -241,6 +241,29 @@ Two findings are intentional and remain until specific milestones: `plugin_updat
 (the `Update URI` clobber-guard, F3-35 — removed at the upstream merge) and, while still
 a beta, `mismatched_plugin_name` (the `(BETA)` Name suffix — dropped at the 3.0 GA bump).
 
+### React admin i18n — rebuild with `bin/build-i18n.sh`, never plain `compile-translations`
+The React admin UI strings are wrapped with a thin `wp.i18n` shim
+(`admin/src/lib/i18n.ts`, called as `__( 'text', 'smaily-connect' )`); the bundle
+reads `window.wp.i18n` at runtime (it does NOT bundle `@wordpress/i18n`), and
+`admin/wizard.php` enqueues the bundle with a `wp-i18n` dependency +
+`wp_set_script_translations`. Two gotchas make the standard `compile-translations`
+WRONG for this, so use **`bin/build-i18n.sh`** (it needs the wp-env container):
+- **`wp i18n make-pot` cannot parse `.tsx`** (the bundled WP-CLI uses a PHP ES parser
+  that chokes on TypeScript → it silently extracts ZERO admin strings). The script
+  first **esbuild-transpiles `admin/src/` → a throwaway `_i18n-src/` of plain JS** so
+  make-pot can see the `__()` calls.
+- **`make-json` hashes its output to its own scheme**, but WordPress loads the
+  script-translation JSON by `md5()` of the script path **relative to the plugin dir**
+  — `dist/admin/admin.js` → `smaily-connect-et-464ceaab21588225a35cae9f83dfa47d.json`.
+  The script builds the combined catalog (via a `--use-map`) and **renames it** to that
+  fixed name. (The hash is stable; the path never changes.)
+- The **committed** i18n source is `languages/smaily-connect.pot` + `…-et.po`. The
+  `*.mo`/`*.json` are gitignored build artifacts (shipped in the ZIP via rsync, NOT
+  git) — `bin/build-i18n.sh` regenerates them from the `.po`. Run it before packaging
+  whenever admin strings or translations changed; the `.po` translations survive
+  (`update-po` preserves `msgstr`). Verify a real render with the Playwright check
+  (set the dev site to a locale, confirm `wp.i18n.__()` returns the translation).
+
 ### Cutting a release ZIP + GH pre-release (the full local sequence)
 `composer run package` ALONE is not a release — it rsync+zips the working tree
 but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,
@@ -258,8 +281,12 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    `dist/public/js/beacon.js`.
 3. `composer run install-block-modules && composer run build` → `blocks/*/build/*`
    (the first installs `blocks/node_modules`; without it `wp-scripts` is missing).
-4. Translations: skip `compile-translations` if no new `__()` strings (host has no
-   wp-cli) — the committed `languages/*.mo`/`*.json` are then current.
+4. Translations: run **`bash bin/build-i18n.sh`** (needs the wp-env container) to
+   rebuild `languages/*.mo` + `*.json` — including the admin-bundle catalog
+   `…-et-464ceaab….json` — from the committed `.po`. The plain `compile-translations`
+   composer script does NOT produce the correct admin-bundle JSON (see the i18n note
+   above). Skip only if no admin strings or `.po` translations changed AND the
+   `*.mo`/`*.json` already on disk are current (they are gitignored, shipped from disk).
 5. `composer install --no-dev --optimize-autoloader` (prod vendor) →
    `composer run package` → `composer install` (restore dev so tests work again).
 6. VERIFY the ZIP before releasing: version string; required present

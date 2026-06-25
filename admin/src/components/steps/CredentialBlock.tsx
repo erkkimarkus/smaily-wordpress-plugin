@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { __, sprintf } from '@admin/lib/i18n';
 import { useTestConnection } from '../../hooks/useTestConnection';
 import { type AsyncStatus, type SmailyCredentials } from '../../state/types';
 import { Banner, Button, Card, Input, Label } from '../primitives';
@@ -74,7 +75,7 @@ export function CredentialBlock({
     } else if (status === 'success' && connection.kind !== 'success') {
       onConnectionSuccess(data?.accountName);
     } else if (status === 'error' && connection.kind !== 'failure') {
-      onConnectionFailure(error ?? 'Connection failed.');
+      onConnectionFailure(error ?? __( 'Connection failed.', 'smaily-connect' ));
     }
   }, [status, data, error, connection.kind, onConnectionStart, onConnectionSuccess, onConnectionFailure]);
 
@@ -105,12 +106,13 @@ export function CredentialBlock({
       <Card title={title} description={description}>
         <div className="flex items-center justify-between gap-4">
           <Banner tone="success" className="flex-1">
-            <span className="font-medium">✓ Connected</span> as{' '}
+            <span className="font-medium">{ __( '✓ Connected', 'smaily-connect' ) }</span>{' '}
+            { __( 'as', 'smaily-connect' ) }{' '}
             <span className="font-mono">{credentials.username}</span> @{' '}
             <span className="font-mono">{credentials.subdomain}.sendsmaily.net</span>
           </Banner>
           <Button variant="ghost" type="button" onClick={handleEditClick}>
-            Edit credentials
+            { __( 'Edit credentials', 'smaily-connect' ) }
           </Button>
         </div>
       </Card>
@@ -122,13 +124,13 @@ export function CredentialBlock({
       <div className="grid gap-4 md:grid-cols-3">
         <div>
           <Label htmlFor={`smaily-subdomain-${idSuffix}`} required>
-            Subdomain
+            { __( 'Subdomain', 'smaily-connect' ) }
           </Label>
           <Input
             id={`smaily-subdomain-${idSuffix}`}
             value={credentials.subdomain}
             onChange={handleField('subdomain')}
-            placeholder="mypetshop"
+            placeholder={ __( 'mypetshop', 'smaily-connect' ) }
             autoComplete="off"
             className="mt-1"
           />
@@ -136,7 +138,7 @@ export function CredentialBlock({
 
         <div>
           <Label htmlFor={`smaily-username-${idSuffix}`} required>
-            API username
+            { __( 'API username', 'smaily-connect' ) }
           </Label>
           <Input
             id={`smaily-username-${idSuffix}`}
@@ -149,7 +151,7 @@ export function CredentialBlock({
 
         <div>
           <Label htmlFor={`smaily-password-${idSuffix}`} required>
-            API password
+            { __( 'API password', 'smaily-connect' ) }
           </Label>
           <Input
             id={`smaily-password-${idSuffix}`}
@@ -170,12 +172,18 @@ export function CredentialBlock({
           loading={status === 'pending'}
           type="button"
         >
-          Test connection
+          { __( 'Test connection', 'smaily-connect' ) }
         </Button>
 
         {connection.kind === 'success' && (
           <Banner tone="success" className="flex-1">
-            {connection.message ? `Connected: ${connection.message}` : 'Connected to Smaily.'}
+            {connection.message
+              ? sprintf(
+                  // translators: %s is the connected Smaily account name.
+                  __( 'Connected: %s', 'smaily-connect' ),
+                  connection.message,
+                )
+              : __( 'Connected to Smaily.', 'smaily-connect' )}
           </Banner>
         )}
         {connection.kind === 'failure' && (

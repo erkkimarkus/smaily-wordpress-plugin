@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { type RssFeedBootData } from '../../state/types';
 import { buildRssFeedUrl } from '../../utils/rss-feed-url';
 import { Button, Card, Input, Label, NumberInput, Select, type SelectOption } from '../primitives';
+import { __ } from '@admin/lib/i18n';
 
 export interface RssFeedSectionProps {
   rss: RssFeedBootData;
@@ -51,18 +52,21 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
   };
 
   const categoryOptions: SelectOption[] = [
-    { value: '', label: 'All' },
+    { value: '', label: __('All', 'smaily-connect') },
     ...rss.categories.map((c) => ({ value: c.slug, label: c.name })),
   ];
 
   return (
     <Card
-      title="Product RSS feed"
-      description="Load store products straight into your newsletters: paste this feed URL into a Smaily template's RSS block and the products appear in the email. The settings below only shape the URL — nothing is saved here."
+      title={__('Product RSS feed', 'smaily-connect')}
+      description={__(
+        "Load store products straight into your newsletters: paste this feed URL into a Smaily template's RSS block and the products appear in the email. The settings below only shape the URL — nothing is saved here.",
+        'smaily-connect',
+      )}
     >
       <div className="grid gap-4 md:grid-cols-5">
         <div className="space-y-1.5">
-          <Label htmlFor="smaily-rss-category">Product category</Label>
+          <Label htmlFor="smaily-rss-category">{__('Product category', 'smaily-connect')}</Label>
           <Select
             id="smaily-rss-category"
             options={categoryOptions}
@@ -72,7 +76,7 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="smaily-rss-limit">Limit</Label>
+          <Label htmlFor="smaily-rss-limit">{__('Limit', 'smaily-connect')}</Label>
           <NumberInput
             id="smaily-rss-limit"
             min={1}
@@ -83,15 +87,15 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="smaily-rss-sort-field">Sort by</Label>
+          <Label htmlFor="smaily-rss-sort-field">{__('Sort by', 'smaily-connect')}</Label>
           <Select
             id="smaily-rss-sort-field"
             options={[
-              { value: 'modified', label: 'Modified At' },
-              { value: 'date', label: 'Created At' },
-              { value: 'id', label: 'ID' },
-              { value: 'name', label: 'Name' },
-              { value: 'type', label: 'Type' },
+              { value: 'modified', label: __('Modified At', 'smaily-connect') },
+              { value: 'date', label: __('Created At', 'smaily-connect') },
+              { value: 'id', label: __('ID', 'smaily-connect') },
+              { value: 'name', label: __('Name', 'smaily-connect') },
+              { value: 'type', label: __('Type', 'smaily-connect') },
             ]}
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -99,12 +103,12 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="smaily-rss-sort-order">Order</Label>
+          <Label htmlFor="smaily-rss-sort-order">{__('Order', 'smaily-connect')}</Label>
           <Select
             id="smaily-rss-sort-order"
             options={[
-              { value: 'ASC', label: 'Ascending' },
-              { value: 'DESC', label: 'Descending' },
+              { value: 'ASC', label: __('Ascending', 'smaily-connect') },
+              { value: 'DESC', label: __('Descending', 'smaily-connect') },
             ]}
             value={order}
             onChange={(e) => setOrder(e.target.value)}
@@ -112,7 +116,7 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="smaily-rss-tax-rate">Tax rate</Label>
+          <Label htmlFor="smaily-rss-tax-rate">{__('Tax rate', 'smaily-connect')}</Label>
           <NumberInput
             id="smaily-rss-tax-rate"
             min={0}
@@ -125,7 +129,7 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
       </div>
 
       <div className="mt-4 space-y-1.5">
-        <Label htmlFor="smaily-rss-feed-url">Feed URL</Label>
+        <Label htmlFor="smaily-rss-feed-url">{__('Feed URL', 'smaily-connect')}</Label>
         <div className="flex items-center gap-2">
           <Input
             id="smaily-rss-feed-url"
@@ -136,7 +140,7 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
             className="font-mono text-sm"
           />
           <Button type="button" variant="secondary" onClick={handleCopy}>
-            {copied ? 'Copied ✓' : 'Copy'}
+            {copied ? __('Copied ✓', 'smaily-connect') : __('Copy', 'smaily-connect')}
           </Button>
         </div>
       </div>

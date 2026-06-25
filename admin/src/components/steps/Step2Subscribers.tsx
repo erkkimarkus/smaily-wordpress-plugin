@@ -1,5 +1,6 @@
 import { useEffect, type Dispatch } from 'react';
 
+import { __, sprintf } from '@admin/lib/i18n';
 import { useBackfillProgress } from '../../hooks/useBackfillProgress';
 import { DEFAULT_SYNC_FIELDS, type WizardAction, type WizardState } from '../../state/types';
 import { Button, Card, Checkbox, ProgressBar, Toggle } from '../primitives';
@@ -60,31 +61,36 @@ export function Step2Subscribers({
     <div className="space-y-6">
       {!inSettings && (
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">Step 2 of 6</p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">Sync your subscribers</h2>
+          <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">{ __( 'Step 2 of 6', 'smaily-connect' ) }</p>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'Sync your subscribers', 'smaily-connect' ) }</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Choose which fields to copy from WordPress to Smaily, and decide where to surface the
-            subscription opt-in checkbox.
+            { __(
+              'Choose which fields to copy from WordPress to Smaily, and decide where to surface the subscription opt-in checkbox.',
+              'smaily-connect',
+            ) }
           </p>
         </div>
       )}
 
-      <Card title="Contact synchronisation">
+      <Card title={ __( 'Contact synchronisation', 'smaily-connect' ) }>
         <Toggle
           name="smly-subscriber-sync-enabled"
           checked={state.subscriberSyncEnabled}
           onChange={(e) =>
             dispatch({ type: 'SET_SUBSCRIBER_SYNC_ENABLED', payload: e.target.checked })
           }
-          label="Sync contacts to Smaily"
-          description="When on, new WP users + WooCommerce customers are pushed to your Smaily contact list."
+          label={ __( 'Sync contacts to Smaily', 'smaily-connect' ) }
+          description={ __(
+            'When on, new WP users + WooCommerce customers are pushed to your Smaily contact list.',
+            'smaily-connect',
+          ) }
         />
 
         {state.subscriberSyncEnabled && (
           <div className="mt-5">
-            <p className="text-sm font-medium text-text-primary">Fields to sync</p>
+            <p className="text-sm font-medium text-text-primary">{ __( 'Fields to sync', 'smaily-connect' ) }</p>
             <p className="mt-1 text-xs text-text-tertiary">
-              Email is always synced. Pick the additional fields you want copied across.
+              { __( 'Email is always synced. Pick the additional fields you want copied across.', 'smaily-connect' ) }
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
               {DEFAULT_SYNC_FIELDS.map((field) => (
@@ -101,7 +107,7 @@ export function Step2Subscribers({
         )}
       </Card>
 
-      <Card title="Subscription checkboxes">
+      <Card title={ __( 'Subscription checkboxes', 'smaily-connect' ) }>
         <div className="space-y-4">
           <Toggle
             name="smly-wp-subscription"
@@ -109,7 +115,7 @@ export function Step2Subscribers({
             onChange={(e) =>
               dispatch({ type: 'SET_WORDPRESS_SUBSCRIPTION_CHECKBOX', payload: e.target.checked })
             }
-            label="Show subscription checkbox during WordPress registration"
+            label={ __( 'Show subscription checkbox during WordPress registration', 'smaily-connect' ) }
           />
           <Toggle
             name="smly-checkout-subscription"
@@ -117,16 +123,20 @@ export function Step2Subscribers({
             onChange={(e) =>
               dispatch({ type: 'SET_CHECKOUT_SUBSCRIPTION_CHECKBOX', payload: e.target.checked })
             }
-            label="Show subscription checkbox during WooCommerce checkout"
+            label={ __( 'Show subscription checkbox during WooCommerce checkout', 'smaily-connect' ) }
           />
         </div>
       </Card>
 
-      <Card title="Initial backfill" description="Import the existing WordPress users into Smaily.">
+      <Card title={ __( 'Initial backfill', 'smaily-connect' ) } description={ __( 'Import the existing WordPress users into Smaily.', 'smaily-connect' ) }>
         <p className="text-sm text-text-secondary">
           {state.env.storeTotals.customers > 0
-            ? `${state.env.storeTotals.customers} users will be processed in batches of 100, ~30 seconds apart.`
-            : 'No existing WordPress users detected — the backfill will be a no-op.'}
+            ? sprintf(
+                // translators: %d is the number of WordPress users.
+                __( '%d users will be processed in batches of 100, ~30 seconds apart.', 'smaily-connect' ),
+                state.env.storeTotals.customers,
+              )
+            : __( 'No existing WordPress users detected — the backfill will be a no-op.', 'smaily-connect' )}
         </p>
 
         <div className="mt-4 flex items-center gap-3">
@@ -137,12 +147,12 @@ export function Step2Subscribers({
             loading={isRunning && progress.processed === 0}
             type="button"
           >
-            {isRunning ? 'Running…' : 'Start backfill'}
+            {isRunning ? __( 'Running…', 'smaily-connect' ) : __( 'Start backfill', 'smaily-connect' )}
           </Button>
 
           {isRunning && (
             <Button variant="ghost" onClick={() => void cancel()} type="button">
-              Cancel
+              { __( 'Cancel', 'smaily-connect' ) }
             </Button>
           )}
         </div>
@@ -152,31 +162,56 @@ export function Step2Subscribers({
             <ProgressBar
               percent={progress.percent}
               tone={hasFailed ? 'danger' : isComplete ? 'success' : 'brand'}
-              ariaLabel="Subscriber backfill progress"
+              ariaLabel={ __( 'Subscriber backfill progress', 'smaily-connect' ) }
             />
             <p className="mt-2 text-xs text-text-secondary">
-              {isRunning && `Synced ${progress.processed} of ${progress.total}.`}
-              {isComplete && `Done — ${progress.processed} of ${progress.total} contacts synced.`}
-              {hasFailed && `Backfill failed${progress.error ? `: ${progress.error}` : '.'}`}
-              {wasCancelled && 'Backfill cancelled. Re-run when ready.'}
+              {isRunning && sprintf(
+                // translators: %1$d is processed count, %2$d is total count.
+                __( 'Synced %1$d of %2$d.', 'smaily-connect' ),
+                progress.processed,
+                progress.total,
+              )}
+              {isComplete && sprintf(
+                // translators: %1$d is processed count, %2$d is total count.
+                __( 'Done — %1$d of %2$d contacts synced.', 'smaily-connect' ),
+                progress.processed,
+                progress.total,
+              )}
+              {hasFailed && (progress.error
+                ? sprintf(
+                    // translators: %s is the error message.
+                    __( 'Backfill failed: %s', 'smaily-connect' ),
+                    progress.error,
+                  )
+                : __( 'Backfill failed.', 'smaily-connect' ))}
+              {wasCancelled && __( 'Backfill cancelled. Re-run when ready.', 'smaily-connect' )}
             </p>
             {(isComplete || wasCancelled || hasFailed) && progress.completedAt && (
               <p className="mt-1 text-xs text-text-tertiary">
-                Last run finished {formatLastRun(progress.completedAt)}.
+                {sprintf(
+                  // translators: %s is a localized date/time.
+                  __( 'Last run finished %s.', 'smaily-connect' ),
+                  formatLastRun(progress.completedAt),
+                )}
               </p>
             )}
             {isRunning && (
               <p className="mt-2 text-xs text-text-tertiary">
-                Backfill runs in the background on your server. You can safely
-                leave this page or close the browser — the job will continue.
-                Return here any time to check progress.
+                { __(
+                  'Backfill runs in the background on your server. You can safely leave this page or close the browser — the job will continue. Return here any time to check progress.',
+                  'smaily-connect',
+                ) }
               </p>
             )}
           </div>
         )}
 
         {pollError && (
-          <p className="mt-3 text-xs text-danger">Couldn&apos;t check status: {pollError}</p>
+          <p className="mt-3 text-xs text-danger">{sprintf(
+            // translators: %s is the error message.
+            __( "Couldn't check status: %s", 'smaily-connect' ),
+            pollError,
+          )}</p>
         )}
       </Card>
     </div>
@@ -184,16 +219,16 @@ export function Step2Subscribers({
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  first_name: 'First name',
-  last_name: 'Last name',
-  phone: 'Phone',
-  birthday: 'Birthday',
-  gender: 'Gender',
-  customer_group: 'Customer group',
-  customer_id: 'Customer ID',
-  first_registered: 'First registered date',
-  nickname: 'Nickname',
-  site_title: 'Site title',
+  first_name: __( 'First name', 'smaily-connect' ),
+  last_name: __( 'Last name', 'smaily-connect' ),
+  phone: __( 'Phone', 'smaily-connect' ),
+  birthday: __( 'Birthday', 'smaily-connect' ),
+  gender: __( 'Gender', 'smaily-connect' ),
+  customer_group: __( 'Customer group', 'smaily-connect' ),
+  customer_id: __( 'Customer ID', 'smaily-connect' ),
+  first_registered: __( 'First registered date', 'smaily-connect' ),
+  nickname: __( 'Nickname', 'smaily-connect' ),
+  site_title: __( 'Site title', 'smaily-connect' ),
 };
 
 function prettyFieldLabel(field: string): string {

@@ -8,6 +8,7 @@ import {
   type EventRow,
   type EventSource,
 } from '../../api/events';
+import { __, _n, sprintf } from '@admin/lib/i18n';
 import { Banner, Button, Card, Pill, Select, type PillTone } from '../primitives';
 
 const PER_PAGE = 50;
@@ -57,7 +58,9 @@ export function EventLog(): React.JSX.Element {
         if (signal?.aborted) {
           return;
         }
-        setError(e instanceof Error ? e.message : 'Failed to load the event log.');
+        setError(
+          e instanceof Error ? e.message : __('Failed to load the event log.', 'smaily-connect'),
+        );
       } finally {
         setLoading(false);
       }
@@ -87,7 +90,7 @@ export function EventLog(): React.JSX.Element {
         await retryEvents(args);
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Retry failed.');
+        setError(e instanceof Error ? e.message : __('Retry failed.', 'smaily-connect'));
       } finally {
         setRetrying(false);
       }
@@ -102,7 +105,16 @@ export function EventLog(): React.JSX.Element {
       {failed24h > 0 && (
         <Banner
           tone="danger"
-          title={`${failed24h} failed ${failed24h === 1 ? 'event' : 'events'} in the last 24 hours`}
+          title={sprintf(
+            // translators: %d is the number of failed events in the last 24 hours.
+            _n(
+              '%d failed event in the last 24 hours',
+              '%d failed events in the last 24 hours',
+              failed24h,
+              'smaily-connect',
+            ),
+            failed24h,
+          )}
           actions={
             <div className="flex gap-2">
               <Button
@@ -113,7 +125,7 @@ export function EventLog(): React.JSX.Element {
                   setPage(1);
                 }}
               >
-                View only failed
+                {__('View only failed', 'smaily-connect')}
               </Button>
               <Button
                 variant="primary"
@@ -121,50 +133,53 @@ export function EventLog(): React.JSX.Element {
                 loading={retrying}
                 onClick={() => void handleRetry({})}
               >
-                Retry all failed
+                {__('Retry all failed', 'smaily-connect')}
               </Button>
             </div>
           }
         >
-          Some records didn&apos;t reach their destination. Review them below.
+          {__('Some records didn’t reach their destination. Review them below.', 'smaily-connect')}
         </Banner>
       )}
 
       <Card
-        title="Event log"
-        description="Sync activity across the Smaily and recommendation-engine queues. Read-only — last 7 days of events."
+        title={__('Event log', 'smaily-connect')}
+        description={__(
+          'Sync activity across the Smaily and recommendation-engine queues. Read-only — last 7 days of events.',
+          'smaily-connect',
+        )}
       >
         <div className="flex flex-wrap items-end gap-3">
           <Select
-            aria-label="Filter by source"
+            aria-label={__('Filter by source', 'smaily-connect')}
             value={source}
             onChange={(e) => {
               setSource(e.target.value as EventSource | '');
               setPage(1);
             }}
             options={[
-              { value: '', label: 'All sources' },
-              { value: 'rec_engine', label: 'Recommendations engine' },
-              { value: 'smaily', label: 'Smaily' },
+              { value: '', label: __('All sources', 'smaily-connect') },
+              { value: 'rec_engine', label: __('Recommendations engine', 'smaily-connect') },
+              { value: 'smaily', label: __('Smaily', 'smaily-connect') },
             ]}
           />
           <Select
-            aria-label="Filter by status"
+            aria-label={__('Filter by status', 'smaily-connect')}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
               setPage(1);
             }}
             options={[
-              { value: '', label: 'All statuses' },
-              { value: 'pending', label: 'Pending' },
-              { value: 'sent', label: 'Sent' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'blocked', label: 'Blocked' },
+              { value: '', label: __('All statuses', 'smaily-connect') },
+              { value: 'pending', label: __('Pending', 'smaily-connect') },
+              { value: 'sent', label: __('Sent', 'smaily-connect') },
+              { value: 'failed', label: __('Failed', 'smaily-connect') },
+              { value: 'blocked', label: __('Blocked', 'smaily-connect') },
             ]}
           />
           <Button variant="ghost" type="button" onClick={() => void load()}>
-            Refresh
+            {__('Refresh', 'smaily-connect')}
           </Button>
         </div>
 
@@ -178,13 +193,13 @@ export function EventLog(): React.JSX.Element {
           <table className="w-full text-left text-xs">
             <thead className="text-text-tertiary">
               <tr className="border-b border-border">
-                <th className="py-2 pr-3 font-medium">Time (UTC)</th>
-                <th className="py-2 pr-3 font-medium">Source</th>
-                <th className="py-2 pr-3 font-medium">Event</th>
-                <th className="py-2 pr-3 font-medium">Entity</th>
-                <th className="py-2 pr-3 font-medium">Status</th>
-                <th className="py-2 pr-3 font-medium">Attempts</th>
-                <th className="py-2 pr-3 font-medium">Last error</th>
+                <th className="py-2 pr-3 font-medium">{__('Time (UTC)', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Source', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Event', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Entity', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Status', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Attempts', 'smaily-connect')}</th>
+                <th className="py-2 pr-3 font-medium">{__('Last error', 'smaily-connect')}</th>
                 {/* Pinned to the right edge so Retry/Details stay reachable
                     when the row overflows horizontally (the failed-row case:
                     the Retry button widens the row and used to push Details
@@ -196,7 +211,7 @@ export function EventLog(): React.JSX.Element {
               {rows.length === 0 && !loading && (
                 <tr>
                   <td colSpan={8} className="py-6 text-center text-text-tertiary">
-                    No events yet.
+                    {__('No events yet.', 'smaily-connect')}
                   </td>
                 </tr>
               )}
@@ -205,7 +220,11 @@ export function EventLog(): React.JSX.Element {
                   <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">
                     {row.created_at}
                   </td>
-                  <td className="py-2 pr-3">{row.source === 'rec_engine' ? 'Rec' : 'Smaily'}</td>
+                  <td className="py-2 pr-3">
+                    {row.source === 'rec_engine'
+                      ? __('Rec', 'smaily-connect')
+                      : __('Smaily', 'smaily-connect')}
+                  </td>
                   <td className="py-2 pr-3 font-mono">{row.event_type}</td>
                   <td className="py-2 pr-3 font-mono text-text-secondary">{row.entity_id || '—'}</td>
                   <td className="py-2 pr-3">
@@ -232,11 +251,11 @@ export function EventLog(): React.JSX.Element {
                           disabled={retrying}
                           onClick={() => void handleRetry({ source: row.source, id: row.id })}
                         >
-                          Retry
+                          {__('Retry', 'smaily-connect')}
                         </Button>
                       )}
                       <Button variant="ghost" type="button" onClick={() => void openDetail(row)}>
-                        Details
+                        {__('Details', 'smaily-connect')}
                       </Button>
                     </div>
                   </td>
@@ -248,8 +267,12 @@ export function EventLog(): React.JSX.Element {
 
         <div className="mt-4 flex items-center justify-between text-xs text-text-secondary">
           <span>
-            {total} {total === 1 ? 'event' : 'events'}
-            {loading ? ' · loading…' : ''}
+            {sprintf(
+              // translators: %d is the total number of events.
+              _n('%d event', '%d events', total, 'smaily-connect'),
+              total,
+            )}
+            {loading ? __(' · loading…', 'smaily-connect') : ''}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -258,10 +281,15 @@ export function EventLog(): React.JSX.Element {
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              Previous
+              {__('Previous', 'smaily-connect')}
             </Button>
             <span>
-              Page {page} of {totalPages}
+              {sprintf(
+                // translators: %1$d is the current page number, %2$d is the total page count.
+                __('Page %1$d of %2$d', 'smaily-connect'),
+                page,
+                totalPages,
+              )}
             </span>
             <Button
               variant="ghost"
@@ -269,7 +297,7 @@ export function EventLog(): React.JSX.Element {
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
-              Next
+              {__('Next', 'smaily-connect')}
             </Button>
           </div>
         </div>
@@ -309,7 +337,7 @@ function EventDetailModal({
       {/* Backdrop is a real button so closing on outside-click stays a11y-valid. */}
       <button
         type="button"
-        aria-label="Close details"
+        aria-label={__('Close details', 'smaily-connect')}
         className="absolute inset-0 h-full w-full cursor-default bg-text-primary/40"
         onClick={onClose}
       />
@@ -317,56 +345,58 @@ function EventDetailModal({
         <div className="flex items-start justify-between gap-4">
           <h3 className="font-mono text-lg font-semibold text-text-primary">{event.event_type}</h3>
           <Button variant="ghost" type="button" onClick={onClose}>
-            Close
+            {__('Close', 'smaily-connect')}
           </Button>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
           <div>
-            <dt className="text-text-tertiary">Source</dt>
+            <dt className="text-text-tertiary">{__('Source', 'smaily-connect')}</dt>
             <dd>{event.source}</dd>
           </div>
           <div>
-            <dt className="text-text-tertiary">Status</dt>
+            <dt className="text-text-tertiary">{__('Status', 'smaily-connect')}</dt>
             <dd>{event.status}</dd>
           </div>
           <div>
-            <dt className="text-text-tertiary">Entity</dt>
+            <dt className="text-text-tertiary">{__('Entity', 'smaily-connect')}</dt>
             <dd className="font-mono">{event.entity_id || '—'}</dd>
           </div>
           <div>
-            <dt className="text-text-tertiary">Attempts</dt>
+            <dt className="text-text-tertiary">{__('Attempts', 'smaily-connect')}</dt>
             <dd>
               {event.attempts}
               {event.max_attempts !== null ? `/${event.max_attempts}` : ''}
             </dd>
           </div>
           <div className="col-span-2">
-            <dt className="text-text-tertiary">Created (UTC)</dt>
+            <dt className="text-text-tertiary">{__('Created (UTC)', 'smaily-connect')}</dt>
             <dd className="font-mono">{event.created_at}</dd>
           </div>
         </dl>
         {event.last_error !== '' && (
           <div className="mt-3">
-            <p className="text-xs font-medium text-text-tertiary">Last error</p>
+            <p className="text-xs font-medium text-text-tertiary">{__('Last error', 'smaily-connect')}</p>
             <pre className="mt-1 whitespace-pre-wrap rounded bg-surface-muted p-2 text-xs text-danger">
               {event.last_error}
             </pre>
           </div>
         )}
         <div className="mt-3">
-          <p className="text-xs font-medium text-text-tertiary">Request sent to the engine</p>
+          <p className="text-xs font-medium text-text-tertiary">{__('Request sent to the engine', 'smaily-connect')}</p>
           <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
-            {sent !== '' ? sent : '— nothing recorded (not sent, or the row predates this version)'}
+            {sent !== ''
+              ? sent
+              : __('— nothing recorded (not sent, or the row predates this version)', 'smaily-connect')}
           </pre>
         </div>
         <div className="mt-3">
-          <p className="text-xs font-medium text-text-tertiary">Engine response</p>
+          <p className="text-xs font-medium text-text-tertiary">{__('Engine response', 'smaily-connect')}</p>
           <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
             {response !== '' ? response : '—'}
           </pre>
         </div>
         <div className="mt-3">
-          <p className="text-xs font-medium text-text-tertiary">Enqueued payload</p>
+          <p className="text-xs font-medium text-text-tertiary">{__('Enqueued payload', 'smaily-connect')}</p>
           <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-muted p-2 font-mono text-xs text-text-secondary">
             {enqueued}
           </pre>

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { __ } from '@admin/lib/i18n';
+
 import {
   cancelBackfill,
   getBackfillStatus,
@@ -151,7 +153,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       }
     } catch (err) {
       if (mountedRef.current) {
-        setPollError(err instanceof Error ? err.message : 'Failed to fetch backfill status');
+        setPollError(err instanceof Error ? err.message : __( 'Failed to fetch backfill status', 'smaily-connect' ));
       }
       loopActiveRef.current = false;
     }
@@ -206,7 +208,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       });
     } catch (err) {
       if (mountedRef.current) {
-        setPollError(err instanceof Error ? err.message : 'Failed to start backfill');
+        setPollError(err instanceof Error ? err.message : __( 'Failed to start backfill', 'smaily-connect' ));
       }
     }
   }, [jobType]);
@@ -220,7 +222,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       loopActiveRef.current = false;
     } catch (err) {
       if (mountedRef.current) {
-        setPollError(err instanceof Error ? err.message : 'Failed to cancel backfill');
+        setPollError(err instanceof Error ? err.message : __( 'Failed to cancel backfill', 'smaily-connect' ));
       }
     }
   }, [jobType]);

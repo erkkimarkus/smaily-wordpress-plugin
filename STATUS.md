@@ -57,10 +57,21 @@ no dev cruft, no `-dirty`, from commit `910f632`); **final `wp plugin check` aga
 ZIP = 1 finding, the intentional `Update URI`** (`mismatched_plugin_name` cleared by the BETA
 drop); published as a **full (non-pre-) GitHub release** on the fork
 (`erkkimarkus/smaily-wordpress-plugin`, tag `v3.0.0`, ZIP attached) — `release.yml` fires but
-fails harmlessly (no wp-cli) and does not clobber the asset. **NEXT: upstream-merge prep** —
-remove the `Update URI` header (W-3), reconcile upstream #119 (ABSPATH guards it already
-added) + #120/#128/#132, address the deferred upstream-only polish (inline-script→enqueue,
-React i18n) per `docs/audits/CODE_QUALITY_AUDIT.md`. See `docs/audits/`. Prior:
+fails harmlessly (no wp-cli) and does not clobber the asset. Then the
+**upstream-merge prep started** (the technical items the fork can do before Smaily
+greenlights the takeover; see `docs/UPSTREAM_MERGE_PROPOSAL.md`): **W-5 DONE** — the
+admin-notice dismiss moved from an inline `<script>` to an enqueued
+`admin/js/notice-dismiss.js` (E2E-verified); **W-7 DONE** — the React admin UI is now
+**fully internationalized** (~244 strings across 24 files wrapped with a `wp.i18n` shim
+`admin/src/lib/i18n.ts`; `wizard.php` enqueues `wp-i18n` + `wp_set_script_translations`;
+`bin/build-i18n.sh` reproducibly rebuilds `languages/*.mo`/`*.json` incl. the admin-bundle
+catalog — make-pot can't read `.tsx` so it esbuild-transpiles first, and the catalog is
+renamed to WP's expected `…-et-464ceaab….json`; a Playwright check confirms Estonian
+renders end-to-end with 0 console errors; 21 representative ET strings translated, the
+rest of the `.po` ready to fill). ci:strict exit=0 (unit 374, JS 158); integration OK 114.
+**Still NEXT:** **W-3** remove `Update URI` (at the merge, not before — it's the fork
+clobber-guard), reconcile upstream #119/#120/#128/#132, full ET translation of the `.po`,
+and the Smaily go/no-go on the takeover. See `docs/audits/`. Prior:
 **Faas 2: legacy admin settings-page removed (F3-45)** — the
 redundant legacy `Admin` settings page + `Settings`/`Renderer`/`Sanitizer` + partials +
 `smaily-admin.css/js` deleted; the subscription **widget** and Plugins-page **Settings

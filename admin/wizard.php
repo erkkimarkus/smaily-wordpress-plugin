@@ -163,9 +163,18 @@ function smaily_connect_enqueue_admin_bundle( string $hook_suffix ): void {
 	wp_enqueue_script(
 		'smaily-connect-admin',
 		$dist_url . '/admin.js',
-		array(),
+		array( 'wp-i18n' ),
 		(string) filemtime( $js_path ),
 		true
+	);
+
+	// Load the JS translation catalog for the admin bundle. UI strings are
+	// wrapped with a thin wp.i18n shim (admin/src/lib/i18n.ts); `wp i18n make-json`
+	// emits the catalog hashed to dist/admin/admin.js (see the build:i18n step).
+	wp_set_script_translations(
+		'smaily-connect-admin',
+		'smaily-connect',
+		SMAILY_CONNECT_PLUGIN_PATH . 'languages'
 	);
 
 	// ESM bundle — Vite emits `type="module"` markup. WordPress' enqueue

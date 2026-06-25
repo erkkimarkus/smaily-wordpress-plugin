@@ -1,3 +1,4 @@
+import { __ } from '@admin/lib/i18n';
 import { cn } from '../../utils/cn';
 
 export interface StepRailItem {
@@ -45,7 +46,10 @@ export interface StepRailProps {
  */
 export function StepRail({ currentStep, steps, onStepClick, className }: StepRailProps): React.JSX.Element {
   return (
-    <nav className={cn('w-56 shrink-0 bg-surface-soft px-4 py-6', className)} aria-label="Wizard steps">
+    <nav
+      className={cn('w-56 shrink-0 bg-surface-soft px-4 py-6', className)}
+      aria-label={__('Wizard steps', 'smaily-connect')}
+    >
       <ol className="space-y-1">
         {steps.map((step) => {
           const isActive = step.id === currentStep;

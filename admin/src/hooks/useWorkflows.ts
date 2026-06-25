@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { __ } from '@admin/lib/i18n';
+
 import { listWorkflows, type Workflow } from '../api/workflows';
 
 export type UseWorkflowsStatus = 'idle' | 'pending' | 'success' | 'error';
@@ -94,7 +96,7 @@ export function useWorkflows(accountKey: string = 'default'): UseWorkflowsResult
         } catch (err) {
           if (mountedRef.current) {
             setStatus('error');
-            setError(err instanceof Error ? err.message : 'Failed to load workflows');
+            setError(err instanceof Error ? err.message : __( 'Failed to load workflows', 'smaily-connect' ));
           }
         }
       })();

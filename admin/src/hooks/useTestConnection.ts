@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
+import { __ } from '@admin/lib/i18n';
+
 import {
   testSmailyConnection,
   type TestConnectionResponse,
@@ -73,7 +75,7 @@ export function useTestConnection(): UseTestConnectionResult {
         setError(null);
       } else {
         setStatus('error');
-        setError(response.error ?? 'Smaily rejected the credentials.');
+        setError(response.error ?? __( 'Smaily rejected the credentials.', 'smaily-connect' ));
       }
     } catch (err) {
       // AbortError fires when the next mutate() cancels us — silent.
@@ -86,7 +88,7 @@ export function useTestConnection(): UseTestConnectionResult {
       }
 
       setStatus('error');
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : __( 'Unknown error', 'smaily-connect' ));
     }
   }, []);
 

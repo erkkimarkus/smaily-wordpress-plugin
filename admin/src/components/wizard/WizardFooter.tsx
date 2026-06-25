@@ -1,3 +1,4 @@
+import { __ } from '@admin/lib/i18n';
 import { Button } from '../primitives';
 import { cn } from '../../utils/cn';
 
@@ -61,7 +62,7 @@ export function WizardFooter({
       <div className="flex items-center">
         {!isFirstStep && onBack && (
           <Button variant="ghost" onClick={onBack} type="button">
-            ← Back
+            {__('← Back', 'smaily-connect')}
           </Button>
         )}
       </div>
@@ -81,7 +82,7 @@ export function WizardFooter({
             loading={loading}
             type="button"
           >
-            Finish
+            {__('Finish', 'smaily-connect')}
           </Button>
         ) : (
           <Button
@@ -91,7 +92,7 @@ export function WizardFooter({
             loading={loading}
             type="button"
           >
-            Continue →
+            {__('Continue →', 'smaily-connect')}
           </Button>
         )}
       </div>

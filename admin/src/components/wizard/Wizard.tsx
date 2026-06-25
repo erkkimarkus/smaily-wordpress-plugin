@@ -4,6 +4,7 @@ import { saveSettings } from '../../api/saveSettings';
 import { buildTabPayload } from '../../state/buildTabPayload';
 import { wizardReducer } from '../../state/wizard-reducer';
 import { type SettingsTabKey, type WizardState } from '../../state/types';
+import { __, sprintf } from '@admin/lib/i18n';
 import { Banner } from '../primitives';
 import {
   Step1Connect,
@@ -21,12 +22,21 @@ export interface WizardProps {
 }
 
 const STEP_LABELS: Array<{ label: string; description: string }> = [
-  { label: 'Connect', description: 'Smaily credentials' },
-  { label: 'Subscribers', description: 'Field mapping + backfill' },
-  { label: 'WooCommerce', description: 'Automation triggers' },
-  { label: 'Campaign Intelligence', description: 'Optional' },
-  { label: 'Integrations', description: 'Elementor / CF7 / Blocks' },
-  { label: 'Done', description: 'Summary + finish' },
+  { label: __('Connect', 'smaily-connect'), description: __('Smaily credentials', 'smaily-connect') },
+  {
+    label: __('Subscribers', 'smaily-connect'),
+    description: __('Field mapping + backfill', 'smaily-connect'),
+  },
+  {
+    label: __('WooCommerce', 'smaily-connect'),
+    description: __('Automation triggers', 'smaily-connect'),
+  },
+  { label: __('Campaign Intelligence', 'smaily-connect'), description: __('Optional', 'smaily-connect') },
+  {
+    label: __('Integrations', 'smaily-connect'),
+    description: __('Elementor / CF7 / Blocks', 'smaily-connect'),
+  },
+  { label: __('Done', 'smaily-connect'), description: __('Summary + finish', 'smaily-connect') },
 ];
 
 /**
@@ -65,7 +75,7 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
       description: entry.description,
       completed: state.currentStep > stepId,
       locked,
-      lockedReason: locked ? 'Complete Step 1 (Connect) first.' : undefined,
+      lockedReason: locked ? __('Complete Step 1 (Connect) first.', 'smaily-connect') : undefined,
     };
   });
 
@@ -84,15 +94,21 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
       if (!response.saved) {
         const message =
           response.errors.map((e) => `${e.field}: ${e.message}`).join('; ') ||
-          'Save failed.';
+          __('Save failed.', 'smaily-connect');
         setNavStatus('error');
-        setNavError(`Couldn't save ${tab}: ${message}`);
+        setNavError(
+          // translators: %1$s is the settings tab key, %2$s is the error detail.
+          sprintf(__('Couldn’t save %1$s: %2$s', 'smaily-connect'), tab, message),
+        );
         return false;
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Network error';
+      const message = err instanceof Error ? err.message : __('Network error', 'smaily-connect');
       setNavStatus('error');
-      setNavError(`Couldn't save ${tab}: ${message}`);
+      setNavError(
+        // translators: %1$s is the settings tab key, %2$s is the error detail.
+        sprintf(__('Couldn’t save %1$s: %2$s', 'smaily-connect'), tab, message),
+      );
       return false;
     }
     setNavStatus('idle');
@@ -232,7 +248,7 @@ function computeCanAdvance(state: WizardState): boolean {
 
 function computeAdvanceHint(state: WizardState): string | undefined {
   if (state.currentStep === 1 && state.smailyConnection.kind !== 'success') {
-    return 'Test your Smaily connection to continue.';
+    return __('Test your Smaily connection to continue.', 'smaily-connect');
   }
   return undefined;
 }

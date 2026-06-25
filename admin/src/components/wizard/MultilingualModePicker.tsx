@@ -1,6 +1,7 @@
 import { type ChangeEvent } from 'react';
 
 import { type MultilingualMode } from '../../state/types';
+import { __ } from '@admin/lib/i18n';
 import { Radio } from '../primitives';
 import { cn } from '../../utils/cn';
 
@@ -53,7 +54,7 @@ export function MultilingualModePicker({
   return (
     <fieldset
       className={cn('grid gap-3 md:grid-cols-3', className)}
-      aria-label="How is your Smaily setup organised for languages?"
+      aria-label={__('How is your Smaily setup organised for languages?', 'smaily-connect')}
     >
       {MODE_OPTIONS.map((option) => {
         const isSelected = option.value === value;
@@ -87,17 +88,26 @@ export function MultilingualModePicker({
 const MODE_OPTIONS: ModeOption[] = [
   {
     value: 'A',
-    label: 'Separate Smaily accounts',
-    description: 'One Smaily subdomain per language. Each language has its own subscriber list and credentials.',
+    label: __('Separate Smaily accounts', 'smaily-connect'),
+    description: __(
+      'One Smaily subdomain per language. Each language has its own subscriber list and credentials.',
+      'smaily-connect',
+    ),
   },
   {
     value: 'B',
-    label: 'One account, per-language automations',
-    description: 'Single Smaily account, but a separate automation workflow per language. Most common setup.',
+    label: __('One account, per-language automations', 'smaily-connect'),
+    description: __(
+      'Single Smaily account, but a separate automation workflow per language. Most common setup.',
+      'smaily-connect',
+    ),
   },
   {
     value: 'C',
-    label: 'One account, one automation with branches',
-    description: 'Single Smaily workflow that branches on the contact’s language inside Smaily.',
+    label: __('One account, one automation with branches', 'smaily-connect'),
+    description: __(
+      'Single Smaily workflow that branches on the contact’s language inside Smaily.',
+      'smaily-connect',
+    ),
   },
 ];

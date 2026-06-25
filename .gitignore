@@ -21,3 +21,7 @@ phpunit.xml
 tmp/
 .phpcs-cache
 .claude/
+
+# i18n build (transient: esbuild transpile + make-json use-map)
+_i18n-src/
+languages/i18n-map.json

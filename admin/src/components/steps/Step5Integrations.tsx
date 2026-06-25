@@ -1,6 +1,7 @@
 import { type WizardState } from '../../state/types';
 import { Card, Pill } from '../primitives';
 import { RssFeedSection } from './RssFeedSection';
+import { __ } from '@admin/lib/i18n';
 
 export interface Step5IntegrationsProps {
   state: WizardState;
@@ -29,31 +30,34 @@ interface IntegrationCard {
 
 const CARDS: IntegrationCard[] = [
   {
-    title: 'Elementor',
-    description: 'The Smaily subscription-form widget is available in the Elementor editor.',
+    title: __('Elementor', 'smaily-connect'),
+    description: __(
+      'The Smaily subscription-form widget is available in the Elementor editor.',
+      'smaily-connect',
+    ),
     installedKey: 'elementorPresent',
     hrefInstalled: 'admin.php?page=elementor-app',
     hrefMissing: 'plugin-install.php?s=elementor&tab=search&type=term',
-    ctaInstalled: 'Open Elementor',
-    ctaMissing: 'Install Elementor',
+    ctaInstalled: __('Open Elementor', 'smaily-connect'),
+    ctaMissing: __('Install Elementor', 'smaily-connect'),
   },
   {
-    title: 'Contact Form 7',
-    description: 'Configure individual CF7 forms in Forms → Smaily tab.',
+    title: __('Contact Form 7', 'smaily-connect'),
+    description: __('Configure individual CF7 forms in Forms → Smaily tab.', 'smaily-connect'),
     installedKey: 'cf7Present',
     hrefInstalled: 'admin.php?page=wpcf7',
     hrefMissing: 'plugin-install.php?s=contact+form+7&tab=search&type=term',
-    ctaInstalled: 'Open CF7',
-    ctaMissing: 'Install Contact Form 7',
+    ctaInstalled: __('Open CF7', 'smaily-connect'),
+    ctaMissing: __('Install Contact Form 7', 'smaily-connect'),
   },
   {
-    title: 'Smaily Landing Pages',
-    description: 'Embed Smaily landing pages anywhere via the Gutenberg block.',
+    title: __('Smaily Landing Pages', 'smaily-connect'),
+    description: __('Embed Smaily landing pages anywhere via the Gutenberg block.', 'smaily-connect'),
     installedKey: null,
     hrefInstalled: 'post-new.php?post_type=page',
     hrefMissing: 'post-new.php?post_type=page',
-    ctaInstalled: 'Add a new page',
-    ctaMissing: 'Add a new page',
+    ctaInstalled: __('Add a new page', 'smaily-connect'),
+    ctaMissing: __('Add a new page', 'smaily-connect'),
   },
 ];
 
@@ -83,12 +87,16 @@ export function Step5Integrations({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
-            Step 5 of 6
+            {__('Step 5 of 6', 'smaily-connect')}
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">Integrations</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">
+            {__('Integrations', 'smaily-connect')}
+          </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Smaily plays nicely with the other tools you already have installed. Configure each one
-            from its own admin page — no extra setup required here.
+            {__(
+              'Smaily plays nicely with the other tools you already have installed. Configure each one from its own admin page — no extra setup required here.',
+              'smaily-connect',
+            )}
           </p>
         </div>
       )}
@@ -104,7 +112,11 @@ export function Step5Integrations({
               key={card.title}
               title={card.title}
               headerAccessory={
-                installed ? <Pill tone="success">Installed</Pill> : <Pill tone="neutral">Not installed</Pill>
+                installed ? (
+                  <Pill tone="success">{__('Installed', 'smaily-connect')}</Pill>
+                ) : (
+                  <Pill tone="neutral">{__('Not installed', 'smaily-connect')}</Pill>
+                )
               }
             >
               <p className="text-sm text-text-secondary">{card.description}</p>

@@ -1,5 +1,6 @@
 import { type WizardState } from '../../state/types';
 import { Banner, Button, Card } from '../primitives';
+import { __, _n, sprintf } from '@admin/lib/i18n';
 
 export interface Step6DoneProps {
   state: WizardState;
@@ -38,17 +39,21 @@ export function Step6Done({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
-            Step 6 of 6
+            {__('Step 6 of 6', 'smaily-connect')}
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">You&apos;re all set</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">
+            {__("You're all set", 'smaily-connect')}
+          </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Smaily Connect is configured and ready. Click Finish to save and exit the wizard, or
-            review the summary below first.
+            {__(
+              'Smaily Connect is configured and ready. Click Finish to save and exit the wizard, or review the summary below first.',
+              'smaily-connect',
+            )}
           </p>
         </div>
       )}
 
-      <Card title="What's active">
+      <Card title={__("What's active", 'smaily-connect')}>
         <ul className="divide-y divide-border-subtle">
           {items.map((item) => (
             <li key={item.label} className="flex items-start gap-3 py-3">
@@ -78,11 +83,15 @@ export function Step6Done({
       </Card>
 
       <Banner tone="info">
-        All sync events appear in the <strong>Event Log</strong> tab (Settings → Event Log). Use it
-        to diagnose any unexpected behaviour during the first days of operation.
+        {__('All sync events appear in the', 'smaily-connect')}{' '}
+        <strong>{__('Event Log', 'smaily-connect')}</strong>{' '}
+        {__(
+          'tab (Settings → Event Log). Use it to diagnose any unexpected behaviour during the first days of operation.',
+          'smaily-connect',
+        )}
       </Banner>
 
-      <Card title="Open dashboards">
+      <Card title={__('Open dashboards', 'smaily-connect')}>
         <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="secondary"
@@ -90,11 +99,11 @@ export function Step6Done({
             onClick={() => openSmailyDashboard(state, onOpenSmailyDashboard)}
             disabled={state.smailyConnection.kind !== 'success' || !smailySubdomain(state)}
           >
-            Open Smaily dashboard →
+            {__('Open Smaily dashboard →', 'smaily-connect')}
           </Button>
           {state.recEngineConnection.kind === 'success' && (
             <Button variant="secondary" type="button" onClick={onOpenRecEngineDashboard}>
-              Open Campaign Intelligence dashboard →
+              {__('Open Campaign Intelligence dashboard →', 'smaily-connect')}
             </Button>
           )}
         </div>
@@ -109,63 +118,100 @@ function computeSummary(state: WizardState): SummaryItem[] {
   // Connection -----------------------------------------------------------
   const accountCount = 1 + state.perLanguageAccounts.length;
   items.push({
-    label: 'Smaily connected',
+    label: __('Smaily connected', 'smaily-connect'),
     active: state.smailyConnection.kind === 'success',
     detail:
       state.multilingualMode === 'A'
-        ? `${accountCount} accounts configured (Mode A)`
-        : `Multilingual mode: ${state.multilingualMode}`,
+        ? sprintf(
+            /* translators: %d: number of configured accounts. */
+            __('%d accounts configured (Mode A)', 'smaily-connect'),
+            accountCount,
+          )
+        : sprintf(
+            /* translators: %s: multilingual mode identifier. */
+            __('Multilingual mode: %s', 'smaily-connect'),
+            state.multilingualMode,
+          ),
   });
 
   // Subscribers ----------------------------------------------------------
   items.push({
-    label: 'Subscriber sync enabled',
+    label: __('Subscriber sync enabled', 'smaily-connect'),
     active: state.subscriberSyncEnabled,
     detail: state.subscriberSyncEnabled
-      ? `${state.syncFields.length} fields synced`
+      ? sprintf(
+          /* translators: %d: number of synced fields. */
+          _n('%d field synced', '%d fields synced', state.syncFields.length, 'smaily-connect'),
+          state.syncFields.length,
+        )
       : undefined,
   });
 
   if (state.contactsBackfill.status === 'completed') {
     items.push({
-      label: 'Initial backfill complete',
+      label: __('Initial backfill complete', 'smaily-connect'),
       active: true,
-      detail: `${state.contactsBackfill.processed} contacts synced.`,
+      detail: sprintf(
+        /* translators: %d: number of contacts synced. */
+        _n(
+          '%d contact synced.',
+          '%d contacts synced.',
+          state.contactsBackfill.processed,
+          'smaily-connect',
+        ),
+        state.contactsBackfill.processed,
+      ),
     });
   }
 
   // Step 3 — automations -------------------------------------------------
   items.push({
-    label: 'Welcome email',
+    label: __('Welcome email', 'smaily-connect'),
     active: state.welcomeEnabled,
     detail: state.welcomeEnabled
-      ? `${countMappings(state, 'welcome')} workflow(s) mapped`
+      ? sprintf(
+          /* translators: %d: number of mapped workflows. */
+          _n('%d workflow mapped', '%d workflows mapped', countMappings(state, 'welcome'), 'smaily-connect'),
+          countMappings(state, 'welcome'),
+        )
       : undefined,
   });
   items.push({
-    label: 'First-order email',
+    label: __('First-order email', 'smaily-connect'),
     active: state.firstOrderEnabled,
     detail: state.firstOrderEnabled
-      ? `${countMappings(state, 'first_order')} workflow(s) mapped`
+      ? sprintf(
+          /* translators: %d: number of mapped workflows. */
+          _n('%d workflow mapped', '%d workflows mapped', countMappings(state, 'first_order'), 'smaily-connect'),
+          countMappings(state, 'first_order'),
+        )
       : undefined,
   });
   items.push({
-    label: 'Abandoned-cart reminder',
+    label: __('Abandoned-cart reminder', 'smaily-connect'),
     active: state.abandonedCartEnabled,
     detail: state.abandonedCartEnabled
-      ? `${state.abandonedCartCutoffMinutes}-minute cutoff`
+      ? sprintf(
+          /* translators: %d: cutoff in minutes. */
+          __('%d-minute cutoff', 'smaily-connect'),
+          state.abandonedCartCutoffMinutes,
+        )
       : undefined,
   });
 
   // Step 4 — recommendations ---------------------------------------------
   const recActiveCount = Object.values(state.recEngineFeatures).filter(Boolean).length;
   items.push({
-    label: 'Campaign Intelligence',
+    label: __('Campaign Intelligence', 'smaily-connect'),
     active: state.recEngineConnection.kind === 'success',
     detail:
       state.recEngineConnection.kind === 'success'
-        ? `${recActiveCount} of 5 features active`
-        : 'Not connected (optional)',
+        ? sprintf(
+            /* translators: %d: number of active features (out of 5). */
+            __('%d of 5 features active', 'smaily-connect'),
+            recActiveCount,
+          )
+        : __('Not connected (optional)', 'smaily-connect'),
   });
 
   return items;

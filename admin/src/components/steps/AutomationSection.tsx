@@ -1,5 +1,6 @@
 import { type Dispatch } from 'react';
 
+import { __, sprintf } from '@admin/lib/i18n';
 import { useWorkflows } from '../../hooks/useWorkflows';
 import {
   type AutomationMapping,
@@ -61,13 +62,17 @@ export function AutomationSection({
     <Card
       title={title}
       description={description}
-      headerAccessory={isEnabled ? <Pill tone="success">Active</Pill> : <Pill tone="neutral">Off</Pill>}
+      headerAccessory={isEnabled ? <Pill tone="success">{ __( 'Active', 'smaily-connect' ) }</Pill> : <Pill tone="neutral">{ __( 'Off', 'smaily-connect' ) }</Pill>}
     >
       <Toggle
         name={`smly-automation-${trigger}-enabled`}
         checked={isEnabled}
         onChange={(e) => onEnabledChange(e.target.checked)}
-        label={`Enable ${title.toLowerCase()}`}
+        label={sprintf(
+          // translators: %s is the automation name, e.g. "welcome email".
+          __( 'Enable %s', 'smaily-connect' ),
+          title.toLowerCase(),
+        )}
       />
 
       {extras}
@@ -111,9 +116,9 @@ function MultiLanguageRows({
     <table className="w-full text-sm">
       <thead className="text-left text-text-tertiary">
         <tr>
-          <th className="w-1/4 pb-2 font-medium">Language</th>
-          <th className="pb-2 font-medium">Workflow</th>
-          <th className="w-32 pb-2 text-center font-medium">Default fallback</th>
+          <th className="w-1/4 pb-2 font-medium">{ __( 'Language', 'smaily-connect' ) }</th>
+          <th className="pb-2 font-medium">{ __( 'Workflow', 'smaily-connect' ) }</th>
+          <th className="w-32 pb-2 text-center font-medium">{ __( 'Default fallback', 'smaily-connect' ) }</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border-subtle">
@@ -186,7 +191,7 @@ function AutomationRow({
       ? workflows.map((w) => ({
           value: w.id,
           label: w.name,
-          hint: w.status === 'INACTIVE' ? 'inactive' : undefined,
+          hint: w.status === 'INACTIVE' ? __( 'inactive', 'smaily-connect' ) : undefined,
         }))
       : [];
 
@@ -227,11 +232,15 @@ function AutomationRow({
       <tr>
         <td colSpan={3} className="py-3">
           {status === 'error' && error !== null ? (
-            <Banner tone="warning">Couldn&apos;t load workflows: {error}</Banner>
+            <Banner tone="warning">{sprintf(
+              // translators: %s is the error message.
+              __( "Couldn't load workflows: %s", 'smaily-connect' ),
+              error,
+            )}</Banner>
           ) : (
             <Select
               options={options}
-              placeholder={status === 'pending' ? 'Loading workflows…' : '— pick a workflow —'}
+              placeholder={status === 'pending' ? __( 'Loading workflows…', 'smaily-connect' ) : __( '— pick a workflow —', 'smaily-connect' )}
               value={value}
               onChange={handleChange}
               disabled={status !== 'success'}
@@ -247,11 +256,15 @@ function AutomationRow({
       <td className="py-3 align-middle text-text-secondary">{humaniseLocale(language)}</td>
       <td className="py-3 align-middle">
         {status === 'error' && error !== null ? (
-          <Banner tone="warning">Couldn&apos;t load: {error}</Banner>
+          <Banner tone="warning">{sprintf(
+            // translators: %s is the error message.
+            __( "Couldn't load: %s", 'smaily-connect' ),
+            error,
+          )}</Banner>
         ) : (
           <Select
             options={options}
-            placeholder={status === 'pending' ? 'Loading workflows…' : '— pick a workflow —'}
+            placeholder={status === 'pending' ? __( 'Loading workflows…', 'smaily-connect' ) : __( '— pick a workflow —', 'smaily-connect' )}
             value={value}
             onChange={handleChange}
             disabled={status !== 'success'}
@@ -263,7 +276,11 @@ function AutomationRow({
           name={`smly-fallback-${trigger}`}
           checked={mapping?.isDefaultFallback ?? false}
           onChange={handleFallback}
-          aria-label={`Mark ${humaniseLocale(language)} as default fallback`}
+          aria-label={sprintf(
+            // translators: %s is a locale code, e.g. en-US.
+            __( 'Mark %s as default fallback', 'smaily-connect' ),
+            humaniseLocale(language),
+          )}
         />
       </td>
     </tr>
