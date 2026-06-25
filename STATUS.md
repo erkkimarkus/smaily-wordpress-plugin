@@ -52,9 +52,15 @@ integration 114; **a Playwright browser smoke-test confirmed the apiVersion-2→
 render in the WP 7.0 iframe editor with 0 console errors**); version bumped **2.1.0-beta.10
 → 3.0.0** across the header / both constants / package.json / readme Stable-tag+changelog
 +upgrade-notice / the 3 test pins, and **"(BETA)" dropped** from the plugin Name (clears
-PCP `mismatched_plugin_name`). NEXT: build the `--no-dev` release ZIP → final PCP-against-ZIP
-→ GH release (the publish is the open checkpoint). Then upstream-merge prep (remove
-`Update URI`). See `docs/audits/`. Prior:
+PCP `mismatched_plugin_name`). **`v3.0.0` GA RELEASED** — built the `--no-dev` ZIP (974 KB,
+no dev cruft, no `-dirty`, from commit `910f632`); **final `wp plugin check` against the prod
+ZIP = 1 finding, the intentional `Update URI`** (`mismatched_plugin_name` cleared by the BETA
+drop); published as a **full (non-pre-) GitHub release** on the fork
+(`erkkimarkus/smaily-wordpress-plugin`, tag `v3.0.0`, ZIP attached) — `release.yml` fires but
+fails harmlessly (no wp-cli) and does not clobber the asset. **NEXT: upstream-merge prep** —
+remove the `Update URI` header (W-3), reconcile upstream #119 (ABSPATH guards it already
+added) + #120/#128/#132, address the deferred upstream-only polish (inline-script→enqueue,
+React i18n) per `docs/audits/CODE_QUALITY_AUDIT.md`. See `docs/audits/`. Prior:
 **Faas 2: legacy admin settings-page removed (F3-45)** — the
 redundant legacy `Admin` settings page + `Settings`/`Renderer`/`Sanitizer` + partials +
 `smaily-admin.css/js` deleted; the subscription **widget** and Plugins-page **Settings
