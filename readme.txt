@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,9 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.0.1 =
+* Internationalization: the React admin UI (setup wizard + Settings) is now fully translatable, and the plugin ships a complete Estonian translation. No functional change.
 
 = 3.0.0 =
 First general-availability release, graduating the 2.1.0-beta line. Existing settings, credentials and connections are preserved; an in-place update needs no re-import.
@@ -235,8 +238,8 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 
 == Upgrade Notice ==
 
-= 3.0.0 =
-First general-availability release (3.0), graduating the 2.1.0-beta line. Existing settings and connections are preserved — an in-place update needs no re-import. Includes a WordPress.org Plugin Check hardening pass and Block API v3 for the WordPress 7.0 editor.
+= 3.0.1 =
+Translation update: the admin interface is now fully translatable and ships a complete Estonian translation. No functional change; no re-import required.
 
 == Screenshots ==
 

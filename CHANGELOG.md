@@ -4,6 +4,22 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.0.1 — internationalization + Estonian translation (2026-06-25)
+
+- **i18n (W-7):** the React admin UI (~244 strings / 24 components) is now wrapped
+  with a `wp.i18n` shim (`admin/src/lib/i18n.ts`); `wizard.php` enqueues `wp-i18n` +
+  `wp_set_script_translations`. Reproducible catalog build via `bin/build-i18n.sh`
+  (esbuild-transpiles `.tsx` so make-pot can read it; renames the catalog to WP's
+  expected `…-et-464ceaab….json`).
+- **l10n:** complete Estonian translation — all 275 previously-untranslated strings
+  (admin UI + blocks + PHP), plurals + printf placeholders preserved; Playwright-verified
+  full-wizard render.
+- **W-5:** the admin-notice dismiss moved from an inline `<script>` to an enqueued
+  `admin/js/notice-dismiss.js`.
+
+No functional change. (These are the fork-side upstream-readiness items; the
+`Update URI` clobber-guard stays until the actual wordpress.org merge.)
+
 ## 3.0.0 — first general-availability release (2026-06-25)
 
 Graduates the `2.1.0-beta` line (beta.1–beta.10) to GA. Existing settings,
