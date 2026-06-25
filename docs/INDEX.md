@@ -89,7 +89,7 @@ get forgotten.
 |----------|--------------|-------|
 | ~~`SECURITY_AUDIT.md`~~ | — | **Written** (2026-06-25) as [`docs/audits/SECURITY_AUDIT.md`](audits/SECURITY_AUDIT.md): high-risk-surface + broad security pass on the 906cf3d..HEAD delta, wp.org bar, dependency audit. 0 Critical / 0 High. |
 | ~~`CODE_QUALITY_AUDIT.md`~~ | — | **Written** (2026-06-25) as [`docs/audits/CODE_QUALITY_AUDIT.md`](audits/CODE_QUALITY_AUDIT.md): changed-code quality/architecture + full PCP 2.0.0 + plugin-review readiness; carries the 3.0-GA + upstream-merge punch-list. |
-| `UPSTREAM_MERGE_PROPOSAL.md` | When proposing the fork back to Smaily | A summary document for the Smaily team explaining what was done, why, with links to ARCHITECTURE / DECISIONS / `docs/audits/` (SECURITY_AUDIT + CODE_QUALITY_AUDIT). Not yet written. |
+| ~~`UPSTREAM_MERGE_PROPOSAL.md`~~ | — | **Written** (2026-06-25) as [`docs/UPSTREAM_MERGE_PROPOSAL.md`](UPSTREAM_MERGE_PROPOSAL.md): the case + decision request for the Smaily team to take the fork's rewrite over wholesale into the wordpress.org plugin (superset argument, the GCM-vs-CBC + test-coverage comparison, and the prerequisites/prep checklist). Links to DECISIONS + `docs/audits/`. |
 
 ---
 
