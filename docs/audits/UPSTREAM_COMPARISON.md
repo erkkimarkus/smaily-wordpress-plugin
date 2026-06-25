@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-06-12 (fork at `bed2aa6`, upstream tag `2.0.0` = `cb1564b`).
 **Sources:** both codebases inspected directly (upstream tag fetched and read, not
-recalled from memory); `docs/UPSTREAM_AUDIT.md` for the commit-by-commit audit;
+recalled from memory); `docs/audits/UPSTREAM_AUDIT.md` for the commit-by-commit audit;
 `docs/DECISIONS.md` F3-35 for the version-collision background.
 
 ## Context — what each "2.0" actually is
@@ -61,7 +61,7 @@ These two releases share a major version number and a wordpress.org slug
 gender defaulting to male, birthday 1970 fallback, profile fields silently
 dropped, Elementor `failure_url`, checkout-block asset path). Upstream fixed
 them in 1.6.2; the fork cherry-picked all six the same day they were audited
-(`docs/UPSTREAM_AUDIT.md` #121–#126).
+(`docs/audits/UPSTREAM_AUDIT.md` #121–#126).
 
 **Still open upstream (2.0.0):**
 
@@ -102,4 +102,4 @@ relevant if the w.org SVN flow is ever used).
 This is a point-in-time snapshot, not a living register. If upstream ships a
 new release or the fork's feature set changes materially, either refresh the
 snapshot date and affected rows or treat the document as historical. The
-commit-level source of truth for upstream divergence is `docs/UPSTREAM_AUDIT.md`.
+commit-level source of truth for upstream divergence is `docs/audits/UPSTREAM_AUDIT.md`.

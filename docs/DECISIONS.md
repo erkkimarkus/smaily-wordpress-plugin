@@ -239,7 +239,7 @@ protect.
 
 **Context:** the plugin is a fork of `sendsmaily/smaily-wordpress-plugin`. The
 upstream continues to receive commits — bug fixes, compat updates, occasional
-security patches. The first upstream audit (`docs/UPSTREAM_AUDIT.md`,
+security patches. The first upstream audit (`docs/audits/UPSTREAM_AUDIT.md`,
 2026-06-03) found 14 commits accumulated since fork point, including 6 bug
 fixes confirmed reproducible in our fork. Without a deliberate sync rhythm,
 upstream fixes accumulate silently and the fork drifts further from a safe
@@ -251,7 +251,7 @@ with ad-hoc reviews triggered by:
 - Major WordPress or WooCommerce releases (compat-fix likelihood)
 - Pilot-client reports that match an upstream-fixed issue
 
-**Process** (documented in `docs/UPSTREAM_AUDIT.md` as a cumulative log):
+**Process** (documented in `docs/audits/UPSTREAM_AUDIT.md` as a cumulative log):
 
 1. `git fetch upstream`
 2. List commits since the previous audit's HEAD: `git log <prev-audit-head>..upstream/main --oneline`
@@ -277,7 +277,7 @@ with ad-hoc reviews triggered by:
   drift — some upstream changes (PHP/WP minimum version bumps) intentionally
   conflict with our pilot-compatibility targets and must be rejected even when
   upstream considers them progress.
-- **Cumulative log** in `UPSTREAM_AUDIT.md` (rather than ephemeral notes)
+- **Cumulative log** in `docs/audits/UPSTREAM_AUDIT.md` (rather than ephemeral notes)
   means a new contributor or a future Claude session can read the entire fork
   history of sync decisions in one place.
 
@@ -1128,7 +1128,7 @@ logic is identical regardless of endpoint.
   fresh build (customers) before touching the already-synced older endpoints.
 
 **Correction to earlier framing:** browse was mis-categorized as "cleanest /
-already per-item" in `MOCK_DIVERGENCE_AUDIT.md`; it is also all-or-nothing and
+already per-item" in `docs/audits/MOCK_DIVERGENCE_AUDIT.md`; it is also all-or-nothing and
 needs the same retrofit as catalog. The only existing partial-success
 reference is the admin CSV path (`commitCatalog` → `import_errors`), not the
 HTTP endpoints. (Audit doc to be corrected.)

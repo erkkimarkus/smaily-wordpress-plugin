@@ -59,7 +59,7 @@ The plugin connects to Smaily Campaign Intelligence and feeds it product, custom
 
 ### Phase 4 — Pilot stabilization (current)
 
-The plugin side is feature-complete and hardened (Event Log / retry / health notices, version-floor reconciliation, legacy-WC order-backfill verification, a full codebase audit with all fixes landed — see `docs/FABLE_AUDIT.md`). The pilot runs next on a real merchant; general availability and the upstream merge follow a passed pilot (`docs/TESTING.md` defines the pass/fail bar).
+The plugin side is feature-complete and hardened (Event Log / retry / health notices, version-floor reconciliation, legacy-WC order-backfill verification, a full codebase audit with all fixes landed — see `docs/audits/FABLE_AUDIT.md`). The pilot runs next on a real merchant; general availability and the upstream merge follow a passed pilot (`docs/TESTING.md` defines the pass/fail bar).
 
 ---
 
@@ -211,7 +211,7 @@ This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://gith
 - The full legacy `Smaily_Connect` code, so existing 1.x installs continue working
 - Compatibility with all legacy settings, options, and database tables
 
-**Upstream commits relevant to the fork** are tracked in [`docs/UPSTREAM_AUDIT.md`](docs/UPSTREAM_AUDIT.md). Security and bug fixes from upstream are evaluated against the 2.0 codebase and brought over when they apply; refactors and stylistic changes are not.
+**Upstream commits relevant to the fork** are tracked in [`docs/audits/UPSTREAM_AUDIT.md`](docs/audits/UPSTREAM_AUDIT.md). Security and bug fixes from upstream are evaluated against the 2.0 codebase and brought over when they apply; refactors and stylistic changes are not.
 
 ---
 

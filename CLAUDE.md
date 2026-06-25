@@ -199,6 +199,33 @@ datetime field goes through IsoDate.
 (Verify exact paths/scripts against the repo — this list is the working set as
 of orders ingest; update if the build evolves.)
 
+### Audits live in `docs/audits/` — re-run after bigger changes
+All audit reports + the register table live in `docs/audits/` (start at
+`docs/audits/INDEX.md`): the Fable codebase audit, the Security audit, the
+Code-quality + wordpress.org-readiness audit (carries the GA/upstream punch-list),
+the upstream audit + comparison, and the mock↔engine divergence register.
+
+An audit is a snapshot of one repo state — it goes stale as code moves (the
+2026-06-25 audits exist because ~10k lines landed after the 2026-06-11 one). So
+**re-run the security + code-quality audits after a bigger change** — concretely:
+before any GA/non-beta tag or wordpress.org submission; after a large delta
+(rule of thumb > ~2,000 changed plugin lines); or after any change to a
+security-sensitive surface (a REST route, the public `/relay` beacon,
+auth/capability/nonce, crypto, custom-table SQL, what gets stored/logged
+(secrets/PII), GDPR/consent, external HTTP/file I/O). Scope = the delta since the
+last audit's baseline + a security pass on any high-risk surface it touched + PCP
+**against the built ZIP** for a release gate. Record the run as a row in
+`docs/audits/INDEX.md` + a dated report, and note it in STATUS.md. Skipping the
+re-audit on a bigger change is a defect, like a skipped gate. The full policy is
+in `docs/audits/INDEX.md` § Re-audit policy.
+
+**Running PCP (WordPress Plugin Check):** in wp-env —
+`wp plugin install plugin-check --activate` then
+`wp plugin check smaily-connect` (via `sg docker` in the `…-cli-1` container).
+NB: run against the **packaged ZIP** for a real gate — against the dev tree PCP
+trips on dev-only files the `.zipignore` excludes (stray release ZIPs, `.github`,
+configs, `*.md`), which is noise, not findings.
+
 ### Cutting a release ZIP + GH pre-release (the full local sequence)
 `composer run package` ALONE is not a release — it rsync+zips the working tree
 but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,

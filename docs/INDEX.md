@@ -49,7 +49,7 @@ where something is.
 | `PLUGIN_IMPLEMENTATION_WP.md` | Plugin developers | **Exists, partially outdated** | WordPress-specific implementation guide. Updated at Phase 3 end (variant A custom queue replaces old AS-native sketch — see `DECISIONS.md` F3-7). |
 | `STYLE_MAPPING.md` | UI developers | **Exists** | Tailwind tokens, color palette, the layered-input pattern, primitive components. |
 | `FIELD_MAPPING.md` | Plugin developers, integration consumers | **Exists** | Canonical field-naming standard (Smaily WC plugin convention is canonical). Required reading for anyone touching subscriber sync. |
-| `UPSTREAM_COMPARISON.md` | Erkki, strategy/merge reviewers | **Written** (2026-06-12) | Point-in-time comparison of upstream 2.0.0 (a 1.6-line min-versions bump on w.org) vs fork 2.1.0-beta.1: features, stacks, version support, code quality, known problems, the version-collision story. Snapshot, not a living register — `UPSTREAM_AUDIT.md` stays the commit-level source of truth. |
+| **Audits** (`docs/audits/`) | Devs, security / merge reviewers | **Active register** | All audit reports + the register table live in `docs/audits/` — start at [`docs/audits/INDEX.md`](audits/INDEX.md). Holds: codebase audit (Fable), Security audit, Code-quality + wp.org-readiness audit, Upstream audit, Upstream comparison (snapshot), Mock↔engine divergence. The **re-audit policy** (when bigger changes force a fresh pass) lives there too. |
 | `ENGINE_TEAM_PILOT_SYNC.md` | Engine team + Erkki | **Written** (2026-06-12) | Pilot go-live joint-sync brief: what the engine will see from the pilot tenant after beta.2 (synthetic `wc-{id}` keys, catalog backfill jump, orders retry flood, browse sku), the joint verification checklist, contract byte-sync action. Paste into the engine conversation; one-shot doc for the go-live window. |
 | `SPEC_DRAFT_BROWSE_ABANDONED_CART.md` | Engine team + Erkki | **Draft** (2026-06-12, post-pilot 🟡) | Feature spec draft: engine-side abandoned-cart from browse signals for guest-only stores (identity via Smaily-click/checkout merge; order-based suppression; consent gate; F3-37 age-window requirement). BACKLOG 🟡 entry links here. |
 | `TRIGGER_ROADMAP_DRAFT.md` | Erkki, product/strategy | **Draft** (2026-06-12, post-pilot 🟡) | Idea register: Family A = engine-free Woo→Smaily triggers (post-purchase, review ask, cross/upsell, contact-field enrichment, cancellation recovery); Family B = engine-side sweeps (replenishment, win-back, back-in-stock…). Two-tier engine-upsell frame; 2 concrete plugin items (variation-stock hook gap, P10 no-email guard). |
@@ -87,9 +87,9 @@ get forgotten.
 
 | Document | When to write | Notes |
 |----------|--------------|-------|
-| `SECURITY_AUDIT.md` | Phase 3 end | A formal security audit walkthrough: `$wpdb->prepare` coverage, `esc_*` coverage, capability checks, dependency audit. Claude prepares the template, Code runs the audit. |
-| `CODE_QUALITY_AUDIT.md` | Phase 3 end | Checklist for code quality (style, architecture, tests, docs). Code runs through it, generates a report. Used to validate upstream-merge readiness. |
-| `UPSTREAM_MERGE_PROPOSAL.md` | When proposing the fork back to Smaily | A summary document for the Smaily team explaining what was done, why, with links to ARCHITECTURE / DECISIONS / SECURITY_AUDIT / CODE_QUALITY_AUDIT. |
+| ~~`SECURITY_AUDIT.md`~~ | — | **Written** (2026-06-25) as [`docs/audits/SECURITY_AUDIT.md`](audits/SECURITY_AUDIT.md): high-risk-surface + broad security pass on the 906cf3d..HEAD delta, wp.org bar, dependency audit. 0 Critical / 0 High. |
+| ~~`CODE_QUALITY_AUDIT.md`~~ | — | **Written** (2026-06-25) as [`docs/audits/CODE_QUALITY_AUDIT.md`](audits/CODE_QUALITY_AUDIT.md): changed-code quality/architecture + full PCP 2.0.0 + plugin-review readiness; carries the 3.0-GA + upstream-merge punch-list. |
+| `UPSTREAM_MERGE_PROPOSAL.md` | When proposing the fork back to Smaily | A summary document for the Smaily team explaining what was done, why, with links to ARCHITECTURE / DECISIONS / `docs/audits/` (SECURITY_AUDIT + CODE_QUALITY_AUDIT). Not yet written. |
 
 ---
 
@@ -101,4 +101,5 @@ document changes status (e.g. `TODO` → `Exists`), update its row.
 This index is itself a document — keep it current. Stale indexes erode trust faster
 than missing ones.
 
-**Last reviewed:** pilot-hardening P4 (INSTALL.md written)
+**Last reviewed:** 2026-06-25 — `docs/audits/` folder created (audit reports +
+register relocated there); Security + Code-quality/wp.org-readiness audits added.
