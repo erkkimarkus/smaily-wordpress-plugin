@@ -1,5 +1,7 @@
 <?php
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily_Connect\Admin\Notices;
 use Smaily_Connect\Includes\API;
 use Smaily_Connect\Includes\Blocks;

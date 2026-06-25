@@ -135,7 +135,7 @@ class BackfillEndpoint {
 
 	public function start( WP_REST_Request $request ): WP_REST_Response {
 		// Diagnostic — sub-PR 2.H.6.
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect backfill.endpoint.start] requested job_type=%s',
 				(string) $request->get_param( 'job_type' )
@@ -149,7 +149,7 @@ class BackfillEndpoint {
 
 		$job = ( $this->job_factory )( $job_type );
 		if ( ! $job instanceof BackfillJobInterface ) {
-			error_log( '[smaily-connect backfill.endpoint.start] factory returned null — not connected' );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect backfill.endpoint.start] factory returned null — not connected' );
 			return new WP_REST_Response(
 				array(
 					'error'   => 'not_configured',
@@ -163,7 +163,7 @@ class BackfillEndpoint {
 		}
 
 		$job_id = $job->start();
-		error_log( sprintf( '[smaily-connect backfill.endpoint.start] start() returned row_id=%d', $job_id ) );
+		\Smaily\Connect\Support\DebugLog::write( sprintf( '[smaily-connect backfill.endpoint.start] start() returned row_id=%d', $job_id ) );
 
 		// Schedule the first AS tick so backfill processing begins
 		// immediately. The tick handler reschedules itself until the job
@@ -323,6 +323,7 @@ class BackfillEndpoint {
 
 		global $wpdb;
 		$table   = $wpdb->prefix . self::TABLE_SUFFIX;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- direct status update on the custom backfill-state table; write-through, no cache.
 		$updated = $wpdb->update(
 			$table,
 			array(

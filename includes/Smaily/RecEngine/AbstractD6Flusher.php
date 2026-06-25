@@ -219,7 +219,7 @@ abstract class AbstractD6Flusher {
 		}
 
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect] D6 invariant violation on %s ingest: processed(%d) + deduplicated(%d) + errors(%d) != batch(%d). Engine-side bug?',
 				$this->endpoint_label(),

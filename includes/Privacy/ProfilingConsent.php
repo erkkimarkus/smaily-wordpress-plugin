@@ -147,7 +147,7 @@ class ProfilingConsent {
 		} catch ( \Throwable $e ) {
 			// A failed write is non-fatal here; the cache still reflects the WP
 			// intent, and the next read-back reconciles against Smaily.
-			error_log( '[smaily-connect profiling-consent] write failed: ' . $e->getMessage() );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect profiling-consent] write failed: ' . $e->getMessage() );
 		}
 	}
 
@@ -165,7 +165,7 @@ class ProfilingConsent {
 				)
 			);
 		} catch ( \Throwable $e ) {
-			error_log( '[smaily-connect profiling-consent] engine opt-out failed: ' . $e->getMessage() );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect profiling-consent] engine opt-out failed: ' . $e->getMessage() );
 		}
 	}
 
@@ -182,7 +182,7 @@ class ProfilingConsent {
 				)
 			);
 		} catch ( \Throwable $e ) {
-			error_log( '[smaily-connect profiling-consent] engine opt-in failed: ' . $e->getMessage() );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect profiling-consent] engine opt-in failed: ' . $e->getMessage() );
 		}
 	}
 

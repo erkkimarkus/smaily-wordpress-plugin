@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect;
 
+defined( 'ABSPATH' ) || exit;
+
 use Exception;
 use Smaily_Connect\Includes\Helper;
 use Smaily_Connect\Includes\Options;

@@ -303,7 +303,7 @@ class BeaconEndpoint {
 		if ( $dropped > 0 ) {
 			$key = 'smly_profiling_dropped_24h';
 			set_transient( $key, (int) get_transient( $key ) + $dropped, DAY_IN_SECONDS );
-			error_log(
+			\Smaily\Connect\Support\DebugLog::write(
 				sprintf( '[smaily-connect profiling] dropped %d browse event(s) for opted-out contact(s)', $dropped )
 			);
 		}

@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\Elementor;
 
+defined( 'ABSPATH' ) || exit;
+
 use Elementor\Controls_Manager;
 use Elementor\Core\Kits\Documents\Tabs\Global_Colors;
 use Elementor\Group_Control_Typography;

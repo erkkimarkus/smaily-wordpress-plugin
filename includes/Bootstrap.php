@@ -12,6 +12,8 @@ namespace Smaily\Connect;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- internal config exceptions are surfaced to admins / logged, never echoed to a browser.
+
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
@@ -253,7 +255,7 @@ final class Bootstrap {
 	public function on_backfill_tick( string $job_type = 'contacts' ): void {
 		$job = $this->make_backfill_job( $job_type );
 		if ( $job === null ) {
-			error_log( sprintf( '[smaily-connect backfill.tick] no job for job_type=%s (unconfigured or unknown)', $job_type ) );
+			\Smaily\Connect\Support\DebugLog::write( sprintf( '[smaily-connect backfill.tick] no job for job_type=%s (unconfigured or unknown)', $job_type ) );
 			return;
 		}
 
@@ -557,6 +559,7 @@ final class Bootstrap {
 	 * to keep the namespaced classes self-contained.
 	 */
 	public function load_textdomain(): void {
+		// phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- explicit load retained for the private-ZIP distribution; redundant-but-harmless on wp.org (WP 4.6+ auto-loads).
 		load_plugin_textdomain(
 			Constants::TEXT_DOMAIN,
 			false,

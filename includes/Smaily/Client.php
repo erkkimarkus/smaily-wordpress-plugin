@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- exception messages are captured to the Event Log / returned to admin-only read models, never echoed to a browser; output-escaping does not apply.
+
 use Smaily\Connect\Constants;
 
 /**

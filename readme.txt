@@ -231,37 +231,7 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 == Upgrade Notice ==
 
 = 2.1.0-beta.10 =
-Recommended update: the Event Log's Details view now records exactly what was sent to Campaign Intelligence and the engine's reply (previously empty), for much easier diagnosis. Internal cleanup removed the old settings screen — configuration lives in the setup wizard and Settings, using the same options; your subscription widget and settings are unchanged.
-
-= 2.1.0-beta.9 =
-Recommended update: fixes orders that silently never reached Campaign Intelligence — orders in custom WooCommerce statuses (e.g. "label printed"/"shipped") and orders containing a since-deleted product are now sent. Re-run the order import after updating (Campaign Intelligence → Import existing data → Orders) to backfill orders that were skipped before.
-
-= 2.1.0-beta.8 =
-Recommended update if you use Campaign Intelligence browse tracking: the storefront tracking script and its endpoint were renamed so common ad/tracking blockers no longer block them by name, so browse events are recorded for more visitors. No settings change; consent rules are unchanged.
-
-= 2.1.0-beta.7 =
-Recommended update: previously-ordered products you move to the Trash are now kept in Campaign Intelligence as out-of-stock so the engine keeps learning from them (rather than disappearing). Re-run the product import after updating (Campaign Intelligence → Import existing data → Products) to pick up products already in the Trash.
-
-= 2.1.0-beta.6 =
-Safe update: new Campaign Intelligence connections use the production address https://intelligence.smaily.com. Existing connections are unaffected and keep working — no settings change and no re-import required. To move an existing store onto the new address, reconnect with a fresh setup link from Smaily.
-
-= 2.1.0-beta.5 =
-Naming update only: the recommendation engine is now called Smaily Campaign Intelligence in the plugin interface. No data, connection or settings changes; no re-import required.
-
-= 2.1.0-beta.4 =
-Recommended maintenance update: stops failed catalog events for draft/auto-draft products in the Event Log, shows the true synced-product count during catalog import on multilingual stores, and keeps the Event Log's Retry/Details actions reachable. No re-import required.
-
-= 2.1.0-beta.3 =
-Recommended for multilingual stores (WPML / Polylang): translated products are now merged into one recommendation per product — no more language-mixed or duplicated recommendations — with per-language names, descriptions and links. After upgrading, re-run the catalog import; coordinate with Smaily, as the recommendation engine resets the product graph for a clean canonical re-sync.
-
-= 2.1.0-beta.2 =
-Recommended for all stores, essential for stores whose products have no SKUs: product, order and browse sync to the recommendation engine now works without SKUs. After upgrading, re-run the catalog import and use "Retry all failed" in the Event Log to heal previously failed orders.
-
-= 2.1.0-beta.1 =
-Major update. Existing settings and behaviour are preserved — legacy subscriber sync continues unchanged until you complete the new setup wizard. The recommendation-engine features are optional and stay off until you connect them. Stored API credentials are automatically re-encrypted with a stronger scheme on upgrade.
-
-= 1.0.0 =
-If upgrading from individual Smaily plugins to the combined version, please review your settings to ensure all integrations are correctly configured.
+Recommended update: the Event Log Details view now records exactly what was sent to Campaign Intelligence and the engine's reply, for easier diagnosis. Internal cleanup removed the old settings screen — configuration now lives in the setup wizard and Settings (same options).
 
 == Screenshots ==
 

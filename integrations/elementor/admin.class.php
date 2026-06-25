@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\Elementor;
 
+defined( 'ABSPATH' ) || exit;
+
 class Admin {
 	const WIDGET_CATEGORY = SMAILY_CONNECT_PLUGIN_NAME . '-elementor-category';
 

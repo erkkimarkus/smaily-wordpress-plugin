@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\CF7;
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily_Connect\Includes\Helper;
 use Smaily_Connect\Includes\Options;
 use Smaily_Connect\Includes\Smaily_Client;

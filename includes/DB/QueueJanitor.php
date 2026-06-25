@@ -110,7 +110,7 @@ class QueueJanitor {
 			$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
 
 			for ( $batch = 0; $batch < self::MAX_BATCHES_PER_RUN; $batch++ ) {
-				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter
 				$rows = $wpdb->query(
 					$wpdb->prepare(
 						"DELETE FROM {$table} WHERE status = %s AND created_at < %s LIMIT %d",

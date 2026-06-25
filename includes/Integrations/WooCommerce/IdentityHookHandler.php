@@ -125,7 +125,7 @@ class IdentityHookHandler {
 			// 404 customer_not_found (rare — A-filter ingests every registered
 			// user) and transient failures both log + skip: the next
 			// email-carrying browse event binds the session retroactively (§6).
-			error_log( '[smaily-connect identity.merge] ' . $e->getMessage() );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect identity.merge] ' . $e->getMessage() );
 		}
 	}
 

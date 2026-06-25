@@ -11,6 +11,8 @@ namespace Smaily\Connect\Multilingual;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- third-party plugin hooks (WPML / WooCommerce extensions) consumed here, not hooks we define.
+
 /**
  * Implements DetectorInterface against WPML (WordPress Multilingual).
  *

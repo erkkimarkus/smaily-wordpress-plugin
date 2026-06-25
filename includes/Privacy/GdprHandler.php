@@ -170,7 +170,7 @@ class GdprHandler {
 			$export = ( $this->client_factory )()->customer_export( $email );
 		} catch ( ApiException $e ) {
 			if ( $e->getCode() !== 404 ) {
-				error_log( '[smaily-connect gdpr.export] ' . $e->getMessage() );
+				\Smaily\Connect\Support\DebugLog::write( '[smaily-connect gdpr.export] ' . $e->getMessage() );
 			}
 			return array(); // 404 = no engine record; other errors must not fail the whole WP export.
 		}
@@ -265,7 +265,7 @@ class GdprHandler {
 			if ( $e->getCode() === 404 ) {
 				return true; // Already deleted — idempotent success (§9).
 			}
-			error_log( '[smaily-connect gdpr.erase] ' . $e->getMessage() );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect gdpr.erase] ' . $e->getMessage() );
 			return false;
 		}
 	}

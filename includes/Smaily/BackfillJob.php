@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
+
 /**
  * Walks the WP user table in batches of 100, marking each user with a
  * _smaily_synced_at meta on successful upsert so re-runs only touch
@@ -100,8 +102,8 @@ class BackfillJob implements BackfillJobInterface {
 					self::META_KEY
 				)
 			);
-			// phpcs:enable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-			error_log(
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+			\Smaily\Connect\Support\DebugLog::write(
 				sprintf(
 					'[smaily-connect backfill.start] cleared %d freshness markers',
 					is_numeric( $cleared ) ? (int) $cleared : 0
@@ -113,7 +115,7 @@ class BackfillJob implements BackfillJobInterface {
 		// ticks completing with zero work; these lines let us see in
 		// debug.log which decision branch fires. Drop these after the
 		// pilot stabilises (Phase 4).
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect backfill.start] total_users=%d table=%s',
 				$total,
@@ -151,7 +153,7 @@ class BackfillJob implements BackfillJobInterface {
 		$last_error = isset( $wpdb->last_error ) && (string) $wpdb->last_error !== ''
 			? (string) $wpdb->last_error
 			: '(none)';
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect backfill.start] row_id=%d wpdb_last_error=%s',
 				$id,
@@ -191,7 +193,7 @@ class BackfillJob implements BackfillJobInterface {
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $state ) ) {
-			error_log( '[smaily-connect backfill.batch] state row missing — start() was never run or insert failed' );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect backfill.batch] state row missing — start() was never run or insert failed' );
 			return array(
 				'processed' => 0,
 				'remaining' => 0,
@@ -203,7 +205,7 @@ class BackfillJob implements BackfillJobInterface {
 		$users  = $this->fetch_users_after( $after, $batch_size );
 		$synced = 0;
 
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect backfill.batch] state_id=%s status=%s processed=%s/%s cursor_after=%d fetched_users=%d',
 				isset( $state['id'] ) ? (string) $state['id'] : '?',
@@ -228,7 +230,7 @@ class BackfillJob implements BackfillJobInterface {
 				update_user_meta( (int) $user->ID, self::META_KEY, time() );
 				++$synced;
 			} catch ( ApiException $e ) {
-				error_log(
+				\Smaily\Connect\Support\DebugLog::write(
 					sprintf(
 						'[smaily-connect backfill.batch] user_id=%d upsert_failed: %s',
 						(int) $user->ID,
@@ -240,7 +242,7 @@ class BackfillJob implements BackfillJobInterface {
 			}
 		}
 
-		error_log(
+		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
 				'[smaily-connect backfill.batch] synced=%d fresh_skipped=%d',
 				$synced,

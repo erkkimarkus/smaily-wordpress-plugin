@@ -38,7 +38,17 @@ GA/upstream-ready. Punch-list for the 3.0 cut: ABSPATH guard on ~29 shipped lega
 `Name` header, gate ~21 unconditional `error_log()` behind WP_DEBUG, `esc_html`/phpcs
 the ~9 `ExceptionNotEscaped` throws, PCP polish, re-run PCP against the built ZIP. At
 upstream merge: **remove the `Update URI` header** (F3-35 fork-only guard, not allowed on
-wp.org). NOT YET APPLIED — next checkpoint. See `docs/audits/`. Prior:
+wp.org). **Punch-list NOW APPLIED (full PCP-clean, Erkki's call):** ABSPATH guard on the
+~29 legacy files, `error_log` → new `Support\DebugLog` (WP_DEBUG-gated, ~23 sites), file-level
+`phpcs:disable` on the custom-table DAOs + justified ignores (DB/nonce/hookname/textdomain/
+ExceptionNotEscaped), readme Upgrade-Notice trimmed, blocks `apiVersion` 2→3 (⚠️ needs an
+editor smoke-test), `.zipignore` drops stale `dist/partials`+`dist/template` / `BACKLOG.md` /
+`blocks/.eslintrc.cjs` and ships `composer.json`. **`wp plugin check` against the BUILT ZIP is
+clean except the 2 intentional** (`Update URI`=fork guard, `(BETA)`=3.0 cut). ci:strict exit=0
+(unit 374, JS 158). Lesson: run PCP against the ZIP with `--slug` (the dev-tree run hid `dist/`
++ blocks; a wrong unzip-dir name caused 255 false TextDomainMismatch) — CLAUDE.md updated. NEXT:
+3.0 GA cut (drop `(BETA)`, version bump, `--no-dev` ZIP), then upstream-merge prep (remove
+`Update URI`). See `docs/audits/`. Prior:
 **Faas 2: legacy admin settings-page removed (F3-45)** — the
 redundant legacy `Admin` settings page + `Settings`/`Renderer`/`Sanitizer` + partials +
 `smaily-admin.css/js` deleted; the subscription **widget** and Plugins-page **Settings

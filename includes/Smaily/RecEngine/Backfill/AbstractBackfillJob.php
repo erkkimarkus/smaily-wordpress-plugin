@@ -12,6 +12,8 @@ namespace Smaily\Connect\Smaily\RecEngine\Backfill;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
+
 use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\RecEngine\AbstractD6Flusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -96,7 +98,7 @@ abstract class AbstractBackfillJob implements BackfillJobInterface {
 		$total = $this->count_total();
 		$table = $this->table_name();
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query(
 			$wpdb->prepare(
 				"INSERT INTO {$table} (job_type, target, status, total_count, processed_count, started_at) VALUES (%s, %s, %s, %d, %d, %s) ON DUPLICATE KEY UPDATE status = VALUES(status), total_count = VALUES(total_count), processed_count = 0, cursor_value = NULL, started_at = VALUES(started_at), completed_at = NULL, error_message = NULL",
@@ -116,7 +118,7 @@ abstract class AbstractBackfillJob implements BackfillJobInterface {
 				self::TARGET
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
 		return $id;
 	}
@@ -130,7 +132,7 @@ abstract class AbstractBackfillJob implements BackfillJobInterface {
 		$batch_size = $this->batch_size();
 		$table      = $this->table_name();
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 		$state = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT id, cursor_value, processed_count, total_count FROM {$table} WHERE job_type = %s AND target = %s",
@@ -139,7 +141,7 @@ abstract class AbstractBackfillJob implements BackfillJobInterface {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! is_array( $state ) ) {
 			return array(

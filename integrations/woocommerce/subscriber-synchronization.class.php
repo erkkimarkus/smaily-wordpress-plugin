@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\WooCommerce;
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily_Connect\Blocks\Checkout_Optin\Extend_Store_Endpoint;
 use Smaily_Connect\Includes\Helper;
 use Smaily_Connect\Includes\Logger;

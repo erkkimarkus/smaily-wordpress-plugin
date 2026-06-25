@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily\RecEngine;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- exception messages are captured to the Event Log / returned to admin-only read models, never echoed to a browser; output-escaping does not apply.
+
 /**
  * Authenticated calls to https://<engine_base_url>/api/v1/... using
  * the Bearer api_key the merchant exchanged during setup.
@@ -482,7 +484,7 @@ class Client {
 		}
 		$major = (int) $m[1];
 		if ( $major > self::SUPPORTED_MAJOR ) {
-			error_log(
+			\Smaily\Connect\Support\DebugLog::write(
 				sprintf(
 					'[smaily-connect rec-engine] Engine version %s is beyond plugin support range (<=%d.x). Continuing in graceful-degradation mode.',
 					$version,

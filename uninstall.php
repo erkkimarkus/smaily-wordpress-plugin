@@ -31,6 +31,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- top-level uninstall script: locals live in this one-shot file's own scope, not global pollution.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- direct option/meta cleanup on uninstall; table names are $wpdb properties, values are $wpdb->prepare()d.
+
 global $wpdb;
 
 // --- 1. wp_options: every smly_plus_* row + a known legacy set. -----------

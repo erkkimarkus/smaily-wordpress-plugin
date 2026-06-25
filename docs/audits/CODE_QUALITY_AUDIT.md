@@ -13,6 +13,35 @@ pass against the whole shipped surface. Gate purpose: **3.0 GA + upstream merge*
 
 ---
 
+## RESOLUTION — full PCP-clean punch-list applied (2026-06-25)
+
+The §C punch-list was applied the same day (Erkki's call: full PCP-clean before the
+3.0 cut). **`wp plugin check` against the built ZIP is now clean except two
+intentional findings:** `plugin_updater_detected` (the `Update URI` header — the
+F3-35 fork clobber-guard, removed at the upstream merge) and `mismatched_plugin_name`
+(the `(BETA)` suffix in the plugin Name header — dropped at the 3.0 GA bump). Gates:
+**ci:strict exit=0 (PHPUnit 374, JS 158)**. What changed:
+
+- **ABSPATH guard** added to the ~29 shipped legacy PHP files (new PSR-4 code already had it).
+- **`error_log`** routed through a new `Support\DebugLog` (WP_DEBUG-gated, single phpcs:ignore chokepoint); ~23 call sites converted.
+- **DB sniffs** (`DirectQuery`/`NoCaching`/`UnescapedDBParameter`/`UnquotedComplexPlaceholder`/`SchemaChange`) suppressed via file-level `phpcs:disable` on the custom-table data-access classes + targeted line ignores; the existing per-query `WordPress.DB.PreparedSQL.*` disables (needed by local PHPCS) were preserved, and a few bare `phpcs:enable` lines that were re-enabling my file-level disable were trimmed.
+- **`ExceptionNotEscaped`** suppressed on the exception-throwing API-client classes (messages go to the Event Log, never echoed).
+- **Nonce / hookname / prefix / textdomain** false-positives suppressed with justified ignores (legacy display reads, third-party WPML/WC hooks, uninstall/template globals).
+- **readme** Upgrade Notice trimmed to a single ≤300-char entry; **blocks `apiVersion` 2→3** (WP 7.0 iframe-editor requirement — ⚠️ needs a block-editor smoke-test before release); **`.zipignore`** extended to drop stale unused `dist/partials` + `dist/template` (the code only ever loads `public/…`), `BACKLOG.md`, `blocks/.eslintrc.cjs`, and to **ship `composer.json`** (PCP wants it whenever `vendor/` ships).
+
+> **Operational lesson — run PCP against the built ZIP, with `--slug`.** The dev-tree
+> run (`wp plugin check smaily-connect`) was *misleading*: it hid `dist/` duplicate
+> templates, the `blocks/` tree, and which files actually ship — so it under-reported.
+> And unzipping the package to any dir whose name ≠ the text domain makes PCP expect
+> that dir name as the text domain → **hundreds of false `TextDomainMismatch` errors**.
+> The authoritative gate is: build the ZIP, unzip it, and
+> `wp plugin check <dir> --slug=smaily-connect --exclude-directories=vendor`. Recorded
+> in CLAUDE.md. **For the actual release ZIP, also `composer install --no-dev` first**
+> (this validation ZIP shipped the dev vendor; vendor was excluded from the check, but
+> the real release must not ship phpunit et al.).
+
+---
+
 ## A. Code-quality & architecture (changed code: 906cf3d..HEAD)
 
 **Strengths (what's done well):**

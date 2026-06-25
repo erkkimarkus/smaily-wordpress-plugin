@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\WooCommerce;
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily_Connect\Includes\Options;
 
 class Profile_Settings {
@@ -188,6 +190,7 @@ class Profile_Settings {
 	 * @return int $user_id Current user ID
 	 */
 	public function smaily_get_edit_user_id() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- int-cast read used only to scope a profile lookup; the form-save path verifies the nonce (see docblock).
 		return isset( $_GET['user_id'] ) ? (int) $_GET['user_id'] : get_current_user_id();
 	}
 

@@ -219,12 +219,27 @@ last audit's baseline + a security pass on any high-risk surface it touched + PC
 re-audit on a bigger change is a defect, like a skipped gate. The full policy is
 in `docs/audits/INDEX.md` § Re-audit policy.
 
-**Running PCP (WordPress Plugin Check):** in wp-env —
-`wp plugin install plugin-check --activate` then
-`wp plugin check smaily-connect` (via `sg docker` in the `…-cli-1` container).
-NB: run against the **packaged ZIP** for a real gate — against the dev tree PCP
-trips on dev-only files the `.zipignore` excludes (stray release ZIPs, `.github`,
-configs, `*.md`), which is noise, not findings.
+**Running PCP (WordPress Plugin Check):** in wp-env (PCP plugin installed via
+`wp plugin install plugin-check --activate`). **Run it against the BUILT ZIP, not
+the dev tree** — `composer run package` → `docker cp` the zip into the `…-cli-1`
+container → unzip into `wp-content/plugins/<dir>` → `wp plugin check <dir>
+--slug=smaily-connect --format=csv --allow-root --exclude-directories=vendor`.
+Two gotchas that cost real time (2026-06-25, the pre-3.0 PCP-clean pass):
+- **The dev-tree run UNDER-reports.** `wp plugin check smaily-connect` (the mounted
+  working tree) hides `dist/` duplicate templates, the `blocks/` tree, and which files
+  actually ship; it reads clean while the ZIP is not. The packaged ZIP is the only
+  honest gate. (Conversely it also trips on dev-only `*.zip`/`.github`/`*.md`/configs
+  that `.zipignore` excludes — noise, not findings.)
+- **Always pass `--slug=smaily-connect`.** PCP infers the expected text domain from
+  the plugin DIRECTORY name; unzip to any other dir (`smaily-connect-pkg`, …) and every
+  `__( …, 'smaily-connect' )` call becomes a false `TextDomainMismatch` (hundreds of
+  them). `--slug` pins the expected domain.
+- For the **real release ZIP**, `composer install --no-dev --optimize-autoloader`
+  before `composer run package` (else the ZIP ships phpunit et al.); ship `composer.json`
+  (PCP flags `missing_composer_json_file` when `vendor/` ships without it).
+Two findings are intentional and remain until specific milestones: `plugin_updater_detected`
+(the `Update URI` clobber-guard, F3-35 — removed at the upstream merge) and, while still
+a beta, `mismatched_plugin_name` (the `(BETA)` Name suffix — dropped at the 3.0 GA bump).
 
 ### Cutting a release ZIP + GH pre-release (the full local sequence)
 `composer run package` ALONE is not a release — it rsync+zips the working tree

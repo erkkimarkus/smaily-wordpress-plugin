@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Integrations\WooCommerce;
 
+defined( 'ABSPATH' ) || exit;
+
 use Smaily_Connect\Includes\Options;
 use Smaily_Connect\Includes\Helper;
 

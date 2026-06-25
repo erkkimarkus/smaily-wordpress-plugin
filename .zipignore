@@ -8,7 +8,7 @@
 /assets
 /compose.min.yaml
 /compose.yaml
-/composer.*
+/composer.lock
 /contributing.md
 /Dockerfile
 /phpcs.xml
@@ -79,3 +79,7 @@
 /languages/.gitignore
 /languages/*.po
 /languages/*.pot
+/BACKLOG.md
+/dist/partials
+/dist/template
+/blocks/.eslintrc.cjs

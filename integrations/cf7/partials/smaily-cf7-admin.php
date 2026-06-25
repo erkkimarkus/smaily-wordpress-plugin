@@ -1,5 +1,7 @@
 <?php
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound, WordPress.Security.NonceVerification.Recommended -- display partial: reads a GET value only to render (sanitized), no state change; locals are file-scoped.
+
 // Exit if accessed directly
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

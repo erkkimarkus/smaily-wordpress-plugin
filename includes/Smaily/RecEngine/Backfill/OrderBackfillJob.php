@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily\RecEngine\Backfill;
 
 defined( 'ABSPATH' ) || exit;
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
+
 use Automattic\WooCommerce\Utilities\OrderUtil;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\RecEngine\OrderFlusher;

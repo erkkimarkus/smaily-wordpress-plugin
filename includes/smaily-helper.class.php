@@ -5,6 +5,8 @@
 
 namespace Smaily_Connect\Includes;
 
+defined( 'ABSPATH' ) || exit;
+
 class Helper {
 	/**
 	 * Make a request to Smaily asking for autoresponders.
@@ -360,6 +362,7 @@ class Helper {
 	 * @return string|bool 'success' or 'error' if the URL contains a code, false otherwise.
 	 */
 	public static function get_optin_form_response_type() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- reads a Smaily redirect response code for display; external redirect, not a form post to us, so nonce N/A.
 		$code       = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : null;
 		$is_success = $code === '101';
 		$is_error   = $code && ! $is_success;

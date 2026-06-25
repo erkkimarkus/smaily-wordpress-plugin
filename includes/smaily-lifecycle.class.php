@@ -2,6 +2,10 @@
 
 namespace Smaily_Connect\Includes;
 
+defined( 'ABSPATH' ) || exit;
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
+
 require_once SMAILY_CONNECT_PLUGIN_PATH . 'integrations/woocommerce/cart.class.php';
 
 use Smaily_Connect\Integrations\WooCommerce\Cart;
@@ -253,6 +257,7 @@ class Lifecycle {
 	 *
 	 */
 	public function set_locale() {
+		// phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- explicit load retained for the private-ZIP distribution; redundant-but-harmless on wp.org (WP 4.6+ auto-loads).
 		load_plugin_textdomain(
 			'smaily-connect',
 			false,

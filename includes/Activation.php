@@ -84,6 +84,7 @@ final class Activation {
 		// Array-shaped credential options: the legacy default + per-account.
 		$option_keys = array( Settings\Credentials::LEGACY_OPTION_KEY );
 		$like        = $wpdb->esc_like( Settings\Credentials::PHASE2_OPTION_PREFIX ) . '%';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time option_name scan on (de)activation; nothing to cache.
 		$per_account = $wpdb->get_col(
 			$wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like )
 		);
@@ -183,7 +184,7 @@ final class Activation {
 
 		$before = $auditor->audit_before_clear();
 		if ( ! empty( $before ) ) {
-			error_log(
+			\Smaily\Connect\Support\DebugLog::write(
 				sprintf(
 					'[smaily-connect] WP-Cron audit before clear: %s',
 					wp_json_encode( $before )
@@ -195,7 +196,7 @@ final class Activation {
 
 		$survivors = $auditor->audit_after_clear();
 		if ( ! empty( $survivors ) ) {
-			error_log(
+			\Smaily\Connect\Support\DebugLog::write(
 				sprintf(
 					'[smaily-connect] WP-Cron audit AFTER clear still shows %s — investigate (custom plugin re-scheduling?)',
 					wp_json_encode( $survivors )

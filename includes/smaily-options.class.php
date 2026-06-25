@@ -2,6 +2,8 @@
 
 namespace Smaily_Connect\Includes;
 
+defined( 'ABSPATH' ) || exit;
+
 class Options {
 	/**
 	 * Default values for subscriber sync fields.

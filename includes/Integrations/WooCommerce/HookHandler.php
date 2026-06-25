@@ -212,7 +212,7 @@ class HookHandler {
 		if ( ! self::$gate_logged && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			self::$gate_logged = true;
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			error_log( '[smaily-connect] Live sync deferred: smly_plus_setup_completed is false; legacy Smaily sync owns WooCommerce events until the setup wizard is finished.' );
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect] Live sync deferred: smly_plus_setup_completed is false; legacy Smaily sync owns WooCommerce events until the setup wizard is finished.' );
 		}
 
 		return true;
