@@ -46,8 +46,14 @@ editor smoke-test), `.zipignore` drops stale `dist/partials`+`dist/template` / `
 `blocks/.eslintrc.cjs` and ships `composer.json`. **`wp plugin check` against the BUILT ZIP is
 clean except the 2 intentional** (`Update URI`=fork guard, `(BETA)`=3.0 cut). ci:strict exit=0
 (unit 374, JS 158). Lesson: run PCP against the ZIP with `--slug` (the dev-tree run hid `dist/`
-+ blocks; a wrong unzip-dir name caused 255 false TextDomainMismatch) — CLAUDE.md updated. NEXT:
-3.0 GA cut (drop `(BETA)`, version bump, `--no-dev` ZIP), then upstream-merge prep (remove
++ blocks; a wrong unzip-dir name caused 255 false TextDomainMismatch) — CLAUDE.md updated.
+**Then the 3.0.0 GA cut STARTED:** all tests green first (ci:strict unit 374 / JS 158;
+integration 114; **a Playwright browser smoke-test confirmed the apiVersion-2→3 blocks
+render in the WP 7.0 iframe editor with 0 console errors**); version bumped **2.1.0-beta.10
+→ 3.0.0** across the header / both constants / package.json / readme Stable-tag+changelog
++upgrade-notice / the 3 test pins, and **"(BETA)" dropped** from the plugin Name (clears
+PCP `mismatched_plugin_name`). NEXT: build the `--no-dev` release ZIP → final PCP-against-ZIP
+→ GH release (the publish is the open checkpoint). Then upstream-merge prep (remove
 `Update URI`). See `docs/audits/`. Prior:
 **Faas 2: legacy admin settings-page removed (F3-45)** — the
 redundant legacy `Admin` settings page + `Settings`/`Renderer`/`Sanitizer` + partials +

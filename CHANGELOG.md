@@ -4,6 +4,23 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.0.0 — first general-availability release (2026-06-25)
+
+Graduates the `2.1.0-beta` line (beta.1–beta.10) to GA. Existing settings,
+credentials and connections are preserved; an in-place update needs no re-import.
+
+- **Sync:** WooCommerce → Smaily Campaign Intelligence — catalog, customers, orders
+  and consent-gated browse tracking; backfill of existing data; Event Log with
+  per-row retry and the stored request/response (F3-44); GDPR export / erase /
+  opt-out; multilingual canonical SKU + `{lang:value}` payloads (CC.1–CC.4);
+  order-sync data-loss fixes (F3-42/F3-43); trashed products kept as
+  `in_stock=false` (F3-40); browse beacon renamed off ad-block lists (F3-41).
+- **Hardening:** WordPress.org Plugin Check pass — ABSPATH guards across the legacy
+  layer, `error_log` gated behind `WP_DEBUG` via `Support\DebugLog`, justified
+  `phpcs:ignore`s for custom-table queries / internal exceptions; editor blocks
+  moved to Block API v3 for the WordPress 7.0 iframe editor; `.zipignore` slimmed.
+- The `Update URI` clobber-guard (F3-35) stays until the upstream merge.
+
 ## 2.1.0-beta.6 — engine default URL → intelligence.smaily.com (2026-06-16)
 
 The recommendation engine moved to its production domain

@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 2.1.0-beta.10
+Stable tag: 3.0.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.0.0 =
+First general-availability release, graduating the 2.1.0-beta line. Existing settings, credentials and connections are preserved; an in-place update needs no re-import.
+* WooCommerce → Smaily Campaign Intelligence sync: catalog, customers, orders and consent-gated browse tracking, with backfill of existing data, an Event Log (with per-row retry and the request/response detail), and GDPR export / erase / opt-out.
+* Hardening: WordPress.org Plugin Check pass (sanitization, escaping, prefixing, ABSPATH guards); editor blocks updated to Block API v3 for the WordPress 7.0 iframe editor; diagnostics gated behind WP_DEBUG.
 
 = 2.1.0-beta.10 =
 
@@ -230,8 +235,8 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 
 == Upgrade Notice ==
 
-= 2.1.0-beta.10 =
-Recommended update: the Event Log Details view now records exactly what was sent to Campaign Intelligence and the engine's reply, for easier diagnosis. Internal cleanup removed the old settings screen — configuration now lives in the setup wizard and Settings (same options).
+= 3.0.0 =
+First general-availability release (3.0), graduating the 2.1.0-beta line. Existing settings and connections are preserved — an in-place update needs no re-import. Includes a WordPress.org Plugin Check hardening pass and Block API v3 for the WordPress 7.0 editor.
 
 == Screenshots ==
 
