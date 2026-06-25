@@ -47,6 +47,9 @@ echo "4/6  make-mo (PHP translations)"
 wpc make-mo languages/ languages/
 
 echo "5/6  make-json with use-map (collapse admin sources into one catalog) + rename to WP's name"
+# Drop stale catalogs first so the "most strings" pick below can't latch onto a
+# previous run's already-renamed file (make-json --no-purge regenerates them all).
+rm -f languages/smaily-connect-${LANG}-*.json
 python3 - <<'PY'
 import json, glob
 json.dump({ p: "dist/admin/admin.js" for p in sorted(glob.glob('_i18n-src/**/*.js', recursive=True)) },
