@@ -26,7 +26,18 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-25 (**Pre-3.0 GA audit pass** — three read-only audits on the
+_Last updated: 2026-06-25 (**`v3.0.1` RELEASED** — full GitHub release on the fork
+(`erkkimarkus/smaily-wordpress-plugin`, build `a34ed40`, ZIP 966 KB attached): the React
+admin UI internationalization (W-7) + the W-5 enqueue refactor + a **complete Estonian
+translation** (all 275 strings; admin UI + blocks + PHP). Translation-only, no functional
+change. `bin/build-i18n.sh` rebuilds `languages/*.mo`/`*.json` (incl. the admin-bundle
+catalog `…-et-464ceaab….json`) reproducibly. Gates: ci:strict exit=0 (unit 374, JS 158);
+integration OK 114; Playwright-verified full-wizard Estonian render (0 console errors); PCP
+against the ZIP clean bar the intentional `Update URI`. These are the fork-side
+upstream-readiness items (see `docs/UPSTREAM_MERGE_PROPOSAL.md`); **W-3** (remove `Update
+URI`) stays until the actual wp.org merge, and the full-ET review by a native speaker +
+upstream #119/#120/#128/#132 + the Smaily go/no-go remain. Prior: **Pre-3.0 GA audit pass**
+— three read-only audits on the
 `906cf3d..HEAD` delta (~151 files / +10.4k lines since the 2026-06-11 Fable audit):
 Security, Code-quality + wordpress.org-readiness (incl. `wp plugin check` PCP 2.0.0),
 relocated with the existing audit docs into a new **`docs/audits/`** folder + register
