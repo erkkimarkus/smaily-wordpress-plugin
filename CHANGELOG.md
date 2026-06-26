@@ -4,6 +4,21 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.1.0 — recommendation attribution: server-side landing capture (2026-06-26)
+
+- **Rec attribution (F3-46):** new `Integrations\WooCommerce\LandingCapture` captures the
+  recommendation id an email rec link carries (`smaily_rec`, or `utm_content` guarded by
+  `utm_source=smaily`) **server-side** on `template_redirect` into the first-party cookie the
+  checkout already stamps onto the order — so the engine can attribute purchases to email
+  recommendations. Fixes the pilot's empty attribution (374 orders / 30d, 0 `smaily_rec_id`):
+  the only capture path used to be client-side JS gated behind browse-tracking + marketing
+  consent + not-ad-blocked, so it never fired. Now decoupled from the browse beacon: captured
+  unconditionally when the engine is connected (a first-party functional signal — a rec id +
+  an opaque visitor token, no personal data on their own), gated by the
+  `smaily_connect_capture_attribution` filter. Follows the contract's cookie model
+  (`smaily_rec` → `smaily_rec_id`), not the brief's `smre_*`. Zero downstream change
+  (`HookHandler` / `OrderPayloadBuilder` already read these cookies/meta). DECISIONS F3-46.
+
 ## 3.0.1 — internationalization + Estonian translation (2026-06-25)
 
 - **i18n (W-7):** the React admin UI (~244 strings / 24 components) is now wrapped

@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.0.1
+Stable tag: 3.1.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,9 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.1.0 =
+* Recommendation attribution (landing capture): when a shopper clicks a product recommendation in a Smaily email and lands on the shop, the plugin now captures the recommendation id server-side and attaches it to the resulting order, so the engine can credit the purchase to the recommendation. Captured as a first-party functional cookie, independent of the browse-tracking consent toggle; disable with the `smaily_connect_capture_attribution` filter.
 
 = 3.0.1 =
 * Internationalization: the React admin UI (setup wizard + Settings) is now fully translatable, and the plugin ships a complete Estonian translation. No functional change.
@@ -237,6 +240,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.1.0 =
+Recommendation attribution: rec-link clicks are now captured server-side and attached to orders, so the engine can credit purchases to email recommendations. No re-import required.
 
 = 3.0.1 =
 Translation update: the admin interface is now fully translatable and ships a complete Estonian translation. No functional change; no re-import required.
