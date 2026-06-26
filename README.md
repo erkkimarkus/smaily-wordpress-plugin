@@ -96,6 +96,8 @@ The integration suite covers the boundary cases where unit tests can mislead (se
 
 **Browse-beacon consent.** The storefront beacon never sends an event or sets a tracking cookie without marketing consent, resolved as: a site-provided JS override → the **WP Consent API** (`wp_has_consent('marketing')`, native to CookieYes, Complianz, Real Cookie Banner, …) → fail-safe deny. For a non-WP-Consent-API plugin (Cookiebot, custom), adapt it through the escape-hatch without code changes — the `smaily_connect_beacon_consent_category` PHP filter (if you categorise tracking as something other than `marketing`) or a `window.smailyConnectBeacon.consentOverride` JS callback pointed at your plugin's consent state.
 
+**Recommendation attribution (landing capture).** Separate from the browse beacon: when a shopper clicks a product recommendation in a Smaily email, they land on your shop with the recommendation id in the URL. The plugin captures it **server-side** (on `template_redirect`, only when the engine is connected) into a first-party functional cookie that is then attached to the resulting order — so the engine can credit the purchase to the recommendation. This is a functional attribution signal (a recommendation id + an opaque visitor token, no personal data on their own) and is captured independently of the browse-tracking consent gate above. To disable it entirely, return false from the `smaily_connect_capture_attribution` PHP filter.
+
 ---
 
 ## Relationship to upstream

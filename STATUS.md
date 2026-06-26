@@ -26,7 +26,25 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-25 (**`v3.0.1` RELEASED** — full GitHub release on the fork
+_Last updated: 2026-06-26 (**F3-46 DONE — server-side rec-attribution landing capture**.
+Engine brief `PLUGIN_BRIEF_woo_rec_link_redirect.md` (rev 2): prod shows 374 orders/30d, 0
+with `smaily_rec_id` — attribution empty. Root cause: the capture→stamp→send chain already
+existed end-to-end (`HookHandler` reads cookie `smaily_rec_id` → order meta → `OrderPayloadBuilder`),
+but the ONLY cookie producer was client-side JS (`StorefrontBeacon`/`captureUrlParams`), gated
+behind browse-tracking + marketing consent + not-ad-blocked → it never fired on the pilot. Fix:
+new `Integrations\WooCommerce\LandingCapture` on `template_redirect` writes the SAME cookies
+server-side, ungated by the beacon path (DECISIONS F3-46). **Two decisions (Erkki):** (1)
+**follow the contract, not the brief** — capture `smaily_rec`→`smaily_rec_id`/`smaily_vt`→`smaily_rec_uid`/`smaily_ctx`→`smaily_rec_ctx`
+(the brief's `smre_*`/`utm_content`/90d diverge from the byte-synced §"Cookie names"); accept
+`utm_content` only as a fallback guarded by `utm_source=smaily`+uuid; **feedback sent to the
+engine team** to realign their brief; (2) **capture unconditionally when connected** — rec
+attribution is a first-party functional signal (rec_id uuid + opaque visitor token, no PII),
+decoupled from the browse beacon; browse/Layer-2 consent stays separate; `smaily_connect_capture_attribution`
+filter is the escape-hatch. Zero downstream change (no HookHandler/builder edit). Out of scope:
+the brief's optional redirect endpoint (§3.4, YAGNI), Layer-2 site-wide vid, the pre-existing
+block-checkout stamping gap. Gates: ci:strict exit=0 (unit 391 +17, JS 158); integration OK 119
+(+5). **The real click→land→buy→attribute round-trip is a manual pilot check** (server path is
+unit+integration-proven; the browser moment is not walk-coverable). Prior: **`v3.0.1` RELEASED** — full GitHub release on the fork
 (`erkkimarkus/smaily-wordpress-plugin`, build `a34ed40`, ZIP 966 KB attached): the React
 admin UI internationalization (W-7) + the W-5 enqueue refactor + a **complete Estonian
 translation** (all 275 strings; admin UI + blocks + PHP). Translation-only, no functional

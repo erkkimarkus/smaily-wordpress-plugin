@@ -346,6 +346,32 @@ is NOT observable from a server-side proxy walk. Coverage is split:
 Do NOT claim the live-walk validates checkout/page-view timing — it validates
 the engine contract, not the browser render moment.
 
+### Rec attribution capture is SERVER-SIDE (LandingCapture) — separate from the browse beacon
+`Integrations\WooCommerce\LandingCapture` (F3-46) captures the recommendation
+attribution params an email rec link carries (`smaily_rec`/`smaily_vt`/`smaily_ctx`,
+or `utm_content` guarded by `utm_source=smaily`) into the first-party cookies the
+checkout already stamps onto the order — on `template_redirect`, **ungated by the
+browse beacon's toggle/consent/ad-block path**. This is the missing piece behind the
+pilot's "374 orders / 0 `smaily_rec_id`": the cookie producer used to be JS-only
+(`StorefrontBeacon`/`captureUrlParams`), which never ran with browse-tracking off.
+Two things that must stay true:
+- **It writes the SAME cookies `HookHandler::save_attribution_cookies_to_order()`
+  reads** (`smaily_rec_id`/`smaily_rec_uid`/`smaily_rec_ctx`, names+TTLs from the
+  engine config — the contract §"Cookie names", NOT the brief's `smre_*`/90d). Do not
+  rename to a parallel cookie set; the whole point is zero downstream change.
+- **Attribution capture is consent-UNgated (Erkki, F3-46)** — first-party functional
+  signal, gated only on `is_connected()` + the `smaily_connect_capture_attribution`
+  filter. Browse telemetry (Layer 2) stays consent-gated (StorefrontBeacon). Don't
+  fold attribution back behind the browse consent gate.
+- **`headers_already_sent()` is a test seam** — PHPUnit's own progress output makes the
+  bare `headers_sent()` true mid-suite, so both the unit and integration tests override
+  it; never inline `headers_sent()` back or the write-path tests can't run.
+
+The click→land→buy→attribute round-trip (does the cookie set on a real landing, does a
+test purchase carry `smaily_rec_id`, does the engine credit it via path-1) is a **manual
+pilot check** — like browse timing, the server path is unit+integration-proven but the
+browser moment isn't live-walk-coverable.
+
 ### OrderBackfill — which storage path the tests actually cover (HPOS vs legacy)
 OrderBackfillJob (3.5.2) reads orders with a direct `WHERE id > cursor` query
 against whichever table is active — `wc_orders` (HPOS) or `wp_posts` (legacy) —

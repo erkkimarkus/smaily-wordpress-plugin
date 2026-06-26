@@ -2320,6 +2320,64 @@ exit=0; integration OK 114 (the plugin boots with the legacy admin gone).
 **Relationships:** F1 (the Settings-link repoint this completes); 2.H.3 (legacy-menu
 hide, now removed as moot); the coexistence model (`setup_completed`) — untouched.
 
+### F3-46 — Server-side landing capture of rec attribution (decoupled from the browse beacon)
+
+**Context:** the engine brief `PLUGIN_BRIEF_woo_rec_link_redirect.md` (rev 2,
+2026-06-26): production shows **374 orders / 30 days, 0 carry `smaily_rec_id`** — rec
+attribution is empty. The rec link (built by engine `lib/sync/url-builder.ts`) lands on
+the merchant's own product page carrying `utm_source=smaily`, `utm_content=<rec_id>`,
+**and** the engine's own `smaily_rec` / `smaily_vt` / `smaily_ctx` params. The
+capture→stamp→send chain ALREADY existed end-to-end: `HookHandler::
+save_attribution_cookies_to_order()` reads cookie `smaily_rec_id` → order meta
+`_smaily_rec_id`, and `OrderPayloadBuilder` forwards it. The ONLY missing piece was the
+**producer** of that cookie: the sole capture path was client-side JS
+(`StorefrontBeacon` → `beacon-core.ts captureUrlParams`), which only runs when
+browse-tracking is enabled AND marketing consent is granted AND `sc-runtime.js` isn't
+ad-blocked — so on the pilot it never fired and the `rec_id` fell on the floor.
+
+**Decision (implemented, 2026-06-26):** add `Integrations\WooCommerce\LandingCapture`
+on `template_redirect` — a server-side producer of the SAME cookies the checkout
+stamping already consumes. Zero downstream change (no HookHandler / OrderPayloadBuilder
+edit). Specifics:
+- **Source param — follow the contract, not the brief literally (Erkki).** The brief
+  proposes capturing `utm_content` into new `smre_rec`/`smre_vid` cookies (90d/365d). The
+  byte-synced contract (§"Cookie names") instead sources `smaily_rec` → `smaily_rec_id`
+  (30d) / `smaily_vt` → `smaily_rec_uid` (365d) / `smaily_ctx` → `smaily_rec_ctx` (30d),
+  and even states *"the engine does NOT use `utm_content` for `rec_id`"* (which the engine
+  CODE contradicts). We capture **`smaily_rec` primarily** and accept **`utm_content` only
+  as a fallback guarded by `utm_source=smaily` + a strict uuid shape** (utm_content is a
+  shared GA/ads param). Cookie names + TTLs come from the stored engine config (same
+  source `StorefrontBeacon` reads), so the server-set and JS-set cookies are identical.
+  **Feedback sent to the engine team** to realign their brief + the §162 contract note
+  with `url-builder.ts`.
+- **Consent — captured UNCONDITIONALLY when connected (Erkki).** Recommendation
+  attribution is a first-party functional signal (a rec_id uuid + an opaque visitor
+  token, not PII on their own); tying engine recommendations to real purchases is the
+  whole point, and it must not depend on the browse-beacon's toggle/consent/ad-block
+  path. **Browse telemetry (Layer 2) stays separately gated** behind the browse-tracking
+  toggle + marketing consent (`StorefrontBeacon` unchanged). Escape-hatch: the
+  `smaily_connect_capture_attribution` filter (default true) disables it.
+- **Gates:** `is_connected()` (rec links exist only for a connected tenant; orders ingest
+  only then) + trigger-param presence (fast bail on every ordinary request) +
+  `headers_sent()` guard (a `headers_already_sent()` seam so tests can exercise the write
+  path past PHPUnit's own output). Cookie attributes mirror the contract: `Path=/`,
+  Domain = `COOKIE_DOMAIN`, `SameSite=Lax`, `Secure` on https, `HttpOnly=false` (the
+  beacon proxy reads them client-side). `$_COOKIE` is kept coherent within the request.
+- **Scope:** Layer 1 only. NOT built: the brief's optional redirect endpoint (§3.4,
+  YAGNI), the Layer-2 site-wide `smre_vid` generation, and a fix for the pre-existing
+  block-checkout (`woocommerce_store_api_checkout_order_processed`) stamping gap (classic
+  checkout only, as today).
+
+**Gates:** ci:strict exit=0 (unit 391 +17, JS 158, PHPStan clean, PHPCS 0 errors);
+integration OK 119 (+5). **Browser-moment verification (does the cookie actually set on a
+real rec-link landing, and does a test purchase carry `smaily_rec_id`) is a manual pilot
+check** — like the browse render-timing, the server-side path is unit+integration-proven
+but the real click→land→buy→attribute round-trip is pilot-verified.
+
+**Relationships:** F3-41 (`StorefrontBeacon` / the JS `captureUrlParams` this complements
+server-side); the contract §"Cookie names"; F3-42/F3-43 (the order ingest this feeds);
+`PLUGIN_BRIEF_order_sync_reliability.md` (the order-side receiver).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

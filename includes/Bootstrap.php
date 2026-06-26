@@ -18,6 +18,7 @@ use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
+use Smaily\Connect\Integrations\WooCommerce\LandingCapture;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
 use Smaily\Connect\DB\QueueJanitor;
@@ -173,6 +174,14 @@ final class Bootstrap {
 		// front-end-only hook; StorefrontBeacon::enqueue() self-gates on
 		// connected + browse-tracking + WooCommerce active.
 		( new StorefrontBeacon( new RecEngineSettings() ) )->register();
+
+		// Server-side recommendation-attribution capture (Layer 1). On
+		// template_redirect it reads the `smaily_rec`/`smaily_vt`/`smaily_ctx`
+		// (or guarded `utm_content`) the email rec link carries and writes the
+		// first-party cookies the checkout stamps onto the order — ungated by the
+		// beacon's browse-toggle/consent/ad-block path, so attribution works even
+		// when the JS beacon never runs. Self-gates on the engine connection.
+		( new LandingCapture( new RecEngineSettings() ) )->register();
 
 		// GDPR rights for rec-engine personal data (3.8) — registers a WP
 		// Privacy API exporter (Art 15) + eraser (Art 17) so WordPress's own
