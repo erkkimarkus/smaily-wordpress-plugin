@@ -44,7 +44,12 @@ filter is the escape-hatch. Zero downstream change (no HookHandler/builder edit)
 the brief's optional redirect endpoint (§3.4, YAGNI), Layer-2 site-wide vid, the pre-existing
 block-checkout stamping gap. Gates: ci:strict exit=0 (unit 391 +17, JS 158); integration OK 119
 (+5). **The real click→land→buy→attribute round-trip is a manual pilot check** (server path is
-unit+integration-proven; the browser moment is not walk-coverable). Prior: **`v3.0.1` RELEASED** — full GitHub release on the fork
+unit+integration-proven; the browser moment is not walk-coverable). **Released `v3.1.0`** — full
+GitHub release on the fork (`erkkimarkus/smaily-wordpress-plugin`, build `904f4ab`, ZIP ~994 KB
+attached) — the pilot needs this to fix the empty attribution; after install, do the manual
+rec-link round-trip check. Release gate: PCP against the BUILT ZIP clean except the intentional
+`Update URI` (F3-35); a focused security pass on the new `$_GET`/cookie surface found no new
+findings (audit register row added). Prior: **`v3.0.1` RELEASED** — full GitHub release on the fork
 (`erkkimarkus/smaily-wordpress-plugin`, build `a34ed40`, ZIP 966 KB attached): the React
 admin UI internationalization (W-7) + the W-5 enqueue refactor + a **complete Estonian
 translation** (all 275 strings; admin UI + blocks + PHP). Translation-only, no functional
