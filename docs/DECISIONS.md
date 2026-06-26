@@ -2349,7 +2349,20 @@ edit). Specifics:
   shared GA/ads param). Cookie names + TTLs come from the stored engine config (same
   source `StorefrontBeacon` reads), so the server-set and JS-set cookies are identical.
   **Feedback sent to the engine team** to realign their brief + the §162 contract note
-  with `url-builder.ts`.
+  with `url-builder.ts`. **RESOLVED 2026-06-26:** the engine published brief **rev 3**
+  (`re` commit `98b472d`) aligned byte-for-byte to the contract (cookie/param table now
+  `smaily_rec`→`smaily_rec_id`/`smaily_vt`→`smaily_rec_uid`/`smaily_ctx`→`smaily_rec_ctx`,
+  `utm_source=smaily` guard), and **`utm_content=rec_id` was removed engine-side**
+  (`url-builder.ts`: rec_id travels only in `smaily_rec`). Our shipped capture matches it
+  exactly; the `utm_content` fallback is now dormant (guarded, harmless — kept as a
+  forward-compat safety net). Contract md5 unchanged (the brief moved to the contract).
+  Engine also shipped a **domain-less `rec_N_link_path`** (`re`
+  `DECISION_rec_link_domainless.md`): the merchant template carries the literal domain +
+  `{{rec_N_link_path}}`, so the `smaily_*` params STILL land on the shop on every click —
+  **no plugin change** (our capture works across both the old `rec_N_link_url` and new
+  `rec_N_link_path` template forms). That decision names the **shop-side plugin path as the
+  preferred-accuracy attribution route** (a baked `smaily_rec` is immune to the nightly
+  recommendation re-sync that can shift a slot→rec reconstruction).
 - **Consent — captured UNCONDITIONALLY when connected (Erkki).** Recommendation
   attribution is a first-party functional signal (a rec_id uuid + an opaque visitor
   token, not PII on their own); tying engine recommendations to real purchases is the
