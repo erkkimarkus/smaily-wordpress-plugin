@@ -47,6 +47,8 @@ class AutomationRouter {
 
 	private WorkflowResolverInterface $resolver;
 
+	private ContactSyncMode $mode;
+
 	/** The Client used by the last trigger_automation() that reached the API (F3-44). */
 	private ?Client $last_client = null;
 
@@ -54,10 +56,14 @@ class AutomationRouter {
 	 * @param WorkflowResolverInterface           $resolver       Workflow lookup strategy.
 	 * @param callable(string $account_key): Client $client_factory Returns a configured Client
 	 *                                                               for the given account key.
+	 * @param ContactSyncMode|null                $mode           Drives the automation
+	 *                                                             force_opt_in posture; defaults
+	 *                                                             to the active mode.
 	 */
-	public function __construct( WorkflowResolverInterface $resolver, callable $client_factory ) {
+	public function __construct( WorkflowResolverInterface $resolver, callable $client_factory, ?ContactSyncMode $mode = null ) {
 		$this->resolver       = $resolver;
 		$this->client_factory = $client_factory;
+		$this->mode           = $mode ?? new ContactSyncMode();
 	}
 
 	/**
@@ -130,10 +136,15 @@ class AutomationRouter {
 		$client            = ( $this->client_factory )( $match->account_key );
 		$this->last_client = $client;
 
+		// force_opt_in follows the contact-sync mode (F3-48.4): consent +
+		// checkout-only never re-subscribe on trigger (honour Smaily's opt-out);
+		// legitimate interest only forces opt-in when the merchant enables the
+		// advanced toggle. An undocumented Smaily param — see ../re/docs.
+		//
 		// Let ApiException bubble up — the Flusher (sub-PR 5.C) uses it to
 		// distinguish transient failures (retry) from terminal skips
 		// (false return).
-		$client->trigger_automation( $match->workflow_id, array( $address ) );
+		$client->trigger_automation( $match->workflow_id, array( $address ), $this->mode->automation_force_opt_in() );
 
 		return true;
 	}

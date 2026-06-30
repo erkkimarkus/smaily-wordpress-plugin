@@ -53,7 +53,13 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 + .3 DONE.**
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 + .3 + .4 DONE.**
+F3-48.4: `AutomationRouter::trigger_automation` passes `ContactSyncMode::automation_force_opt_in()`
+(consent/checkout → never re-subscribe on trigger; legitimate interest → only with the advanced
+toggle) instead of the hard-coded `true`. Gates: ci:strict exit=0 (PHPUnit 442), integration OK 119.
+Remaining: .5 UI (preset selector) → .6 is_unsubscribed opt-out + regression locks → .7 Prike
+cutover (+ thorough end testing per Erkki: full gates + live-walk + security/code-quality re-audit
++ PCP against the built ZIP).
 F3-48.3 (cron takeover): `on_contact_sync_tick` no longer fires the legacy buggy mass-send (the
 F3-47 site-locale clobber — now orphaned); it runs `ContactReconciler::reconcile()` (consent) +
 a mode-aware refresh via non-clearing `BackfillJob::start(false)`, guarded by

@@ -2531,8 +2531,12 @@ see `docs/CONSENT_STRATEGY_COMPARISON.md`. **F3-48.3 DONE** — cron takeover:
 it runs `ContactReconciler::reconcile()` (consent mode) + a mode-aware refresh via a
 non-clearing `BackfillJob::start(false)`, guarded by `BackfillJob::should_start_refresh()`
 (skip while a walk runs / re-arm once per freshness window). API errors swallowed so the tick
-never fails; abandoned-cart bridge untouched. Remaining: automation `force_opt_in` (mode-driven),
-UI, `is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
+never fails; abandoned-cart bridge untouched. **F3-48.4 DONE** — `AutomationRouter::
+trigger_automation` now passes `ContactSyncMode::automation_force_opt_in()` instead of the
+hard-coded `true` default, so welcome/first_order/abandoned_cart honour the mode's consent
+posture (consent/checkout → never re-subscribe; legitimate interest → only with the advanced
+toggle). Remaining: UI (preset selector), `is_unsubscribed` opt-out semantics + regression locks,
+Prike cutover.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 

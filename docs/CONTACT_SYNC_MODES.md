@@ -249,7 +249,10 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    guard) + the rewritten tick (reconcile + non-clearing refresh; legacy
    `smaily_connect_cron_sync_subscribers` no longer fired, left orphaned).
 4. **`AutomationRouter` `force_opt_in`** made mode-driven (welcome / first_order /
-   abandoned_cart unified).
+   abandoned_cart unified). **DONE (F3-48.4)** — `trigger_automation` now passes
+   `ContactSyncMode::automation_force_opt_in()` (consent/checkout → always `false`;
+   legitimate interest → `false` unless the advanced toggle is on). Replaces the
+   hard-coded `true` default.
 5. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.
 6. **Regression locks** — `is_unsubscribed` + `force_opt_in` per mode; audience
    per mode.

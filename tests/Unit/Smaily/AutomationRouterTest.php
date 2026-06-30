@@ -16,10 +16,14 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\WorkflowMatch;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
 
 final class AutomationRouterTest extends TestCase {
+
+	/** @var array<string, mixed> wp_options fixtures (drives ContactSyncMode). */
+	private array $options = array();
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -27,11 +31,19 @@ final class AutomationRouterTest extends TestCase {
 
 		Functions\when( 'get_bloginfo' )->justReturn( 'x' );
 		Functions\when( 'apply_filters' )->returnArg( 2 );
+
+		$opts =& $this->options;
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = false ) use ( &$opts ) {
+				return array_key_exists( $key, $opts ) ? $opts[ $key ] : $default;
+			}
+		);
 	}
 
 	protected function tearDown(): void {
 		Monkey\tearDown();
 		parent::tearDown();
+		$this->options = array();
 	}
 
 	public function test_skips_when_email_missing(): void {
@@ -75,7 +87,9 @@ final class AutomationRouterTest extends TestCase {
 						return $addresses[0]['email'] === 'a@b.c'
 							&& $addresses[0]['first_name'] === 'Anna';
 					}
-				)
+				),
+				// Default (consent) mode → never re-subscribe on trigger.
+				false
 			)
 			->willReturn( array( 'status' => 'ok' ) );
 
@@ -99,6 +113,23 @@ final class AutomationRouterTest extends TestCase {
 		);
 
 		self::assertSame( 'et_account', $captured_key );
+	}
+
+	public function test_legitimate_interest_with_toggle_forces_opt_in(): void {
+		$this->options[ ContactSyncMode::OPTION_MODE ]                   = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+		$this->options[ ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN ] = '1';
+
+		$resolver = $this->resolverThatReturns( new WorkflowMatch( 7, 'default' ) );
+
+		$client = $this->createMock( Client::class );
+		$client->expects( $this->once() )
+			->method( 'trigger_automation' )
+			->with( 7, $this->anything(), true ) // legitimate interest + toggle → force opt-in
+			->willReturn( array( 'status' => 'ok' ) );
+
+		$router = new AutomationRouter( $resolver, static fn (): Client => $client );
+
+		self::assertTrue( $router->trigger_automation( 'welcome', array( 'email' => 'a@b.c' ) ) );
 	}
 
 	public function test_lets_api_exception_bubble_for_flusher_retry_handling(): void {
