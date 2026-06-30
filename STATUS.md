@@ -53,6 +53,16 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
+**RELEASED v3.2.0 (2026-06-30)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
+build `5034cc9`, ZIP ~991 KB attached). Headline: the **block-checkout rec-attribution fix** (the
+MiuMjau `smaily_rec_id`-empty regression — MiuMjau runs block checkout, so the cookie was captured
+but never stamped onto the order; now stamped via `woocommerce_store_api_checkout_order_processed`)
++ the **F3-48 contact-sync mode engine** (ships dormant behind the email wizard). Both re-audits'
+findings fixed; PCP on the ZIP clean except the intentional `Update URI`. **MiuMjau needs this build
+deployed** to fix attribution; then the manual live block-checkout acceptance test. F3-48 Smaily
+live-walk + Prike cutover are the next gates (Smaily sandbox access now available at /tmp/smaily_api).
+Pending follow-up: a Shopify-Connect feature-parity doc for the platform-agnostic changes (Erkki).
+
 **F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1–.6 DONE (engine feature-complete).**
 F3-48.6: consent opt-in/opt-out propagation (WP→Smaily) — a `user_newsletter` meta-transition
 handler (consent mode) enqueues a separate `:consent` row (opt-in → is_unsubscribed=0, opt-out →
