@@ -44,10 +44,12 @@ minority. Decisions (Erkki): sync **all** registered customers regardless of con
 guests**; **never send `is_unsubscribed`** (Smaily owns consent — the legacy path reset it,
 another reason to migrate Prike off it). Contact sync is `setup_completed`-gated, independent of
 the rec-engine → ships before Prike goes on the engine. Gates: ci:strict exit=0 (PHPUnit 404
-+13, JS 158, PHPStan clean, PHPCS 0 errors); integration OK 119. **Pending sub-PRs:** SP-B
-(backfill sends language = corrective mass re-sync of the ~1000), SP-D (replace legacy daily-cron
-bridge `on_contact_sync_tick` so the `en`-clobber stops), SP-E (lock `is_unsubscribed` out of the
-payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). Interim mitigation while
++13, JS 158, PHPStan clean, PHPCS 0 errors); integration OK 119. **SP-B DONE** — `BackfillJob::build_subscriber_payload` adds `language` via the same resolver
+(omit-on-empty), so a one-off backfill run = the corrective mass re-sync of the ~1000 (re-sends
+each contact with the resolver's language, not the cron's stale `en`). **Pending sub-PRs:** SP-D
+(replace legacy daily-cron bridge `on_contact_sync_tick` so the `en`-clobber stops — until then
+the backfill fixes contacts but the daily cron can re-drift them), SP-E (lock `is_unsubscribed`
+out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). Interim mitigation while
 Prike is still on the old plugin: uncheck "Language" in its Subscriber Synchronization (stops the
 daily `en` overwrite — omitted field preserves the existing value). DECISIONS F3-47). Prior — 2026-06-26 (**F3-46 DONE — server-side rec-attribution landing capture**.
 Engine brief `PLUGIN_BRIEF_woo_rec_link_redirect.md` (rev 2): prod shows 374 orders/30d, 0

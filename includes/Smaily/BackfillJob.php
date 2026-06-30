@@ -11,6 +11,8 @@ namespace Smaily\Connect\Smaily;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Support\ContactLanguageResolver;
+
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
 
 /**
@@ -63,6 +65,8 @@ class BackfillJob implements BackfillJobInterface {
 	private int $freshness_seconds;
 
 	private ?SubscriberPayloadBuilder $builder = null;
+
+	private ?ContactLanguageResolver $language_resolver = null;
 
 	public function __construct( Client $client, int $freshness_seconds = self::DEFAULT_FRESHNESS_SECONDS ) {
 		$this->client            = $client;
@@ -319,7 +323,20 @@ class BackfillJob implements BackfillJobInterface {
 	 * @return array<string, mixed>
 	 */
 	private function build_subscriber_payload( \WP_User $user ): array {
-		return $this->payload_builder()->build( $user );
+		$payload = $this->payload_builder()->build( $user );
+
+		// Language is resolved here (not in SubscriberPayloadBuilder) so the
+		// single ContactLanguageResolver source — not get_user_locale — drives
+		// both live-sync and this backfill. This is what makes the backfill the
+		// corrective mass re-sync for a store whose contacts drifted to the WP
+		// site locale (F3-47): each user is re-sent with the right language.
+		// Omit on empty — absent leaves Smaily's value intact, empty wipes.
+		$language = $this->language_resolver()->for_user( $user );
+		if ( $language !== '' ) {
+			$payload['language'] = $language;
+		}
+
+		return $payload;
 	}
 
 	private function payload_builder(): SubscriberPayloadBuilder {
@@ -327,6 +344,13 @@ class BackfillJob implements BackfillJobInterface {
 			$this->builder = new SubscriberPayloadBuilder();
 		}
 		return $this->builder;
+	}
+
+	private function language_resolver(): ContactLanguageResolver {
+		if ( $this->language_resolver === null ) {
+			$this->language_resolver = new ContactLanguageResolver();
+		}
+		return $this->language_resolver;
 	}
 
 	private function record_error( int $job_id, string $message ): void {

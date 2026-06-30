@@ -14,17 +14,27 @@ namespace Smaily\Connect\Tests\Unit\Smaily;
 use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Multilingual\DetectorFactory;
 use Smaily\Connect\Smaily\ApiException;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
 
 final class BackfillJobTest extends TestCase {
 
+	/** @var array<string, mixed> First contact payload captured from upsert_subscribers. */
+	private array $captured_payload = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		$this->captured_payload = array();
+		// ContactLanguageResolver (via build_subscriber_payload) caches the
+		// detector through DetectorFactory's process-global static.
+		DetectorFactory::reset();
 
 		Functions\when( 'current_time' )->justReturn( '2026-05-19 12:00:00' );
+		// No multilingual plugin in unit context → SiteLocale default.
+		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
 
 		// Empty user-meta by default — every user looks "never synced".
 		Functions\when( 'get_user_meta' )->justReturn( '' );
@@ -42,6 +52,7 @@ final class BackfillJobTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		DetectorFactory::reset();
 		Monkey\tearDown();
 		parent::tearDown();
 		unset( $GLOBALS['wpdb'] );
@@ -175,6 +186,45 @@ final class BackfillJobTest extends TestCase {
 		self::assertNotEmpty( $wpdb->updates );
 		self::assertSame( 'failed', $wpdb->updates[0]['data']['status'] );
 		self::assertSame( 'rate limited', $wpdb->updates[0]['data']['error_message'] );
+	}
+
+	public function test_backfill_payload_carries_resolved_default_language(): void {
+		$wpdb            = $this->fake_wpdb_for_process_batch(
+			array(
+				'id'              => 77,
+				'cursor_value'    => '0',
+				'processed_count' => '0',
+				'total_count'     => '1',
+			)
+		);
+		$GLOBALS['wpdb'] = $wpdb;
+
+		Functions\when( 'get_users' )->justReturn( array( $this->fake_user( 1, 'a@x.test' ) ) );
+
+		// No _user_preferred_language meta → resolver falls to the SiteLocale
+		// default ('et_EE' → 'et'). This is the corrective re-sync: a contact
+		// the buggy cron pushed as 'en' is re-sent with the store default.
+		( new BackfillJob( $this->capturing_client() ) )->process_batch( 10 );
+
+		self::assertSame( 'et', $this->captured_payload['language'] ?? null );
+	}
+
+	/**
+	 * Client mock whose upsert_subscribers records the first contact payload
+	 * into $this->captured_payload.
+	 */
+	private function capturing_client(): Client {
+		$captured = &$this->captured_payload;
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )->willReturnCallback(
+			static function ( array $subscribers ) use ( &$captured ): array {
+				$captured = is_array( $subscribers[0] ?? null ) ? $subscribers[0] : array();
+				return array();
+			}
+		);
+
+		return $client;
 	}
 
 	private function fake_user( int $id, string $email ): \WP_User {

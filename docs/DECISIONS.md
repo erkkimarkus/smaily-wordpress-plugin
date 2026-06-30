@@ -2454,11 +2454,17 @@ integration OK 119. The round-trip on the real store (does the corrective backfi
 the ~1000 from `en` to their true language) is a **manual post-deploy check** — we ship
 the plugin, the merchant runs it; the resolver is unit-proven.
 
-**Scope:** SP-A = the resolver + HookHandler wiring only. Pending sub-PRs: SP-B (backfill
-sends `language` via the resolver = the corrective mass re-sync), SP-D (replace the legacy
-daily-cron bridge `on_contact_sync_tick` with a correct refresh so the `en`-clobber stops),
-SP-E (regression test locking `is_unsubscribed` out of the payload), SP-G (cutover: Connect
-plugin → wizard → Make data-sync off).
+**Scope:** SP-A (resolver + HookHandler wiring) + SP-B (DONE) — `BackfillJob::
+build_subscriber_payload` now adds `language` via the SAME resolver (omit-on-empty), so a
+one-off backfill run IS the corrective mass re-sync: every existing contact is re-sent with
+the resolver's language instead of the stale `en` the cron pushed. Pending sub-PRs: SP-D
+(replace the legacy daily-cron bridge `on_contact_sync_tick` with a correct refresh so the
+`en`-clobber stops — until then the backfill fixes contacts but the daily cron can re-drift
+them), SP-E (regression test locking `is_unsubscribed` out of the payload), SP-G (cutover:
+Connect plugin → wizard → Make data-sync off). Note: at the unit level the backfill resolves
+through the single-language SiteLocale detector, so the active-language clamp collapses any
+non-site code to the default — the multi-language meta/order priority is proven in
+`ContactLanguageResolverTest` (mock detector), not re-tested at the backfill seam.
 
 **Relationships:** CC-1 (single-source-of-truth — joins `SubscriberPayloadBuilder` /
 `SkuResolver` / `IsoDate`); the legacy `Helper::get_current_language_code` cron-unsafe
