@@ -2471,6 +2471,54 @@ non-site code to the default — the multi-language meta/order priority is prove
 docblock (the bug it routes around); the coexistence map (`setup_completed` email-wizard
 gate that owns this path vs the rec-engine `is_connected()` gate).
 
+### F3-48 — Contact-sync mode engine: named presets keyed to lawful basis (DESIGN, under review)
+
+**Context:** managed/pilot stores want different contact-sync behaviour driven by their
+lawful basis for marketing and store shape. Three real cases: Prike wants **all** customers
+under *legitimate interest* (legacy couldn't — its cron only synced `user_newsletter=1`,
+which is the missing-contacts root cause Make papered over); Client 2 wants **consent**
+(opt-in only) with Smaily↔WP reconciliation; Client 3 (MiuMjau-shaped) wants **checkout
+opt-in only**, guests, send-only. The F3-47 language fix is mode-independent and already
+shipped; the *audience + sync-back + automation-consent* posture is where stores diverge.
+
+**Decision (Erkki, 2026-06-30):** a contact-sync **mode engine** built as a few **named
+presets** (not a combinatorial toggle matrix — presets prevent incoherent/unlawful combos
+and map to how merchants think). Three presets, internally factored as
+`legal_basis` (legitimate_interest | consent) + the `include_guests` sub-option:
+1. **All customers (legitimate interest)** — all registered customers, never send
+   `is_unsubscribed`, no sync-back, automation `force_opt_in=true`.
+2. **Subscribers only (consent)** — DEFAULT — only `user_newsletter=1`; opt-in → subscribe,
+   WP opt-out → `is_unsubscribed=1`; daily Smaily↔WP reconcile **both** directions
+   (leavers + returners); automation `force_opt_in=false`.
+3. **Checkout opt-in only** — no accounts, checkbox-only (guests), send-only,
+   `force_opt_in=false`.
+
+**Rationale / key points:** (a) **Default = consent** is both lawful-safe AND back-compat
+(matches legacy's `user_newsletter=1` filter — upgrading never silently broadens audience).
+(b) `include_guests` is a checkbox, default OFF (Erkki). (c) Reconcile is **bidirectional**
+(Erkki). (d) **Automation `force_opt_in` is mode-driven** — the contact-sync posture also
+governs whether a welcome/first_order/abandoned_cart trigger re-subscribes; this unifies a
+current inconsistency (new `AutomationRouter` always `true`, legacy abandoned-cart passes
+`false`). `force_opt_in` is an undocumented Smaily param — being added to `../re/docs`.
+(e) UI = named radio-card presets in `Step2Subscribers` + a `Banner tone="warning"` for the
+legitimate-interest preset, matching the existing `Card`/`Toggle`/`Banner` style.
+(f) Architecture is CC-1: one `ContactSyncMode` policy core consumed by `HookHandler`,
+`BackfillJob`, the SP-D `on_contact_sync_tick` cron takeover, and `AutomationRouter`. The
+old unsubscribe-pull is NOT dead — it becomes preset 2's `ContactReconciler`.
+
+**Scope boundary:** does NOT touch rec-engine customer ingest (`CustomerHookHandler`, a
+different destination gated by `is_connected()`); abandoned-cart keeps its own enable, only
+its automation `force_opt_in` is mode-driven.
+
+**Status:** DESIGN under review — full design in `docs/CONTACT_SYNC_MODES.md`. Two open
+questions pending Erkki sign-off (preset-1 automation `force_opt_in` default; preset labels).
+Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
+into this engine). Builds on F3-47.
+
+**Relationships:** F3-47 (the mode-independent language resolver this builds on); CC-1; the
+coexistence map (`setup_completed` wizard gate); the legacy `Cron::smaily_sync_subscribers`
+(the buggy mass-send this retires) + its unsubscribe-pull (becomes the reconciler).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

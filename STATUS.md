@@ -49,7 +49,25 @@ the rec-engine → ships before Prike goes on the engine. Gates: ci:strict exit=
 each contact with the resolver's language, not the cron's stale `en`). **Pending sub-PRs:** SP-D
 (replace legacy daily-cron bridge `on_contact_sync_tick` so the `en`-clobber stops — until then
 the backfill fixes contacts but the daily cron can re-drift them), SP-E (lock `is_unsubscribed`
-out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). Interim mitigation while
+out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). **NOTE: the
+ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
+cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
+
+**F3-48 contact-sync mode engine — DESIGN under review (2026-06-30).** Different stores need
+different sync behaviour by lawful basis: Prike wants ALL customers (legitimate interest;
+legacy only synced `user_newsletter=1` → the missing-contacts root cause); Client 2 wants
+consent + Smaily↔WP reconcile; Client 3 wants checkout-opt-in-only/guests. Decision (Erkki):
+named **presets** (not a toggle matrix), default = consent (lawful-safe AND matches legacy's
+opt-in filter, so upgrades never silently broaden). Three presets: All customers (legit
+interest) / Subscribers only (consent, default) / Checkout opt-in only. `include_guests`
+checkbox default off; bidirectional reconcile; **automation `force_opt_in` is mode-driven**
+(unifies the AutomationRouter-always-true vs legacy-abandoned-false inconsistency;
+`force_opt_in` is an undocumented Smaily param being added to `../re/docs` by a separate
+agent). UI = radio-card presets in Step2Subscribers + warning Banner for legit-interest.
+Full design: `docs/CONTACT_SYNC_MODES.md`; DECISIONS F3-48. Two open questions pending sign-off
+(preset-1 `force_opt_in` default; preset labels). Then implement (mode core → reconciler+cron
+takeover → automation force_opt_in → UI → regression locks → Prike cutover). Builds on the
+shipped F3-47 language resolver (mode-independent). Interim mitigation while
 Prike is still on the old plugin: uncheck "Language" in its Subscriber Synchronization (stops the
 daily `en` overwrite — omitted field preserves the existing value). DECISIONS F3-47). Prior — 2026-06-26 (**F3-46 DONE — server-side rec-attribution landing capture**.
 Engine brief `PLUGIN_BRIEF_woo_rec_link_redirect.md` (rev 2): prod shows 374 orders/30d, 0
