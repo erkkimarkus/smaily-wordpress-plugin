@@ -1,9 +1,9 @@
 # CONTACT_SYNC_MODES.md — Contact-sync mode engine (design)
 
-> **Status: DESIGN / for review (2026-06-30).** Not yet implemented. This file
-> is the agreed shape before any code. DECISIONS F3-48 carries the summary +
-> rationale; this file carries the full design. Implementation sub-PRs are
-> listed in § Implementation sequence.
+> **Status: DESIGN — APPROVED (Erkki, 2026-06-30).** Not yet implemented. Both
+> open questions resolved (§ 11). This file is the agreed shape before any code.
+> DECISIONS F3-48 carries the summary + rationale; this file carries the full
+> design. Implementation sub-PRs are listed in § Implementation sequence.
 
 ## 1. Why this exists
 
@@ -44,7 +44,7 @@ sub-options; surfaced in the UI as **three named presets**:
 | Guests | optional (`include_guests`, default **off**) | guest checkout opt-in | guest checkout opt-in (the point) |
 | `is_unsubscribed` sent on upsert | **never** (Smaily owns suppression) | `0` on opt-in; `1` on WP opt-out | `0` on checkbox |
 | Sync-back (Smaily → WP reconcile) | no | **yes** — leavers **and** returners | no |
-| Automation `force_opt_in` | `true` (subscribe + deliver) | **`false`** (trigger fires, consent untouched) | **`false`** |
+| Automation `force_opt_in` | **`false`** default; advanced toggle to force opt-in | **`false`** (trigger fires, consent untouched) | **`false`** |
 
 Client 1 = preset 1, Client 2 = preset 2, Client 3 = preset 3. Preset 3 is
 "consent, no accounts, no reconcile, guests" — a coherent bundle, not a fourth
@@ -61,11 +61,12 @@ lawful basis.
 - **Send:** never send `is_unsubscribed` (Smaily owns suppression; a plain upsert
   preserves an existing unsubscribe — confirmed by Erkki).
 - **Sync-back:** none.
-- **Automations:** `force_opt_in=true` (the merchant asserts a basis to reach
-  all). **Legal note:** `force_opt_in=true` re-subscribes a contact on trigger,
-  overriding an explicit unsubscribe — GDPR Art. 21 makes the unsubscribe right
-  absolute for direct marketing. The preset's warning banner (§9) states this; see
-  the open question in § 11 on whether to default this to `false` even here.
+- **Automations:** `force_opt_in=false` **by default** (resolved with Erkki) — even
+  under legitimate interest an explicit unsubscribe is honoured (GDPR Art. 21: the
+  right to object to direct marketing is absolute). A merchant who genuinely wants
+  triggers to re-subscribe enables the advanced **"Force opt-in on automation
+  triggers"** toggle (§ 4), which flips this preset to `true` behind a warning. The
+  strict presets (2, 3) never expose that toggle — they are always `false`.
 
 ### Preset 2 — Subscribers only (consent) — DEFAULT
 - **Audience:** only customers with `user_newsletter=1` (set via the
@@ -94,6 +95,10 @@ lawful basis.
 
 - **`include_guests`** (bool, default **off**) — include guest-order emails as
   contacts. Off in presets 1/2 by default; intrinsically on in preset 3.
+- **"Force opt-in on automation triggers"** (bool, default **off**) — shown ONLY
+  for preset 1 (legitimate interest); when on, automation triggers send
+  `force_opt_in=true` (re-subscribe on trigger). Behind a warning. Presets 2/3
+  never expose it (always `false`).
 - **Reconcile direction** is derived from the mode (consent → both directions),
   not a user toggle, to keep presets coherent. Developer filters can narrow it.
 - Everything else (segment/list routing, role filters) is a **filter**, not UI.
@@ -118,9 +123,10 @@ always `true`, while the **legacy** abandoned-cart cron passes `false`
 
 The mode engine unifies this: **the contact-sync mode drives `force_opt_in` on
 every automation trigger** (welcome, first_order, abandoned_cart):
-- consent presets (2, 3) → `force_opt_in=false`;
-- legitimate-interest preset (1) → `force_opt_in=true` (subject to the § 11
-  open question / warning).
+- consent presets (2, 3) → `force_opt_in=false` (always);
+- legitimate-interest preset (1) → `force_opt_in=false` by default, `true` only
+  if the merchant enables the advanced "Force opt-in on automation triggers"
+  toggle (§ 4) behind a warning.
 
 This guarantees you can't pick a strict contact-sync posture while automations
 silently re-subscribe everyone.
@@ -179,6 +185,10 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
   triggers may re-subscribe contacts — see settings."* (role="alert").
 - An **`include_guests` `Checkbox`** under the mode card (default off), shown for
   presets 1/2.
+- An advanced **"Force opt-in on automation triggers" `Toggle`** shown ONLY for
+  preset 1, default off, with its own `Banner tone="warning"`: *"Triggering a
+  welcome / abandoned-cart / first-order automation will re-subscribe the contact
+  in Smaily, overriding an existing unsubscribe."*
 - Preset 2 shows a short info `Banner` that the store mirrors Smaily's
   unsubscribes/returns daily.
 - The existing "Subscription checkboxes" + "Fields to sync" + "Initial backfill"
@@ -203,15 +213,13 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
 - **Abandoned-cart as a feature** keeps its own enable toggle; only its automation
   `force_opt_in` is mode-driven.
 
-**Open questions for Erkki before the doc is final:**
-1. Preset 1 automation `force_opt_in`: default `true` (reach all, may override an
-   unsubscribe), or default `false` with an explicit advanced "force opt-in on
-   automation triggers" toggle (+ warning)? The latter respects unsubscribes by
-   default even under legitimate interest (GDPR Art. 21) while still meeting the
-   "stricter modes pass false" requirement. *(Recommend: default `false` + advanced
-   opt-in toggle.)*
-2. Preset names — keep "All customers (legitimate interest)" / "Subscribers only
-   (consent)" / "Checkout opt-in only", or shorter labels?
+**Resolved decisions (Erkki, 2026-06-30):**
+1. Preset 1 automation `force_opt_in`: **default `false`** (honour unsubscribes
+   even under legitimate interest — GDPR Art. 21) + an advanced "Force opt-in on
+   automation triggers" toggle (preset 1 only, behind a warning) to override.
+   Presets 2/3 are always `false`.
+2. Preset names: keep **"All customers (legitimate interest)"** / **"Subscribers
+   only (consent)"** / **"Checkout opt-in only"**.
 
 ## 12. Implementation sequence (after design sign-off)
 

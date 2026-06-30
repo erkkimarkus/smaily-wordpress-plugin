@@ -2471,7 +2471,7 @@ non-site code to the default — the multi-language meta/order priority is prove
 docblock (the bug it routes around); the coexistence map (`setup_completed` email-wizard
 gate that owns this path vs the rec-engine `is_connected()` gate).
 
-### F3-48 — Contact-sync mode engine: named presets keyed to lawful basis (DESIGN, under review)
+### F3-48 — Contact-sync mode engine: named presets keyed to lawful basis (DESIGN — approved 2026-06-30)
 
 **Context:** managed/pilot stores want different contact-sync behaviour driven by their
 lawful basis for marketing and store shape. Three real cases: Prike wants **all** customers
@@ -2486,7 +2486,9 @@ presets** (not a combinatorial toggle matrix — presets prevent incoherent/unla
 and map to how merchants think). Three presets, internally factored as
 `legal_basis` (legitimate_interest | consent) + the `include_guests` sub-option:
 1. **All customers (legitimate interest)** — all registered customers, never send
-   `is_unsubscribed`, no sync-back, automation `force_opt_in=true`.
+   `is_unsubscribed`, no sync-back, automation `force_opt_in=false` by default
+   (an explicit unsubscribe is honoured even here — GDPR Art. 21) + an advanced
+   preset-1-only "Force opt-in on automation triggers" toggle to override.
 2. **Subscribers only (consent)** — DEFAULT — only `user_newsletter=1`; opt-in → subscribe,
    WP opt-out → `is_unsubscribed=1`; daily Smaily↔WP reconcile **both** directions
    (leavers + returners); automation `force_opt_in=false`.
@@ -2510,8 +2512,9 @@ old unsubscribe-pull is NOT dead — it becomes preset 2's `ContactReconciler`.
 different destination gated by `is_connected()`); abandoned-cart keeps its own enable, only
 its automation `force_opt_in` is mode-driven.
 
-**Status:** DESIGN under review — full design in `docs/CONTACT_SYNC_MODES.md`. Two open
-questions pending Erkki sign-off (preset-1 automation `force_opt_in` default; preset labels).
+**Status:** DESIGN approved (Erkki, 2026-06-30) — full design in `docs/CONTACT_SYNC_MODES.md`;
+both open questions resolved (preset-1 `force_opt_in` defaults `false` + advanced toggle;
+preset labels kept). Implementation pending (§ Implementation sequence in the design doc).
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 
