@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Support\DebugLog;
 
 /**
  * Captures the attribution signals an email recommendation link carries
@@ -106,22 +107,26 @@ class LandingCapture {
 		 * @param bool $enabled Default true.
 		 */
 		if ( ! (bool) apply_filters( 'smaily_connect_capture_attribution', true ) ) {
+			DebugLog::write( '[smaily-connect landing-capture] skipped: disabled by smaily_connect_capture_attribution filter' );
 			return;
 		}
 
 		// Only meaningful when the engine is connected: rec links exist only for a
 		// connected tenant, and orders are only ingested then.
 		if ( ! $this->settings->is_connected() ) {
+			DebugLog::write( '[smaily-connect landing-capture] bailed: rec-engine not connected (is_connected=false) — connect the engine in Settings → Campaign Intelligence' );
 			return;
 		}
 
 		// Cookies are response headers — once output has started we cannot set them.
 		if ( $this->headers_already_sent() ) {
+			DebugLog::write( '[smaily-connect landing-capture] bailed: headers already sent (a theme/plugin printed output before template_redirect)' );
 			return;
 		}
 
 		$captures = $this->resolve( $get );
 		if ( array() === $captures ) {
+			DebugLog::write( '[smaily-connect landing-capture] bailed: a trigger param was present but no valid attribution value resolved (param shape mismatch?)' );
 			return;
 		}
 
@@ -133,6 +138,10 @@ class LandingCapture {
 				$this->cookie_ttl_days( $config, (string) $slot )
 			);
 		}
+
+		// The single success line: which signals were captured (no values — the
+		// rec_id is a uuid, but keep the log shape-only). Visible under WP_DEBUG.
+		DebugLog::write( sprintf( '[smaily-connect landing-capture] captured: %s', implode( ',', array_keys( $captures ) ) ) );
 	}
 
 	/**

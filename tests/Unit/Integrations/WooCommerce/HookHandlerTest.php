@@ -423,6 +423,9 @@ final class HookHandlerTest extends TestCase {
 		self::assertNotNull( $contact, 'A guest order must enqueue a contact.sync under legit interest + include_guests.' );
 		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $contact['type'] );
 		self::assertSame( 'guest@example.test', $contact['payload']['email'] );
+		// Enriched with the order's billing name (not email-only).
+		self::assertSame( 'Guest', $contact['payload']['fields']['first_name'] );
+		self::assertSame( 'Buyer', $contact['payload']['fields']['last_name'] );
 		self::assertArrayNotHasKey( 'is_unsubscribed', $contact['payload'], 'Legit interest leaves consent to Smaily.' );
 	}
 
@@ -515,6 +518,14 @@ final class HookHandlerTest extends TestCase {
 				return $this->email;
 			}
 
+			public function get_billing_first_name( $context = 'view' ): string {
+				return 'Guest';
+			}
+
+			public function get_billing_last_name( $context = 'view' ): string {
+				return 'Buyer';
+			}
+
 			public function get_customer_id( $context = 'view' ): int {
 				return $this->customer_id;
 			}
@@ -564,6 +575,8 @@ if ( ! class_exists( \WC_Order::class ) ) {
 class WC_Order {
 	public function get_id(): int { return 0; }
 	public function get_billing_email( $context = 'view' ): string { return ''; }
+	public function get_billing_first_name( $context = 'view' ): string { return ''; }
+	public function get_billing_last_name( $context = 'view' ): string { return ''; }
 	public function get_customer_id( $context = 'view' ): int { return 0; }
 	public function get_total( $context = 'view' ): string { return '0'; }
 	public function get_currency( $context = 'view' ): string { return ''; }

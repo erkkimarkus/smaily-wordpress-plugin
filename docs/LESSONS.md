@@ -403,6 +403,47 @@ easy to miss because the backfill's filter is an explicit `WHERE post_status =
   belongs only where the record is provably non-ingestable — the delete of a
   never-published artifact, not the upsert of a real-but-incomplete one.
 
+### 2.13 A WooCommerce event with two code paths (classic + block) needs BOTH — verify the pilot's actual config before a scope-cut
+
+**What happened (F3-46 → MiuMjau, 2026-06-30).** Rec-attribution stamping (read the
+`smaily_rec` cookie → write order meta → send to the engine) was hooked only on
+`woocommerce_checkout_order_processed`, which the **classic** checkout fires. F3-46
+explicitly deferred the **block-checkout** path as a documented scope-cut: *"NOT
+built … block-checkout (`woocommerce_store_api_checkout_order_processed`) stamping
+gap (classic checkout only, as today)."* It looked safe — "as today" matched the
+prior behaviour. But the pilot store (MiuMjau) **runs block checkout**, so for
+weeks the cookie was captured yet **never reached the order**: `is_connected=true`,
+`order.upsert` returned HTTP 200, the engine accepted every order — but with **zero
+attribution fields**. Engine-side this read as "0 orders carry `smaily_rec_id`,"
+and a High-severity field regression sat invisible until someone cross-checked the
+order payload against the click data.
+
+**Why it slipped.** The scope-cut was made on an **unverified assumption** — that
+the pilot used classic checkout. Nobody confirmed it. The fix (a one-line Store-API
+twin hook) was trivial; the gap's cost (a silent, weeks-long attribution loss that
+made the whole rec-engine look unmeasurable) was not.
+
+**The lesson — three parts.**
+1. **Two code paths for the same outcome → cover both, unless you've VERIFIED only
+   one is in use.** Classic vs block checkout, REST vs admin order creation, WPML
+   single-domain vs domain-per-language — when a WC/WP capability has a forked
+   implementation, a hook on one fork silently misses the other. "As today" is not
+   a justification when "today" was already incomplete.
+2. **Verify the pilot's actual configuration before scoping against it.** "The
+   pilot uses X" is a fact to check (one screenshot of their checkout, their WPML
+   mode, their plugin version), not to assume. The whole block-checkout miss was an
+   unchecked assumption about one setting.
+3. **A capture that can silently bail is a monitoring gap, not just a code gap.**
+   The bail had no trace — `LandingCapture` returned early on a closed gate / wrong
+   path and logged nothing, so the failure was invisible to every dashboard. The
+   fix added WP_DEBUG bail-reason logging (captured / not-connected / headers-sent /
+   no-valid-param) so the next silent miss is one log line away, not a field-data
+   forensics exercise. (Generalises LESSONS §2.11: a silent drop is invisible to
+   every monitor you built.)
+
+Companion: `docs/EDGE_CASES_REC_ATTRIBUTION_CONTACT_SYNC.md` (the full order-path +
+capture-gate sweep this triggered); DECISIONS F3-46 (the gap, now fixed `e55514d`).
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs

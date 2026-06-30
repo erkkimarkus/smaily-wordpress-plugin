@@ -293,9 +293,21 @@ class HookHandler {
 		if ( $user instanceof \WP_User ) {
 			$payload = $this->build_contact_payload( $user );
 		} else {
+			// Guest (no WP_User): a minimal payload, enriched with the billing
+			// name the order already carries so the contact isn't email-only.
+			$fields = array( 'store' => function_exists( 'get_site_url' ) ? (string) get_site_url() : '' );
+			$first  = trim( (string) $order->get_billing_first_name() );
+			$last   = trim( (string) $order->get_billing_last_name() );
+			if ( $first !== '' ) {
+				$fields['first_name'] = $first;
+			}
+			if ( $last !== '' ) {
+				$fields['last_name'] = $last;
+			}
+
 			$payload  = array(
 				'email'  => $email,
-				'fields' => array( 'store' => function_exists( 'get_site_url' ) ? (string) get_site_url() : '' ),
+				'fields' => $fields,
 			);
 			$language = $this->detect_language_for_order( $order );
 			if ( $language !== '' ) {

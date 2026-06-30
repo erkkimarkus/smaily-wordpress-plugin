@@ -299,6 +299,8 @@ if ( ! class_exists( \WC_Order::class ) ) {
 class WC_Order {
 	public function get_id(): int { return 0; }
 	public function get_billing_email( $context = 'view' ): string { return ''; }
+	public function get_billing_first_name( $context = 'view' ): string { return ''; }
+	public function get_billing_last_name( $context = 'view' ): string { return ''; }
 	public function get_customer_id( $context = 'view' ): int { return 0; }
 	public function get_total( $context = 'view' ): string { return '0'; }
 	public function get_currency( $context = 'view' ): string { return ''; }
