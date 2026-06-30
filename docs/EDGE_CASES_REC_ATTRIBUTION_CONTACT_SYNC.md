@@ -29,7 +29,7 @@ These do NOT fail loudly; the new `LandingCapture` WP_DEBUG logging (added `e555
 |---|---|---|---|
 | C1 | **`is_connected()` = false** | capture (and order ingest) off | logged ("not connected"); check Settings → Campaign Intelligence |
 | C2 | **`headers_already_sent()`** — a theme/plugin prints before `template_redirect` | capture bails | logged ("headers already sent") |
-| C3 | **Cookie domain/path mismatch** — WPML **domain-per-language** (e.g. `.ee` vs `.lv`): rec lands on one domain, checkout on another | cookie not sent at checkout → no stamp | **MANUAL: confirm the store's WPML mode + COOKIE_DOMAIN.** Single-domain (path/subdir) = fine |
+| C3 | **Cookie domain/path mismatch** — WPML **domain-per-language** (e.g. `.ee` vs `.lv`): rec lands on one domain, checkout on another | cookie not sent at checkout → no stamp | **MiuMjau = single-domain → not affected (Erkki, 2026-06-30).** Re-check with the next **multi-domain** client; a domain-per-language store needs a cross-domain cookie strategy |
 | C4 | **Consent / cookie-manager plugin wipes first-party cookies** before checkout | no stamp | first-party functional cookie; document; merchant config |
 | C5 | **30-day rec_id cookie TTL** — click now, buy >30 days later | expired → no attribution | contract-defined (30d); acceptable |
 | C6 | **Smaily redirect strips the query** | no param on landing | **verified NOT happening** (param survives the `trck.smai.ly` redirect); re-check if Smaily changes link wrapping |
@@ -51,7 +51,7 @@ These do NOT fail loudly; the new `LandingCapture` WP_DEBUG logging (added `e555
 - **Done:** block-checkout stamping (`e55514d`), `LandingCapture` bail logging, guest-payload name enrichment, reconcile reentrancy guard, F1 guest/checkout wiring.
 - **Manual / pilot checks (not code):**
   - **Live block-checkout acceptance test** — a real rec-link → block-checkout purchase → confirm `orders.smaily_rec_id` populates (the unit test proves the method; only a live block checkout proves the *hook fires*).
-  - **C3** — confirm the store's WPML domain mode + `COOKIE_DOMAIN` (domain-per-language would need a cross-domain cookie strategy).
+  - **C3** — MiuMjau confirmed single-domain (Erkki, 2026-06-30) → fine. Re-check at the next multi-domain client onboarding (domain-per-language needs a cross-domain cookie strategy).
 - **Engine-side (cross-team):** retroactive attribution for past orders via the action-log (click `value` carries `smaily_rec`; match to order by email + time, ~30-day window) — the plugin cannot recover a vanished checkout cookie. See `docs/RESPONSE_smaily_rec_capture_regression.md`.
 - **Verify-before-wiring:** M7 (`list=1` semantics) before `rebaseline()` is hooked anywhere.
 

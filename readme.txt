@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.1.0
+Stable tag: 3.2.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,12 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.2.0 =
+* Fix: recommendation attribution is now captured on the WooCommerce **Block (Store API) checkout**, not just the classic checkout. On a block-checkout store the recommendation id was captured but never stamped onto the order; block-checkout orders now carry the attribution so purchases are credited to the recommendation.
+* Contact sync modes: choose how customers are synced to Smaily by your lawful basis — "All customers (legitimate interest)", "Subscribers only (consent)" (default), or "Checkout opt-in only" — in the setup wizard / Settings. Consent mode mirrors Smaily unsubscribes/re-subscribes back into WordPress.
+* Contacts are now synced with the correct language consistently (including from background jobs), and an opt-in / opt-out made in WordPress propagates to Smaily.
+* Guest-checkout contacts and the checkout opt-in checkbox are now honoured by the contact sync.
 
 = 3.1.0 =
 * Recommendation attribution (landing capture): when a shopper clicks a product recommendation in a Smaily email and lands on the shop, the plugin now captures the recommendation id server-side and attaches it to the resulting order, so the engine can credit the purchase to the recommendation. Captured as a first-party functional cookie, independent of the browse-tracking consent toggle; disable with the `smaily_connect_capture_attribution` filter.
@@ -240,6 +246,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.2.0 =
+Fixes recommendation attribution on the WooCommerce Block checkout and adds contact-sync modes. Recommended especially for stores using the block checkout.
 
 = 3.1.0 =
 Recommendation attribution: rec-link clicks are now captured server-side and attached to orders, so the engine can credit purchases to email recommendations. No re-import required.
