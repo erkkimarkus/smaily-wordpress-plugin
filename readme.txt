@@ -46,7 +46,7 @@ Version 2.0 is a major update built alongside the proven 1.x feature set:
 * **Multilingual-aware** – language detection works with Polylang, WPML and TranslatePress for routing subscribers to the right lists and automations.
 * **Product RSS feed** – load store products straight into your Smaily email templates. The familiar 1.x feed is unchanged; its URL builder now lives on the Integrations tab, and existing feed URLs keep working.
 
-Existing 1.x installs upgrade in place: legacy behaviour continues unchanged until you complete the new setup wizard.
+Existing installs upgrade in place — your settings, credentials and connections are preserved. If you have already completed the setup wizard, the new behaviour (including the cron-safe contact-language and consent sync) is active immediately on upgrade with no re-setup; an install that has never finished the wizard keeps its legacy live sync until it does.
 
 = Documentation & Support =
 

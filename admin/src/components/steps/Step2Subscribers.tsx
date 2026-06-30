@@ -4,7 +4,7 @@ import { __, sprintf } from '@admin/lib/i18n';
 import { useBackfillProgress } from '../../hooks/useBackfillProgress';
 import { DEFAULT_SYNC_FIELDS, type ContactSyncMode, type WizardAction, type WizardState } from '../../state/types';
 import { cn } from '../../utils/cn';
-import { Banner, Button, Card, Checkbox, ProgressBar, Toggle } from '../primitives';
+import { Banner, Button, Card, Checkbox, ProgressBar, Radio, Toggle } from '../primitives';
 
 export interface Step2SubscribersProps {
   state: WizardState;
@@ -73,71 +73,6 @@ export function Step2Subscribers({
         </div>
       )}
 
-      <Card
-        title={ __( 'Contact sync mode', 'smaily-connect' ) }
-        description={ __( 'Who is sent to Smaily, by your lawful basis for marketing email.', 'smaily-connect' ) }
-      >
-        <div className="space-y-2">
-          {CONTACT_SYNC_MODES.map((mode) => (
-            <label
-              key={mode.value}
-              className={cn(
-                'flex cursor-pointer flex-wrap items-start gap-x-3 rounded border p-3',
-                state.contactSyncMode === mode.value ? 'border-brand bg-surface-soft' : 'border-border',
-              )}
-            >
-              <input
-                type="radio"
-                name="smly-contact-sync-mode"
-                value={mode.value}
-                checked={state.contactSyncMode === mode.value}
-                onChange={() => dispatch({ type: 'SET_CONTACT_SYNC_MODE', payload: mode.value })}
-                className="mt-1 accent-brand"
-              />
-              <span className="text-sm font-medium text-text-primary">{mode.label}</span>
-              <span className="mt-0.5 w-full pl-7 text-sm text-text-secondary">{mode.description}</span>
-            </label>
-          ))}
-        </div>
-
-        {state.contactSyncMode === 'legitimate_interest' && (
-          <Banner tone="warning" className="mt-4">
-            { __(
-              'This sends every customer to Smaily regardless of marketing consent. Make sure you have a lawful basis (legitimate interest).',
-              'smaily-connect',
-            ) }
-          </Banner>
-        )}
-
-        {state.contactSyncMode !== 'checkout_optin' && (
-          <div className="mt-4">
-            <Checkbox
-              name="smly-include-guests"
-              checked={state.includeGuests}
-              onChange={() => dispatch({ type: 'SET_INCLUDE_GUESTS', payload: !state.includeGuests })}
-              label={ __( 'Also sync guest-order email addresses', 'smaily-connect' ) }
-            />
-          </div>
-        )}
-
-        {state.contactSyncMode === 'legitimate_interest' && (
-          <div className="mt-4">
-            <Toggle
-              name="smly-automation-force-opt-in"
-              checked={state.automationForceOptIn}
-              onChange={(e) =>
-                dispatch({ type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: e.target.checked })
-              }
-              label={ __( 'Force opt-in on automation triggers', 'smaily-connect' ) }
-              description={ __(
-                'Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe.',
-                'smaily-connect',
-              ) }
-            />
-          </div>
-        )}
-      </Card>
-
       <Card title={ __( 'Contact synchronisation', 'smaily-connect' ) }>
         <Toggle
           name="smly-subscriber-sync-enabled"
@@ -172,6 +107,89 @@ export function Step2Subscribers({
           </div>
         )}
       </Card>
+
+      {state.subscriberSyncEnabled && (
+        <Card
+          title={ __( 'Contact sync mode', 'smaily-connect' ) }
+          description={ __( 'Who is sent to Smaily, by your lawful basis for marketing email.', 'smaily-connect' ) }
+        >
+          <fieldset className="space-y-3" aria-label={ __( 'Contact sync mode', 'smaily-connect' ) }>
+            {CONTACT_SYNC_MODES.map((mode) => {
+              const isSelected = state.contactSyncMode === mode.value;
+              const needsCheckout = mode.value === 'checkout_optin';
+              const isDisabled = needsCheckout && ! state.checkoutSubscriptionCheckbox;
+              return (
+                <label
+                  key={mode.value}
+                  className={cn(
+                    'flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors duration-120',
+                    'focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2',
+                    isSelected
+                      ? 'border-brand bg-brand-soft-bg'
+                      : 'border-border bg-surface hover:border-border-cool',
+                    isDisabled && 'cursor-not-allowed opacity-60 hover:border-border',
+                  )}
+                >
+                  <Radio
+                    name="smly-contact-sync-mode"
+                    value={mode.value}
+                    checked={isSelected}
+                    disabled={isDisabled}
+                    onChange={() => dispatch({ type: 'SET_CONTACT_SYNC_MODE', payload: mode.value })}
+                    label={<span className="font-semibold text-text-primary">{mode.label}</span>}
+                  />
+                  <p className="ml-7 text-sm text-text-secondary">{mode.description}</p>
+                  {isDisabled && (
+                    <p className="ml-7 text-xs text-text-tertiary">
+                      { __(
+                        'Turn on “Show subscription checkbox during WooCommerce checkout” below to use this mode.',
+                        'smaily-connect',
+                      ) }
+                    </p>
+                  )}
+                </label>
+              );
+            })}
+          </fieldset>
+
+          {state.contactSyncMode === 'legitimate_interest' && (
+            <Banner tone="warning" className="mt-4">
+              { __(
+                'This sends every customer to Smaily regardless of marketing consent. Make sure you have a lawful basis (legitimate interest).',
+                'smaily-connect',
+              ) }
+            </Banner>
+          )}
+
+          {state.contactSyncMode !== 'checkout_optin' && (
+            <div className="mt-4">
+              <Checkbox
+                name="smly-include-guests"
+                checked={state.includeGuests}
+                onChange={() => dispatch({ type: 'SET_INCLUDE_GUESTS', payload: !state.includeGuests })}
+                label={ __( 'Also sync guest-order email addresses', 'smaily-connect' ) }
+              />
+            </div>
+          )}
+
+          {state.contactSyncMode === 'legitimate_interest' && (
+            <div className="mt-4">
+              <Toggle
+                name="smly-automation-force-opt-in"
+                checked={state.automationForceOptIn}
+                onChange={(e) =>
+                  dispatch({ type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: e.target.checked })
+                }
+                label={ __( 'Force opt-in on automation triggers', 'smaily-connect' ) }
+                description={ __(
+                  'Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe.',
+                  'smaily-connect',
+                ) }
+              />
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card title={ __( 'Subscription checkboxes', 'smaily-connect' ) }>
         <div className="space-y-4">
