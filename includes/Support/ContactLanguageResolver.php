@@ -195,6 +195,7 @@ final class ContactLanguageResolver {
 			return self::DEFAULT_USER_PREF_META;
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- the constant value IS the plugin prefix (smaily_connect_*); PCP can't resolve self::CONST.
 		$key = apply_filters( self::FILTER_USER_PREF_META, self::DEFAULT_USER_PREF_META );
 
 		return ( is_string( $key ) && $key !== '' ) ? $key : self::DEFAULT_USER_PREF_META;
@@ -277,6 +278,7 @@ final class ContactLanguageResolver {
 			return $language;
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- the constant value IS the plugin prefix (smaily_connect_*); PCP can't resolve self::CONST.
 		$filtered = apply_filters( self::FILTER_LANGUAGE, $language, $context );
 
 		return is_string( $filtered ) ? $filtered : $language;
