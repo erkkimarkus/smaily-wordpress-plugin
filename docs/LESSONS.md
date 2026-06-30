@@ -446,6 +446,61 @@ capture-gate sweep this triggered); DECISIONS F3-46 (the gap, now fixed `e55514d
 
 ---
 
+### 2.14 A live-walk failure can be the TEST's fault, not the code's — isolate one variable before "fixing" the implementation
+
+**What happened (F3-48 Smaily contact-API live-walk, 2026-07-01).** The walk drove
+the real `Smaily\Connect\Smaily\Client` against the `smailydemo` sandbox. The contact
+upsert came back `{"code":203}` ("invalid data"); the test contact never landed, so
+every downstream consent read failed too. The plausible story wrote itself: the
+Smaily docs show contact.php with `Content-Type: application/json` + a JSON body, but
+the Client does `wp_remote_post($url, ['body' => $array])` — which WordPress
+**form-encodes** (`0[email]=…`). "Found it: the Client should send JSON." I was one
+edit from converting the Client.
+
+**Why that was wrong.** The synthetic test address was `…@example.test`. Erkki asked
+the two questions that mattered: *"could it be the `.test` domain?"* and *"isn't that
+in the gotcha doc?"* A controlled probe that varied **one axis at a time** — 4 body
+encodings (JSON object, JSON array, form-flat, form-batch) × 3 email domains
+(`.test`, `example.com`, `mailinator.com`) — settled it in one run:
+
+- `…@example.test` → **203 in every encoding, including correct JSON**;
+- `…@example.com` / `…@mailinator.com` → **101 in every encoding, including the
+  Client's exact form-encoded batch**.
+
+So the Client's wire format was **correct all along**; live Smaily rejects an
+RFC-6761 **reserved-TLD** address (`.test`/`.example`/`.invalid`/`.localhost`) with
+`203`, not the email-syntax code `204`. Re-running the walk with `@example.com` →
+all 12 checks green. (Bonus divergence the probe also exposed: contact.php is
+**async** — an immediate readback after a `101` upsert returns `206` "not found"; the
+walk had to **poll**, not single-read.)
+
+**The lesson — four parts.**
+1. **When a live-walk fails, first decide whether the fault is in the code-under-test
+   or the test fixture.** A failing live assertion is evidence of *a* divergence, not
+   evidence of *which* one. I conflated two variables (a wrong email domain + a
+   plausible-but-wrong wire-format theory) and almost "fixed" working code.
+2. **Isolate by varying ONE axis at a time.** The 4×3 format×domain probe is the
+   whole technique: hold the body constant and change the domain, hold the domain
+   constant and change the body. The cell that fails across *every* value of the other
+   axis is your culprit. This is cheaper than reading the implementation and guessing.
+3. **A reserved-TLD email is a live-only landmine the mock can't show you.** The
+   integration mock validated loosely and never checks TLDs, so it accepted `.test`
+   happily — the rejection exists only on the live Zod/validator. Use a real-but-
+   non-delivering domain (`@example.com`, RFC-2606) for synthetic live contacts; never
+   `.test`/`.example`/`.invalid`. (Now documented: `re/docs/smaily-api/guides/gotchas.md`
+   → "Reserved-TLD emails".)
+4. **The domain expert's offhand question beat the plausible code theory.** "Could it
+   be the domain?" cost one sentence; chasing the JSON theory would have shipped a
+   needless Client rewrite and *still* failed (JSON `.test` is also 203). When a fix
+   feels obvious from the code, a 30-second controlled probe is cheaper than being
+   confidently wrong.
+
+Companion: `bin/walk-f3-48-contact-sync.cjs` (the walk, with the sandbox gate +
+`@example.com` + async poll baked in); the gotcha lives in
+`re/docs/smaily-api/guides/gotchas.md`.
+
+---
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

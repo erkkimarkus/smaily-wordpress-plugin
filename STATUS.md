@@ -64,8 +64,20 @@ re-wizard. The legacy daily mass-sync behind the `en`-drift is cleared by `WPCro
 upgrade **regardless** of wizard state — only the *live per-event* sync ownership and the mode
 selector are gated by `setup_completed`). Both re-audits'
 findings fixed; PCP on the ZIP clean except the intentional `Update URI`. **MiuMjau needs this build
-deployed** to fix attribution; then the manual live block-checkout acceptance test. F3-48 Smaily
-live-walk + Prike cutover are the next gates (Smaily sandbox access now available at /tmp/smaily_api).
+deployed** to fix attribution; then the manual live block-checkout acceptance test.
+
+**F3-48 Smaily contact-API live-walk — DONE & GREEN (2026-07-01, `bin/walk-f3-48-contact-sync.cjs`,
+12/12 against the `smailydemo` SANDBOX).** Drives the real `Smaily\Connect\Smaily\Client` over live
+Smaily: contact upsert code 101 with a SHORT `language` (`et`) + custom fields; `is_unsubscribed`
+0→1→0 round-trip (F3-48.6) read back via `contact.php?email=`; absent-language upsert accepted
+(omit=keep); `history.php` (reconcile delta) + `list=1` (rebaseline) + autoresponder-list shapes;
+`autoresponder.php` accepts the `force_opt_in` param. Two LIVE divergences the mock hid, both now
+handled in the walk (NOT plugin bugs — the form-encoded batch the Client sends returns 101 with a
+valid domain): (1) live Smaily rejects RFC-6761 **reserved-TLD** emails (`.test`/`.example`/
+`.invalid`) with code **203** "invalid data" — the walk uses `@example.com`; (2) `contact.php` is
+**async** — an immediate readback after a 101 upsert misses (`206`), so the walk **polls**. Both
+documented: LESSONS §2.14 + `re/docs/smaily-api/guides/gotchas.md` ("Reserved-TLD emails"). **Next
+gate: Prike cutover** (Erkki installs Connect → wizard → preset 1 → Make off).
 Pending follow-up: a Shopify-Connect feature-parity doc for the platform-agnostic changes (Erkki).
 
 **F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1–.6 DONE (engine feature-complete).**
