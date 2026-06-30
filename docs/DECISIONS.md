@@ -2379,7 +2379,15 @@ edit). Specifics:
 - **Scope:** Layer 1 only. NOT built: the brief's optional redirect endpoint (§3.4,
   YAGNI), the Layer-2 site-wide `smre_vid` generation, and a fix for the pre-existing
   block-checkout (`woocommerce_store_api_checkout_order_processed`) stamping gap (classic
-  checkout only, as today).
+  checkout only, as today). **UPDATE 2026-06-30 (`e55514d`): the block-checkout stamping gap
+  is now FIXED** — it was THE cause of the MiuMjau `smaily_rec_id`-empty regression (MiuMjau
+  runs block checkout, so the cookie was captured but never stamped onto the order;
+  `is_connected=true`, `order.upsert` 200, but no attribution fields). `HookHandler::
+  on_block_checkout_order_processed` (bound to `woocommerce_store_api_checkout_order_processed`)
+  now stamps the same cookies on block orders. Past orders can't be plugin-backfilled (the
+  checkout cookie is gone) — retroactive attribution is engine-side via the action-log (click
+  `value` carries `smaily_rec`, match to order by email+time, ~30-day window). Full write-up:
+  `docs/RESPONSE_smaily_rec_capture_regression.md`.
 
 **Gates:** ci:strict exit=0 (unit 391 +17, JS 158, PHPStan clean, PHPCS 0 errors);
 integration OK 119 (+5). **Browser-moment verification (does the cookie actually set on a
