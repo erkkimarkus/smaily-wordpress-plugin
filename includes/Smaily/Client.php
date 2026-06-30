@@ -195,6 +195,63 @@ class Client {
 	}
 
 	/**
+	 * Poll the subscriber action log (`GET /api/history.php`) for events newer
+	 * than $since_seq_id. Smaily is pull-only (no webhooks); the caller tracks
+	 * the max seq_id as a durable cursor and loops while a full page returns.
+	 * Returns ONE page of action rows (each `{seq_id, email, action, time, …}`);
+	 * an error/status payload comes back as an empty list.
+	 *
+	 * @param array<int, string> $actions Action types to filter (optin/optout/delete/complaint/…).
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_action_log( int $since_seq_id, array $actions = array(), int $limit = 10000 ): array {
+		$params = array(
+			'since_seq_id' => $since_seq_id,
+			'limit'        => $limit,
+		);
+		if ( $actions !== array() ) {
+			$params['actions'] = array_values( $actions );
+		}
+
+		$body = $this->request( 'GET', 'history', $params );
+
+		if ( ! is_array( $body ) || isset( $body['code'] ) ) {
+			return array();
+		}
+
+		return array_values( array_filter( $body, 'is_array' ) );
+	}
+
+	/**
+	 * Page the full subscriber list (`GET /api/contact.php?list=1`) — email +
+	 * is_unsubscribed only, to keep the pull lean. Used ONLY for the occasional
+	 * reconcile re-baseline (onboarding / stale cursor); the standing reconcile
+	 * uses the action log. `$offset` is the 0-indexed PAGE; the last page returns
+	 * fewer than `$limit` rows.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_contacts( int $offset = 0, int $limit = 25000 ): array {
+		$body = $this->request(
+			'GET',
+			'contact',
+			array(
+				'list'   => 1,
+				'fields' => 'email,is_unsubscribed',
+				'offset' => $offset,
+				'limit'  => $limit,
+			)
+		);
+
+		if ( ! is_array( $body ) || isset( $body['code'] ) ) {
+			return array();
+		}
+
+		return array_values( array_filter( $body, 'is_array' ) );
+	}
+
+	/**
 	 * Performs a single HTTP request against the configured Smaily subdomain.
 	 *
 	 * @param string                                   $method   "GET" or "POST".

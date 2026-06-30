@@ -239,14 +239,17 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    step 5 with the regression locks.
 2. **`ContactReconciler`** (Smaily→WP, both directions, consent mode) —
    **action-log delta poll** (`history.php` + `since_seq_id`) as the standing
-   reconcile, full `list=1` pull only as an occasional re-baseline — **+ SP-D
-   cron takeover** (`on_contact_sync_tick` → reconcile + mode-aware refresh;
-   legacy buggy mass-send retired).
-3. **`AutomationRouter` `force_opt_in`** made mode-driven (welcome / first_order /
+   reconcile, full `list=1` pull only as an occasional re-baseline. **DONE
+   (F3-48.2)** — `Client::get_action_log()` + `Client::list_contacts()` +
+   `ContactReconciler::reconcile()`/`rebaseline()`, not yet wired.
+3. **SP-D cron takeover** (`on_contact_sync_tick` → `ContactReconciler::reconcile`
+   + mode-aware `BackfillJob` refresh via a non-clearing `start(false)`; legacy
+   buggy mass-send retired). Wires step 2 in.
+4. **`AutomationRouter` `force_opt_in`** made mode-driven (welcome / first_order /
    abandoned_cart unified).
-4. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.
-5. **Regression locks** — `is_unsubscribed` + `force_opt_in` per mode; audience
+5. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.
+6. **Regression locks** — `is_unsubscribed` + `force_opt_in` per mode; audience
    per mode.
-6. **Cutover (Prike)** — install plugin → wizard → preset 1 → Make data-sync off.
+7. **Cutover (Prike)** — install plugin → wizard → preset 1 → Make data-sync off.
 
 Builds on F3-47 (the language resolver — already shipped, mode-independent).

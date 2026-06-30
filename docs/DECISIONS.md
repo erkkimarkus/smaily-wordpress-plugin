@@ -2518,7 +2518,15 @@ preset labels kept). **Implementation started: F3-48.1 DONE** — `ContactSyncMo
 policy) + `ContactAudience` (mode-aware "is this a contact?"), wired into the `HookHandler`
 live `contact.sync` gate + the `BackfillJob` audience filter. Default `consent` now narrows
 the new path's live + backfill audience to `user_newsletter=1` (matches legacy; legitimate
-interest syncs all). Remaining: reconciler + cron takeover, automation `force_opt_in`, UI,
+interest syncs all). **F3-48.2 DONE** — `ContactReconciler` (Smaily→WP marketing-consent
+mirror, consent mode only) + `Client::get_action_log()`/`list_contacts()`. Delta-first (Erkki
+resource concern): the standing `reconcile()` polls the Smaily action-log (`history.php` +
+`since_seq_id` cursor) for `optin`/`optout`/`delete`/`complaint` deltas — O(changes), light on
+shared hosting; `rebaseline()` (full `list=1` pull) is the occasional re-baseline only.
+Marketing-only (never touches profiling `smaily_rec_profiling`). Mirrors the engine's action-log
+approach (`re/docs/CONTACT_RECONCILIATION_DESIGN.md`, `re/docs/smaily-api/reference/action-log.md`);
+see `docs/CONSENT_STRATEGY_COMPARISON.md`. Not yet wired (cron takeover is the next slice).
+Remaining: cron takeover (wires the reconciler + refresh), automation `force_opt_in`, UI,
 `is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.

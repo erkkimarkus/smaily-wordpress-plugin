@@ -53,7 +53,14 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 DONE.**
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 DONE.**
+F3-48.2: `ContactReconciler` (Smaily→WP marketing-consent mirror, consent mode) + `Client::
+get_action_log()`/`list_contacts()`. Delta-first — standing reconcile polls the Smaily action-log
+(`history.php` + `since_seq_id`) for optin/optout/delete/complaint deltas (O(changes), light on
+shared hosting); full `list=1` pull only as an occasional re-baseline. Marketing-only (never
+profiling). New cross-team doc `docs/CONSENT_STRATEGY_COMPARISON.md` (engine vs plugin consent
+layers). Not yet wired — cron takeover next. Gates: ci:strict exit=0 (PHPUnit 436), integration
+OK 119.
 F3-48.1: `ContactSyncMode` (preset→policy) + `ContactAudience` (mode-aware audience) wired into
 the HookHandler live `contact.sync` gate + BackfillJob audience filter; default `consent`
 narrows the new path to `user_newsletter=1` (matches legacy), legit-interest syncs all. Gates:

@@ -178,6 +178,59 @@ final class ClientTest extends TestCase {
 		self::assertStringContainsString( 'status=ACTIVE', $captured_url );
 	}
 
+	public function test_get_action_log_hits_history_endpoint_and_parses_rows(): void {
+		$captured_url = null;
+		Functions\when( 'wp_remote_get' )->alias(
+			static function ( $url, $args ) use ( &$captured_url ) {
+				$captured_url = $url;
+				return array();
+			}
+		);
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn(
+			'[{"seq_id":42,"email":"a@x.test","action":"optout"}]'
+		);
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$rows = ( new Client( 'demo', 'alice', 's3cret' ) )->get_action_log( 0, array( 'optin', 'optout' ) );
+
+		self::assertIsString( $captured_url );
+		self::assertStringContainsString( '/api/history.php', $captured_url );
+		self::assertStringContainsString( 'since_seq_id=0', $captured_url );
+		self::assertCount( 1, $rows );
+		self::assertSame( 'optout', $rows[0]['action'] );
+	}
+
+	public function test_get_action_log_returns_empty_on_status_payload(): void {
+		Functions\when( 'wp_remote_get' )->justReturn( array() );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"code":223,"message":"missing date"}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		self::assertSame( array(), ( new Client( 'demo', 'u', 'p' ) )->get_action_log( 0 ) );
+	}
+
+	public function test_list_contacts_hits_list_1_endpoint(): void {
+		$captured_url = null;
+		Functions\when( 'wp_remote_get' )->alias(
+			static function ( $url, $args ) use ( &$captured_url ) {
+				$captured_url = $url;
+				return array();
+			}
+		);
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '[{"email":"a@x.test","is_unsubscribed":"1"}]' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$rows = ( new Client( 'demo', 'alice', 's3cret' ) )->list_contacts( 0 );
+
+		self::assertIsString( $captured_url );
+		self::assertStringContainsString( '/api/contact.php', $captured_url );
+		self::assertStringContainsString( 'list=1', $captured_url );
+		self::assertStringContainsString( 'fields=', $captured_url );
+		self::assertCount( 1, $rows );
+	}
+
 	private function successful_response( string $body ): array {
 		return array(
 			'response' => array( 'code' => 200 ),
