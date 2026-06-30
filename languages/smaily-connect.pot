@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-3.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Smaily Connect 3.0.0\n"
+"Project-Id-Version: Smaily Connect 3.2.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/smaily-connect\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-06-25T18:48:53+00:00\n"
+"POT-Creation-Date: 2026-06-30T20:16:30+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -184,19 +184,19 @@ msgstr ""
 msgid "Stored rec-engine configuration is incomplete. Re-run setup."
 msgstr ""
 
-#: includes/REST/SettingsEndpoint.php:97
+#: includes/REST/SettingsEndpoint.php:98
 msgid "You do not have permission to save Smaily Connect settings."
 msgstr ""
 
-#: includes/REST/SettingsEndpoint.php:114
+#: includes/REST/SettingsEndpoint.php:115
 msgid "Unknown settings tab."
 msgstr ""
 
-#: includes/REST/SettingsEndpoint.php:126
+#: includes/REST/SettingsEndpoint.php:127
 msgid "Payload must be an object."
 msgstr ""
 
-#: includes/REST/SettingsEndpoint.php:193
+#: includes/REST/SettingsEndpoint.php:194
 msgid "Subdomain + username are required."
 msgstr ""
 
@@ -713,7 +713,7 @@ msgid "Additional Information"
 msgstr ""
 
 #: integrations/woocommerce/profile-settings.class.php:373
-#: admin/src/components/steps/Step2Subscribers.tsx:161
+#: admin/src/components/steps/Step2Subscribers.tsx:248
 msgid "Gender"
 msgstr ""
 
@@ -726,7 +726,7 @@ msgid "Female"
 msgstr ""
 
 #: integrations/woocommerce/profile-settings.class.php:387
-#: admin/src/components/steps/Step2Subscribers.tsx:159
+#: admin/src/components/steps/Step2Subscribers.tsx:246
 msgid "Phone"
 msgstr ""
 
@@ -735,7 +735,7 @@ msgid "Enter phone number"
 msgstr ""
 
 #: integrations/woocommerce/profile-settings.class.php:398
-#: admin/src/components/steps/Step2Subscribers.tsx:160
+#: admin/src/components/steps/Step2Subscribers.tsx:247
 msgid "Birthday"
 msgstr ""
 
@@ -933,7 +933,7 @@ msgid "Import now"
 msgstr ""
 
 #: admin/src/components/BackfillPanel.tsx:51
-#: admin/src/components/steps/Step2Subscribers.tsx:107
+#: admin/src/components/steps/Step2Subscribers.tsx:168
 msgid "Cancel"
 msgstr ""
 
@@ -958,18 +958,18 @@ msgstr ""
 #. translators: %s: error message.
 #. translators: %s is the error message.
 #: admin/src/components/BackfillPanel.tsx:83
-#: admin/src/components/steps/Step2Subscribers.tsx:133
+#: admin/src/components/steps/Step2Subscribers.tsx:194
 #, js-format
 msgid "Backfill failed: %s"
 msgstr ""
 
 #: admin/src/components/BackfillPanel.tsx:85
-#: admin/src/components/steps/Step2Subscribers.tsx:135
+#: admin/src/components/steps/Step2Subscribers.tsx:196
 msgid "Backfill failed."
 msgstr ""
 
 #: admin/src/components/BackfillPanel.tsx:86
-#: admin/src/components/steps/Step2Subscribers.tsx:136
+#: admin/src/components/steps/Step2Subscribers.tsx:197
 msgid "Backfill cancelled. Re-run when ready."
 msgstr ""
 
@@ -984,7 +984,7 @@ msgstr[1] ""
 #. translators: %s: localized date/time of the last run.
 #. translators: %s is a localized date/time.
 #: admin/src/components/BackfillPanel.tsx:100
-#: admin/src/components/steps/Step2Subscribers.tsx:140
+#: admin/src/components/steps/Step2Subscribers.tsx:201
 #, js-format
 msgid "Last run finished %s."
 msgstr ""
@@ -992,7 +992,7 @@ msgstr ""
 #. translators: %s: status-check error message.
 #. translators: %s is the error message.
 #: admin/src/components/BackfillPanel.tsx:106
-#: admin/src/components/steps/Step2Subscribers.tsx:150
+#: admin/src/components/steps/Step2Subscribers.tsx:211
 #, js-format
 msgid "Couldn't check status: %s"
 msgstr ""
@@ -1472,121 +1472,169 @@ msgstr ""
 msgid "Contacts with the %s locale will sync to this Smaily account."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:33
+#: admin/src/components/steps/Step2Subscribers.tsx:34
 msgid "Step 2 of 6"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:34
+#: admin/src/components/steps/Step2Subscribers.tsx:35
 msgid "Sync your subscribers"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:35
+#: admin/src/components/steps/Step2Subscribers.tsx:36
 msgid "Choose which fields to copy from WordPress to Smaily, and decide where to surface the subscription opt-in checkbox."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:40
+#: admin/src/components/steps/Step2Subscribers.tsx:44
+msgid "Contact sync mode"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:45
+msgid "Who is sent to Smaily, by your lawful basis for marketing email."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:72
+msgid "This sends every customer to Smaily regardless of marketing consent. Make sure you have a lawful basis (legitimate interest)."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:82
+msgid "Also sync guest-order email addresses"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:91
+msgid "Force opt-in on automation triggers"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:92
+msgid "Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:101
 msgid "Contact synchronisation"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:47
+#: admin/src/components/steps/Step2Subscribers.tsx:108
 msgid "Sync contacts to Smaily"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:48
+#: admin/src/components/steps/Step2Subscribers.tsx:109
 msgid "When on, new WP users + WooCommerce customers are pushed to your Smaily contact list."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:55
+#: admin/src/components/steps/Step2Subscribers.tsx:116
 msgid "Fields to sync"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:56
+#: admin/src/components/steps/Step2Subscribers.tsx:117
 msgid "Email is always synced. Pick the additional fields you want copied across."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:69
+#: admin/src/components/steps/Step2Subscribers.tsx:130
 msgid "Subscription checkboxes"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:76
+#: admin/src/components/steps/Step2Subscribers.tsx:137
 msgid "Show subscription checkbox during WordPress registration"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:85
+#: admin/src/components/steps/Step2Subscribers.tsx:146
 msgid "Show subscription checkbox during WooCommerce checkout"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:89
+#: admin/src/components/steps/Step2Subscribers.tsx:150
 msgid "Initial backfill"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:89
+#: admin/src/components/steps/Step2Subscribers.tsx:150
 msgid "Import the existing WordPress users into Smaily."
 msgstr ""
 
 #. translators: %d is the number of WordPress users.
-#: admin/src/components/steps/Step2Subscribers.tsx:92
+#: admin/src/components/steps/Step2Subscribers.tsx:153
 #, js-format
 msgid "%d users will be processed in batches of 100, ~30 seconds apart."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:94
+#: admin/src/components/steps/Step2Subscribers.tsx:155
 msgid "No existing WordPress users detected — the backfill will be a no-op."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:104
+#: admin/src/components/steps/Step2Subscribers.tsx:165
 msgid "Running…"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:104
+#: admin/src/components/steps/Step2Subscribers.tsx:165
 msgid "Start backfill"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:115
+#: admin/src/components/steps/Step2Subscribers.tsx:176
 msgid "Subscriber backfill progress"
 msgstr ""
 
 #. translators: %1$d is processed count, %2$d is total count.
-#: admin/src/components/steps/Step2Subscribers.tsx:121
+#: admin/src/components/steps/Step2Subscribers.tsx:182
 #, js-format
 msgid "Synced %1$d of %2$d."
 msgstr ""
 
 #. translators: %1$d is processed count, %2$d is total count.
-#: admin/src/components/steps/Step2Subscribers.tsx:127
+#: admin/src/components/steps/Step2Subscribers.tsx:188
 #, js-format
 msgid "Done — %1$d of %2$d contacts synced."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:143
+#: admin/src/components/steps/Step2Subscribers.tsx:204
 msgid "Backfill runs in the background on your server. You can safely leave this page or close the browser — the job will continue. Return here any time to check progress."
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:157
+#: admin/src/components/steps/Step2Subscribers.tsx:220
+msgid "Subscribers only (consent)"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:221
+msgid "Only customers who opted in (the subscription checkbox) are sent to Smaily. The store mirrors Smaily unsubscribes back daily."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:228
+msgid "All customers (legitimate interest)"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:229
+msgid "Every customer is sent to Smaily regardless of marketing consent. Requires a lawful basis."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:236
+msgid "Checkout opt-in only"
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:237
+msgid "Only customers who tick the checkout subscription box are sent (guests included). No account sync, no sync-back."
+msgstr ""
+
+#: admin/src/components/steps/Step2Subscribers.tsx:244
 msgid "First name"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:158
+#: admin/src/components/steps/Step2Subscribers.tsx:245
 msgid "Last name"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:162
+#: admin/src/components/steps/Step2Subscribers.tsx:249
 msgid "Customer group"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:163
+#: admin/src/components/steps/Step2Subscribers.tsx:250
 msgid "Customer ID"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:164
+#: admin/src/components/steps/Step2Subscribers.tsx:251
 msgid "First registered date"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:165
+#: admin/src/components/steps/Step2Subscribers.tsx:252
 msgid "Nickname"
 msgstr ""
 
-#: admin/src/components/steps/Step2Subscribers.tsx:166
+#: admin/src/components/steps/Step2Subscribers.tsx:253
 msgid "Site title"
 msgstr ""
 
