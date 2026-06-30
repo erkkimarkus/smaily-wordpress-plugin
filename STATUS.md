@@ -53,6 +53,15 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
+**RELEASED v3.2.1 (2026-07-01)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
+build `4b6fd3f`, ZIP ~992 KB attached). Headline: the **F3-48.5a contact-sync mode-selector UI
+refinement** (mode card visible only when sync enabled + below the sync toggle; "Checkout opt-in only"
+disabled until the checkout checkbox is on; homepage radio-card style) + doc-accuracy fixes (the
+"ships dormant" wording). Admin-UI-only, no functional/data change. Gated by the **F3-48 Smaily
+contact-API live-walk 12/12 green** (`bin/walk-f3-48-contact-sync.cjs`, sandbox); PCP on the ZIP clean
+except the intentional `Update URI`; ci:strict exit=0 (PHPUnit 456, vitest 161); ET i18n complete.
+No security/code-quality re-audit (TSX-only delta, no security surface). **Next gate: Prike cutover.**
+
 **RELEASED v3.2.0 (2026-06-30)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
 build `5034cc9`, ZIP ~991 KB attached). Headline: the **block-checkout rec-attribution fix** (the
 MiuMjau `smaily_rec_id`-empty regression — MiuMjau runs block checkout, so the cookie was captured
