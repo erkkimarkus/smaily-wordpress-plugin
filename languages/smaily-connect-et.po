@@ -47,17 +47,17 @@ msgid "Email"
 msgstr "E-post"
 
 #: integrations/woocommerce/profile-settings.class.php:398
-#: admin/src/components/steps/Step2Subscribers.tsx:247
+#: admin/src/components/steps/Step2Subscribers.tsx:257
 msgid "Birthday"
 msgstr "Sünnipäev"
 
 #: integrations/woocommerce/profile-settings.class.php:373
-#: admin/src/components/steps/Step2Subscribers.tsx:248
+#: admin/src/components/steps/Step2Subscribers.tsx:258
 msgid "Gender"
 msgstr "Sugu"
 
 #: integrations/woocommerce/profile-settings.class.php:387
-#: admin/src/components/steps/Step2Subscribers.tsx:246
+#: admin/src/components/steps/Step2Subscribers.tsx:256
 msgid "Phone"
 msgstr "Telefon"
 
@@ -991,7 +991,7 @@ msgid "Import now"
 msgstr "Impordi kohe"
 
 #: admin/src/components/BackfillPanel.tsx:51
-#: admin/src/components/steps/Step2Subscribers.tsx:168
+#: admin/src/components/steps/Step2Subscribers.tsx:178
 msgid "Cancel"
 msgstr "Tühista"
 
@@ -1016,18 +1016,18 @@ msgstr "Valmis — sünkroonitud %1$d %2$s."
 #. translators: %s: error message.
 #. translators: %s is the error message.
 #: admin/src/components/BackfillPanel.tsx:83
-#: admin/src/components/steps/Step2Subscribers.tsx:194
+#: admin/src/components/steps/Step2Subscribers.tsx:204
 #, js-format
 msgid "Backfill failed: %s"
 msgstr "Import ebaõnnestus: %s"
 
 #: admin/src/components/BackfillPanel.tsx:85
-#: admin/src/components/steps/Step2Subscribers.tsx:196
+#: admin/src/components/steps/Step2Subscribers.tsx:206
 msgid "Backfill failed."
 msgstr "Import ebaõnnestus."
 
 #: admin/src/components/BackfillPanel.tsx:86
-#: admin/src/components/steps/Step2Subscribers.tsx:197
+#: admin/src/components/steps/Step2Subscribers.tsx:207
 msgid "Backfill cancelled. Re-run when ready."
 msgstr "Import tühistatud. Käivita uuesti, kui valmis."
 
@@ -1042,7 +1042,7 @@ msgstr[1] "%d kirjet ei sünkroonitud — vaata üksikasju sündmuste logist."
 #. translators: %s: localized date/time of the last run.
 #. translators: %s is a localized date/time.
 #: admin/src/components/BackfillPanel.tsx:100
-#: admin/src/components/steps/Step2Subscribers.tsx:201
+#: admin/src/components/steps/Step2Subscribers.tsx:211
 #, js-format
 msgid "Last run finished %s."
 msgstr "Viimane käivitus lõppes %s."
@@ -1050,7 +1050,7 @@ msgstr "Viimane käivitus lõppes %s."
 #. translators: %s: status-check error message.
 #. translators: %s is the error message.
 #: admin/src/components/BackfillPanel.tsx:106
-#: admin/src/components/steps/Step2Subscribers.tsx:211
+#: admin/src/components/steps/Step2Subscribers.tsx:221
 #, js-format
 msgid "Couldn't check status: %s"
 msgstr "Olekut ei õnnestunud kontrollida: %s"
@@ -1542,109 +1542,109 @@ msgstr "Sünkrooni oma tellijad"
 msgid "Choose which fields to copy from WordPress to Smaily, and decide where to surface the subscription opt-in checkbox."
 msgstr "Vali, millised väljad WordPressist Smailysse kopeerida, ja otsusta, kus kuvada tellimisnõusoleku märkeruut."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:101
+#: admin/src/components/steps/Step2Subscribers.tsx:41
 msgid "Contact synchronisation"
 msgstr "Kontaktide sünkroonimine"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:108
+#: admin/src/components/steps/Step2Subscribers.tsx:48
 msgid "Sync contacts to Smaily"
 msgstr "Sünkrooni kontaktid Smailysse"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:109
+#: admin/src/components/steps/Step2Subscribers.tsx:49
 msgid "When on, new WP users + WooCommerce customers are pushed to your Smaily contact list."
 msgstr "Kui sees, lisatakse uued WP kasutajad ja WooCommerce'i kliendid sinu Smaily kontaktiloendisse."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:116
+#: admin/src/components/steps/Step2Subscribers.tsx:56
 msgid "Fields to sync"
 msgstr "Sünkroonitavad väljad"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:117
+#: admin/src/components/steps/Step2Subscribers.tsx:57
 msgid "Email is always synced. Pick the additional fields you want copied across."
 msgstr "E-post sünkroonitakse alati. Vali lisaväljad, mida soovid kaasa kopeerida."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:130
+#: admin/src/components/steps/Step2Subscribers.tsx:140
 msgid "Subscription checkboxes"
 msgstr "Tellimise märkeruudud"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:137
+#: admin/src/components/steps/Step2Subscribers.tsx:147
 msgid "Show subscription checkbox during WordPress registration"
 msgstr "Näita tellimise märkeruutu WordPressi registreerumisel"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:146
+#: admin/src/components/steps/Step2Subscribers.tsx:156
 msgid "Show subscription checkbox during WooCommerce checkout"
 msgstr "Näita tellimise märkeruutu WooCommerce'i kassas"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:150
+#: admin/src/components/steps/Step2Subscribers.tsx:160
 msgid "Initial backfill"
 msgstr "Algne import"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:150
+#: admin/src/components/steps/Step2Subscribers.tsx:160
 msgid "Import the existing WordPress users into Smaily."
 msgstr "Impordi olemasolevad WordPressi kasutajad Smailysse."
 
 #. translators: %d is the number of WordPress users.
-#: admin/src/components/steps/Step2Subscribers.tsx:153
+#: admin/src/components/steps/Step2Subscribers.tsx:163
 #, js-format
 msgid "%d users will be processed in batches of 100, ~30 seconds apart."
 msgstr "%d kasutajat töödeldakse 100-kaupa, ~30-sekundilise vahega."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:155
+#: admin/src/components/steps/Step2Subscribers.tsx:165
 msgid "No existing WordPress users detected — the backfill will be a no-op."
 msgstr "Olemasolevaid WordPressi kasutajaid ei tuvastatud — import ei tee midagi."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:165
+#: admin/src/components/steps/Step2Subscribers.tsx:175
 msgid "Running…"
 msgstr "Töötab…"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:165
+#: admin/src/components/steps/Step2Subscribers.tsx:175
 msgid "Start backfill"
 msgstr "Alusta importi"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:176
+#: admin/src/components/steps/Step2Subscribers.tsx:186
 msgid "Subscriber backfill progress"
 msgstr "Tellijate impordi edenemine"
 
 #. translators: %1$d is processed count, %2$d is total count.
-#: admin/src/components/steps/Step2Subscribers.tsx:182
+#: admin/src/components/steps/Step2Subscribers.tsx:192
 #, js-format
 msgid "Synced %1$d of %2$d."
 msgstr "Sünkroonitud %1$d / %2$d."
 
 #. translators: %1$d is processed count, %2$d is total count.
-#: admin/src/components/steps/Step2Subscribers.tsx:188
+#: admin/src/components/steps/Step2Subscribers.tsx:198
 #, js-format
 msgid "Done — %1$d of %2$d contacts synced."
 msgstr "Valmis — sünkroonitud %1$d / %2$d kontakti."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:204
+#: admin/src/components/steps/Step2Subscribers.tsx:214
 msgid "Backfill runs in the background on your server. You can safely leave this page or close the browser — the job will continue. Return here any time to check progress."
 msgstr "Import töötab taustal sinu serveris. Võid selle lehe ohutult sulgeda või brauseri kinni panna — töö jätkub. Naase siia igal ajal edenemist vaatama."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:244
+#: admin/src/components/steps/Step2Subscribers.tsx:254
 msgid "First name"
 msgstr "Eesnimi"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:245
+#: admin/src/components/steps/Step2Subscribers.tsx:255
 msgid "Last name"
 msgstr "Perekonnanimi"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:249
+#: admin/src/components/steps/Step2Subscribers.tsx:259
 msgid "Customer group"
 msgstr "Kliendigrupp"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:250
+#: admin/src/components/steps/Step2Subscribers.tsx:260
 msgid "Customer ID"
 msgstr "Kliendi ID"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:251
+#: admin/src/components/steps/Step2Subscribers.tsx:261
 msgid "First registered date"
 msgstr "Esmase registreerumise kuupäev"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:252
+#: admin/src/components/steps/Step2Subscribers.tsx:262
 msgid "Nickname"
 msgstr "Hüüdnimi"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:253
+#: admin/src/components/steps/Step2Subscribers.tsx:263
 msgid "Site title"
 msgstr "Saidi pealkiri"
 
@@ -2116,50 +2116,55 @@ msgstr "Smaily lükkas mandaadid tagasi."
 msgid "Failed to load workflows"
 msgstr "Töövoogude laadimine ebaõnnestus"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:44
+#: admin/src/components/steps/Step2Subscribers.tsx:73
+#: admin/src/components/steps/Step2Subscribers.tsx:76
 msgid "Contact sync mode"
 msgstr "Kontaktide sünkimise režiim"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:45
+#: admin/src/components/steps/Step2Subscribers.tsx:74
 msgid "Who is sent to Smaily, by your lawful basis for marketing email."
 msgstr "Keda Smailysse saadetakse, vastavalt sinu turunduskirjade õiguslikule alusele."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:72
+#: admin/src/components/steps/Step2Subscribers.tsx:111
 msgid "This sends every customer to Smaily regardless of marketing consent. Make sure you have a lawful basis (legitimate interest)."
 msgstr "See saadab Smailysse iga kliendi, sõltumata turundusnõusolekust. Veendu, et sul on õiguslik alus (õigustatud huvi)."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:82
+#: admin/src/components/steps/Step2Subscribers.tsx:121
 msgid "Also sync guest-order email addresses"
 msgstr "Sünki ka külalistellimuste e-posti aadressid"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:91
+#: admin/src/components/steps/Step2Subscribers.tsx:130
 msgid "Force opt-in on automation triggers"
 msgstr "Sunni automaatika-päästikutel nõusolek peale"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:92
+#: admin/src/components/steps/Step2Subscribers.tsx:131
 msgid "Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe."
 msgstr "Edasijõudnutele: tervitus- / hüljatud ostukorvi / esimese tellimuse automaatika tellib kontakti Smailys uuesti, tühistades olemasoleva loobumise."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:220
+#: admin/src/components/steps/Step2Subscribers.tsx:230
 msgid "Subscribers only (consent)"
 msgstr "Ainult tellijad (nõusolek)"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:221
+#: admin/src/components/steps/Step2Subscribers.tsx:231
 msgid "Only customers who opted in (the subscription checkbox) are sent to Smaily. The store mirrors Smaily unsubscribes back daily."
 msgstr "Smailysse saadetakse ainult kliendid, kes on andnud nõusoleku (tellimuse linnuke). Pood peegeldab Smaily loobumised iga päev tagasi."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:228
+#: admin/src/components/steps/Step2Subscribers.tsx:238
 msgid "All customers (legitimate interest)"
 msgstr "Kõik kliendid (õigustatud huvi)"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:229
+#: admin/src/components/steps/Step2Subscribers.tsx:239
 msgid "Every customer is sent to Smaily regardless of marketing consent. Requires a lawful basis."
 msgstr "Smailysse saadetakse iga klient, sõltumata turundusnõusolekust. Nõuab õiguslikku alust."
 
-#: admin/src/components/steps/Step2Subscribers.tsx:236
+#: admin/src/components/steps/Step2Subscribers.tsx:246
 msgid "Checkout opt-in only"
 msgstr "Ainult kassas antud nõusolek"
 
-#: admin/src/components/steps/Step2Subscribers.tsx:237
+#: admin/src/components/steps/Step2Subscribers.tsx:247
 msgid "Only customers who tick the checkout subscription box are sent (guests included). No account sync, no sync-back."
 msgstr "Saadetakse ainult kliendid, kes märgivad kassas tellimuse linnukese (sh külalised). Konto-sünki ega tagasi-sünki ei toimu."
+
+#: admin/src/components/steps/Step2Subscribers.tsx:102
+msgid "Turn on “Show subscription checkbox during WooCommerce checkout” below to use this mode."
+msgstr "Selle režiimi kasutamiseks lülita all sisse „Näita tellimise märkeruutu WooCommerce’i kassas“."
