@@ -385,6 +385,91 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( 'visitor-abc', $order->get_meta( '_smaily_visitor_token' ) );
 	}
 
+	public function test_block_checkout_stamps_rec_attribution_onto_order(): void {
+		// F3-46 gap fix: block checkout never fires woocommerce_checkout_order_processed,
+		// so the smaily_rec cookie must be stamped via the Store-API twin.
+		$order                    = $this->fake_order( 100, 'buyer@example.test', 9, 1 );
+		$_COOKIE['smaily_rec_id'] = 'rec-uuid-123';
+
+		( new HookHandler( $this->queue ) )->on_block_checkout_order_processed( $order );
+
+		self::assertSame( 'rec-uuid-123', $order->get_meta( '_smaily_rec_id' ) );
+	}
+
+	public function test_checkout_order_syncs_guest_email_in_legitimate_interest(): void {
+		// F3-48 F1: the order path is what makes guests + checkout-opt-in work.
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
+				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				if ( $key === ContactSyncMode::OPTION_MODE ) {
+					return ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+				}
+				if ( $key === ContactSyncMode::OPTION_INCLUDE_GUESTS ) {
+					return '1';
+				}
+				return $default;
+			}
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $this->fake_order( 100, 'guest@example.test', 0, 1 ) );
+
+		( new HookHandler( $this->queue ) )->on_checkout_order_processed( 100, array() );
+
+		$contact = $this->find_enqueued( 'order:100' );
+		self::assertNotNull( $contact, 'A guest order must enqueue a contact.sync under legit interest + include_guests.' );
+		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $contact['type'] );
+		self::assertSame( 'guest@example.test', $contact['payload']['email'] );
+		self::assertArrayNotHasKey( 'is_unsubscribed', $contact['payload'], 'Legit interest leaves consent to Smaily.' );
+	}
+
+	public function test_checkout_order_skips_guest_in_default_consent_mode(): void {
+		// Default consent + include_guests off → guests are not synced.
+		Functions\when( 'wc_get_order' )->justReturn( $this->fake_order( 100, 'guest@example.test', 0, 1 ) );
+
+		( new HookHandler( $this->queue ) )->on_checkout_order_processed( 100, array() );
+
+		self::assertNull( $this->find_enqueued( 'order:100' ) );
+	}
+
+	public function test_block_checkout_optin_syncs_with_subscribe_in_checkout_mode(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' || $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				if ( $key === ContactSyncMode::OPTION_MODE ) {
+					return ContactSyncMode::MODE_CHECKOUT_OPTIN;
+				}
+				return $default;
+			}
+		);
+
+		$order   = $this->fake_order( 100, 'guest@example.test', 0, 1 );
+		$request = array( 'extensions' => array( 'smaily-checkout-optin' => array( 'user_newsletter' => true ) ) );
+
+		( new HookHandler( $this->queue ) )->on_checkout_block_optin( $order, $request );
+
+		$contact = $this->find_enqueued( 'order:100' );
+		self::assertNotNull( $contact );
+		self::assertSame( 0, $contact['payload']['is_unsubscribed'], 'A checkout opt-in subscribes.' );
+	}
+
+	/**
+	 * @return array{type: string, entity_id: string, payload: array<string, mixed>}|null
+	 */
+	private function find_enqueued( string $entity_id ): ?array {
+		foreach ( $this->enqueued as $row ) {
+			if ( $row['entity_id'] === $entity_id ) {
+				return $row;
+			}
+		}
+		return null;
+	}
+
 	private function fake_user( int $id, string $email, string $first, string $last ): \WP_User {
 		// WP_User isn't autoloadable in unit tests; build an object with the
 		// fields HookHandler reads.

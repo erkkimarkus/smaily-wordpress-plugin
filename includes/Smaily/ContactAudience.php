@@ -50,12 +50,32 @@ final class ContactAudience {
 	}
 
 	/**
-	 * Should guest-order emails be synced at all? Governed by the include_guests
-	 * toggle (always on under checkout-only). The opt-in itself is enforced at
-	 * the checkout-checkbox call site, not here.
+	 * Should an ORDER's billing email be synced as a contact (the checkout
+	 * path, F3-48)? Registered customers are covered by the account hooks, so in
+	 * consent / legitimate-interest this only adds GUESTS:
+	 *
+	 *   - checkout_optin      → the checkbox is the only source: sync (guest OR
+	 *                           account) iff opted in;
+	 *   - legitimate_interest → guests synced iff include_guests (no opt-in needed);
+	 *   - consent             → guests synced iff include_guests AND opted in.
+	 *
+	 * @param int  $customer_id Order's WP customer id (0 = guest).
+	 * @param bool $opted_in    Whether the checkout subscription checkbox was ticked.
 	 */
-	public function should_sync_guest(): bool {
-		return $this->mode->include_guests();
+	public function should_sync_order_email( int $customer_id, bool $opted_in ): bool {
+		if ( $this->mode->mode() === ContactSyncMode::MODE_CHECKOUT_OPTIN ) {
+			return $opted_in;
+		}
+
+		if ( $customer_id > 0 ) {
+			return false;
+		}
+
+		if ( ! $this->mode->include_guests() ) {
+			return false;
+		}
+
+		return $this->mode->requires_optin() ? $opted_in : true;
 	}
 
 	private function opted_in( int $user_id ): bool {

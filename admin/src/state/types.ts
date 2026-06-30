@@ -150,6 +150,17 @@ export type ContactSyncMode = 'legitimate_interest' | 'consent' | 'checkout_opti
 
 export const DEFAULT_CONTACT_SYNC_MODE: ContactSyncMode = 'consent';
 
+/**
+ * Coerce a server-emitted / stored mode string into the union — an unknown or
+ * missing value falls back to the lawful-safe default (F3-48). Single source so
+ * the wizard (hydrate) and Settings (settings-reducer) paths can't drift.
+ */
+export function normalizeContactSyncMode(value: string | undefined): ContactSyncMode {
+  return value === 'legitimate_interest' || value === 'consent' || value === 'checkout_optin'
+    ? value
+    : DEFAULT_CONTACT_SYNC_MODE;
+}
+
 export interface WizardState {
   /** True when rendering inside Settings tabs (sub-PR 2.F). */
   inSettings: boolean;

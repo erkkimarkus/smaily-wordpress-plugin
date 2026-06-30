@@ -182,7 +182,10 @@ class HookHandler {
 		$this->on_user_register( $customer_id );
 	}
 
-	public function on_checkout_order_processed( int $order_id ): void {
+	/**
+	 * @param array<string, mixed> $posted_data Classic-checkout POSTed fields (3-arg hook).
+	 */
+	public function on_checkout_order_processed( int $order_id, array $posted_data = array() ): void {
 		if ( ! function_exists( 'wc_get_order' ) ) {
 			return;
 		}
@@ -201,6 +204,12 @@ class HookHandler {
 		if ( $this->gate_closed() ) {
 			return;
 		}
+
+		// F3-48 F1: order-path contact sync — guests + the checkout-opt-in preset.
+		// Classic checkout carries the newsletter checkbox in $posted_data; block
+		// checkout uses on_checkout_block_optin instead.
+		$opted_in = isset( $posted_data['user_newsletter'] ) && (int) $posted_data['user_newsletter'] === 1;
+		$this->sync_order_contact( $order, $opted_in );
 
 		$email = $order->get_billing_email();
 		if ( $email === '' ) {
@@ -230,6 +239,77 @@ class HookHandler {
 		}
 
 		$this->maybe_enqueue( self::EVENT_AUTOMATION_FIRST_ORDER, (string) $order_id, $payload );
+	}
+
+	/**
+	 * Block-checkout opt-in (F3-48 F1). The WC Blocks Store API carries the
+	 * subscription checkbox in the request extensions, not in classic POST data.
+	 *
+	 * @param mixed $request The store-API request (array-accessible extensions bag).
+	 */
+	public function on_checkout_block_optin( \WC_Order $order, $request ): void {
+		$opted_in = isset( $request['extensions']['smaily-checkout-optin']['user_newsletter'] )
+			&& true === $request['extensions']['smaily-checkout-optin']['user_newsletter'];
+
+		$this->sync_order_contact( $order, $opted_in );
+	}
+
+	/**
+	 * Stamp the rec-attribution cookies onto a BLOCK-checkout order
+	 * (`woocommerce_store_api_checkout_order_processed`). The classic-checkout
+	 * stamping in on_checkout_order_processed never fires for Store-API orders,
+	 * so a block-checkout store captured the `smaily_rec` cookie but the order
+	 * never carried `_smaily_rec_id` → `smaily_rec_id` was absent from every
+	 * order payload (the F3-46 "classic checkout only" gap; MiuMjau field
+	 * regression 2026-06-30). Attribution is rec-engine, not contact sync, so it
+	 * runs ungated — exactly like the classic path.
+	 */
+	public function on_block_checkout_order_processed( \WC_Order $order ): void {
+		$this->save_attribution_cookies_to_order( $order );
+	}
+
+	/**
+	 * Enqueue a contact.sync for an order's billing email when the mode's
+	 * audience says so (F3-48 F1 — the guest / checkout-opt-in path the account
+	 * hooks don't cover). Registered customers in consent / legitimate interest
+	 * are handled by the account hooks; checkout-only routes everyone here.
+	 */
+	private function sync_order_contact( \WC_Order $order, bool $opted_in ): void {
+		if ( $this->gate_closed() || ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+			return;
+		}
+
+		$customer_id = (int) $order->get_customer_id();
+		if ( ! $this->audience()->should_sync_order_email( $customer_id, $opted_in ) ) {
+			return;
+		}
+
+		$email = (string) $order->get_billing_email();
+		if ( $email === '' ) {
+			return;
+		}
+
+		$user = $customer_id > 0 ? get_userdata( $customer_id ) : false;
+		if ( $user instanceof \WP_User ) {
+			$payload = $this->build_contact_payload( $user );
+		} else {
+			$payload  = array(
+				'email'  => $email,
+				'fields' => array( 'store' => function_exists( 'get_site_url' ) ? (string) get_site_url() : '' ),
+			);
+			$language = $this->detect_language_for_order( $order );
+			if ( $language !== '' ) {
+				$payload['language'] = $language;
+			}
+		}
+
+		// An explicit checkout opt-in subscribes (consent / checkout-only); under
+		// legitimate interest Smaily owns consent, so is_unsubscribed is omitted.
+		if ( $opted_in && $this->mode()->mode() !== ContactSyncMode::MODE_LEGITIMATE_INTEREST ) {
+			$payload['is_unsubscribed'] = 0;
+		}
+
+		$this->maybe_enqueue( self::EVENT_CONTACT_SYNC, 'order:' . $order->get_id(), $payload );
 	}
 
 	/**

@@ -1,9 +1,9 @@
 import {
-  DEFAULT_CONTACT_SYNC_MODE,
   DEFAULT_SYNC_FIELDS,
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  normalizeContactSyncMode,
   type RssFeedBootData,
   type WizardState,
 } from './types';
@@ -100,10 +100,7 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     syncFields: env.syncFields ?? [...DEFAULT_SYNC_FIELDS],
     wordpressSubscriptionCheckbox: env.wordpressSubscriptionCheckbox ?? false,
     checkoutSubscriptionCheckbox: env.checkoutSubscriptionCheckbox ?? false,
-    contactSyncMode:
-      env.contactSyncMode === 'legitimate_interest' || env.contactSyncMode === 'checkout_optin'
-        ? env.contactSyncMode
-        : DEFAULT_CONTACT_SYNC_MODE,
+    contactSyncMode: normalizeContactSyncMode(env.contactSyncMode),
     includeGuests: env.includeGuests ?? false,
     automationForceOptIn: env.automationForceOptIn ?? false,
     contactsBackfill: idleBackfill,

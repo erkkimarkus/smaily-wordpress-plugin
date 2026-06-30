@@ -4,22 +4,12 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  normalizeContactSyncMode,
   type AutomationMapping,
   type AutomationTrigger,
-  type ContactSyncMode,
   type RssFeedBootData,
   type WizardState,
 } from './types';
-
-/**
- * Coerce the server-emitted mode string into the ContactSyncMode union — an
- * unknown / missing value falls back to the lawful-safe default (F3-48).
- */
-function normalizeContactSyncMode(value: string): ContactSyncMode {
-  return value === 'legitimate_interest' || value === 'consent' || value === 'checkout_optin'
-    ? value
-    : DEFAULT_CONTACT_SYNC_MODE;
-}
 
 /**
  * Server-emitted boot payload — admin/wizard.php + admin/settings.php

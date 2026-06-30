@@ -72,12 +72,35 @@ final class ContactAudienceTest extends TestCase {
 		self::assertFalse( $this->audience()->should_sync_user( $this->user( 5 ) ) );
 	}
 
-	public function test_should_sync_guest_follows_include_guests(): void {
-		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
-		self::assertFalse( $this->audience()->should_sync_guest(), 'Guests off by default.' );
+	public function test_should_sync_order_email_checkout_optin_is_opt_in_gated(): void {
+		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_CHECKOUT_OPTIN;
+
+		// Guest AND account: synced iff opted in.
+		self::assertTrue( $this->audience()->should_sync_order_email( 0, true ) );
+		self::assertTrue( $this->audience()->should_sync_order_email( 9, true ) );
+		self::assertFalse( $this->audience()->should_sync_order_email( 0, false ) );
+	}
+
+	public function test_should_sync_order_email_consent_guests_need_optin_and_toggle(): void {
+		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_CONSENT;
+
+		// Registered customers go through the account hooks, not the order path.
+		self::assertFalse( $this->audience()->should_sync_order_email( 9, true ) );
+		// Guests: only with include_guests AND opted in.
+		self::assertFalse( $this->audience()->should_sync_order_email( 0, true ), 'include_guests off by default.' );
 
 		$this->options[ ContactSyncMode::OPTION_INCLUDE_GUESTS ] = '1';
-		self::assertTrue( $this->audience()->should_sync_guest() );
+		self::assertTrue( $this->audience()->should_sync_order_email( 0, true ) );
+		self::assertFalse( $this->audience()->should_sync_order_email( 0, false ), 'Consent guests need the opt-in.' );
+	}
+
+	public function test_should_sync_order_email_legitimate_interest_guests_need_only_the_toggle(): void {
+		$this->options[ ContactSyncMode::OPTION_MODE ]           = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+		$this->options[ ContactSyncMode::OPTION_INCLUDE_GUESTS ] = '1';
+
+		// Guest synced without an opt-in; registered still via account hooks.
+		self::assertTrue( $this->audience()->should_sync_order_email( 0, false ) );
+		self::assertFalse( $this->audience()->should_sync_order_email( 9, false ) );
 	}
 
 	private function audience(): ContactAudience {

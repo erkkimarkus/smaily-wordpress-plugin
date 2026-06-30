@@ -42,7 +42,14 @@ final class Hooks {
 		add_action( 'profile_update', array( $handler, 'on_profile_update' ), 10, 1 );
 		add_action( 'woocommerce_save_account_details', array( $handler, 'on_profile_update' ), 10, 1 );
 		add_action( 'woocommerce_created_customer', array( $handler, 'on_woocommerce_created_customer' ), 10, 1 );
-		add_action( 'woocommerce_checkout_order_processed', array( $handler, 'on_checkout_order_processed' ), 10, 1 );
+		// 2 args: $order_id + $posted_data (the classic-checkout newsletter checkbox).
+		add_action( 'woocommerce_checkout_order_processed', array( $handler, 'on_checkout_order_processed' ), 10, 2 );
+		// Block checkout carries the opt-in in the Store API request, not POST.
+		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( $handler, 'on_checkout_block_optin' ), 10, 2 );
+		// Block checkout never fires woocommerce_checkout_order_processed, so the
+		// rec-attribution cookie→order-meta stamping needs its Store-API twin
+		// (F3-46 gap → MiuMjau smaily_rec_id regression).
+		add_action( 'woocommerce_store_api_checkout_order_processed', array( $handler, 'on_block_checkout_order_processed' ), 10, 1 );
 
 		// F3-48.6: propagate a WP marketing opt-in/opt-out to Smaily (consent
 		// mode). These fire BEFORE the meta write so the handler can read the
