@@ -43,6 +43,13 @@ final class Hooks {
 		add_action( 'woocommerce_save_account_details', array( $handler, 'on_profile_update' ), 10, 1 );
 		add_action( 'woocommerce_created_customer', array( $handler, 'on_woocommerce_created_customer' ), 10, 1 );
 		add_action( 'woocommerce_checkout_order_processed', array( $handler, 'on_checkout_order_processed' ), 10, 1 );
+
+		// F3-48.6: propagate a WP marketing opt-in/opt-out to Smaily (consent
+		// mode). These fire BEFORE the meta write so the handler can read the
+		// old value; `add_user_meta` covers the first-ever set (which WP routes
+		// through add, not update).
+		add_action( 'update_user_meta', array( $handler, 'on_user_newsletter_meta_update' ), 10, 4 );
+		add_action( 'add_user_meta', array( $handler, 'on_user_newsletter_meta_add' ), 10, 3 );
 	}
 
 	private function __construct() {

@@ -53,7 +53,15 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1–.5 DONE.**
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1–.6 DONE (engine feature-complete).**
+F3-48.6: consent opt-in/opt-out propagation (WP→Smaily) — a `user_newsletter` meta-transition
+handler (consent mode) enqueues a separate `:consent` row (opt-in → is_unsubscribed=0, opt-out →
+=1); routine data sync never sends is_unsubscribed. Fixed a latent bug found here: the Flusher
+dropped the live contact-sync `language` (only the backfill sent it) — now forwarded. Regression
+locks added. Gates: ci:strict exit=0 (PHPUnit 448, vitest 161), integration OK 119. **Remaining:
+.7 — Prike cutover (Erkki installs the plugin, sets preset 1, Make off) + thorough end testing
+(full gates + live-walk sandbox + security/code-quality re-audit + PCP against built ZIP + i18n
+.pot/.po regen).**
 F3-48.5: Settings/wizard UI — "Contact sync mode" Card in Step2Subscribers (3 radio presets +
 legitimate-interest warning Banner + include_guests checkbox + preset-1-only force-opt-in toggle),
 wired through the wizard reducer → buildTabPayload/hydrate/settings-reducer →

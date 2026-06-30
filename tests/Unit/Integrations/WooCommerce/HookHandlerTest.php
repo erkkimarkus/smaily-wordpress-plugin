@@ -178,6 +178,69 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $this->enqueued[0]['type'] );
 	}
 
+	public function test_regular_contact_sync_never_carries_is_unsubscribed(): void {
+		// Regression lock (F3-48.6): a routine data sync must NOT send
+		// is_unsubscribed — only an explicit opt-state transition does — so a
+		// profile edit can't resurrect a Smaily unsubscribe between reconciles.
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_register( 42 );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertArrayNotHasKey( 'is_unsubscribed', $this->enqueued[0]['payload'] );
+	}
+
+	public function test_newsletter_optout_enqueues_unsubscribe_consent_event(): void {
+		// Default consent mode; setUp stubs user_newsletter='1' (opted in) → the
+		// pre-write old value; new value 0 → opt-out.
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_newsletter_meta_update( 0, 42, 'user_newsletter', 0 );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $this->enqueued[0]['type'] );
+		self::assertSame( '42:consent', $this->enqueued[0]['entity_id'] );
+		self::assertSame( 1, $this->enqueued[0]['payload']['is_unsubscribed'] );
+	}
+
+	public function test_newsletter_optin_enqueues_subscribe_consent_event(): void {
+		// Add path → old = 0 (no prior meta); new = 1 → opt-in.
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_newsletter_meta_add( 42, 'user_newsletter', 1 );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( 0, $this->enqueued[0]['payload']['is_unsubscribed'] );
+	}
+
+	public function test_newsletter_change_ignored_for_other_meta_keys(): void {
+		( new HookHandler( $this->queue ) )->on_user_newsletter_meta_update( 0, 42, 'billing_phone', 0 );
+
+		self::assertSame( array(), $this->enqueued );
+	}
+
+	public function test_newsletter_change_ignored_outside_consent_mode(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
+				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				if ( $key === ContactSyncMode::OPTION_MODE ) {
+					return ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+				}
+				return $default;
+			}
+		);
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_newsletter_meta_update( 0, 42, 'user_newsletter', 0 );
+
+		self::assertSame( array(), $this->enqueued, 'Legitimate interest leaves consent to Smaily.' );
+	}
+
 	public function test_user_register_skips_contact_sync_when_disabled(): void {
 		Functions\when( 'get_option' )->justReturn( false );
 		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );

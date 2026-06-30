@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\ContactAudience;
+use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Support\ContactLanguageResolver;
 
@@ -84,6 +85,8 @@ class HookHandler {
 
 	private ?ContactAudience $audience = null;
 
+	private ?ContactSyncMode $mode = null;
+
 	public function __construct( EventQueue $queue ) {
 		$this->queue = $queue;
 	}
@@ -138,6 +141,36 @@ class HookHandler {
 			(string) $user_id,
 			$this->build_contact_payload( $user )
 		);
+	}
+
+	/**
+	 * Propagate a WP marketing opt-in / opt-out to Smaily (F3-48.6, consent mode
+	 * only). Bound to `update_user_meta` (existing meta changes) — the action
+	 * fires BEFORE the write, so get_user_meta still returns the OLD value.
+	 *
+	 * @param int|string $meta_id
+	 * @param mixed      $meta_value
+	 */
+	public function on_user_newsletter_meta_update( $meta_id, int $object_id, string $meta_key, $meta_value ): void {
+		if ( $meta_key !== ContactAudience::OPTIN_META ) {
+			return;
+		}
+		$old = function_exists( 'get_user_meta' ) ? (int) get_user_meta( $object_id, ContactAudience::OPTIN_META, true ) : 0;
+		$this->handle_newsletter_change( $object_id, $old, (int) $meta_value );
+	}
+
+	/**
+	 * Same as on_user_newsletter_meta_update but for the FIRST set of the meta
+	 * (WordPress routes a never-seen key through `add_user_meta`, not update).
+	 * No prior value → old = 0.
+	 *
+	 * @param mixed $meta_value
+	 */
+	public function on_user_newsletter_meta_add( int $object_id, string $meta_key, $meta_value ): void {
+		if ( $meta_key !== ContactAudience::OPTIN_META ) {
+			return;
+		}
+		$this->handle_newsletter_change( $object_id, 0, (int) $meta_value );
 	}
 
 	public function on_woocommerce_created_customer( int $customer_id ): void {
@@ -298,6 +331,55 @@ class HookHandler {
 			$this->audience = new ContactAudience();
 		}
 		return $this->audience;
+	}
+
+	private function mode(): ContactSyncMode {
+		if ( $this->mode === null ) {
+			$this->mode = new ContactSyncMode();
+		}
+		return $this->mode;
+	}
+
+	/**
+	 * Turn a user_newsletter transition into a Smaily consent change. Opt-in
+	 * (→1) sends is_unsubscribed=0 (subscribe — an explicit re-grant overrides a
+	 * prior Smaily unsubscribe); opt-out (1→0) sends is_unsubscribed=1. Only in
+	 * consent mode: legitimate interest leaves consent to Smaily, checkout-only
+	 * has no accounts. The regular data sync (on_profile_update) never sends
+	 * is_unsubscribed — so a routine profile edit can't resurrect a Smaily
+	 * unsubscribe between reconciles; only an actual opt-state transition does.
+	 */
+	private function handle_newsletter_change( int $user_id, int $old_value, int $new_value ): void {
+		if ( $old_value === $new_value || $this->gate_closed() ) {
+			return;
+		}
+		if ( ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+			return;
+		}
+		if ( $this->mode()->mode() !== ContactSyncMode::MODE_CONSENT ) {
+			return;
+		}
+
+		$user = get_userdata( $user_id );
+		if ( $user === false ) {
+			return;
+		}
+
+		if ( $new_value === 1 ) {
+			$this->enqueue_consent_change( $user, 0 );
+		} elseif ( $old_value === 1 ) {
+			$this->enqueue_consent_change( $user, 1 );
+		}
+	}
+
+	private function enqueue_consent_change( \WP_User $user, int $is_unsubscribed ): void {
+		$payload                    = $this->build_contact_payload( $user );
+		$payload['is_unsubscribed'] = $is_unsubscribed;
+
+		// Distinct entity id so this consent event is a SEPARATE queue row from
+		// any same-request data sync (which omits is_unsubscribed = preserve) —
+		// the per-request dedupe never swallows the consent change.
+		$this->maybe_enqueue( self::EVENT_CONTACT_SYNC, $user->ID . ':consent', $payload );
 	}
 
 	private function detect_language_for_user( \WP_User $user ): string {

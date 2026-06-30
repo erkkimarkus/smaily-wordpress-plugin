@@ -79,6 +79,42 @@ final class FlusherTest extends TestCase {
 		self::assertSame( array( 1 ), $queue->marked_sent );
 	}
 
+	public function test_contact_sync_forwards_language_and_is_unsubscribed(): void {
+		// F3-48.6: `language` (F3-47) + `is_unsubscribed` are top-level payload
+		// keys the custom-`fields` bag doesn't carry; the Flusher must merge them
+		// into the Smaily row (language was previously dropped on the live path).
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 1,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode(
+						array(
+							'email'           => 'a@b.c',
+							'language'        => 'et',
+							'is_unsubscribed' => 1,
+							'fields'          => array( 'first_name' => 'Alice' ),
+						)
+					),
+				),
+			)
+		);
+
+		$captured = array();
+		$client   = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )->willReturnCallback(
+			static function ( array $rows ) use ( &$captured ): array {
+				$captured = $rows[0];
+				return array();
+			}
+		);
+
+		( new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client ) )->flush();
+
+		self::assertSame( 'et', $captured['language'] ?? null );
+		self::assertSame( 1, $captured['is_unsubscribed'] ?? null );
+	}
+
 	public function test_contact_sync_records_the_exchange_from_the_client(): void {
 		// F3-44: the Flusher stores what the Client sent + the Smaily reply, read
 		// from the Client's last_exchange() (populated in Client::request()).

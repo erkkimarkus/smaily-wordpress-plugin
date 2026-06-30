@@ -145,7 +145,7 @@ final class Flusher {
 
 		switch ( $event_type ) {
 			case HookHandler::EVENT_CONTACT_SYNC:
-				$this->dispatch_contact_sync( $email, $fields );
+				$this->dispatch_contact_sync( $email, $payload, $fields );
 				return;
 
 			case HookHandler::EVENT_AUTOMATION_WELCOME:
@@ -166,10 +166,23 @@ final class Flusher {
 	}
 
 	/**
+	 * @param array<string, mixed> $payload
 	 * @param array<string, mixed> $fields
 	 */
-	private function dispatch_contact_sync( string $email, array $fields ): void {
-		$row    = array_merge( array( 'email' => $email ), $fields );
+	private function dispatch_contact_sync( string $email, array $payload, array $fields ): void {
+		$row = array_merge( array( 'email' => $email ), $fields );
+
+		// Forward the top-level contact fields the Smaily contact API keys on,
+		// which the custom-`fields` bag doesn't carry: `language` (F3-47 — this
+		// was silently dropped on the live path; only the backfill sent it) and
+		// `is_unsubscribed` (F3-48.6 consent opt-in/opt-out propagation).
+		if ( isset( $payload['language'] ) && (string) $payload['language'] !== '' ) {
+			$row['language'] = (string) $payload['language'];
+		}
+		if ( isset( $payload['is_unsubscribed'] ) ) {
+			$row['is_unsubscribed'] = (int) $payload['is_unsubscribed'];
+		}
+
 		$client = ( $this->client_factory )( 'default' );
 		try {
 			$client->upsert_subscribers( array( $row ) );

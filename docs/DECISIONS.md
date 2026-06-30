@@ -2540,7 +2540,14 @@ toggle). **F3-48.5 DONE** — Settings/wizard UI: a "Contact sync mode" Card in 
 preset-1-only force-opt-in toggle), wired end-to-end (wizard reducer actions →
 `buildTabPayload`/`hydrate`/`settings-reducer` → `SettingsEndpoint::save_subscribers` validated +
 `EnvDetector::saved_settings` boot). Merchants now pick the preset in the UI (no longer
-option-only). Remaining: `is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
+option-only). **F3-48.6 DONE** — consent opt-in/opt-out propagation (WP → Smaily): a
+`user_newsletter` meta-transition handler (consent mode, bound to `update_user_meta` +
+`add_user_meta`, reads the pre-write old value) enqueues a separate `:consent` contact-sync row
+— opt-in → `is_unsubscribed=0`, opt-out → `is_unsubscribed=1`; the routine data sync never sends
+`is_unsubscribed` (so a profile edit can't resurrect a Smaily unsubscribe between reconciles).
+Also fixed a **latent bug found here**: the `Flusher` dropped the top-level `language` on the live
+contact-sync path (only the backfill ever sent it) — now forwarded into the Smaily row alongside
+`is_unsubscribed`. Regression locks added. Remaining: Prike cutover (.7) + thorough end testing.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 

@@ -262,8 +262,13 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    save_subscribers` (validated) + `EnvDetector::saved_settings` (boot). New
    English `__()` strings — `.pot`/`-et.po` regen + ET translation is a packaging
    step (`bin/build-i18n.sh`).
-6. **Regression locks** — `is_unsubscribed` + `force_opt_in` per mode; audience
-   per mode.
+6. **`is_unsubscribed` opt-out semantics + regression locks** — **DONE (F3-48.6)**.
+   A `user_newsletter` meta-transition handler (consent mode) enqueues a separate
+   `:consent` contact-sync row: opt-in (→1) → `is_unsubscribed=0`, opt-out (1→0)
+   → `is_unsubscribed=1`; the regular data sync never sends `is_unsubscribed`.
+   Also fixed a latent bug: the `Flusher` dropped the top-level `language` on the
+   live contact-sync path (only the backfill sent it) — now forwarded alongside
+   `is_unsubscribed`. Regression locks added.
 7. **Cutover (Prike)** — install plugin → wizard → preset 1 → Make data-sync off.
 
 Builds on F3-47 (the language resolver — already shipped, mode-independent).
