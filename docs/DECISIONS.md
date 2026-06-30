@@ -2429,6 +2429,14 @@ and is **context-independent by construction** (no `ICL_LANGUAGE_CODE` /
   `language` only when non-empty.
 - Filterable: `smaily_connect_contact_language` (final override) +
   `smaily_connect_user_language_meta_key` (redirect the user-meta lookup).
+- **Active-language clamp (Erkki):** a resolved code that is NOT one of the site's
+  currently-active languages (`DetectorFactory::get_detected_languages()`) is
+  clamped to the configured default. The resolver never *invents* a language —
+  it only echoes WPML's own values — but this hard-guarantees that dirty history
+  (a stray `ru` `_user_preferred_language` / old order `wpml_language` from a
+  language the store has since removed) can't spawn a contact list that shouldn't
+  exist. No-op when the detector can't enumerate (empty allowlist); the filter
+  runs AFTER the clamp, so an explicit override is still the last word.
 - **`get_user_locale()` is deliberately NOT a source** — it reintroduces the very
   site-locale leak this fixes.
 

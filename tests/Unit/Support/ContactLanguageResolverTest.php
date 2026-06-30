@@ -148,6 +148,55 @@ final class ContactLanguageResolverTest extends TestCase {
 		self::assertSame( 'xx', $resolver->for_user( $this->user( 42 ) ) );
 	}
 
+	// ---- allowlist clamp --------------------------------------------------
+
+	public function test_for_user_clamps_out_of_set_language_to_default(): void {
+		// A stray `ru` preferred-language meta on an et/en-only store must NOT
+		// produce a `ru` contact — it clamps to the default (Erkki's RU-list
+		// concern).
+		$this->seed_meta( 42, '_user_preferred_language', 'ru' );
+
+		$resolver = $this->resolver(
+			$this->detector( 'et', array( 'et', 'en' ) ),
+			static fn ( int $id ): string => ''
+		);
+
+		self::assertSame( 'et', $resolver->for_user( $this->user( 42 ) ) );
+	}
+
+	public function test_for_user_keeps_in_set_language(): void {
+		$this->seed_meta( 42, '_user_preferred_language', 'en' );
+
+		$resolver = $this->resolver(
+			$this->detector( 'et', array( 'et', 'en' ) ),
+			static fn ( int $id ): string => ''
+		);
+
+		self::assertSame( 'en', $resolver->for_user( $this->user( 42 ) ) );
+	}
+
+	public function test_no_clamp_when_active_set_unknown(): void {
+		// Detector can't enumerate languages → no allowlist → trust resolution
+		// rather than clamp against an unknown set.
+		$this->seed_meta( 42, '_user_preferred_language', 'ru' );
+
+		$resolver = $this->resolver(
+			$this->detector( 'et', array() ),
+			static fn ( int $id ): string => ''
+		);
+
+		self::assertSame( 'ru', $resolver->for_user( $this->user( 42 ) ) );
+	}
+
+	public function test_for_order_clamps_out_of_set_wpml_language(): void {
+		$resolver = $this->resolver(
+			$this->detector( 'et', array( 'et', 'en' ) ),
+			static fn ( int $id ): string => ''
+		);
+
+		self::assertSame( 'et', $resolver->for_order( $this->order( 'ru', 9 ) ) );
+	}
+
 	// ---- for_order --------------------------------------------------------
 
 	public function test_for_order_uses_order_wpml_language(): void {
@@ -183,9 +232,13 @@ final class ContactLanguageResolverTest extends TestCase {
 		return new ContactLanguageResolver( $detector, $order_language_provider );
 	}
 
-	private function detector( string $default_language ): DetectorInterface {
+	/**
+	 * @param array<int, string> $detected Active site languages (empty = detector can't enumerate).
+	 */
+	private function detector( string $default_language, array $detected = array() ): DetectorInterface {
 		$detector = $this->createMock( DetectorInterface::class );
 		$detector->method( 'get_default_language' )->willReturn( $default_language );
+		$detector->method( 'get_detected_languages' )->willReturn( $detected );
 		return $detector;
 	}
 

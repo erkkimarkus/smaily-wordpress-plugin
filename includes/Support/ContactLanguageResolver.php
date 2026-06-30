@@ -105,7 +105,7 @@ final class ContactLanguageResolver {
 			$language = $this->default_language();
 		}
 
-		return $this->filtered( $language, $user );
+		return $this->filtered( $this->clamp_to_active( $language ), $user );
 	}
 
 	/**
@@ -129,7 +129,52 @@ final class ContactLanguageResolver {
 			$language = $this->default_language();
 		}
 
-		return $this->filtered( $language, $order );
+		return $this->filtered( $this->clamp_to_active( $language ), $order );
+	}
+
+	/**
+	 * Hard guarantee against an out-of-set language reaching Smaily: a resolved
+	 * code that is NOT one of the site's currently-active languages is clamped
+	 * to the configured default. Protects against dirty history — a stray
+	 * `_user_preferred_language` / old order `wpml_language` from a language the
+	 * store has since removed (e.g. a `ru` value on an `et`/`en`-only store)
+	 * would otherwise spawn a contact list that shouldn't exist (Erkki, F3-47).
+	 *
+	 * No-op when the detector can't enumerate languages (empty allowlist) —
+	 * we don't clamp against an unknown set. The explicit
+	 * `smaily_connect_contact_language` filter runs AFTER this, so a merchant
+	 * override is still the last word.
+	 */
+	private function clamp_to_active( string $language ): string {
+		if ( $language === '' ) {
+			return '';
+		}
+
+		$active = $this->active_languages();
+		if ( $active === array() || in_array( $language, $active, true ) ) {
+			return $language;
+		}
+
+		return $this->default_language();
+	}
+
+	/**
+	 * The site's currently-active language codes, normalised. Empty when the
+	 * detector can't determine them.
+	 *
+	 * @return array<int, string>
+	 */
+	private function active_languages(): array {
+		$languages = array();
+
+		foreach ( $this->detector->get_detected_languages() as $code ) {
+			$normalized = $this->normalize( (string) $code );
+			if ( $normalized !== '' ) {
+				$languages[] = $normalized;
+			}
+		}
+
+		return array_values( array_unique( $languages ) );
 	}
 
 	/**

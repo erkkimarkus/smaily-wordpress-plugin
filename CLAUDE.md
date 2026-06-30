@@ -196,9 +196,13 @@ daily. **Two rules:** (1) a NEW datetime-style sin — never reintroduce a raw
 `get_user_locale()`/`get_locale()` language source on the contact path; route it
 through the resolver. (2) **Omit `language` when the resolver returns `''`** —
 Smaily treats absent as "leave existing intact", empty as "wipe"; the
-HookHandler payload builders add the key only when non-empty. Contact sync is
-gated by `setup_completed` (email wizard), independent of the rec-engine — so
-this can ship to a non-engine store. The corrective mass re-sync of an already-
+HookHandler payload builders add the key only when non-empty. (3) The resolved
+code is **clamped to the site's active languages** (`DetectorFactory::
+get_detected_languages()`) — a code outside that set (dirty history, e.g. a
+stray `ru` on an `et`/`en`-only store) falls to the default, so the sync can't
+spawn a list that shouldn't exist; the resolver never invents a language, the
+clamp just locks it. Contact sync is gated by `setup_completed` (email wizard),
+independent of the rec-engine — so this can ship to a non-engine store. The corrective mass re-sync of an already-
 drifted store is the backfill running the SAME resolver (SP-B), not a one-off.
 
 ### Build / test / walk commands
