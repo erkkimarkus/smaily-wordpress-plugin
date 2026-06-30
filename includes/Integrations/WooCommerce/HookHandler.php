@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\ContactAudience;
+use Smaily\Connect\Smaily\ContactReconciler;
 use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Support\ContactLanguageResolver;
@@ -350,6 +351,11 @@ class HookHandler {
 	 * unsubscribe between reconciles; only an actual opt-state transition does.
 	 */
 	private function handle_newsletter_change( int $user_id, int $old_value, int $new_value ): void {
+		// The reconciler's own Smaily→WP write fires this hook — don't echo it
+		// back to Smaily (a mirrored `delete` would re-create the contact).
+		if ( ContactReconciler::is_applying() ) {
+			return;
+		}
 		if ( $old_value === $new_value || $this->gate_closed() ) {
 			return;
 		}

@@ -200,6 +200,31 @@ final class ContactReconcilerTest extends TestCase {
 		self::assertSame( 0, $this->reconciler( $client )->rebaseline() );
 	}
 
+	public function test_apply_runs_with_the_echo_suppression_flag(): void {
+		$this->consent_mode();
+		$this->user( 'a@x.test', 10, 1 );
+
+		$applying_during_write = null;
+		$meta                  =& $this->user_meta;
+		Functions\when( 'update_user_meta' )->alias(
+			static function ( int $id, string $key, $value ) use ( &$applying_during_write, &$meta ): bool {
+				$applying_during_write          = ContactReconciler::is_applying();
+				$meta[ $id . ':' . $key ] = $value;
+				return true;
+			}
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'get_action_log' )->willReturn(
+			array( array( 'seq_id' => 5, 'email' => 'a@x.test', 'action' => 'optout' ) )
+		);
+
+		$this->reconciler( $client )->reconcile();
+
+		self::assertTrue( $applying_during_write, 'Reconciler writes run with the echo-suppression flag set.' );
+		self::assertFalse( ContactReconciler::is_applying(), 'Flag is reset after the write.' );
+	}
+
 	private function reconciler( Client $client ): ContactReconciler {
 		return new ContactReconciler( $client, new ContactSyncMode() );
 	}

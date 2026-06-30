@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler;
 use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Smaily\ContactReconciler;
 use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\EventQueue;
 
@@ -211,6 +212,21 @@ final class HookHandlerTest extends TestCase {
 
 		self::assertCount( 1, $this->enqueued );
 		self::assertSame( 0, $this->enqueued[0]['payload']['is_unsubscribed'] );
+	}
+
+	public function test_reconcile_write_does_not_echo_a_consent_change_back(): void {
+		// Security re-audit fix: the reconciler's own Smaily→WP user_newsletter
+		// write fires this hook; it must NOT echo a contact.sync back to Smaily
+		// (a mirrored `delete` would otherwise re-create the deleted contact).
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		ContactReconciler::run_suppressed(
+			function (): void {
+				( new HookHandler( $this->queue ) )->on_user_newsletter_meta_update( 0, 42, 'user_newsletter', 0 );
+			}
+		);
+
+		self::assertSame( array(), $this->enqueued, 'A reconcile-driven meta write must not echo back to Smaily.' );
 	}
 
 	public function test_newsletter_change_ignored_for_other_meta_keys(): void {

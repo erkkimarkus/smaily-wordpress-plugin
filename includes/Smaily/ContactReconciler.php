@@ -45,6 +45,15 @@ final class ContactReconciler {
 	/** Backstop on the paginating loops so a runaway never hangs a cron tick. */
 	private const MAX_PAGES = 50;
 
+	/**
+	 * Reentrancy guard: true while apply() writes `user_newsletter`. The
+	 * HookHandler's WP→Smaily meta-transition handler checks this and skips —
+	 * otherwise a Smaily→WP reconcile write would echo straight back to Smaily
+	 * (and a Smaily `delete` mirrored to WP would re-CREATE the deleted contact,
+	 * fighting GDPR erasure — security re-audit 2026-06-30).
+	 */
+	private static bool $applying = false;
+
 	private Client $client;
 
 	private ContactSyncMode $mode;
@@ -159,9 +168,36 @@ final class ContactReconciler {
 			return 0;
 		}
 
-		update_user_meta( (int) $user->ID, self::OPTIN_META, $desired );
+		// Suppress the WP→Smaily echo: this write is the Smaily→WP direction.
+		self::run_suppressed(
+			static function () use ( $user, $desired ): void {
+				update_user_meta( (int) $user->ID, self::OPTIN_META, $desired );
+			}
+		);
 
 		return 1;
+	}
+
+	/** True while a reconcile write is in flight — the meta-transition handler skips. */
+	public static function is_applying(): bool {
+		return self::$applying;
+	}
+
+	/**
+	 * Run $fn with the reconcile guard set, restoring the previous value after
+	 * (nesting-safe). Public so the meta-transition handler's suppression is
+	 * unit-testable without a live reconcile.
+	 *
+	 * @param callable():void $fn
+	 */
+	public static function run_suppressed( callable $fn ): void {
+		$previous       = self::$applying;
+		self::$applying = true;
+		try {
+			$fn();
+		} finally {
+			self::$applying = $previous;
+		}
 	}
 
 	private function cursor(): int {
