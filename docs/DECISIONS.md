@@ -2525,9 +2525,14 @@ resource concern): the standing `reconcile()` polls the Smaily action-log (`hist
 shared hosting; `rebaseline()` (full `list=1` pull) is the occasional re-baseline only.
 Marketing-only (never touches profiling `smaily_rec_profiling`). Mirrors the engine's action-log
 approach (`re/docs/CONTACT_RECONCILIATION_DESIGN.md`, `re/docs/smaily-api/reference/action-log.md`);
-see `docs/CONSENT_STRATEGY_COMPARISON.md`. Not yet wired (cron takeover is the next slice).
-Remaining: cron takeover (wires the reconciler + refresh), automation `force_opt_in`, UI,
-`is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
+see `docs/CONSENT_STRATEGY_COMPARISON.md`. **F3-48.3 DONE** — cron takeover:
+`Bootstrap::on_contact_sync_tick` no longer fires the legacy buggy
+`Cron::smaily_sync_subscribers` mass-send (the F3-47 site-locale clobber, now orphaned/dead);
+it runs `ContactReconciler::reconcile()` (consent mode) + a mode-aware refresh via a
+non-clearing `BackfillJob::start(false)`, guarded by `BackfillJob::should_start_refresh()`
+(skip while a walk runs / re-arm once per freshness window). API errors swallowed so the tick
+never fails; abandoned-cart bridge untouched. Remaining: automation `force_opt_in` (mode-driven),
+UI, `is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 

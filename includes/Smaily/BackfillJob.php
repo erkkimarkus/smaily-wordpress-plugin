@@ -89,7 +89,7 @@ class BackfillJob implements BackfillJobInterface {
 	 *
 	 * @return int The backfill_job row id.
 	 */
-	public function start(): int {
+	public function start( bool $reset_freshness = true ): int {
 		global $wpdb;
 
 		$counts = count_users();
@@ -97,10 +97,15 @@ class BackfillJob implements BackfillJobInterface {
 
 		$table = $this->table_name();
 
+		// $reset_freshness=false is the daily-refresh path (F3-48.3): keep the
+		// _smaily_synced_at markers so the walk re-syncs only users outside the
+		// freshness window, not everyone. The merchant-driven "Start backfill"
+		// keeps the default (true) — a deliberate full re-sync.
+		//
 		// Defensive against unit-test fakes that don't seed $wpdb->usermeta
 		// (BackfillJobTest's anonymous wpdb only exposes `prefix`). In
 		// production $wpdb is always the WP-bootstrapped instance.
-		if ( $wpdb instanceof \wpdb ) {
+		if ( $reset_freshness && $wpdb instanceof \wpdb ) {
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 			$cleared = $wpdb->query(
 				$wpdb->prepare(
@@ -168,6 +173,59 @@ class BackfillJob implements BackfillJobInterface {
 		);
 
 		return $id;
+	}
+
+	/**
+	 * Whether the daily refresh (F3-48.3) should (re)start a walk now. False
+	 * while a walk is already draining — restarting would reset its cursor — and
+	 * for one freshness window after the last completion, so each contact is
+	 * re-synced about once per window instead of re-walked every daily tick.
+	 * True when no walk has ever run.
+	 */
+	public function should_start_refresh(): bool {
+		$state = $this->current_state();
+		if ( $state === null ) {
+			return true;
+		}
+
+		$status = isset( $state['status'] ) ? (string) $state['status'] : '';
+		if ( $status === 'running' ) {
+			return false;
+		}
+
+		if ( $status === 'completed' && ! empty( $state['completed_at'] ) ) {
+			$completed = strtotime( (string) $state['completed_at'] . ' UTC' );
+			if ( $completed !== false && ( time() - $completed ) < $this->freshness_seconds ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * @return array<string, mixed>|null Backfill state row (status + completed_at), or null.
+	 */
+	private function current_state(): ?array {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) ) {
+			return null;
+		}
+
+		$table = $this->table_name();
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT status, completed_at FROM {$table} WHERE job_type = %s AND target = %s",
+				self::BACKFILL_TYPE,
+				self::BACKFILL_TARGET
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+
+		return is_array( $row ) ? $row : null;
 	}
 
 	/**

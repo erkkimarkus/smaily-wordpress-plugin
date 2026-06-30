@@ -224,6 +224,43 @@ final class BackfillJobTest extends TestCase {
 		self::assertSame( 'et', $this->captured_payload['language'] ?? null );
 	}
 
+	public function test_should_start_refresh_true_when_never_run(): void {
+		$GLOBALS['wpdb'] = $this->fake_wpdb_for_process_batch( null );
+
+		self::assertTrue( ( new BackfillJob( $this->createMock( Client::class ) ) )->should_start_refresh() );
+	}
+
+	public function test_should_start_refresh_false_while_a_walk_is_running(): void {
+		$GLOBALS['wpdb'] = $this->fake_wpdb_for_process_batch( array( 'status' => 'running' ) );
+
+		self::assertFalse(
+			( new BackfillJob( $this->createMock( Client::class ) ) )->should_start_refresh(),
+			'Restarting a running walk would reset its cursor.'
+		);
+	}
+
+	public function test_should_start_refresh_false_when_recently_completed(): void {
+		$GLOBALS['wpdb'] = $this->fake_wpdb_for_process_batch(
+			array( 'status' => 'completed', 'completed_at' => gmdate( 'Y-m-d H:i:s', time() - 3600 ) )
+		);
+
+		self::assertFalse(
+			( new BackfillJob( $this->createMock( Client::class ) ) )->should_start_refresh(),
+			'A refresh completed an hour ago — nothing is due within the 7-day freshness window.'
+		);
+	}
+
+	public function test_should_start_refresh_true_when_completed_long_ago(): void {
+		$GLOBALS['wpdb'] = $this->fake_wpdb_for_process_batch(
+			array( 'status' => 'completed', 'completed_at' => gmdate( 'Y-m-d H:i:s', time() - ( 8 * 86400 ) ) )
+		);
+
+		self::assertTrue(
+			( new BackfillJob( $this->createMock( Client::class ) ) )->should_start_refresh(),
+			'Last refresh is older than the freshness window — re-arm.'
+		);
+	}
+
 	public function test_process_batch_skips_non_opted_in_users_in_consent_mode(): void {
 		$wpdb            = $this->fake_wpdb_for_process_batch(
 			array(

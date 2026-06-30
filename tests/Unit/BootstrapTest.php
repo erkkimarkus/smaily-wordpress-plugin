@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Unit;
 
 use Brain\Monkey;
+use Brain\Monkey\Actions;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Bootstrap;
@@ -54,6 +55,26 @@ final class BootstrapTest extends TestCase {
 		$bs = Bootstrap::instance();
 
 		self::assertSame( $bs->credentials(), $bs->credentials() );
+	}
+
+	public function test_contact_sync_tick_no_longer_bridges_the_legacy_mass_send(): void {
+		// F3-48.3 regression lock: the daily tick must NOT fire the legacy
+		// Cron::smaily_sync_subscribers mass-send (the site-locale language
+		// clobber, F3-47). With no credentials it is a safe no-op — reconcile
+		// swallows the missing-connection error and the refresh schedule guards
+		// on as_schedule_single_action being absent in the unit context.
+		Actions\expectDone( 'smaily_connect_cron_sync_subscribers' )->never();
+
+		$creds = $this->createMock( Credentials::class );
+		$creds->method( 'get' )->willReturn( null );
+
+		$bs = Bootstrap::instance();
+		$bs->set_credentials( $creds );
+
+		$bs->on_contact_sync_tick();
+
+		// Reached here without throwing on the unconfigured connection.
+		$this->addToAssertionCount( 1 );
 	}
 
 	public function test_smaily_client_throws_when_credentials_missing(): void {

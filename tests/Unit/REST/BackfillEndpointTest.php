@@ -189,7 +189,7 @@ final class BackfillEndpointTest extends TestCase {
 			public function __construct( int $id ) {
 				$this->stamped = $id;
 			}
-			public function start(): int {
+			public function start( bool $reset_freshness = true ): int {
 				return $this->stamped;
 			}
 			public function process_batch( int $batch_size = 100 ): array {

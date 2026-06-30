@@ -244,7 +244,10 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    `ContactReconciler::reconcile()`/`rebaseline()`, not yet wired.
 3. **SP-D cron takeover** (`on_contact_sync_tick` → `ContactReconciler::reconcile`
    + mode-aware `BackfillJob` refresh via a non-clearing `start(false)`; legacy
-   buggy mass-send retired). Wires step 2 in.
+   buggy mass-send retired). Wires step 2 in. **DONE (F3-48.3)** —
+   `start(bool $reset_freshness)` + `BackfillJob::should_start_refresh()` (re-arm
+   guard) + the rewritten tick (reconcile + non-clearing refresh; legacy
+   `smaily_connect_cron_sync_subscribers` no longer fired, left orphaned).
 4. **`AutomationRouter` `force_opt_in`** made mode-driven (welcome / first_order /
    abandoned_cart unified).
 5. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.

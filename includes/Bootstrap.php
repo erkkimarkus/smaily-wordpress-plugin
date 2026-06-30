@@ -38,6 +38,7 @@ use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
+use Smaily\Connect\Smaily\ContactReconciler;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CatalogBackfillJob;
 use Smaily\Connect\Smaily\RecEngine\Backfill\CustomerBackfillJob;
 use Smaily\Connect\Smaily\RecEngine\Backfill\OrderBackfillJob;
@@ -318,13 +319,65 @@ final class Bootstrap {
 	}
 
 	/**
-	 * AS callback for smly_plus_contact_sync (daily). Bridges to the
-	 * legacy `smaily_connect_cron_sync_subscribers` hook so the existing
-	 * Smaily_Connect\Integrations\WooCommerce\Cron::smaily_sync_subscribers
-	 * callback runs unchanged.
+	 * AS callback for smly_plus_contact_sync (daily). F3-48.3: NO LONGER bridges
+	 * the legacy `smaily_connect_cron_sync_subscribers` mass-send — that path
+	 * derived contact language from the cron-unsafe site locale and clobbered
+	 * ~contacts to `en` daily (F3-47). The legacy callback is left registered but
+	 * orphaned (dead, harmless; removed at the upstream merge).
+	 *
+	 * Instead the daily tick now: (1) mirrors Smaily marketing-consent back into
+	 * WP `user_newsletter` (consent mode only — ContactReconciler self-gates),
+	 * and (2) drives a mode-aware, resolver-correct contact refresh (the
+	 * audience-filtered BackfillJob from F3-48.1/.2). The abandoned-cart bridge
+	 * (on_abandoned_cart_tick) is unaffected.
 	 */
 	public function on_contact_sync_tick(): void {
-		do_action( 'smaily_connect_cron_sync_subscribers' );
+		$this->run_contact_reconcile();
+		$this->maybe_start_contact_refresh();
+	}
+
+	/**
+	 * Pull the Smaily action-log deltas and mirror opt-in/opt-out into WP
+	 * (consent mode only). Swallows API/credential errors so the tick never
+	 * fails — a missing connection just means "nothing to reconcile yet".
+	 */
+	private function run_contact_reconcile(): void {
+		try {
+			$changed = ( new ContactReconciler( $this->smaily_client() ) )->reconcile();
+			if ( $changed > 0 ) {
+				\Smaily\Connect\Support\DebugLog::write(
+					sprintf( '[smaily-connect contact.reconcile] %d WP opt-in flags updated from Smaily', $changed )
+				);
+			}
+		} catch ( \Throwable $e ) {
+			\Smaily\Connect\Support\DebugLog::write(
+				sprintf( '[smaily-connect contact.reconcile] skipped: %s', $e->getMessage() )
+			);
+		}
+	}
+
+	/**
+	 * (Re)start the daily contact refresh unless a walk is already draining or
+	 * one completed within the freshness window. Non-clearing (`start(false)`):
+	 * the walk re-syncs only stale users, skipping the freshly-synced.
+	 */
+	private function maybe_start_contact_refresh(): void {
+		if ( ! function_exists( 'as_schedule_single_action' ) ) {
+			return;
+		}
+
+		$job = $this->make_backfill_job( BackfillJob::BACKFILL_TYPE );
+		if ( ! $job instanceof BackfillJob || ! $job->should_start_refresh() ) {
+			return;
+		}
+
+		$job->start( false );
+		as_schedule_single_action(
+			time() + 5,
+			BackfillEndpoint::TICK_HOOK,
+			array( 'job_type' => BackfillJob::BACKFILL_TYPE ),
+			EventQueue::AS_GROUP
+		);
 	}
 
 	/**

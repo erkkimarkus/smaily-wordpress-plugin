@@ -53,7 +53,13 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 DONE.**
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 + .3 DONE.**
+F3-48.3 (cron takeover): `on_contact_sync_tick` no longer fires the legacy buggy mass-send (the
+F3-47 site-locale clobber — now orphaned); it runs `ContactReconciler::reconcile()` (consent) +
+a mode-aware refresh via non-clearing `BackfillJob::start(false)`, guarded by
+`should_start_refresh()` (skip while running / re-arm once per freshness window). Gates:
+ci:strict exit=0 (PHPUnit 441), integration OK 119. Remaining: automation force_opt_in → UI →
+is_unsubscribed+locks → Prike cutover.
 F3-48.2: `ContactReconciler` (Smaily→WP marketing-consent mirror, consent mode) + `Client::
 get_action_log()`/`list_contacts()`. Delta-first — standing reconcile polls the Smaily action-log
 (`history.php` + `since_seq_id`) for optin/optout/delete/complaint deltas (O(changes), light on
