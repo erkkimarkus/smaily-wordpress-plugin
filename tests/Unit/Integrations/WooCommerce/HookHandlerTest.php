@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler;
 use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\EventQueue;
 
 final class HookHandlerTest extends TestCase {
@@ -56,9 +57,15 @@ final class HookHandlerTest extends TestCase {
 
 		Functions\when( 'get_user_locale' )->justReturn( 'et_EE' );
 		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
-		// No per-user preferred-language meta in these cases — the resolver
-		// then falls through to the SiteLocale default ('et_EE' → 'et').
-		Functions\when( 'get_user_meta' )->justReturn( '' );
+		// Users are opted-in by default so the default (consent) contact-sync
+		// mode lets contact.sync through (F3-48 audience). No preferred-language
+		// meta → the resolver falls through to the SiteLocale default
+		// ('et_EE' → 'et'). Audience-gating cases override this stub.
+		Functions\when( 'get_user_meta' )->alias(
+			static function ( int $user_id, string $key, bool $single = false ) {
+				return $key === 'user_newsletter' ? '1' : '';
+			}
+		);
 		Functions\when( 'sanitize_text_field' )->returnArg( 1 );
 		Functions\when( 'wp_unslash' )->returnArg( 1 );
 
@@ -133,6 +140,42 @@ final class HookHandlerTest extends TestCase {
 		// preferred-language meta it lands on the SiteLocale default ('et').
 		self::assertSame( 'et', $this->enqueued[0]['payload']['language'] );
 		self::assertSame( 'Alice', $this->enqueued[0]['payload']['fields']['first_name'] );
+	}
+
+	public function test_consent_mode_skips_contact_sync_for_non_opted_in_user(): void {
+		// Default mode is consent → a user without user_newsletter=1 is not in
+		// the audience, so no contact.sync (F3-48).
+		Functions\when( 'get_user_meta' )->justReturn( '' );
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_register( 42 );
+
+		self::assertSame( array(), array_column( $this->enqueued, 'type' ) );
+	}
+
+	public function test_legitimate_interest_mode_syncs_non_opted_in_user(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
+				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				if ( $key === ContactSyncMode::OPTION_MODE ) {
+					return ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+				}
+				return $default;
+			}
+		);
+		// Not opted in — legitimate interest syncs everyone anyway.
+		Functions\when( 'get_user_meta' )->justReturn( '' );
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_user_register( 42 );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $this->enqueued[0]['type'] );
 	}
 
 	public function test_user_register_skips_contact_sync_when_disabled(): void {

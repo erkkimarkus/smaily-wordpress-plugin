@@ -53,7 +53,12 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30), implementation next.** Different stores need
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 DONE.**
+F3-48.1: `ContactSyncMode` (preset→policy) + `ContactAudience` (mode-aware audience) wired into
+the HookHandler live `contact.sync` gate + BackfillJob audience filter; default `consent`
+narrows the new path to `user_newsletter=1` (matches legacy), legit-interest syncs all. Gates:
+ci:strict exit=0 (PHPUnit 425, PHPStan clean, PHPCS 0 errors); integration OK 119. Remaining
+sub-PRs below. Different stores need
 different sync behaviour by lawful basis: Prike wants ALL customers (legitimate interest;
 legacy only synced `user_newsletter=1` → the missing-contacts root cause); Client 2 wants
 consent + Smaily↔WP reconcile; Client 3 wants checkout-opt-in-only/guests. Decision (Erkki):

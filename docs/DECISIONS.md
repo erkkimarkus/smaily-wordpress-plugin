@@ -2514,7 +2514,12 @@ its automation `force_opt_in` is mode-driven.
 
 **Status:** DESIGN approved (Erkki, 2026-06-30) — full design in `docs/CONTACT_SYNC_MODES.md`;
 both open questions resolved (preset-1 `force_opt_in` defaults `false` + advanced toggle;
-preset labels kept). Implementation pending (§ Implementation sequence in the design doc).
+preset labels kept). **Implementation started: F3-48.1 DONE** — `ContactSyncMode` (preset →
+policy) + `ContactAudience` (mode-aware "is this a contact?"), wired into the `HookHandler`
+live `contact.sync` gate + the `BackfillJob` audience filter. Default `consent` now narrows
+the new path's live + backfill audience to `user_newsletter=1` (matches legacy; legitimate
+interest syncs all). Remaining: reconciler + cron takeover, automation `force_opt_in`, UI,
+`is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 

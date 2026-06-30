@@ -223,8 +223,10 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
 
 ## 12. Implementation sequence (after design sign-off)
 
-1. **Mode config + `ContactSyncMode`/`Audience`/`Policy` core** + wiring into
-   `HookHandler` (live gate) + `BackfillJob` (audience filter) + send semantics.
+1. **Mode config + `ContactSyncMode`/`ContactAudience` core** + wiring into
+   `HookHandler` (live `contact.sync` gate) + `BackfillJob` (audience filter).
+   **DONE (F3-48.1).** Send semantics (`is_unsubscribed` on opt-out) deferred to
+   step 5 with the regression locks.
 2. **`ContactReconciler`** (Smaily→WP, both directions, consent mode) **+ SP-D
    cron takeover** (`on_contact_sync_tick` → mode-aware refresh; legacy buggy
    mass-send retired).

@@ -68,6 +68,8 @@ class BackfillJob implements BackfillJobInterface {
 
 	private ?ContactLanguageResolver $language_resolver = null;
 
+	private ?ContactAudience $audience = null;
+
 	public function __construct( Client $client, int $freshness_seconds = self::DEFAULT_FRESHNESS_SECONDS ) {
 		$this->client            = $client;
 		$this->freshness_seconds = $freshness_seconds;
@@ -221,8 +223,17 @@ class BackfillJob implements BackfillJobInterface {
 			)
 		);
 
-		$fresh_skips = 0;
+		$fresh_skips    = 0;
+		$audience_skips = 0;
 		foreach ( $users as $user ) {
+			// F3-48: only sync the mode's audience (consent → opted-in only;
+			// legitimate interest → all; checkout-only → none). Walked-past but
+			// not POSTed, like a fresh-skip — the cursor still advances.
+			if ( ! $this->audience()->should_sync_user( $user ) ) {
+				++$audience_skips;
+				continue;
+			}
+
 			if ( $this->is_fresh( (int) $user->ID ) ) {
 				++$fresh_skips;
 				continue;
@@ -248,9 +259,10 @@ class BackfillJob implements BackfillJobInterface {
 
 		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
-				'[smaily-connect backfill.batch] synced=%d fresh_skipped=%d',
+				'[smaily-connect backfill.batch] synced=%d fresh_skipped=%d audience_skipped=%d',
 				$synced,
-				$fresh_skips
+				$fresh_skips,
+				$audience_skips
 			)
 		);
 
@@ -351,6 +363,13 @@ class BackfillJob implements BackfillJobInterface {
 			$this->language_resolver = new ContactLanguageResolver();
 		}
 		return $this->language_resolver;
+	}
+
+	private function audience(): ContactAudience {
+		if ( $this->audience === null ) {
+			$this->audience = new ContactAudience();
+		}
+		return $this->audience;
 	}
 
 	private function record_error( int $job_id, string $message ): void {

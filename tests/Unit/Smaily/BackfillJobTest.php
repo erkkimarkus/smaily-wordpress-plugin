@@ -36,8 +36,13 @@ final class BackfillJobTest extends TestCase {
 		// No multilingual plugin in unit context → SiteLocale default.
 		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
 
-		// Empty user-meta by default — every user looks "never synced".
-		Functions\when( 'get_user_meta' )->justReturn( '' );
+		// Users opted-in by default so the default (consent) audience syncs them;
+		// no _smaily_synced_at, so every user looks "never synced" (F3-48).
+		Functions\when( 'get_user_meta' )->alias(
+			static function ( int $user_id, string $key, bool $single = false ) {
+				return $key === 'user_newsletter' ? '1' : '';
+			}
+		);
 
 		// Pass-through for update_user_meta — tests don't need to inspect it
 		// unless an assertion explicitly cares.
@@ -135,9 +140,19 @@ final class BackfillJobTest extends TestCase {
 
 		Functions\when( 'get_users' )->justReturn( array( $this->fake_user( 1, 'fresh@x.test' ) ) );
 
-		// User WAS synced one minute ago — well inside the 7-day freshness
-		// window default — so upsert_subscribers must not be called.
-		Functions\when( 'get_user_meta' )->justReturn( (string) ( time() - 60 ) );
+		// Opted-in (passes the audience) but synced one minute ago — well inside
+		// the 7-day freshness window — so upsert_subscribers must not be called.
+		Functions\when( 'get_user_meta' )->alias(
+			static function ( int $user_id, string $key, bool $single = false ) {
+				if ( $key === 'user_newsletter' ) {
+					return '1';
+				}
+				if ( $key === BackfillJob::META_KEY ) {
+					return (string) ( time() - 60 );
+				}
+				return '';
+			}
+		);
 
 		$client = $this->createMock( Client::class );
 		$client->expects( $this->never() )->method( 'upsert_subscribers' );
@@ -207,6 +222,29 @@ final class BackfillJobTest extends TestCase {
 		( new BackfillJob( $this->capturing_client() ) )->process_batch( 10 );
 
 		self::assertSame( 'et', $this->captured_payload['language'] ?? null );
+	}
+
+	public function test_process_batch_skips_non_opted_in_users_in_consent_mode(): void {
+		$wpdb            = $this->fake_wpdb_for_process_batch(
+			array(
+				'id'              => 77,
+				'cursor_value'    => '0',
+				'processed_count' => '0',
+				'total_count'     => '1',
+			)
+		);
+		$GLOBALS['wpdb'] = $wpdb;
+
+		Functions\when( 'get_users' )->justReturn( array( $this->fake_user( 1, 'a@x.test' ) ) );
+		// Default mode is consent; this user is NOT opted in → audience-skipped.
+		Functions\when( 'get_user_meta' )->justReturn( '' );
+
+		$client = $this->createMock( Client::class );
+		$client->expects( $this->never() )->method( 'upsert_subscribers' );
+
+		$result = ( new BackfillJob( $client ) )->process_batch();
+
+		self::assertSame( 0, $result['processed'], 'Consent mode must skip users without user_newsletter=1.' );
 	}
 
 	/**

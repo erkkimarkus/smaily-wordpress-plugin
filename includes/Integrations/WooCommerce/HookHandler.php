@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Support\ContactLanguageResolver;
 
@@ -81,6 +82,8 @@ class HookHandler {
 
 	private ?ContactLanguageResolver $language_resolver = null;
 
+	private ?ContactAudience $audience = null;
+
 	public function __construct( EventQueue $queue ) {
 		$this->queue = $queue;
 	}
@@ -95,7 +98,7 @@ class HookHandler {
 			return;
 		}
 
-		if ( $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+		if ( $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) && $this->audience()->should_sync_user( $user ) ) {
 			$this->maybe_enqueue(
 				self::EVENT_CONTACT_SYNC,
 				(string) $user_id,
@@ -123,6 +126,10 @@ class HookHandler {
 
 		$user = get_userdata( $user_id );
 		if ( $user === false ) {
+			return;
+		}
+
+		if ( ! $this->audience()->should_sync_user( $user ) ) {
 			return;
 		}
 
@@ -284,6 +291,13 @@ class HookHandler {
 			$this->language_resolver = new ContactLanguageResolver();
 		}
 		return $this->language_resolver;
+	}
+
+	private function audience(): ContactAudience {
+		if ( $this->audience === null ) {
+			$this->audience = new ContactAudience();
+		}
+		return $this->audience;
 	}
 
 	private function detect_language_for_user( \WP_User $user ): string {
