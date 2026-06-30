@@ -26,7 +26,30 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-26 (**F3-46 DONE — server-side rec-attribution landing capture**.
+_Last updated: 2026-06-30 (**F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
+Managed (non-pilot) client Prike: ~1000 Smaily contacts drifted to language `en`. Root cause —
+the upstream plugin's daily "sync all subscribers" cron derives language from the cron-unsafe
+`Helper::get_current_language_code()`, which in a cron tick returns `get_locale()` = the WP
+**site** locale; Prike's WP locale is `en` but its WPML content default is `et`, so the cron
+mass-pushed `en` daily and out-raced the merchant's (correct) Make automations
+(`_user_preferred_language`/`wpml_language`, default `et`). Our own new live path had a sibling
+latent bug (`get_user_locale()` + always-set `language` key). Fix (SP-A): one shared
+`Support\ContactLanguageResolver` — context-independent, mirrors the Make sources
+(`_user_preferred_language` → latest order `wpml_language` → WPML default via `DetectorFactory`
+→ site-locale short code), normalises to `et`/`en`, and **omits `language` on empty** (absent
+preserves Smaily's value, empty wipes). Wired into `HookHandler` (`for_user`/`for_order`,
+omit-when-empty on all three payloads). Robust **without a live-store data check** (Erkki has no
+direct shop access — we ship only the plugin): the latest-order tier preserves the non-`et`
+minority. Decisions (Erkki): sync **all** registered customers regardless of consent; **no
+guests**; **never send `is_unsubscribed`** (Smaily owns consent — the legacy path reset it,
+another reason to migrate Prike off it). Contact sync is `setup_completed`-gated, independent of
+the rec-engine → ships before Prike goes on the engine. Gates: ci:strict exit=0 (PHPUnit 404
++13, JS 158, PHPStan clean, PHPCS 0 errors); integration OK 119. **Pending sub-PRs:** SP-B
+(backfill sends language = corrective mass re-sync of the ~1000), SP-D (replace legacy daily-cron
+bridge `on_contact_sync_tick` so the `en`-clobber stops), SP-E (lock `is_unsubscribed` out of the
+payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). Interim mitigation while
+Prike is still on the old plugin: uncheck "Language" in its Subscriber Synchronization (stops the
+daily `en` overwrite — omitted field preserves the existing value). DECISIONS F3-47). Prior — 2026-06-26 (**F3-46 DONE — server-side rec-attribution landing capture**.
 Engine brief `PLUGIN_BRIEF_woo_rec_link_redirect.md` (rev 2): prod shows 374 orders/30d, 0
 with `smaily_rec_id` — attribution empty. Root cause: the capture→stamp→send chain already
 existed end-to-end (`HookHandler` reads cookie `smaily_rec_id` → order meta → `OrderPayloadBuilder`),

@@ -13,6 +13,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler;
+use Smaily\Connect\Multilingual\DetectorFactory;
 use Smaily\Connect\Smaily\EventQueue;
 
 final class HookHandlerTest extends TestCase {
@@ -27,6 +28,10 @@ final class HookHandlerTest extends TestCase {
 		Monkey\setUp();
 
 		HookHandler::reset_seen();
+		// ContactLanguageResolver caches the active detector via DetectorFactory
+		// (a process-global static). Reset so each case resolves through the
+		// single-language SiteLocale fallback, independent of other tests.
+		DetectorFactory::reset();
 		$this->enqueued = array();
 
 		// Fake EventQueue that records enqueue() calls in the local array
@@ -51,6 +56,9 @@ final class HookHandlerTest extends TestCase {
 
 		Functions\when( 'get_user_locale' )->justReturn( 'et_EE' );
 		Functions\when( 'get_locale' )->justReturn( 'et_EE' );
+		// No per-user preferred-language meta in these cases — the resolver
+		// then falls through to the SiteLocale default ('et_EE' → 'et').
+		Functions\when( 'get_user_meta' )->justReturn( '' );
 		Functions\when( 'sanitize_text_field' )->returnArg( 1 );
 		Functions\when( 'wp_unslash' )->returnArg( 1 );
 
@@ -76,6 +84,7 @@ final class HookHandlerTest extends TestCase {
 
 	protected function tearDown(): void {
 		HookHandler::reset_seen();
+		DetectorFactory::reset();
 		Monkey\tearDown();
 		parent::tearDown();
 		$_COOKIE = array();
@@ -120,7 +129,9 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( HookHandler::EVENT_CONTACT_SYNC, $this->enqueued[0]['type'] );
 		self::assertSame( '42', $this->enqueued[0]['entity_id'] );
 		self::assertSame( 'alice@example.test', $this->enqueued[0]['payload']['email'] );
-		self::assertSame( 'et_EE', $this->enqueued[0]['payload']['language'] );
+		// Resolver normalises to the short content-language code; with no
+		// preferred-language meta it lands on the SiteLocale default ('et').
+		self::assertSame( 'et', $this->enqueued[0]['payload']['language'] );
 		self::assertSame( 'Alice', $this->enqueued[0]['payload']['fields']['first_name'] );
 	}
 

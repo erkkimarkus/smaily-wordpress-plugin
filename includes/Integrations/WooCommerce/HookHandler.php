@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Support\ContactLanguageResolver;
 
 /**
  * Hook callbacks that fan WordPress + WooCommerce events into the Smaily
@@ -77,6 +78,8 @@ class HookHandler {
 	private EventQueue $queue;
 
 	private ?\Smaily\Connect\Smaily\SubscriberPayloadBuilder $builder = null;
+
+	private ?ContactLanguageResolver $language_resolver = null;
 
 	public function __construct( EventQueue $queue ) {
 		$this->queue = $queue;
@@ -171,19 +174,21 @@ class HookHandler {
 			return;
 		}
 
-		$this->maybe_enqueue(
-			self::EVENT_AUTOMATION_FIRST_ORDER,
-			(string) $order_id,
-			array(
-				'email'    => $email,
-				'language' => $this->detect_language_for_order( $order ),
-				'fields'   => array(
-					'order_id'       => (string) $order_id,
-					'order_total'    => (string) $order->get_total(),
-					'order_currency' => $order->get_currency(),
-				),
-			)
+		$payload = array(
+			'email'  => $email,
+			'fields' => array(
+				'order_id'       => (string) $order_id,
+				'order_total'    => (string) $order->get_total(),
+				'order_currency' => $order->get_currency(),
+			),
 		);
+
+		$language = $this->detect_language_for_order( $order );
+		if ( $language !== '' ) {
+			$payload['language'] = $language;
+		}
+
+		$this->maybe_enqueue( self::EVENT_AUTOMATION_FIRST_ORDER, (string) $order_id, $payload );
 	}
 
 	/**
@@ -235,22 +240,36 @@ class HookHandler {
 	 * @return array<string, mixed>
 	 */
 	private function build_contact_payload( \WP_User $user ): array {
-		return array(
-			'email'    => (string) $user->user_email,
-			'language' => $this->detect_language_for_user( $user ),
-			'fields'   => $this->payload_builder()->build_fields( $user ),
+		$payload = array(
+			'email'  => (string) $user->user_email,
+			'fields' => $this->payload_builder()->build_fields( $user ),
 		);
+
+		// Omit `language` when unresolved — Smaily treats absent as
+		// "leave existing intact", empty as "wipe". Never wipe.
+		$language = $this->detect_language_for_user( $user );
+		if ( $language !== '' ) {
+			$payload['language'] = $language;
+		}
+
+		return $payload;
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
 	private function build_automation_payload( \WP_User $user ): array {
-		return array(
-			'email'    => (string) $user->user_email,
-			'language' => $this->detect_language_for_user( $user ),
-			'fields'   => $this->payload_builder()->build_fields( $user ),
+		$payload = array(
+			'email'  => (string) $user->user_email,
+			'fields' => $this->payload_builder()->build_fields( $user ),
 		);
+
+		$language = $this->detect_language_for_user( $user );
+		if ( $language !== '' ) {
+			$payload['language'] = $language;
+		}
+
+		return $payload;
 	}
 
 	private function payload_builder(): \Smaily\Connect\Smaily\SubscriberPayloadBuilder {
@@ -260,21 +279,19 @@ class HookHandler {
 		return $this->builder;
 	}
 
-	private function detect_language_for_user( \WP_User $user ): string {
-		if ( function_exists( 'get_user_locale' ) ) {
-			return (string) get_user_locale( $user->ID );
+	private function language_resolver(): ContactLanguageResolver {
+		if ( $this->language_resolver === null ) {
+			$this->language_resolver = new ContactLanguageResolver();
 		}
+		return $this->language_resolver;
+	}
 
-		return function_exists( 'get_locale' ) ? (string) get_locale() : '';
+	private function detect_language_for_user( \WP_User $user ): string {
+		return $this->language_resolver()->for_user( $user );
 	}
 
 	private function detect_language_for_order( \WC_Order $order ): string {
-		$customer_id = $order->get_customer_id();
-		if ( $customer_id > 0 && function_exists( 'get_user_locale' ) ) {
-			return (string) get_user_locale( $customer_id );
-		}
-
-		return function_exists( 'get_locale' ) ? (string) get_locale() : '';
+		return $this->language_resolver()->for_order( $order );
 	}
 
 	/**

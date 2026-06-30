@@ -180,6 +180,27 @@ engine rejects it. This bug shipped twice (customer `first_seen_at`, catalog
 `IsoDate` helper (F3-21) — every builder uses it so the bug can't recur. Any new
 datetime field goes through IsoDate.
 
+### Contact-sync language goes through ContactLanguageResolver — never get_user_locale / get_current_language_code (F3-47)
+The Smaily contact `language` code is resolved ONLY by `Support\
+ContactLanguageResolver` (`for_user` / `for_order`). It is context-independent
+(no `ICL_LANGUAGE_CODE`/`pll_current_language`/`get_user_locale` reads), so it
+returns the same answer in a cron tick as an HTTP request. Sources mirror the
+merchant's working Make automations: `_user_preferred_language` user meta →
+most-recent order's `wpml_language` → the multilingual default via
+`DetectorFactory` (WPML `wpml_default_language`, e.g. `et`) → site-locale short
+code; normalised to the short form (`en_US`→`en`). The scar it routes around
+(Prike, F3-47): the legacy cron's `Helper::get_current_language_code()` falls
+back to `get_locale()` in cron = the WP **site** locale (`en`), which on an
+`et`-content store with an `en` WP locale clobbered ~1000 contacts to `en`
+daily. **Two rules:** (1) a NEW datetime-style sin — never reintroduce a raw
+`get_user_locale()`/`get_locale()` language source on the contact path; route it
+through the resolver. (2) **Omit `language` when the resolver returns `''`** —
+Smaily treats absent as "leave existing intact", empty as "wipe"; the
+HookHandler payload builders add the key only when non-empty. Contact sync is
+gated by `setup_completed` (email wizard), independent of the rec-engine — so
+this can ship to a non-engine store. The corrective mass re-sync of an already-
+drifted store is the backfill running the SAME resolver (SP-B), not a one-off.
+
 ### Build / test / walk commands
 - `npm run ci:strict` — PHPCS + PHPStan + PHPUnit unit + JS (eslint/tsc/vitest).
   Must be `exit=0`.

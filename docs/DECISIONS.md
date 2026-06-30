@@ -2391,6 +2391,72 @@ but the real click→land→buy→attribute round-trip is pilot-verified.
 server-side); the contract §"Cookie names"; F3-42/F3-43 (the order ingest this feeds);
 `PLUGIN_BRIEF_order_sync_reliability.md` (the order-side receiver).
 
+### F3-47 — Contact-sync language goes through `ContactLanguageResolver` (Prike `en`-leak)
+
+**Context:** a managed (non-pilot) client store (Prike) runs the upstream Smaily WP plugin
++ two Make automations as a belt-and-braces contact sync. ~1000 contacts drifted to
+language `en`. Root cause: the upstream plugin's "Daily Automatic Subscriber
+Synchronization" cron (`Cron::smaily_sync_subscribers` → `Data_Handler::get_user_data` →
+`Helper::get_user_language_code`) falls back, for any subscriber lacking a stored
+per-user language meta, to `get_current_language_code()` — which the helper's OWN docblock
+flags as **cron-unsafe**: in a cron/Action-Scheduler request it returns `get_locale()` =
+the **WP site locale**. Prike's WP locale is `en` while its real content default (WPML
+`wpml_default_language`) is `et`, so the daily cron mass-pushed `en` and re-clobbered it
+every tick, beating the Make automations (whose language logic was actually **correct** —
+they read `_user_preferred_language` user meta and `wpml_language` order meta, default
+`et`). Our own new live-sync path had a sibling latent bug: `HookHandler::
+detect_language_for_user/order` used `get_user_locale()` (admin-UI locale; defaults to the
+site locale for front-end customers; emits full `en_US`), and `build_contact_payload`
+ALWAYS set the `language` key (empty would wipe the Smaily value).
+
+**Decision (implemented, SP-A 2026-06-30):** one shared `Support\ContactLanguageResolver`
+(CC-1) is the single source of the Smaily `language` code for both live-sync and (next
+sub-PRs) the backfill / daily refresh. It mirrors the Make automations' (correct) sources
+and is **context-independent by construction** (no `ICL_LANGUAGE_CODE` /
+`pll_current_language` reads — same answer in a cron tick as an HTTP request):
+- `for_user`: `_user_preferred_language` user meta → most-recent order's `wpml_language`
+  (injectable provider; `wc_get_orders` limit 1) → the multilingual plugin's configured
+  default via `DetectorFactory` (WPML `wpml_default_language` = `et`) → site-locale short
+  code. The latest-order tier makes the resolver robust **without a data check on the live
+  store** (we can only ship the plugin, not inspect their DB): the non-`et` minority who
+  ordered in their language is preserved, not flattened to the `et` default.
+- `for_order`: order `wpml_language` → the registered customer's `_user_preferred_language`
+  → default → site locale.
+- **Normalise to the short code** (`en_US` → `en`); Smaily + Make both key on `et`/`en`.
+- **Omit on empty** — resolver returns `''` and the caller drops the `language` key
+  (absent leaves Smaily's value intact; empty wipes — never wipe). `HookHandler::
+  build_contact_payload/build_automation_payload` + the first-order payload now add
+  `language` only when non-empty.
+- Filterable: `smaily_connect_contact_language` (final override) +
+  `smaily_connect_user_language_meta_key` (redirect the user-meta lookup).
+- **`get_user_locale()` is deliberately NOT a source** — it reintroduces the very
+  site-locale leak this fixes.
+
+**Decisions taken (Erkki, 2026-06-30):** (1) keep syncing **all registered customers
+regardless of consent** — the new path already does (no opt-in gate); (2) **guests are not
+synced** (no account → no contact) — already true; (3) **never send `is_unsubscribed`** —
+Smaily owns consent; the new path already omits it (the LEGACY live path sent
+`is_unsubscribed=0`, resetting opt-out — a second reason to migrate Prike off it). The
+goal is to retire the Make data-sync and let our Connect plugin own the correct contact
+sync (contact sync is gated by the email wizard `setup_completed`, independent of the
+rec-engine — so it can ship to Prike before they go on the engine).
+
+**Gates:** ci:strict exit=0 (PHPUnit 404 +13, JS 158, PHPStan clean, PHPCS 0 errors);
+integration OK 119. The round-trip on the real store (does the corrective backfill move
+the ~1000 from `en` to their true language) is a **manual post-deploy check** — we ship
+the plugin, the merchant runs it; the resolver is unit-proven.
+
+**Scope:** SP-A = the resolver + HookHandler wiring only. Pending sub-PRs: SP-B (backfill
+sends `language` via the resolver = the corrective mass re-sync), SP-D (replace the legacy
+daily-cron bridge `on_contact_sync_tick` with a correct refresh so the `en`-clobber stops),
+SP-E (regression test locking `is_unsubscribed` out of the payload), SP-G (cutover: Connect
+plugin → wizard → Make data-sync off).
+
+**Relationships:** CC-1 (single-source-of-truth — joins `SubscriberPayloadBuilder` /
+`SkuResolver` / `IsoDate`); the legacy `Helper::get_current_language_code` cron-unsafe
+docblock (the bug it routes around); the coexistence map (`setup_completed` email-wizard
+gate that owns this path vs the rec-engine `is_connected()` gate).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
