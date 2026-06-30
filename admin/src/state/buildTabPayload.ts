@@ -28,6 +28,9 @@ export function buildTabPayload(
         syncFields: state.syncFields,
         wordpressSubscriptionCheckbox: state.wordpressSubscriptionCheckbox,
         checkoutSubscriptionCheckbox: state.checkoutSubscriptionCheckbox,
+        contactSyncMode: state.contactSyncMode,
+        includeGuests: state.includeGuests,
+        automationForceOptIn: state.automationForceOptIn,
       };
     case 'woocommerce':
       return {

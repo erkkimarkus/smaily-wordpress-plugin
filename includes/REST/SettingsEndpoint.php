@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Constants;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Settings\Credentials;
+use Smaily\Connect\Smaily\ContactSyncMode;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -302,10 +303,22 @@ class SettingsEndpoint {
 		$wp_optin       = ! empty( $data['wordpressSubscriptionCheckbox'] );
 		$checkout_optin = ! empty( $data['checkoutSubscriptionCheckbox'] );
 
+		// Contact-sync mode (F3-48) — validate the preset; an unknown value
+		// falls back to the lawful-safe default rather than being stored.
+		$mode = isset( $data['contactSyncMode'] ) ? sanitize_key( (string) $data['contactSyncMode'] ) : ContactSyncMode::DEFAULT_MODE;
+		if ( ! ContactSyncMode::is_valid_mode( $mode ) ) {
+			$mode = ContactSyncMode::DEFAULT_MODE;
+		}
+		$include_guests = ! empty( $data['includeGuests'] );
+		$force_opt_in   = ! empty( $data['automationForceOptIn'] );
+
 		update_option( self::LEGACY_OPTION_SYNC_ENABLED, $sync_enabled );
 		update_option( self::LEGACY_OPTION_SYNC_FIELDS, $fields );
 		update_option( 'smly_plus_wordpress_subscription_checkbox', $wp_optin );
 		update_option( self::LEGACY_OPTION_CHECKOUT_OPTIN, $checkout_optin );
+		update_option( ContactSyncMode::OPTION_MODE, $mode );
+		update_option( ContactSyncMode::OPTION_INCLUDE_GUESTS, $include_guests );
+		update_option( ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN, $force_opt_in );
 
 		return $this->success_response();
 	}

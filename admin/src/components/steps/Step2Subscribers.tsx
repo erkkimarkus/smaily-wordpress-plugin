@@ -2,8 +2,9 @@ import { useEffect, type Dispatch } from 'react';
 
 import { __, sprintf } from '@admin/lib/i18n';
 import { useBackfillProgress } from '../../hooks/useBackfillProgress';
-import { DEFAULT_SYNC_FIELDS, type WizardAction, type WizardState } from '../../state/types';
-import { Button, Card, Checkbox, ProgressBar, Toggle } from '../primitives';
+import { DEFAULT_SYNC_FIELDS, type ContactSyncMode, type WizardAction, type WizardState } from '../../state/types';
+import { cn } from '../../utils/cn';
+import { Banner, Button, Card, Checkbox, ProgressBar, Toggle } from '../primitives';
 
 export interface Step2SubscribersProps {
   state: WizardState;
@@ -71,6 +72,71 @@ export function Step2Subscribers({
           </p>
         </div>
       )}
+
+      <Card
+        title={ __( 'Contact sync mode', 'smaily-connect' ) }
+        description={ __( 'Who is sent to Smaily, by your lawful basis for marketing email.', 'smaily-connect' ) }
+      >
+        <div className="space-y-2">
+          {CONTACT_SYNC_MODES.map((mode) => (
+            <label
+              key={mode.value}
+              className={cn(
+                'flex cursor-pointer flex-wrap items-start gap-x-3 rounded border p-3',
+                state.contactSyncMode === mode.value ? 'border-brand bg-surface-soft' : 'border-border',
+              )}
+            >
+              <input
+                type="radio"
+                name="smly-contact-sync-mode"
+                value={mode.value}
+                checked={state.contactSyncMode === mode.value}
+                onChange={() => dispatch({ type: 'SET_CONTACT_SYNC_MODE', payload: mode.value })}
+                className="mt-1 accent-brand"
+              />
+              <span className="text-sm font-medium text-text-primary">{mode.label}</span>
+              <span className="mt-0.5 w-full pl-7 text-sm text-text-secondary">{mode.description}</span>
+            </label>
+          ))}
+        </div>
+
+        {state.contactSyncMode === 'legitimate_interest' && (
+          <Banner tone="warning" className="mt-4">
+            { __(
+              'This sends every customer to Smaily regardless of marketing consent. Make sure you have a lawful basis (legitimate interest).',
+              'smaily-connect',
+            ) }
+          </Banner>
+        )}
+
+        {state.contactSyncMode !== 'checkout_optin' && (
+          <div className="mt-4">
+            <Checkbox
+              name="smly-include-guests"
+              checked={state.includeGuests}
+              onChange={() => dispatch({ type: 'SET_INCLUDE_GUESTS', payload: !state.includeGuests })}
+              label={ __( 'Also sync guest-order email addresses', 'smaily-connect' ) }
+            />
+          </div>
+        )}
+
+        {state.contactSyncMode === 'legitimate_interest' && (
+          <div className="mt-4">
+            <Toggle
+              name="smly-automation-force-opt-in"
+              checked={state.automationForceOptIn}
+              onChange={(e) =>
+                dispatch({ type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: e.target.checked })
+              }
+              label={ __( 'Force opt-in on automation triggers', 'smaily-connect' ) }
+              description={ __(
+                'Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe.',
+                'smaily-connect',
+              ) }
+            />
+          </div>
+        )}
+      </Card>
 
       <Card title={ __( 'Contact synchronisation', 'smaily-connect' ) }>
         <Toggle
@@ -217,6 +283,33 @@ export function Step2Subscribers({
     </div>
   );
 }
+
+const CONTACT_SYNC_MODES: ReadonlyArray<{ value: ContactSyncMode; label: string; description: string }> = [
+  {
+    value: 'consent',
+    label: __( 'Subscribers only (consent)', 'smaily-connect' ),
+    description: __(
+      'Only customers who opted in (the subscription checkbox) are sent to Smaily. The store mirrors Smaily unsubscribes back daily.',
+      'smaily-connect',
+    ),
+  },
+  {
+    value: 'legitimate_interest',
+    label: __( 'All customers (legitimate interest)', 'smaily-connect' ),
+    description: __(
+      'Every customer is sent to Smaily regardless of marketing consent. Requires a lawful basis.',
+      'smaily-connect',
+    ),
+  },
+  {
+    value: 'checkout_optin',
+    label: __( 'Checkout opt-in only', 'smaily-connect' ),
+    description: __(
+      'Only customers who tick the checkout subscription box are sent (guests included). No account sync, no sync-back.',
+      'smaily-connect',
+    ),
+  },
+];
 
 const FIELD_LABELS: Record<string, string> = {
   first_name: __( 'First name', 'smaily-connect' ),

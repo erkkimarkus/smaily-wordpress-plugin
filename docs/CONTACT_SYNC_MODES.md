@@ -254,6 +254,14 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    legitimate interest → `false` unless the advanced toggle is on). Replaces the
    hard-coded `true` default.
 5. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.
+   **DONE (F3-48.5)** — "Contact sync mode" Card in `Step2Subscribers` (3 radio
+   presets, legitimate-interest warning Banner, `include_guests` checkbox,
+   preset-1-only force-opt-in toggle); wired through the wizard reducer
+   (`SET_CONTACT_SYNC_MODE`/`SET_INCLUDE_GUESTS`/`SET_AUTOMATION_FORCE_OPT_IN`),
+   `buildTabPayload`/`hydrate`/`settings-reducer`, `SettingsEndpoint::
+   save_subscribers` (validated) + `EnvDetector::saved_settings` (boot). New
+   English `__()` strings — `.pot`/`-et.po` regen + ET translation is a packaging
+   step (`bin/build-i18n.sh`).
 6. **Regression locks** — `is_unsubscribed` + `force_opt_in` per mode; audience
    per mode.
 7. **Cutover (Prike)** — install plugin → wizard → preset 1 → Make data-sync off.

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_CONTACT_SYNC_MODE,
   DEFAULT_SYNC_FIELDS,
   emptyCredentials,
   idleAsync,
@@ -55,6 +56,9 @@ export interface ServerEnv {
   syncFields?: string[];
   wordpressSubscriptionCheckbox?: boolean;
   checkoutSubscriptionCheckbox?: boolean;
+  contactSyncMode?: string;
+  includeGuests?: boolean;
+  automationForceOptIn?: boolean;
 }
 
 /**
@@ -96,6 +100,12 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     syncFields: env.syncFields ?? [...DEFAULT_SYNC_FIELDS],
     wordpressSubscriptionCheckbox: env.wordpressSubscriptionCheckbox ?? false,
     checkoutSubscriptionCheckbox: env.checkoutSubscriptionCheckbox ?? false,
+    contactSyncMode:
+      env.contactSyncMode === 'legitimate_interest' || env.contactSyncMode === 'checkout_optin'
+        ? env.contactSyncMode
+        : DEFAULT_CONTACT_SYNC_MODE,
+    includeGuests: env.includeGuests ?? false,
+    automationForceOptIn: env.automationForceOptIn ?? false,
     contactsBackfill: idleBackfill,
 
     automationMappings: [],

@@ -32,6 +32,9 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'SET_SYNC_FIELDS':
     case 'SET_WORDPRESS_SUBSCRIPTION_CHECKBOX':
     case 'SET_CHECKOUT_SUBSCRIPTION_CHECKBOX':
+    case 'SET_CONTACT_SYNC_MODE':
+    case 'SET_INCLUDE_GUESTS':
+    case 'SET_AUTOMATION_FORCE_OPT_IN':
       return 'subscribers';
 
     // WooCommerce tab

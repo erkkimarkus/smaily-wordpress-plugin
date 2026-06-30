@@ -137,6 +137,27 @@ describe('wizardReducer — Step 2 Subscribers', () => {
     expect(next.syncFields).toEqual(['phone', 'birthday']);
   });
 
+  it('defaults the contact-sync mode to consent', () => {
+    expect(baseState.contactSyncMode).toBe('consent');
+  });
+
+  it('sets the contact-sync mode preset', () => {
+    const next = wizardReducer(baseState, {
+      type: 'SET_CONTACT_SYNC_MODE',
+      payload: 'legitimate_interest',
+    });
+
+    expect(next.contactSyncMode).toBe('legitimate_interest');
+  });
+
+  it('toggles include-guests and automation force-opt-in', () => {
+    const guests = wizardReducer(baseState, { type: 'SET_INCLUDE_GUESTS', payload: true });
+    expect(guests.includeGuests).toBe(true);
+
+    const forced = wizardReducer(baseState, { type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: true });
+    expect(forced.automationForceOptIn).toBe(true);
+  });
+
   it('tracks backfill progress lifecycle', () => {
     let s = wizardReducer(baseState, {
       type: 'BACKFILL_START',

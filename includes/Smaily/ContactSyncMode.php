@@ -50,6 +50,11 @@ final class ContactSyncMode {
 
 	private ?string $mode = null;
 
+	/** True when $mode is one of the three presets — used to validate writes. */
+	public static function is_valid_mode( string $mode ): bool {
+		return in_array( $mode, self::VALID_MODES, true );
+	}
+
 	/**
 	 * The active preset, validated — an unknown stored value falls back to the
 	 * lawful-safe default rather than dragging a bogus mode through the policy.

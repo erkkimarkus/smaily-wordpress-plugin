@@ -2535,8 +2535,12 @@ never fails; abandoned-cart bridge untouched. **F3-48.4 DONE** — `AutomationRo
 trigger_automation` now passes `ContactSyncMode::automation_force_opt_in()` instead of the
 hard-coded `true` default, so welcome/first_order/abandoned_cart honour the mode's consent
 posture (consent/checkout → never re-subscribe; legitimate interest → only with the advanced
-toggle). Remaining: UI (preset selector), `is_unsubscribed` opt-out semantics + regression locks,
-Prike cutover.
+toggle). **F3-48.5 DONE** — Settings/wizard UI: a "Contact sync mode" Card in `Step2Subscribers`
+(3 radio-card presets + legitimate-interest warning Banner + `include_guests` checkbox +
+preset-1-only force-opt-in toggle), wired end-to-end (wizard reducer actions →
+`buildTabPayload`/`hydrate`/`settings-reducer` → `SettingsEndpoint::save_subscribers` validated +
+`EnvDetector::saved_settings` boot). Merchants now pick the preset in the UI (no longer
+option-only). Remaining: `is_unsubscribed` opt-out semantics + regression locks, Prike cutover.
 Supersedes the earlier ad-hoc SP-D/SP-E plan (the cron takeover + `is_unsubscribed` lock fold
 into this engine). Builds on F3-47.
 

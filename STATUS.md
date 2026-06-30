@@ -53,7 +53,14 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
-**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1 + .2 + .3 + .4 DONE.**
+**F3-48 contact-sync mode engine — DESIGN APPROVED (Erkki, 2026-06-30); F3-48.1–.5 DONE.**
+F3-48.5: Settings/wizard UI — "Contact sync mode" Card in Step2Subscribers (3 radio presets +
+legitimate-interest warning Banner + include_guests checkbox + preset-1-only force-opt-in toggle),
+wired through the wizard reducer → buildTabPayload/hydrate/settings-reducer →
+SettingsEndpoint::save_subscribers (validated) + EnvDetector::saved_settings (boot). New English
+`__()` strings — .pot/-et.po regen + ET translation is a packaging step (bin/build-i18n.sh). Gates:
+ci:strict exit=0 (PHPUnit 442, vitest 161, tsc/eslint clean), integration OK 119. Remaining: .6
+is_unsubscribed opt-out + regression locks → .7 Prike cutover + thorough end testing.
 F3-48.4: `AutomationRouter::trigger_automation` passes `ContactSyncMode::automation_force_opt_in()`
 (consent/checkout → never re-subscribe on trigger; legitimate interest → only with the advanced
 toggle) instead of the hard-coded `true`. Gates: ci:strict exit=0 (PHPUnit 442), integration OK 119.

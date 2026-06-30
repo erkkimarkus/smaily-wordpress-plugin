@@ -142,6 +142,14 @@ export interface RssFeedBootData {
  * sub-PRs (2.D / 2.E) add actions for Steps 3-6 against the same state
  * tree — never a parallel store.
  */
+/**
+ * Contact-sync mode preset (F3-48) — the merchant's lawful-basis choice for who
+ * gets synced to Smaily. Mirrors ContactSyncMode::MODE_* on the PHP side.
+ */
+export type ContactSyncMode = 'legitimate_interest' | 'consent' | 'checkout_optin';
+
+export const DEFAULT_CONTACT_SYNC_MODE: ContactSyncMode = 'consent';
+
 export interface WizardState {
   /** True when rendering inside Settings tabs (sub-PR 2.F). */
   inSettings: boolean;
@@ -219,6 +227,10 @@ export interface WizardState {
   syncFields: string[];
   wordpressSubscriptionCheckbox: boolean;
   checkoutSubscriptionCheckbox: boolean;
+  /** Contact-sync mode preset (F3-48) — who is synced + the consent posture. */
+  contactSyncMode: ContactSyncMode;
+  includeGuests: boolean;
+  automationForceOptIn: boolean;
   contactsBackfill: BackfillProgress;
 
   /** Step 3 — WooCommerce automations. Wizard sub-PR 2.E fills in the shape. */
@@ -298,6 +310,9 @@ export type WizardAction =
   | { type: 'SET_SYNC_FIELDS'; payload: string[] }
   | { type: 'SET_WORDPRESS_SUBSCRIPTION_CHECKBOX'; payload: boolean }
   | { type: 'SET_CHECKOUT_SUBSCRIPTION_CHECKBOX'; payload: boolean }
+  | { type: 'SET_CONTACT_SYNC_MODE'; payload: ContactSyncMode }
+  | { type: 'SET_INCLUDE_GUESTS'; payload: boolean }
+  | { type: 'SET_AUTOMATION_FORCE_OPT_IN'; payload: boolean }
   | { type: 'BACKFILL_START'; payload: { jobType: 'contacts' } }
   | { type: 'BACKFILL_PROGRESS'; payload: { jobType: 'contacts'; progress: BackfillProgress } }
   | { type: 'BACKFILL_CANCEL'; payload: { jobType: 'contacts' } }

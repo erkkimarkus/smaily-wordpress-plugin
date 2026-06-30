@@ -21,6 +21,7 @@ use Smaily\Connect\Multilingual\TranslatePressAdapter;
 use Smaily\Connect\Multilingual\WPMLAdapter;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\ContactSyncMode;
 
 /**
  * One-shot snapshot of the WP site state the wizard / settings panels
@@ -405,6 +406,11 @@ class EnvDetector {
 			// different option than the saver wrote.
 			'wordpressSubscriptionCheckbox' => (bool) get_option( 'smly_plus_wordpress_subscription_checkbox', false ),
 			'checkoutSubscriptionCheckbox'  => (bool) get_option( 'smaily_connect_checkout_subscription_enabled', false ),
+
+			// Step 2: contact-sync mode (F3-48).
+			'contactSyncMode'               => (string) get_option( ContactSyncMode::OPTION_MODE, ContactSyncMode::DEFAULT_MODE ),
+			'includeGuests'                 => (bool) get_option( ContactSyncMode::OPTION_INCLUDE_GUESTS, false ),
+			'automationForceOptIn'          => (bool) get_option( ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN, false ),
 
 			// Step 3: WooCommerce automations.
 			'abandonedCartCutoffMinutes'    => (int) get_option( 'smaily_connect_abandoned_cart_cutoff', 30 ),
