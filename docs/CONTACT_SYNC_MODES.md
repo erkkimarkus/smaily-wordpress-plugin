@@ -148,7 +148,17 @@ One decision core, consumed by every surface:
 - **`ContactSyncPolicy`** — `is_unsubscribed` + `force_opt_in` decisions.
 - **`ContactReconciler`** — Smaily → WP sync-back (consent mode only). The old
   unsubscribe-pull lives here, generalised to both directions. **Not dead code —
-  it is preset 2's feature.**
+  it is preset 2's feature.** **Delta-first (Erkki, resource concern):** the
+  standing reconcile polls the Smaily **action-log** (`GET /api/history.php`,
+  `since_seq_id` cursor) for only `optin`/`optout`/`delete`/`complaint` deltas —
+  O(changes), a handful of requests, fine on shared hosting even for large bases.
+  A full `GET /api/contact.php?list=1` pull is the **occasional re-baseline only**
+  (onboarding / manual / stale-or-missing cursor — the action-log's ~30-day
+  retention means a long-dormant poller needs a re-baseline to recover the gap).
+  Never a full pull on every tick. Cursor persisted in
+  `smly_plus_contact_reconcile_seq`. Mirrors the engine's action-log approach
+  (`re/docs/CONTACT_RECONCILIATION_DESIGN.md`) and the consent-strategy split in
+  `docs/CONSENT_STRATEGY_COMPARISON.md`.
 
 **Integration points:**
 - `HookHandler` live gate → `ContactAudience`.
@@ -227,9 +237,11 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
    `HookHandler` (live `contact.sync` gate) + `BackfillJob` (audience filter).
    **DONE (F3-48.1).** Send semantics (`is_unsubscribed` on opt-out) deferred to
    step 5 with the regression locks.
-2. **`ContactReconciler`** (Smaily→WP, both directions, consent mode) **+ SP-D
-   cron takeover** (`on_contact_sync_tick` → mode-aware refresh; legacy buggy
-   mass-send retired).
+2. **`ContactReconciler`** (Smaily→WP, both directions, consent mode) —
+   **action-log delta poll** (`history.php` + `since_seq_id`) as the standing
+   reconcile, full `list=1` pull only as an occasional re-baseline — **+ SP-D
+   cron takeover** (`on_contact_sync_tick` → reconcile + mode-aware refresh;
+   legacy buggy mass-send retired).
 3. **`AutomationRouter` `force_opt_in`** made mode-driven (welcome / first_order /
    abandoned_cart unified).
 4. **Settings / wizard UI** — mode radio-cards + warning banner + `include_guests`.
