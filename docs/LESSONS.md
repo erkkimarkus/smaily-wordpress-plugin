@@ -501,6 +501,52 @@ Companion: `bin/walk-f3-48-contact-sync.cjs` (the walk, with the sandbox gate +
 
 ---
 
+### 2.15 A fail-closed integration gate needs its dependency LIVE-PROBED, not assumed present (browse 0-events, MiuMjau, 2026-07-03)
+
+**What happened.** MiuMjau had browse-tracking enabled and the engine connection was
+healthy (ping/orders/catalog all flowing), but the engine received **0** requests on
+`/api/v1/ingest/browse`. The browse beacon gates **fail-closed** on the WP Consent API:
+`beacon-core.ts` `detectConsent()` returns true only when `window.wp_has_consent('marketing')
+=== true`, else false, and `init()` won't fire even the first page-view without it. Our
+own docs asserted "MiuMjau (CookieYes) is WP-Consent-API-native, doesn't need a consent
+bridge" — so the gate was assumed open. One line in the storefront console settled it:
+`typeof window.wp_has_consent` → **`'undefined'`**. CookieYes was present (its own
+`log.cookieyes.com` beacon fired) but it does **not** expose the WP Consent API global, so
+the gate was closed for every visitor. Zero events, despite users accepting the banner.
+
+**Why the assumption survived so long.** Browse browser-timing is explicitly NOT
+live-walk-covered (the server-side walk proves proxy→engine, never the browser render
+moment — CLAUDE.md, STATUS). So the one gap the walk can't see — *does consent ever
+resolve true in a real browser on the pilot's actual CMP?* — is exactly where an unproven
+assumption hid. The `wp_has_consent`-native claim was written once, never probed against
+MiuMjau, and propagated into DECISIONS + STATUS as if established.
+
+**The lesson — three parts.**
+1. **A fail-closed gate turns a missing/mismatched dependency into total silence, not a
+   degraded signal.** "0 events" reads identical to "feature off" — there's no error, no
+   log, no partial data. When a whole telemetry stream is empty, suspect the *gate's
+   dependency* (is the consent global even defined? does the category match?) before the
+   transport. The absence of an error is not evidence the gate is open.
+2. **A third-party integration point (CMP, consent API, auth provider) must be
+   live-probed on the ACTUAL client stack, never assumed by reputation.** "CookieYes is
+   WP-Consent-API-native" was plausible and wrong. `typeof window.X` in the real
+   storefront console is a 5-second check that beats any amount of doc-confidence — the
+   same discipline as live-probing a wire shape before locking it (§2.3, §2.7).
+3. **When a coverage boundary is documented ("not live-walk-covered — manual pilot
+   check"), that boundary is a STANDING todo, not a closed item.** We wrote down that
+   browse browser-timing needed manual pilot verification; the consent-resolution moment
+   lived inside that gap and went unchecked until the pilot showed 0 events. A documented
+   "manual check needed" should be scheduled, not just recorded.
+
+Companion fix: a built-in CookieYes consent bridge (STATUS "Consent-bridge"), live-probing
+CookieYes's own cookie/event shape against MiuMjau before building; the generic
+`window.smailyConnectBeacon.consentOverride` JS hatch is the immediate unblock. Note the
+scar corrected a second doc error found alongside: there is **no** `smaily_connect_beacon_consent`
+PHP filter (only the JS `consentOverride` + the `smaily_connect_beacon_consent_category`
+filter) — STATUS's "Consent-bridge" note claimed one; corrected in the same pass.
+
+---
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

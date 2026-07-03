@@ -1306,15 +1306,21 @@ Feature ideas worth keeping, distinct from "Known deferred items" above (those
 are tracked technical debt). These are NOT scheduled — build only when a real
 need arrives (YAGNI).
 
-- **Consent-bridge extension (future).** The beacon supports non-WP-Consent-API
-  consent plugins (Cookiebot, custom) today via the **escape-hatch** — the
-  `smaily_connect_beacon_consent` PHP filter + `window.smailyConnectBeacon.consentOverride`
-  JS override — a developer-level adapter that requires writing code. Future: a
-  **user-level consent-bridge**, modelled on the existing plugin-integration pages
-  (Elementor, Contact Form), so a non-technical client on a non-WP-Consent-API
-  plugin can map their cookie-consent signal without code — e.g. a guide, a
-  "select your consent plugin" activation, or a settings panel that maps an
-  incompatible plugin's consent state. MiuMjau (CookieYes) does NOT need this
-  (WP-Consent-API-native); this is for future clients on Cookiebot or custom
-  solutions. The escape-hatch covers it technically in the meantime. Build only
-  when a real Cookiebot/custom client lands.
+- **Consent-bridge — CookieYes gap CONFIRMED (2026-07-03), NOT "future" anymore.**
+  The beacon is **fail-closed** on the WP Consent API: `beacon-core.ts` `detectConsent()`
+  sends only when `window.wp_has_consent(category) === true` (category `marketing`), else
+  false. The only escape-hatch is the **JS** `window.smailyConnectBeacon.consentOverride`
+  (there is NO `smaily_connect_beacon_consent` PHP filter — the earlier note claiming one
+  was wrong; the PHP `smaily_connect_beacon_consent_category` filter only changes the
+  gated category). **MiuMjau runs CookieYes, which does NOT expose `window.wp_has_consent`
+  — confirmed live: `typeof window.wp_has_consent === 'undefined'` on the storefront.** So
+  the gate is closed for every visitor and browse sent **0 events** despite browse-tracking
+  enabled and users accepting the banner (engine saw 0 `/api/v1/ingest/browse` while
+  ping/orders/catalog were fine). The earlier assumption "MiuMjau (CookieYes) is
+  WP-Consent-API-native, doesn't need a bridge" was **WRONG** (never live-probed — LESSONS
+  §2.15). **Fix path:** a built-in CookieYes consent bridge — read CookieYes's own consent
+  state (its cookie + `cookieyes_consent_update` event) → feed the beacon — keeping WP
+  Consent API as the primary path (Complianz / Real Cookie Banner) and `consentOverride`
+  as the generic hatch. **Live-probe CookieYes's exact cookie/event shape against MiuMjau
+  before building** (don't assume). Immediate unblock for MiuMjau while we ship: a
+  `consentOverride` snippet in a mu-plugin, wired to CookieYes.
