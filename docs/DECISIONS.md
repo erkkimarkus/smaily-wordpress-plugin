@@ -2617,6 +2617,55 @@ browse-based attribution (engine confirmed no value over order signals).
 capture — where ORDER attribution actually originates), the §6 identity-resolution flow, §14.2
 ("engine consumes browse post-MVP").
 
+### F3-50 — Browse consent stays on the standard WP Consent API; CookieYes is a config fix + an admin advisory, NOT vendor code
+
+**Context:** MiuMjau had browse-tracking on and a healthy connection but the engine got 0
+`/api/v1/ingest/browse` requests. The beacon gates fail-closed on the WP Consent API
+(`beacon-core.ts` `detectConsent()` sends only when `window.wp_has_consent(category) === true`).
+Live probe on the storefront: `typeof window.wp_has_consent === 'undefined'` — no signal ⇒ gate
+closed ⇒ 0 events, no error (LESSONS §2.15).
+
+**First (wrong) fix — 3.3.1, reverted.** On the assumption "CookieYes doesn't support the WP
+Consent API", 3.3.1 added a CookieYes-specific fallback that read the `cookieyes-consent` cookie
+directly. Erkki challenged it on two grounds — (a) per-vendor consent code is a maintenance
+treadmill we deliberately avoided by standardising on the WP Consent API, and (b) CookieYes's own
+docs say it DOES integrate the WP Consent API. Both correct.
+
+**Root cause (corrected).** CookieYes integrates the WP Consent API, but ONLY when the free
+companion **"WP Consent API" plugin** (wordpress.org `wp-consent-api`) is installed + active — that
+plugin is what defines `window.wp_has_consent` and the `wp_has_consent()` PHP function; CookieYes
+registers consent INTO it (CookieYes `Advertisement` → WP Consent API `marketing`, matching the
+beacon's default category). MiuMjau simply lacked the companion plugin. So the gap is a **missing
+companion plugin (config), not a CookieYes incompatibility** — and the standard path works once
+it's installed, with zero plugin code.
+
+**Decisions:**
+1. **Revert the 3.3.1 CookieYes cookie-parse.** Browse consent stays purely on the WP Consent API
+   (+ the `consentOverride` JS hatch + fail-closed default). No per-vendor consent code in core.
+2. **The line for future CMPs:** WP Consent API is the standard/default (0 per-vendor cost); a
+   bespoke adapter is justified ONLY for a dominant CMP or a live client's actual CMP that will not
+   adopt the API — NOT the long tail. CookieYes does adopt it, so it needs no adapter at all.
+3. **Ship an admin advisory instead** (`NotificationManager::needs_consent_api_notice`): browse on
+   + connected + `! function_exists('wp_has_consent')` → a dismissible `notice-warning` telling the
+   merchant to install the free WP Consent API plugin. CMP-agnostic, standard-aligned, catches the
+   silent-0-events trap for every future client without vendor code.
+4. **MiuMjau fix = install the companion plugin** (wp-admin, no server file access — Erkki has
+   none). A mu-plugin `consentOverride` unblock was ruled out for the same reason.
+
+**Rationale:** the ecosystem is designed so ONE integration (WP Consent API) covers all compliant
+CMPs; parsing a vendor's cookie both duplicates that and takes on its format churn. The advisory
+moves the fix to configuration (install a plugin) rather than code we maintain.
+
+**Alternatives rejected:** keep the CookieYes cookie-parse as a fallback (reintroduces the
+maintenance debt the revert removes, and can mask the correct config); a merchant-configurable
+consent-mapping UI (a larger epic — the long-tail answer if bespoke demand ever grows, not needed
+now, YAGNI); tell CookieYes merchants nothing (leaves the silent-0-events trap).
+
+**Relationships:** F3-24 (browse-beacon architecture — the fail-closed WP Consent API gate), F3-49
+(the visitor_token this unblocks once browse fires), F3-30 (NotificationManager — the admin-notice
+infra reused), LESSONS §2.15 (the assume-vs-live-probe scar, now with the deeper correction that
+the standard already covered CookieYes).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

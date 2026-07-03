@@ -33,12 +33,7 @@ interface PageContext {
 interface BeaconBoot {
   config: RecEngineClientConfig;
   context: PageContext;
-  /**
-   * `category` is the WP-Consent-API category gated on (default `marketing`);
-   * `cookieYesCategory` is the CookieYes category treated as that consent when
-   * the WP Consent API is absent (default `advertisement`).
-   */
-  consent: { category: string; cookieYesCategory?: string };
+  consent: { category: string };
   /** Escape-hatch for non-WP-Consent-API plugins (e.g. Cookiebot). */
   consentOverride?: () => boolean;
 }
@@ -77,37 +72,7 @@ export function detectConsent(boot: BeaconBoot): boolean {
   if (typeof window.wp_has_consent === 'function') {
     return window.wp_has_consent(boot.consent.category) === true;
   }
-  // CookieYes does NOT expose the WP Consent API (window.wp_has_consent), so on a
-  // CookieYes-only site the checks above never grant and the beacon stayed
-  // fail-closed — the MiuMjau 0-events bug (LESSONS §2.15). When the WP Consent
-  // API is absent, read CookieYes's own consent cookie. An absent cookie ⇒ false,
-  // so this is a no-op on sites without CookieYes: the fail-safe DENY is preserved.
-  return cookieYesGrants(boot.consent.cookieYesCategory ?? 'advertisement');
-}
-
-/**
- * Read CookieYes's `cookieyes-consent` cookie and decide whether browse tracking
- * is granted. The value is a comma-separated key:value list, e.g.
- * `consentid:…,consent:yes,action:yes,necessary:yes,…,advertisement:yes,other:yes`.
- * Grant only when the visitor made an explicit banner choice (`action:yes`) AND
- * the mapped marketing category (default `advertisement`) is `yes`.
- */
-function cookieYesGrants(category: string): boolean {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-  const match = document.cookie.match(/(?:^|;\s*)cookieyes-consent=([^;]+)/);
-  if (match === null || match[1] === undefined) {
-    return false;
-  }
-  const pairs: Record<string, string> = {};
-  for (const part of decodeURIComponent(match[1]).split(',')) {
-    const i = part.indexOf(':');
-    if (i > -1) {
-      pairs[part.slice(0, i).trim()] = part.slice(i + 1).trim();
-    }
-  }
-  return pairs.action === 'yes' && pairs[category] === 'yes';
+  return false;
 }
 
 /** Map a storefront page type to its §6 event_type (null = no page-view event). */
@@ -214,9 +179,6 @@ export function init(): RecEngineClient | null {
   start();
   if (typeof document !== 'undefined') {
     document.addEventListener('wp_listen_for_consent_change', start);
-    // CookieYes doesn't fire the WP Consent API event; bridge its own update
-    // event so a mid-session accept re-triggers the beacon (CookieYes bridge).
-    document.addEventListener('cookieyes_consent_update', start);
   }
 
   return client;

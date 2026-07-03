@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.3.1
+Stable tag: 3.3.2
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -88,8 +88,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
+= 3.3.2 =
+* Browse tracking relies on the standard **WordPress Consent API** for consent. If browse tracking is on but no consent signal is present, the plugin now shows an admin notice explaining that the free **WP Consent API** plugin must be installed so your cookie banner (CookieYes, Complianz, Real Cookie Banner, …) can pass consent to Smaily — otherwise no browse data is collected. Reverts the CookieYes-specific consent reading added in 3.3.1 in favour of the standard, which CookieYes supports once the WP Consent API plugin is active.
+
 = 3.3.1 =
-* Fix: browse tracking now works on stores using **CookieYes** for cookie consent. The beacon reads consent from the WordPress Consent API, which CookieYes does not provide, so browse events were never sent even when a shopper accepted the banner. It now also reads CookieYes's own consent state (advertising category) as a fallback. No change on stores already using a WP Consent API–compatible banner (Complianz, Real Cookie Banner). Filter the mapped category with `smaily_connect_beacon_cookieyes_category`.
+* Fix: browse tracking on stores using CookieYes for cookie consent. (Superseded by 3.3.2, which uses the standard WordPress Consent API path instead of reading CookieYes directly.)
 
 = 3.3.0 =
 * Browse tracking now includes an anonymous Smaily visitor token (from a recommendation-link click) on browse events, so future personalization can use a shopper's browse history. Purchase attribution is unchanged — it is still credited from the order, not from browse. No recommendation id or email is attached to browse events. Only affects stores with browse tracking enabled and consented.
@@ -256,8 +259,11 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 
 == Upgrade Notice ==
 
+= 3.3.2 =
+Browse tracking uses the standard WordPress Consent API; if no consent signal is present you'll now be told to install the free WP Consent API plugin. Recommended for any store using browse tracking with a cookie banner.
+
 = 3.3.1 =
-Fixes browse tracking on CookieYes stores (browse events were silently not sent). Recommended for any store using CookieYes with browse tracking enabled.
+Superseded by 3.3.2.
 
 = 3.3.0 =
 Browse events now carry an anonymous visitor token for future personalization. No change to purchase attribution or store behavior; safe in-place update.

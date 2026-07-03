@@ -106,6 +106,18 @@ final class NotificationManagerTest extends TestCase {
 		self::assertArrayHasKey( 'smaily_down', $notices );
 	}
 
+	public function test_consent_advisory_fires_only_when_browse_on_connected_and_no_consent_api(): void {
+		$m = $this->manager();
+
+		// The trap: browse on + connected + no WP Consent API present.
+		self::assertTrue( $m->needs_consent_api_notice( true, true, false ) );
+
+		// Any one condition off ⇒ no advisory.
+		self::assertFalse( $m->needs_consent_api_notice( true, true, true ), 'consent API present ⇒ nothing to advise' );
+		self::assertFalse( $m->needs_consent_api_notice( false, true, false ), 'browse off ⇒ no beacon to gate' );
+		self::assertFalse( $m->needs_consent_api_notice( true, false, false ), 'disconnected ⇒ beacon not loaded' );
+	}
+
 	public function test_dismiss_records_the_key_with_a_timestamp(): void {
 		Functions\when( 'get_option' )->justReturn( array() );
 		$captured = null;

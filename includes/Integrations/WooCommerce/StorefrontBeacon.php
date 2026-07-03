@@ -91,13 +91,7 @@ class StorefrontBeacon {
 			'context' => $this->page_context(),
 			'consent' => array(
 				/** Filter the WP-Consent-API category the beacon gates on. */
-				'category'          => (string) apply_filters( 'smaily_connect_beacon_consent_category', 'marketing' ),
-				/**
-				 * CookieYes category treated as that consent when the WP Consent API
-				 * is absent (CookieYes doesn't expose window.wp_has_consent). Default
-				 * `advertisement` = CookieYes's marketing/advertising bucket.
-				 */
-				'cookieYesCategory' => (string) apply_filters( 'smaily_connect_beacon_cookieyes_category', 'advertisement' ),
+				'category' => (string) apply_filters( 'smaily_connect_beacon_consent_category', 'marketing' ),
 			),
 		);
 

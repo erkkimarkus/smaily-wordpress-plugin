@@ -16,6 +16,7 @@ namespace Smaily\Connect\Notifications;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
+use Smaily\Connect\REST\BeaconEndpoint;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\EventQueue;
@@ -53,6 +54,9 @@ final class NotificationManager {
 	public const OPTION_DISMISSED         = 'smly_notice_dismissed';
 
 	public const DISMISS_ACTION = 'smly_dismiss_notice';
+
+	/** Advisory key: browse tracking on + connected, but no WP Consent API present. */
+	public const CONSENT_ADVISORY_KEY = 'consent_api_missing';
 
 	private RecEngineSettings $settings;
 
@@ -148,6 +152,17 @@ final class NotificationManager {
 		}
 
 		return $notices;
+	}
+
+	/**
+	 * Config advisory: browse tracking is enabled AND the engine is connected, but
+	 * no WP Consent API is present — so the beacon is fail-closed and collects
+	 * nothing (the MiuMjau/CookieYes 0-events trap, F3-50). CookieYes/Complianz/etc.
+	 * register consent INTO the free "WP Consent API" plugin; without it there is no
+	 * `wp_has_consent` signal. Pure so the condition is unit-testable without a DB.
+	 */
+	public function needs_consent_api_notice( bool $browse_enabled, bool $connected, bool $consent_api_present ): bool {
+		return $browse_enabled && $connected && ! $consent_api_present;
 	}
 
 	/**
@@ -270,6 +285,49 @@ final class NotificationManager {
 				wp_kses_post( $this->dismiss_link( $key ) )
 			);
 		}
+
+		// Config advisory (live, not cron-driven): browse tracking on + connected but
+		// no WP Consent API ⇒ the beacon is fail-closed and sends nothing. Not an
+		// error — a setup advisory (notice-warning), same 24h dismiss cooldown.
+		$this->render_consent_advisory( $dismissed, $now );
+	}
+
+	/**
+	 * @param array<string, int> $dismissed
+	 */
+	private function render_consent_advisory( array $dismissed, int $now ): void {
+		$active = $this->needs_consent_api_notice(
+			(bool) get_option( BeaconEndpoint::OPTION_TRACK_BROWSING, false ),
+			$this->settings->is_connected(),
+			function_exists( 'wp_has_consent' )
+		);
+		if ( ! $active ) {
+			return;
+		}
+
+		$key          = self::CONSENT_ADVISORY_KEY;
+		$dismissed_at = isset( $dismissed[ $key ] ) ? (int) $dismissed[ $key ] : 0;
+		if ( $dismissed_at > 0 && ( $now - $dismissed_at ) < self::DISMISS_COOLDOWN ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p>%1$s %2$s %3$s</p></div>',
+			esc_html__(
+				'Smaily Connect: browse tracking is on, but no cookie-consent signal was found, so no browse data is being collected. Install the free WP Consent API plugin so your consent banner (CookieYes, Complianz, Real Cookie Banner, …) can tell Smaily when a visitor consents.',
+				'smaily-connect'
+			),
+			wp_kses_post( $this->consent_api_install_link() ),
+			wp_kses_post( $this->dismiss_link( $key ) )
+		);
+	}
+
+	private function consent_api_install_link(): string {
+		return sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'plugin-install.php?s=WP+Consent+API&tab=search&type=term' ) ),
+			esc_html__( 'Install WP Consent API', 'smaily-connect' )
+		);
 	}
 
 	/**

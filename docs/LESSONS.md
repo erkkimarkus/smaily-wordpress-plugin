@@ -521,29 +521,45 @@ resolve true in a real browser on the pilot's actual CMP?* — is exactly where 
 assumption hid. The `wp_has_consent`-native claim was written once, never probed against
 MiuMjau, and propagated into DECISIONS + STATUS as if established.
 
-**The lesson — three parts.**
-1. **A fail-closed gate turns a missing/mismatched dependency into total silence, not a
-   degraded signal.** "0 events" reads identical to "feature off" — there's no error, no
-   log, no partial data. When a whole telemetry stream is empty, suspect the *gate's
-   dependency* (is the consent global even defined? does the category match?) before the
-   transport. The absence of an error is not evidence the gate is open.
-2. **A third-party integration point (CMP, consent API, auth provider) must be
-   live-probed on the ACTUAL client stack, never assumed by reputation.** "CookieYes is
-   WP-Consent-API-native" was plausible and wrong. `typeof window.X` in the real
-   storefront console is a 5-second check that beats any amount of doc-confidence — the
-   same discipline as live-probing a wire shape before locking it (§2.3, §2.7).
-3. **When a coverage boundary is documented ("not live-walk-covered — manual pilot
-   check"), that boundary is a STANDING todo, not a closed item.** We wrote down that
-   browse browser-timing needed manual pilot verification; the consent-resolution moment
-   lived inside that gap and went unchecked until the pilot showed 0 events. A documented
-   "manual check needed" should be scheduled, not just recorded.
+**The twist — the "fix" was also an assumption, and it was wrong too.** Live-probing gave
+the SYMPTOM (`wp_has_consent` undefined) but I then assumed the CAUSE ("CookieYes can't do
+the WP Consent API") and shipped a CookieYes-specific cookie-parser (3.3.1). Erkki challenged
+it: (a) per-vendor consent code is exactly the maintenance treadmill we standardised on the
+WP Consent API to avoid, and (b) CookieYes's own docs say it DOES integrate the WP Consent
+API. Both right. **Real cause:** CookieYes integrates the API, but only when the free
+companion **"WP Consent API" plugin** (`wp-consent-api`) is installed — that plugin defines
+`window.wp_has_consent`; CookieYes registers into it. MiuMjau just lacked the companion
+plugin. The standard already covered CookieYes; the fix was a config install + an admin
+advisory, and the vendor code was **reverted** (3.3.2, F3-50).
 
-Companion fix: a built-in CookieYes consent bridge (STATUS "Consent-bridge"), live-probing
-CookieYes's own cookie/event shape against MiuMjau before building; the generic
-`window.smailyConnectBeacon.consentOverride` JS hatch is the immediate unblock. Note the
-scar corrected a second doc error found alongside: there is **no** `smaily_connect_beacon_consent`
-PHP filter (only the JS `consentOverride` + the `smaily_connect_beacon_consent_category`
-filter) — STATUS's "Consent-bridge" note claimed one; corrected in the same pass.
+**The lesson — four parts.**
+1. **A fail-closed gate turns a missing/mismatched dependency into total silence, not a
+   degraded signal.** "0 events" reads identical to "feature off" — no error, no log, no
+   partial data. When a whole telemetry stream is empty, suspect the *gate's dependency*
+   (is the consent global even defined?) before the transport. Absence of an error is not
+   evidence the gate is open.
+2. **Live-probe the ACTUAL client stack — but a probe reveals the symptom, not the cause.**
+   `typeof window.wp_has_consent === 'undefined'` was the 5-second win that beat doc-
+   confidence (§2.3, §2.7). But then read the vendor's OWN docs before building around the
+   symptom: "the global is missing" had two causes — "the vendor can't provide it" (my
+   assumption) vs "a required companion plugin isn't installed" (the truth). I built for the
+   first without checking the second.
+3. **Before writing a per-vendor adapter, check whether the STANDARD already covers the
+   vendor with configuration.** Reaching for bespoke integration code is a strong signal to
+   stop and re-read the standard + the vendor's integration docs. A config fix (install a
+   plugin, flip a setting) beats code you then own forever. The maintainable move here was
+   an admin advisory that guides the merchant to the standard, not a vendor cookie-parser.
+4. **When a coverage boundary is documented ("manual pilot check"), it's a STANDING todo.**
+   The consent-resolution moment lived inside the documented "browse browser-timing not
+   live-walk-covered" gap and went unchecked until the pilot showed 0 events. A recorded
+   "manual check needed" should be scheduled, not just filed.
+
+Resolution: F3-50 — revert the vendor code, keep browse consent on the WP Consent API, add a
+`NotificationManager` advisory (browse on + connected + no `wp_has_consent` → "install the free
+WP Consent API plugin"). MiuMjau's fix is installing that companion plugin (wp-admin, no file
+access). Also corrected alongside: there is **no** `smaily_connect_beacon_consent` PHP filter
+(only the JS `consentOverride` + `smaily_connect_beacon_consent_category`) — an earlier note
+claimed one.
 
 ---
 

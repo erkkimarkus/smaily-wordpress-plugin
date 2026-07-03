@@ -351,23 +351,27 @@ so renaming them is churn for no benefit. Whether a blocker still catches `/rela
 a **manual browser check** (200 with the blocker on); the integration test only proves
 the server dispatches `/relay`.
 
-### Browse consent is fail-closed on the WP Consent API — a CMP that doesn't expose it = 0 events (MiuMjau/CookieYes)
+### Browse consent is fail-closed on the WP Consent API — needs the `wp-consent-api` plugin, NOT vendor code (F3-50)
 The beacon sends browse events ONLY when `window.wp_has_consent(category) === true`
 (`beacon-core.ts` `detectConsent`, category `marketing` via the
-`smaily_connect_beacon_consent_category` PHP filter). No signal ⇒ **fail-closed** ⇒ no
-events, and no error anywhere — "0 events" is indistinguishable from "feature off". The
-ONLY escape-hatch is the **JS** `window.smailyConnectBeacon.consentOverride` (a function
-returning bool). **There is NO `smaily_connect_beacon_consent` PHP filter** — don't cite
-one (STATUS did, wrongly; the only PHP consent filter is `…_category`). `window.wp_has_consent`
-comes from the **`wp-consent-api` plugin + a CMP that bridges to it** (Complianz, Real
-Cookie Banner), NOT from a CMP alone. **MiuMjau runs CookieYes, which does NOT expose
-`window.wp_has_consent` — confirmed live (`typeof window.wp_has_consent === 'undefined'`),
-so browse sent 0 events despite the toggle on + users accepting (F3-… / LESSONS §2.15).**
-Before assuming any pilot's CMP feeds consent, live-probe `typeof window.wp_has_consent` in
-the real storefront console — the server-side live-walk CANNOT see this (browser-timing +
-consent resolution are the documented uncovered gap). Fix for CookieYes is a built-in
-bridge (read CookieYes's own cookie/`cookieyes_consent_update` event → beacon); the
-immediate unblock is a `consentOverride` mu-plugin snippet.
+`smaily_connect_beacon_consent_category` PHP filter) — else the JS `consentOverride` hatch,
+else fail-closed. No signal ⇒ **0 events, no error** — indistinguishable from "feature off".
+`window.wp_has_consent` is defined by the free **"WP Consent API" plugin** (`wp-consent-api`),
+which CMPs register consent INTO — **CookieYes, Complianz, Real Cookie Banner all support it**
+(CookieYes maps its `Advertisement` category → WP Consent API `marketing`). **The MiuMjau
+0-events bug (2026-07-03) was the companion plugin simply not being installed** (`typeof
+window.wp_has_consent === 'undefined'` live) — NOT a CookieYes incompatibility. **Do NOT write
+per-vendor consent code** (3.3.1 shipped a CookieYes cookie-parser on the wrong assumption
+"CookieYes can't do the API"; reverted in 3.3.2). The standard covers every compliant CMP; a
+bespoke adapter is justified ONLY for a dominant CMP that won't adopt the API — not the long
+tail. The fix is a config install (the merchant adds `wp-consent-api`) surfaced by
+`NotificationManager::needs_consent_api_notice` (browse on + connected + no `wp_has_consent`
+→ a dismissible admin notice pointing to the plugin). When a pilot reports "browse = 0
+events", first live-probe `typeof window.wp_has_consent` in the real storefront console
+(the server-side live-walk can't see this — browser consent resolution is the documented
+uncovered gap); if undefined, the fix is installing `wp-consent-api`, not plugin code. NB:
+there is **no** `smaily_connect_beacon_consent` PHP filter (only the JS `consentOverride` +
+`smaily_connect_beacon_consent_category`).
 
 ### Browse browser-timing is NOT live-walk-covered (manual pilot check)
 Browse (3.4) is client-originated telemetry, so unlike catalog/customers/orders
