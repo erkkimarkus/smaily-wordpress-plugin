@@ -1,6 +1,7 @@
 /**
  * Sub-PR 3.4.4 live harness — browse ingest against the REAL Smaily rec engine
- * (MiuMjau tenant). Browse is the first CLIENT-originated domain, so the walk
+ * (the connected SANDBOX tenant "Smaily Connect test" — NEVER MiuMjau, which is
+ * the pilot's PRODUCTION tenant). Browse is the first CLIENT-originated domain, so the walk
  * differs from the server-walks:
  *
  *   - PROXY path (in-process REST dispatch to POST /beacon): the full chain
@@ -209,7 +210,7 @@ echo "DONE\n";
     })
     .filter(Boolean);
 
-  console.log('\n=== walk-3.4-browse live browse-ingest (real MiuMjau engine) ===');
+  console.log('\n=== walk-3.4-browse live browse-ingest (real connected engine — sandbox) ===');
   let failures = 0;
   for (const r of results) {
     console.log(`  ${r.status === 'PASS' ? '✓' : '✗'} ${r.name}${r.detail ? `  ${r.detail}` : ''}`);

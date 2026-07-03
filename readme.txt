@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.2.1
+Stable tag: 3.3.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,9 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.3.0 =
+* Browse tracking now includes an anonymous Smaily visitor token (from a recommendation-link click) on browse events, so future personalization can use a shopper's browse history. Purchase attribution is unchanged — it is still credited from the order, not from browse. No recommendation id or email is attached to browse events. Only affects stores with browse tracking enabled and consented.
 
 = 3.2.1 =
 * Improved: the contact-sync mode selector now appears only when contact sync is enabled, and the "Checkout opt-in only" mode is selectable only when the checkout subscription checkbox is turned on. Restyled to match the rest of the setup wizard. No functional or data change.
@@ -249,6 +252,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.3.0 =
+Browse events now carry an anonymous visitor token for future personalization. No change to purchase attribution or store behavior; safe in-place update.
 
 = 3.2.1 =
 Minor UI refinement to the contact-sync mode selector. No functional or data change; safe in-place update.
