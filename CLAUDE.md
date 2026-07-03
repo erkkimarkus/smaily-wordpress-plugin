@@ -289,7 +289,7 @@ WRONG for this, so use **`bin/build-i18n.sh`** (it needs the wp-env container):
   (`update-po` preserves `msgstr`). Verify a real render with the Playwright check
   (set the dev site to a locale, confirm `wp.i18n.__()` returns the translation).
 
-### Cutting a release ZIP + GH pre-release (the full local sequence)
+### Cutting a release ZIP + GH release (the full local sequence)
 `composer run package` ALONE is not a release — it rsync+zips the working tree
 but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,
 `blocks/*/build/` are gitignored. The CI `release.yml` is INCOMPLETE (it never
@@ -321,10 +321,14 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    excludes `blocks/node_modules` (583M) — a bloated ZIP means it leaked.
 7. **`gh release create … --repo erkkimarkus/smaily-wordpress-plugin`** — the
    `--repo` is MANDATORY: `gh` defaults to `upstream` (sendsmaily) and 404s
-   (no write access). Tag convention `v<version>-rc.<N>`, `--prerelease`,
-   `--target main`, attach `smaily-connect.zip`. `release.yml` fires on publish
-   but fails harmlessly (no wp-cli) → does NOT clobber the attached asset
-   (confirmed: prior releases' release.yml runs are all red too).
+   (no write access). **Tag convention: the GA line (3.0.0+) uses a full
+   `v<version>` tag as a NORMAL release (non-prerelease → shows as Latest)** —
+   e.g. `gh release create v3.3.2 smaily-connect.zip --repo … --target main
+   --title "…" --notes-file …`, NO `--prerelease`. (The OLD beta line used
+   `v<version>-rc.<N>` + `--prerelease`; that's history, don't copy it for a GA
+   release.) `release.yml` fires on publish but fails harmlessly (no wp-cli) →
+   does NOT clobber the attached asset (confirmed: prior releases' release.yml
+   runs are all red too).
 
 ### CI "Lint and test the codebase" is PRE-EXISTING red on main — not authoritative
 The GH workflow runs `composer run test:php` (= bare `phpunit`, includes the
