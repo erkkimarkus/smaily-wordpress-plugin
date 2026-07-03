@@ -18,7 +18,7 @@ const CONFIG: RecEngineClientConfig = {
 interface BootBlob {
   config: RecEngineClientConfig;
   context: { pageType: string; sku?: string; categoryPath?: string; searchQuery?: string };
-  consent: { category: string };
+  consent: { category: string; cookieYesCategory?: string };
   consentOverride?: () => boolean;
 }
 
@@ -45,6 +45,7 @@ describe('beacon-core: detectConsent', () => {
   afterEach(() => {
     delete window.smailyConnectBeacon;
     delete window.wp_has_consent;
+    document.cookie = 'cookieyes-consent=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
 
   it('uses the site override when present', () => {
@@ -65,6 +66,46 @@ describe('beacon-core: detectConsent', () => {
     const boot = makeBoot();
     window.smailyConnectBeacon = boot;
     expect(detectConsent(boot)).toBe(false);
+  });
+
+  // --- CookieYes fallback (the MiuMjau bug: CookieYes doesn't expose wp_has_consent) ---
+
+  it('grants via the CookieYes cookie when the WP Consent API is absent', () => {
+    const boot = makeBoot();
+    window.smailyConnectBeacon = boot;
+    document.cookie = 'cookieyes-consent=consentid:abc,consent:yes,action:yes,necessary:yes,advertisement:yes,other:yes; path=/';
+    expect(detectConsent(boot)).toBe(true);
+  });
+
+  it('denies via CookieYes when the advertising category is not granted', () => {
+    const boot = makeBoot();
+    window.smailyConnectBeacon = boot;
+    document.cookie = 'cookieyes-consent=consentid:abc,consent:yes,action:yes,necessary:yes,advertisement:no,other:no; path=/';
+    expect(detectConsent(boot)).toBe(false);
+  });
+
+  it('denies via CookieYes before the visitor makes an explicit choice (action:no)', () => {
+    const boot = makeBoot();
+    window.smailyConnectBeacon = boot;
+    document.cookie = 'cookieyes-consent=consentid:abc,consent:no,action:no,necessary:yes,advertisement:yes,other:yes; path=/';
+    expect(detectConsent(boot)).toBe(false);
+  });
+
+  it('honours a custom cookieYesCategory mapping', () => {
+    const boot = makeBoot({ consent: { category: 'marketing', cookieYesCategory: 'analytics' } });
+    window.smailyConnectBeacon = boot;
+    document.cookie = 'cookieyes-consent=consentid:abc,consent:yes,action:yes,analytics:yes,advertisement:no; path=/';
+    expect(detectConsent(boot)).toBe(true);
+  });
+
+  it('the WP Consent API takes precedence over the CookieYes cookie', () => {
+    const boot = makeBoot();
+    window.smailyConnectBeacon = boot;
+    // wp_has_consent says NO for marketing; a permissive CookieYes cookie must not override it.
+    window.wp_has_consent = vi.fn(() => false);
+    document.cookie = 'cookieyes-consent=consentid:abc,action:yes,advertisement:yes; path=/';
+    expect(detectConsent(boot)).toBe(false);
+    expect(window.wp_has_consent).toHaveBeenCalledWith('marketing');
   });
 });
 
@@ -164,6 +205,23 @@ describe('beacon-core: init', () => {
     // Visitor accepts → the WP Consent API fires a native event.
     consent = true;
     document.dispatchEvent(new Event('wp_listen_for_consent_change'));
+
+    await client?.flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'product_view' });
+  });
+
+  it('starts on a later CookieYes consent-update event', async () => {
+    let consent = false;
+    window.smailyConnectBeacon = makeBoot({ consentOverride: () => consent });
+    const client = init();
+
+    await client?.flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // Visitor accepts in CookieYes → its own update event re-triggers the beacon.
+    consent = true;
+    document.dispatchEvent(new Event('cookieyes_consent_update'));
 
     await client?.flush();
     expect(fetchMock).toHaveBeenCalledTimes(1);
