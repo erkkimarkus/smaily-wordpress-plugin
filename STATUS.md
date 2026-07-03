@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-03 (**F3-49 DONE — browse events now carry `smaily_visitor_token` (cold-start identity), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
+_Last updated: 2026-07-03 (**v3.3.1 — CookieYes consent bridge**: browse sent 0 events on CookieYes stores (beacon fail-closed on `window.wp_has_consent`, which CookieYes doesn't expose — confirmed live on MiuMjau); `detectConsent()` now falls back to the `cookieyes-consent` cookie. Prior same day: **F3-49 DONE — browse events now carry `smaily_visitor_token` (cold-start identity), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
 Managed (non-pilot) client Prike: ~1000 Smaily contacts drifted to language `en`. Root cause —
 the upstream plugin's daily "sync all subscribers" cron derives language from the cron-unsafe
 `Helper::get_current_language_code()`, which in a cron tick returns `get_locale()` = the WP
@@ -52,6 +52,20 @@ the backfill fixes contacts but the daily cron can re-drift them), SP-E (lock `i
 out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync off). **NOTE: the
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
+
+**RELEASED v3.3.1 (2026-07-03)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
+build `8af6bc1`, ZIP ~1000 KB attached, tag `v3.3.1`, Latest, NOT a pre-release). Headline:
+**CookieYes consent bridge** — browse tracking sent 0 events on CookieYes stores because the
+beacon is fail-closed on the WP Consent API (`window.wp_has_consent`), which CookieYes doesn't
+expose (confirmed live on MiuMjau). `detectConsent()` now falls back to CookieYes's own
+`cookieyes-consent` cookie (grant on `action:yes` + `advertisement`, filterable), WP Consent API
+keeps precedence, `cookieyes_consent_update` re-triggers mid-session. Once browse fires it carries
+the 3.3.0 `smaily_visitor_token`. Gates: ci:strict exit=0 (PHPUnit 456, vitest 170 incl. 6 new
+CookieYes cases, static clean); integration OK (120 tests, 499 assertions). **No PCP re-run /
+security re-audit** — PHP surface delta is two `apply_filters` lines in the boot blob (no
+REST/auth/SQL/crypto); substantive change is JS. **MiuMjau gets the fix via the normal plugin
+update** (wp-admin — Erkki has no server file access, so the mu-plugin unblock was ruled out).
+DECISIONS F3-49 / LESSONS §2.15.
 
 **RELEASED v3.3.0 (2026-07-03)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
 build `16a530f`, ZIP ~996 KB attached, tag `v3.3.0`, marked Latest, NOT a pre-release). Headline:
@@ -1306,21 +1320,20 @@ Feature ideas worth keeping, distinct from "Known deferred items" above (those
 are tracked technical debt). These are NOT scheduled — build only when a real
 need arrives (YAGNI).
 
-- **Consent-bridge — CookieYes gap CONFIRMED (2026-07-03), NOT "future" anymore.**
-  The beacon is **fail-closed** on the WP Consent API: `beacon-core.ts` `detectConsent()`
-  sends only when `window.wp_has_consent(category) === true` (category `marketing`), else
-  false. The only escape-hatch is the **JS** `window.smailyConnectBeacon.consentOverride`
-  (there is NO `smaily_connect_beacon_consent` PHP filter — the earlier note claiming one
-  was wrong; the PHP `smaily_connect_beacon_consent_category` filter only changes the
-  gated category). **MiuMjau runs CookieYes, which does NOT expose `window.wp_has_consent`
-  — confirmed live: `typeof window.wp_has_consent === 'undefined'` on the storefront.** So
-  the gate is closed for every visitor and browse sent **0 events** despite browse-tracking
-  enabled and users accepting the banner (engine saw 0 `/api/v1/ingest/browse` while
-  ping/orders/catalog were fine). The earlier assumption "MiuMjau (CookieYes) is
-  WP-Consent-API-native, doesn't need a bridge" was **WRONG** (never live-probed — LESSONS
-  §2.15). **Fix path:** a built-in CookieYes consent bridge — read CookieYes's own consent
-  state (its cookie + `cookieyes_consent_update` event) → feed the beacon — keeping WP
-  Consent API as the primary path (Complianz / Real Cookie Banner) and `consentOverride`
-  as the generic hatch. **Live-probe CookieYes's exact cookie/event shape against MiuMjau
-  before building** (don't assume). Immediate unblock for MiuMjau while we ship: a
-  `consentOverride` snippet in a mu-plugin, wired to CookieYes.
+- **Consent-bridge — CookieYes gap RESOLVED (v3.3.1, 2026-07-03).** The beacon is
+  **fail-closed** on the WP Consent API (`beacon-core.ts` `detectConsent()` sends only when
+  `window.wp_has_consent(category) === true`). **MiuMjau runs CookieYes, which does NOT
+  expose `window.wp_has_consent` — confirmed live (`typeof window.wp_has_consent ===
+  'undefined'`), so browse sent 0 events** despite browse-tracking on + users accepting
+  (engine saw 0 `/api/v1/ingest/browse` while ping/orders/catalog were fine). The earlier
+  assumption "MiuMjau (CookieYes) is WP-Consent-API-native, needs no bridge" was WRONG —
+  never live-probed (LESSONS §2.15). **Fix shipped in 3.3.1:** `detectConsent()` falls back
+  to CookieYes's own `cookieyes-consent` cookie when the WP Consent API is absent (grant on
+  `action:yes` AND the mapped category, default `advertisement`, filterable via
+  `smaily_connect_beacon_cookieyes_category`); WP Consent API keeps precedence; a
+  `cookieyes_consent_update` listener re-triggers on mid-session accept. The cookie shape
+  was live-probed against MiuMjau; the event-name bridge is best-effort. MiuMjau gets the
+  fix via the normal **plugin update** (wp-admin, no server file access needed — a mu-plugin
+  unblock was ruled out: Erkki has no file access). Note corrected alongside: there is NO
+  `smaily_connect_beacon_consent` PHP filter (only the JS `consentOverride` +
+  `smaily_connect_beacon_cookieyes_category` / `_consent_category`).
