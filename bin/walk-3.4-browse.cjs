@@ -118,6 +118,17 @@ $match = $client->ingest_browse( array(
 ) );
 result( 'anon_vs_with_customer_match', ( (int) ( $match['with_customer_match'] ?? 0 ) >= 1 ) && ( (int) ( $match['anonymous'] ?? 0 ) >= 1 ), 'match=' . ( $match['with_customer_match'] ?? 'n/a' ) . ' anon=' . ( $match['anonymous'] ?? 'n/a' ) );
 
+// F3-49: the plugin now carries smaily_visitor_token on browse events (identity
+// for the engine's cold-start binding, NOT attribution — attribution rides
+// order signals). Prove the LIVE engine ACCEPTS the field on a browse event (no
+// per-item rejection). Whether an arbitrary token RESOLVES to with_customer_match
+// depends on it already existing in the engine's visitor_tokens table (issued on
+// an email click), which a walk can't seed — so assert acceptance, not resolution.
+$vt_evt = $client->ingest_browse( array(
+	browse_event( 'product_view', array( 'sku' => 'WALK-VT-1', 'smaily_visitor_token' => 'vt_walk_' . wp_generate_uuid4() ) ),
+) );
+result( 'engine_accepts_browse_visitor_token', ( (int) ( $vt_evt['processed'] ?? 0 ) >= 1 ) && ( ( $vt_evt['errors'] ?? array() ) === array() ), json_encode( $vt_evt ) );
+
 // Missing event_id → engine per-item error (no Layer-1 natural key for browse).
 $no_id = $client->ingest_browse( array( array( 'session_id' => 'walk-noid', 'event_type' => 'product_view', 'event_ts' => IsoDate::to_z( time() ), 'sku' => 'WALK-NOID' ) ) );
 $no_id_err = $no_id['errors'][0]['field'] ?? '';

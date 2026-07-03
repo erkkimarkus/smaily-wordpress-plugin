@@ -2563,6 +2563,60 @@ into this engine). Builds on F3-47.
 coexistence map (`setup_completed` wizard gate); the legacy `Cron::smaily_sync_subscribers`
 (the buggy mass-send this retires) + its unsubscribe-pull (becomes the reconciler).
 
+### F3-49 — Browse events carry `smaily_visitor_token` (cold-start identity), NOT rec_id/email; browse attribution stays order-signal-driven
+
+**Context:** the browse beacon (`rec-engine-client.ts` `enrich()`) sent per event ONLY `session_id`
+— no `smaily_visitor_token`/`smaily_rec_id`/`smaily_ctx`/`customer_email` — although the cookies
+hold them, the `/relay` whitelist (`BeaconEndpoint::EVENT_FIELDS`) accepts them, contract §6
+identity-resolution + retroactive-binding reference them, and F3-27 pt1 assumed browse carries
+identity. Net effect: every browse_event resolved to §6 path-4 (anonymous, session-only); the §6
+retroactive-binding-via-browse never fired; the async order-attribution path-3 ("session_id →
+browse_events *with a rec_id link*") was inert. Raised by Erkki (2026-07-01) questioning an
+over-stated claim that a purchase "loses" rec attribution; the investigation logged it as an open
+cross-team question rather than assume.
+
+**Engine-team answer (2026-07-03):** browse does NOT feed attribution. Order-match hierarchy is
+order `smaily_rec_id` → visitor_token → email-click → browse; the block-checkout stamping fix
+(v3.2.0) means path-1 catches the same case more strongly than browse ever could. The
+`direct`/`exact_later`/`indirect_*` classes come from the email click + order `smaily_rec_id`;
+browse would at best yield the softest `assisted_view`, and only for an already-identified
+customer. Guest-browse non-binding is an accepted v1 limitation — login-merge (§7, F3-27) is the
+intended binding path.
+
+**Decisions:**
+1. **No browse-level attribution.** Browse attribution rides ORDER signals; `smaily_rec_id` /
+   `smaily_ctx` / `customer_email` are deliberately NOT put on browse events (redundant +
+   data-minimization). Enforced CLIENT-side (`enrich()` never adds them) — the `/relay` whitelist
+   still lists them (a Shopify/other wrapper may send them), so the minimization is the client's.
+2. **DO carry `smaily_visitor_token` on browse events** — opaque, low-PII, omit-on-empty (mirrors
+   `session_id`; most organic visitors have no token). Value is NOT attribution but future
+   **cold-start personalization** (e.g. category inference from browse before the first purchase):
+   data accumulates now so a v1.1 feature doesn't start from zero. The engine binds the browse row
+   to the customer via the token; ingest already accepts it (whitelist + `with_customer_match`
+   sub-count).
+3. **Profiling opt-out on the token / external_id path is ENGINE-side** (engine-confirmed,
+   server-side enforced from 2026-07-03): an opted-out contact's browse event is never bound to a
+   customer on any path (stays anonymous) and identity-merge is a no-op for it. The plugin's
+   email-based `ProfilingConsent` gate stays the FIRST filter; the plugin can't map
+   visitor_token→email locally (engine-issued), so the token-path opt-out is inherently the
+   engine's responsibility, not a plugin blocker.
+4. **Guest-browse non-binding + browse-session-only = accepted v1 limitation** (Q3), documented
+   here + STATUS "Known deferred items".
+
+**Rationale:** the money question (which rec drove which purchase) is order-attributed and
+unaffected; the only thing browse could add is soft assisted-view, which the engine deprioritized.
+Sending just the opaque token (not rec_id/email) captures the cold-start value at minimal PII cost,
+within the existing consent model.
+
+**Alternatives rejected:** wire rec_id + email onto browse (engine says redundant; data-min);
+leave browse identity-blind entirely (forfeits free cold-start data the engine asked for); build
+browse-based attribution (engine confirmed no value over order signals).
+
+**Relationships:** F3-24 (browse-beacon architecture — server proxy + whitelist), F3-27
+(identity-merge — the intended binding path; §6 retroactive-binding), F3-46 (server-side landing
+capture — where ORDER attribution actually originates), the §6 identity-resolution flow, §14.2
+("engine consumes browse post-MVP").
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

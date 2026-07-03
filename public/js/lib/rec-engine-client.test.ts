@@ -49,7 +49,9 @@ describe('RecEngineClient (3.4.1 transport)', () => {
     client = null;
     vi.useRealTimers();
     vi.unstubAllGlobals();
-    document.cookie = 'smaily_anon_sid=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    for (const name of ['smaily_anon_sid', 'smaily_rec_uid', 'smaily_rec_id', 'smaily_rec_ctx']) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    }
   });
 
   it('buffers track() and does not POST before the batch window', () => {
@@ -140,6 +142,43 @@ describe('RecEngineClient (3.4.1 transport)', () => {
 
     await client.flush();
     expect(lastFetchBody(fetchMock).events[0]?.session_id).toBe('sess-xyz');
+  });
+
+  it('carries smaily_visitor_token from the visitor cookie when present (identity, not attribution — F3-49)', async () => {
+    document.cookie = 'smaily_rec_uid=vt-abc';
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'product_view', sku: 'A' });
+
+    await client.flush();
+    expect(lastFetchBody(fetchMock).events[0]?.smaily_visitor_token).toBe('vt-abc');
+  });
+
+  it('omits smaily_visitor_token when the visitor cookie is absent (never sent empty)', async () => {
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'product_view', sku: 'A' });
+
+    await client.flush();
+    const event = lastFetchBody(fetchMock).events[0];
+    expect(event).toBeDefined();
+    expect(event).not.toHaveProperty('smaily_visitor_token');
+  });
+
+  it('never puts rec_id / ctx / email on a browse event (data-minimization — attribution rides orders)', async () => {
+    document.cookie = 'smaily_rec_uid=vt-abc';
+    document.cookie = 'smaily_rec_id=rec-1';
+    document.cookie = 'smaily_rec_ctx=welcome';
+    client = new RecEngineClient(makeConfig({ customerEmail: 'buyer@example.com' }));
+    client.track({ event_type: 'product_view', sku: 'A' });
+
+    await client.flush();
+    const event = lastFetchBody(fetchMock).events[0];
+    expect(event).toBeDefined();
+    // The ONE identity field we send.
+    expect(event?.smaily_visitor_token).toBe('vt-abc');
+    // Deliberately excluded from browse events.
+    expect(event).not.toHaveProperty('smaily_rec_id');
+    expect(event).not.toHaveProperty('smaily_ctx');
+    expect(event).not.toHaveProperty('customer_email');
   });
 
   it('flushes the buffer via sendBeacon on pagehide', () => {

@@ -397,6 +397,23 @@ test purchase carry `smaily_rec_id`, does the engine credit it via path-1) is a 
 pilot check** — like browse timing, the server path is unit+integration-proven but the
 browser moment isn't live-walk-coverable.
 
+### Browse events carry `smaily_visitor_token` for cold-start — NOT rec_id/email, NOT attribution (F3-49)
+Browse attribution rides ORDER signals, not browse (engine-confirmed 2026-07-03): the
+order's `smaily_rec_id` + email-click drive the `direct`/`exact_later`/`indirect_*`
+classes; browse would at best give the soft `assisted_view`, which the engine
+deprioritized. So `enrich()` (`rec-engine-client.ts`) puts the opaque
+`smaily_visitor_token` on each browse event **when the cookie is present** (omit-on-empty,
+mirrors `session_id`) — its value is future **cold-start personalization** (the engine
+binds the browse row to the customer via the token), NOT attribution. Do **NOT** add
+`smaily_rec_id` / `smaily_ctx` / `customer_email` to browse events — deliberate
+data-minimization enforced CLIENT-side (the `/relay` whitelist still lists them for
+other wrappers; the omission is `enrich()`'s job). Profiling opt-out on the token path is
+**engine-side** (server-enforced): an opted-out contact's browse event is never bound to a
+customer; the plugin's email-based `ProfilingConsent` gate stays the first filter but can't
+map `visitor_token`→email (engine-issued token). Guest-browse binds only via
+`identity/merge` on login (F3-27) — browse-session-only is an accepted v1 limitation.
+(DECISIONS F3-49.)
+
 ### OrderBackfill — which storage path the tests actually cover (HPOS vs legacy)
 OrderBackfillJob (3.5.2) reads orders with a direct `WHERE id > cursor` query
 against whichever table is active — `wc_orders` (HPOS) or `wp_posts` (legacy) —

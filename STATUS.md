@@ -26,7 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-06-30 (**F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
+_Last updated: 2026-07-03 (**F3-49 DONE — browse events now carry `smaily_visitor_token` (cold-start identity), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
 Managed (non-pilot) client Prike: ~1000 Smaily contacts drifted to language `en`. Root cause —
 the upstream plugin's daily "sync all subscribers" cron derives language from the cron-unsafe
 `Helper::get_current_language_code()`, which in a cron tick returns `get_locale()` = the WP
@@ -1266,6 +1266,18 @@ sides ready = go-live.
   (no `WP_UnitTestCase`/`go_to()`); JS mapping is vitest-tested. So confirm the
   render moment manually during the pilot (or a future Chromium E2E — not built,
   YAGNI, low risk). See CLAUDE.md "Browse browser-timing".
+- **Browse-event identity — RESOLVED (F3-49, 2026-07-03).** The beacon carried only
+  `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never
+  fired from our stream and the async order-attribution path-3 was inert. Engine team
+  confirmed browse does NOT feed attribution — order `smaily_rec_id` + email-click drive
+  the `direct`/`exact_later`/`indirect_*` mix; browse would at best give the soft
+  `assisted_view`. So browse still carries NO `smaily_rec_id`/`customer_email`
+  (data-minimization), but NOW carries the opaque `smaily_visitor_token` (omit-on-empty)
+  for the engine's future **cold-start personalization** binding (the engine binds the
+  browse row via it; ingest already accepts the field). Profiling opt-out on the
+  token/external_id path is engine-side (server-enforced 2026-07-03) — the plugin's
+  email `ProfilingConsent` gate stays the first filter. Guest-browse-session-only is an
+  accepted v1 limitation. See DECISIONS F3-49 + the "Browse browser-timing" item above.
 - GDPR export omits rec_attribution — engine-side Art 15 legal review (not a
   contract issue for the plugin).
 - F3-19 guest-customer flusher concern: RESOLVED by W5 — engine auto-creates the

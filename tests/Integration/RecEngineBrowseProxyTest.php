@@ -101,6 +101,28 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		self::assertStringNotContainsString( 'sk_', $serialised );
 	}
 
+	public function test_visitor_token_survives_the_whitelist_and_reaches_engine(): void {
+		$this->enable_beacon();
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'vt-1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'smaily_visitor_token' => 'vt_opaque_9' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'] );
+
+		// The identity field survived the §6 field-whitelist and reached the
+		// engine — F3-49: browse carries visitor_token for the engine's cold-start
+		// binding (NOT attribution), rec_id/email are never added client-side.
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame( 'vt_opaque_9', $received[0]['smaily_visitor_token'] ?? null );
+	}
+
 	public function test_resent_event_id_is_deduplicated(): void {
 		$this->enable_beacon();
 
