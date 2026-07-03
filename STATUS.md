@@ -53,6 +53,20 @@ out of the payload), SP-G (cutover: Connect plugin → wizard → Make data-sync
 ad-hoc SP-D/SP-E plan is now SUPERSEDED by the F3-48 contact-sync mode engine** (below) — the
 cron takeover + `is_unsubscribed`/`force_opt_in` handling fold into that engine.
 
+**RELEASED v3.3.0 (2026-07-03)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
+build `16a530f`, ZIP ~996 KB attached, tag `v3.3.0`, marked Latest, NOT a pre-release). Headline:
+**F3-49** — browse events now carry the opaque `smaily_visitor_token` (identity for the engine's
+future cold-start personalization binding, NOT attribution), while `smaily_rec_id`/email stay OFF
+browse (data-minimization, client-side). Resolves the browse-identity gap Erkki raised 2026-07-01;
+the engine team confirmed (2026-07-03) browse does NOT feed attribution (order signals drive the
+`direct`/`exact_later`/`indirect_*` mix) and asked only for the visitor token. Gates: ci:strict
+exit=0 (PHPUnit 456, vitest 164, PHPStan/PHPCS/tsc/eslint clean); integration OK (120 tests, 499
+assertions); **browse live-walk 14/14 green** vs the SANDBOX ("Smaily Connect test", NOT MiuMjau),
+incl. `engine_accepts_browse_visitor_token`. **No PCP re-run / security re-audit** — the shipped PHP
+surface is unchanged from 3.2.1 (JS + tests only, version strings aside; no REST/auth/SQL/crypto
+surface touched); 3.2.1 PCP was clean except the intentional `Update URI`. DECISIONS F3-49. **MiuMjau
++ Prike get this via their next deploy** (browse bundle `sc-runtime.js` rebuilt in the ZIP).
+
 **RELEASED v3.2.1 (2026-07-01)** — full GH release on the fork (`erkkimarkus/smaily-wordpress-plugin`,
 build `4b6fd3f`, ZIP ~992 KB attached). Headline: the **F3-48.5a contact-sync mode-selector UI
 refinement** (mode card visible only when sync enabled + below the sync toggle; "Checkout opt-in only"
