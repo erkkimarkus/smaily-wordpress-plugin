@@ -48,8 +48,8 @@ function save_state( string $path, array $state ): void {
 /**
  * Automation trigger catalog (§11) — shared by GET /automations/catalog and
  * the PUT /automations/config trigger_key validation ("tundmatu trigger").
- * Mirrors the live shape exactly: all six per-trigger fields (recipe_et is
- * Estonian-only — there is no recipe_en yet). Keys are mock-stable so tests
+ * Mirrors the live shape exactly: all seven per-trigger fields (recipe_en
+ * added in contract v1.2.0). Keys are mock-stable so tests
  * can PUT against them; the CONTRACT says render dynamically, so plugin
  * tests must not assert this exact key list as "the" catalog.
  */
@@ -62,6 +62,7 @@ function automations_catalog_triggers(): array {
 			'description_et' => 'Käivitub, kui kliendi korduvtoode hakkab ennustuse järgi otsa saama.',
 			'description_en' => "Fires when a customer's recurring product is predicted to run out.",
 			'recipe_et'      => 'Ehita Smailys "form submitted" trigeriga automatsioon, mille kiri kasutab rec_replenish_sku + soovitusslotte.',
+			'recipe_en'      => 'Build a Smaily automation with a "form submitted" trigger; the email uses rec_replenish_sku plus the recommendation slots.',
 		),
 		array(
 			'key'            => 'winback_risk',
@@ -70,6 +71,7 @@ function automations_catalog_triggers(): array {
 			'description_et' => 'Käivitub, kui klient on ennustuse järgi lahkumas (ostumuster katkenud).',
 			'description_en' => 'Fires when a customer is predicted to churn (purchase pattern broken).',
 			'recipe_et'      => 'Ehita Smailys "form submitted" trigeriga win-back automatsioon soovitusslottidega.',
+			'recipe_en'      => 'Build a Smaily win-back automation with a "form submitted" trigger and recommendation slots.',
 		),
 		array(
 			'key'            => 'life_stage',
@@ -78,6 +80,7 @@ function automations_catalog_triggers(): array {
 			'description_et' => 'Käivitub, kui lemmiklooma elufaas vahetub (nt kutsikas → täiskasvanu).',
 			'description_en' => 'Fires when a pet transitions life stage (e.g. puppy to adult).',
 			'recipe_et'      => 'Ehita Smailys elufaasi-automatsioon; mootor enrollib kontakti õigel päeval.',
+			'recipe_en'      => 'Build a Smaily life-stage automation; the engine enrols the contact on the right day.',
 		),
 	);
 }

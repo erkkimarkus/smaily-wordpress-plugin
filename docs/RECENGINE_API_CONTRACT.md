@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.1
+# Smaily Recommendation Engine — API Contract v1.2
 
-**Version**: 1.1.0
+**Version**: 1.2.0
 **Published**: 2026-05-19
-**Last updated**: 2026-07-07 (v1.1.0 — automations config API, §11–§13; MINOR bump per the versioning rule: new endpoints)
+**Last updated**: 2026-07-07 (v1.2.0 — `recipe_en` added to the §11 catalog triggers; MINOR bump per the versioning rule: new optional field)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -1355,7 +1355,8 @@ Returns the automation triggers available **for this store**. The list is filter
       "name_en": "Replenishment due",
       "description_et": "Käivitub, kui kliendi korduvtoode hakkab ennustuse järgi otsa saama (85% isiklikust ostuintervallist täis).",
       "description_en": "Fires when a customer's recurring product is predicted to run out (85% of their personal purchase interval reached).",
-      "recipe_et": "Ehita Smailys \"form submitted\" trigeriga automatsioon, mille kiri kasutab rec_replenish_sku + soovitusslotte. Mootor enrollib kontakti õigel päeval."
+      "recipe_et": "Ehita Smailys \"form submitted\" trigeriga automatsioon, mille kiri kasutab rec_replenish_sku + soovitusslotte. Mootor enrollib kontakti õigel päeval.",
+      "recipe_en": "Build a Smaily automation with a \"form submitted\" trigger; the email uses rec_replenish_sku plus the recommendation slots. The engine enrols the contact on the right day."
     }
   ],
   "language_modes": ["single", "per_language"],
@@ -1370,7 +1371,7 @@ Returns the automation triggers available **for this store**. The list is filter
 | `key` | string | Stable machine key — the natural key for config rows (§12/§13). |
 | `name_et` / `name_en` | string | Localized display name. |
 | `description_et` / `description_en` | string | Localized merchant-facing description (when the trigger fires). |
-| `recipe_et` | string | Recipe for the merchant: what the Smaily automation must contain. Currently Estonian-only (no `recipe_en` yet). |
+| `recipe_et` / `recipe_en` | string | Localized recipe for the merchant: what the Smaily automation must contain. (`recipe_en` added v1.2.0 — against an older engine the key is absent; treat it as optional and fall back to `recipe_et`.) |
 
 **Top-level fields**:
 
@@ -1726,6 +1727,10 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **Setup-exchange endpoints map gains `automations_catalog` + `automations_config`** (new `automations_*` prefix in the map convention). Existing connections keep their exchange-time map without these keys — the plugin's fallback path constants cover that (see the "Map age" note in §1).
 - **PUT 422 shape is now indexed, D6-style**: `{error: "validation_failed", errors: [{index?, trigger_key?, field, message}]}` — replaces the Zod `flatten()` `details` object, which collapsed every row error under one `fieldErrors.configs` key and made field-level display impossible. Wrapper-level failures return `field: "configs"` with no `index`. Unlike ingest D6, validation is **all-or-nothing** (422 = nothing written). Engine commit `c16377e`.
 - This resolves the plugin-team T2 gap brief (`CODE_BRIEF_T2_automations_contract_gaps.md`): §11–§13 document live behavior (`app/api/v1/automations/*`, `lib/automations/config-schema.ts`), verified against code, not the plan.
+
+**v1.2.0** (2026-07-07) — **`recipe_en` on §11 catalog triggers**. MINOR bump per the [Versioning](#versioning) rule (new optional field; backward-compatible — nothing existing changed shape):
+- **Every `triggers[]` item now carries `recipe_en`** alongside `recipe_et` (pilot feedback 2026-07-07: a WooCommerce store with an English admin locale saw the Estonian-only recipe). Content-equivalent English recipe, same guidance as `recipe_et`; `name_*` / `description_*` were already bilingual.
+- Plugin side: treat `recipe_en` as optional and fall back to `recipe_et` when absent (an older engine won't send it).
 
 ---
 

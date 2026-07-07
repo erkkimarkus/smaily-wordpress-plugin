@@ -79,7 +79,7 @@ final class RecEngineAutomationsTest extends TestCase {
 		self::assertIsArray( $body['triggers'] );
 		self::assertNotEmpty( $body['triggers'], 'The mock serves a non-empty sector catalog.' );
 		foreach ( $body['triggers'] as $trigger ) {
-			foreach ( array( 'key', 'name_et', 'name_en', 'description_et', 'description_en', 'recipe_et' ) as $field ) {
+			foreach ( array( 'key', 'name_et', 'name_en', 'description_et', 'description_en', 'recipe_et', 'recipe_en' ) as $field ) {
 				self::assertArrayHasKey( $field, $trigger, "Every §11 trigger carries {$field}." );
 				self::assertNotSame( '', (string) $trigger[ $field ] );
 			}
