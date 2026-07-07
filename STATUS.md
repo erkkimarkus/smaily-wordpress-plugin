@@ -26,7 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**T2.4 — engine-automations UI feedback fixes (Erkki's real-store
+_Last updated: 2026-07-07 (**v3.4.1 RELEASED — T2.4 pilot-feedback UI fixes + contract
+v1.2.0 sync (`recipe_en`).** Patch release per the CLAUDE.md recipe: version bumped in all
+six places, committed BEFORE the build → clean build-hash `ae3bc3d`; ci:strict exit=0
+(PHPUnit unit 474, PHPCS 0 errors, PHPStan clean, vitest 232, tsc/eslint clean);
+admin+client+blocks rebuilt; i18n artifacts current from the same-day T2.4 build-i18n run
+(no admin-string changes since — skip per CLAUDE.md); prod-vendor ZIP built + verified
+(v3.4.1 everywhere, required present incl. `dist/admin/admin.js`,
+`dist/public/js/sc-runtime.js`, `blocks/*/build`, `vendor/autoload.php`, `composer.json`,
+`languages/*.mo` + admin-bundle JSON; tests/docs/node_modules/admin-src/dev-vendor absent;
+~1.06 MB); **PCP against the BUILT ZIP clean except the single intentional
+`plugin_updater_detected`** (F3-35). No security re-audit — delta is React-admin-only
+(shipped-PHP delta = version-bump lines; re-audit policy not triggered; judgement recorded
+as the 3.4.1 row in `docs/audits/INDEX.md` per the 3.3.x lesson). No integration full-suite
+run (PHP delta mock/test-only; sandbox connection preserved; the T2.4 automations-suite run
+was OK 6). GH release `v3.4.1` on the fork (normal release, Latest), ZIP attached. Prior
+same day:
+**T2.4 — engine-automations UI feedback fixes (Erkki's real-store
 test of v3.4.0; F3-52 addendum).** Five fixes, all React admin — PHP untouched. (1) **Language
 mode is STORE-GLOBAL** (F3-52 addendum): the display mode derives ALWAYS from the store's
 structure (`deriveLanguageMode`), uniformly for every row; a server row's stored
