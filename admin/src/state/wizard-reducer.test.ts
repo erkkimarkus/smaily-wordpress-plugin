@@ -468,3 +468,89 @@ describe('buildSettingsInitialState', () => {
     expect(s.inSettings).toBe(true);
   });
 });
+
+describe('wizardReducer — engine-run automations slice (T2.2)', () => {
+  const row = {
+    trigger_key: 'replenish_due',
+    enabled: false,
+    language_mode: 'single' as const,
+    automation_map: {},
+    cooldown_days: 7,
+    daily_cap: null,
+    test_mode: true,
+    test_emails: [],
+  };
+
+  it('hydrates rows without marking the slice dirty', () => {
+    const s = wizardReducer(baseState, {
+      type: 'ENGINE_AUTOMATIONS_HYDRATED',
+      payload: { rows: [row], keepDirty: false },
+    });
+
+    expect(s.engineAutomations.rows).toEqual([row]);
+    expect(s.engineAutomations.dirty).toBe(false);
+    expect(s.engineAutomations.serverErrors).toEqual([]);
+  });
+
+  it('hydrate with keepDirty preserves the dirty flag and unresolved errors', () => {
+    let s = wizardReducer(baseState, {
+      type: 'ENGINE_AUTOMATIONS_SAVE_FAILED',
+      payload: { error: 'nope', errors: [{ field: 'configs', message: 'x' }] },
+    });
+    s = wizardReducer(s, {
+      type: 'ENGINE_AUTOMATIONS_HYDRATED',
+      payload: { rows: [row], keepDirty: true },
+    });
+
+    expect(s.engineAutomations.dirty).toBe(true);
+    expect(s.engineAutomations.serverErrors).toHaveLength(1);
+  });
+
+  it('UPDATE patches the matching row, marks dirty, and resets the save outcome', () => {
+    let s = wizardReducer(baseState, {
+      type: 'ENGINE_AUTOMATIONS_HYDRATED',
+      payload: { rows: [row], keepDirty: false },
+    });
+    s = wizardReducer(s, {
+      type: 'ENGINE_AUTOMATIONS_SAVED',
+    });
+    s = wizardReducer(s, {
+      type: 'UPDATE_ENGINE_AUTOMATION',
+      payload: { triggerKey: 'replenish_due', patch: { enabled: true } },
+    });
+
+    expect(s.engineAutomations.rows[0]?.enabled).toBe(true);
+    expect(s.engineAutomations.dirty).toBe(true);
+    expect(s.engineAutomations.saveStatus).toBe('idle');
+    // Engine-automations dirty is deliberately NOT dirtyTabs.woocommerce
+    // (F3-52) — partial save failure keeps only this slice dirty.
+    expect(s.dirtyTabs.woocommerce).toBe(false);
+  });
+
+  it('SAVED clears dirty + errors; SAVE_FAILED keeps dirty (all-or-nothing §13)', () => {
+    let s = wizardReducer(baseState, {
+      type: 'ENGINE_AUTOMATIONS_HYDRATED',
+      payload: { rows: [row], keepDirty: false },
+    });
+    s = wizardReducer(s, {
+      type: 'UPDATE_ENGINE_AUTOMATION',
+      payload: { triggerKey: 'replenish_due', patch: { cooldown_days: 14 } },
+    });
+    s = wizardReducer(s, {
+      type: 'ENGINE_AUTOMATIONS_SAVE_FAILED',
+      payload: {
+        error: 'validation failed',
+        errors: [{ index: 0, trigger_key: 'replenish_due', field: 'automation_map', message: 'x' }],
+      },
+    });
+
+    expect(s.engineAutomations.dirty).toBe(true);
+    expect(s.engineAutomations.saveStatus).toBe('error');
+    expect(s.engineAutomations.serverErrors).toHaveLength(1);
+
+    s = wizardReducer(s, { type: 'ENGINE_AUTOMATIONS_SAVED' });
+    expect(s.engineAutomations.dirty).toBe(false);
+    expect(s.engineAutomations.saveStatus).toBe('success');
+    expect(s.engineAutomations.serverErrors).toEqual([]);
+  });
+});

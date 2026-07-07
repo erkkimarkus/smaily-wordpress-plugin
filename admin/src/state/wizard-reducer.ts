@@ -4,6 +4,7 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  idleEngineAutomations,
   type AutomationMapping,
   type ModeAccount,
   type WizardAction,
@@ -66,6 +67,8 @@ export const wizardInitialState: WizardState = {
   recEngineFeatures: {
     trackBrowsing: false,
   },
+
+  engineAutomations: idleEngineAutomations,
 
   dirtyTabs: {
     connection: false,
@@ -346,6 +349,74 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         recEngineFeatures: {
           ...state.recEngineFeatures,
           [action.payload.feature]: action.payload.enabled,
+        },
+      };
+
+    // Engine-triggered automations (contract §11–§13) ------------------------
+    case 'ENGINE_AUTOMATIONS_HYDRATED':
+      return {
+        ...state,
+        engineAutomations: {
+          ...state.engineAutomations,
+          rows: action.payload.rows,
+          dirty: action.payload.keepDirty,
+          saveStatus: 'idle',
+          saveError: null,
+          // A preserved draft keeps its unresolved save errors visible;
+          // a fresh hydrate starts clean.
+          serverErrors: action.payload.keepDirty ? state.engineAutomations.serverErrors : [],
+        },
+      };
+
+    case 'UPDATE_ENGINE_AUTOMATION':
+      return {
+        ...state,
+        engineAutomations: {
+          ...state.engineAutomations,
+          rows: state.engineAutomations.rows.map((row) =>
+            row.trigger_key === action.payload.triggerKey
+              ? { ...row, ...action.payload.patch }
+              : row,
+          ),
+          dirty: true,
+          // An edit invalidates the previous save outcome banner.
+          saveStatus: 'idle',
+          saveError: null,
+        },
+      };
+
+    case 'ENGINE_AUTOMATIONS_SAVE_START':
+      return {
+        ...state,
+        engineAutomations: {
+          ...state.engineAutomations,
+          saveStatus: 'pending',
+          saveError: null,
+        },
+      };
+
+    case 'ENGINE_AUTOMATIONS_SAVED':
+      return {
+        ...state,
+        engineAutomations: {
+          ...state.engineAutomations,
+          dirty: false,
+          saveStatus: 'success',
+          saveError: null,
+          serverErrors: [],
+        },
+      };
+
+    case 'ENGINE_AUTOMATIONS_SAVE_FAILED':
+      // All-or-nothing (§13): NOTHING was saved, so the slice stays dirty
+      // and the whole selection is resubmitted after the fix.
+      return {
+        ...state,
+        engineAutomations: {
+          ...state.engineAutomations,
+          saveStatus: 'error',
+          saveError: action.payload.error,
+          serverErrors: action.payload.errors,
         },
       };
 

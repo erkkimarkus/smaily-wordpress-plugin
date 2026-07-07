@@ -51,7 +51,13 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'SET_REC_ENGINE_FEATURE':
       return 'recommendations';
 
-    // Non-persistable / orthogonal
+    // Non-persistable / orthogonal.
+    //
+    // Engine-automations actions are here deliberately: they do NOT flip
+    // dirtyTabs.woocommerce — the slice tracks its own dirty bit so a
+    // partial save failure (local POST ok, engine PUT failed) leaves only
+    // the engine section dirty (F3-52). The sticky footer ORs the two
+    // dirty sources together.
     case 'TEST_SMAILY_CONNECTION_START':
     case 'TEST_SMAILY_CONNECTION_SUCCESS':
     case 'TEST_SMAILY_CONNECTION_FAILURE':
@@ -64,6 +70,11 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'BACKFILL_START':
     case 'BACKFILL_PROGRESS':
     case 'BACKFILL_CANCEL':
+    case 'ENGINE_AUTOMATIONS_HYDRATED':
+    case 'UPDATE_ENGINE_AUTOMATION':
+    case 'ENGINE_AUTOMATIONS_SAVE_START':
+    case 'ENGINE_AUTOMATIONS_SAVED':
+    case 'ENGINE_AUTOMATIONS_SAVE_FAILED':
     case 'WIZARD_GO_TO_STEP':
     case 'WIZARD_NEXT_STEP':
     case 'WIZARD_PREVIOUS_STEP':

@@ -4,6 +4,7 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  idleEngineAutomations,
   normalizeContactSyncMode,
   type AutomationMapping,
   type AutomationTrigger,
@@ -165,6 +166,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       recEngineFeatures: {
         trackBrowsing: false,
       },
+      engineAutomations: idleEngineAutomations,
       dirtyTabs: {
         connection: false,
         subscribers: false,
@@ -230,6 +232,9 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     recEngineFeatures: {
       trackBrowsing: s.recEngine?.trackBrowsing ?? false,
     },
+    // Deliberately NOT part of the boot payload — the engine's GET is the
+    // source of truth (F3-51); the section fetches catalog+config on open.
+    engineAutomations: idleEngineAutomations,
     dirtyTabs: {
       connection: false,
       subscribers: false,

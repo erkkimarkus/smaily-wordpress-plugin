@@ -109,6 +109,71 @@ export interface AutomationMapping {
 }
 
 /**
+ * One engine-triggered automation config row — EXACTLY the eight
+ * required §13 wire fields, snake_case, so the PUT sends state rows
+ * as-is with zero translation layer (contract v1.1.0 §13; scar 3.5.3a
+ * — a camelCased mirror of a snake_case wire shape passes vitest and
+ * fails live). Trigger keys come from the §11 catalog at runtime —
+ * never hardcode them (a new trigger ships with an engine deploy).
+ *
+ * The §12 read-only fields (`configured_via`, `updated_at`) are
+ * deliberately NOT here — they must not round-trip into the PUT.
+ */
+export interface EngineAutomationRow {
+  trigger_key: string;
+  /** Fail-closed master switch — never set true without an explicit merchant action. */
+  enabled: boolean;
+  language_mode: 'single' | 'per_language';
+  /**
+   * Smaily workflow ids as numeric strings. Keys: 'id' (single mode);
+   * language codes + 'fallback' (per_language mode). Empty {} allowed
+   * only while enabled=false.
+   */
+  automation_map: Record<string, string>;
+  /** Integer 1–365; UI default 7 (the engine has no server-side default). */
+  cooldown_days: number;
+  /**
+   * Not edited by this UI — comes from GET and goes back UNCHANGED so
+   * an engine-admin-set cap is never wiped. Null = no cap.
+   */
+  daily_cap: number | null;
+  /** UI default TRUE (fail-closed §11) — switching off is a confirmed, separate action. */
+  test_mode: boolean;
+  /** Max 50 valid emails; may be empty. */
+  test_emails: string[];
+}
+
+/**
+ * §13 422 error entry — also reused for client-side pre-validation
+ * issues so the field-binding UI renders both through one path.
+ * Wrapper-level entries have no index and field='configs'.
+ */
+export interface EngineAutomationsIssue {
+  index?: number;
+  trigger_key?: string;
+  field: string;
+  message: string;
+}
+
+/**
+ * Engine-automations slice. Dirty is tracked SEPARATELY from
+ * dirtyTabs.woocommerce: the section renders under the WooCommerce tab
+ * and joins its sticky-footer Save, but a partial failure (local POST
+ * ok, engine PUT failed) must leave ONLY this slice dirty — one shared
+ * bit couldn't express that (F3-52).
+ */
+export interface EngineAutomationsState {
+  /** Draft rows in wire shape, catalog order. Empty until first hydrate. */
+  rows: EngineAutomationRow[];
+  /** True when rows diverge from the last hydrate/save. */
+  dirty: boolean;
+  saveStatus: 'idle' | 'pending' | 'success' | 'error';
+  saveError: string | null;
+  /** §13 422 errors (or local pre-validation issues) from the last save attempt. */
+  serverErrors: EngineAutomationsIssue[];
+}
+
+/**
  * Product RSS-feed builder data — server-computed in
  * EnvDetector::rss_snapshot() and emitted on the boot payload whenever
  * WooCommerce is active. The feed reads every parameter from the URL's
@@ -221,6 +286,13 @@ export interface WizardState {
   };
 
   /**
+   * Engine-triggered automations (contract §11–§13, T2.2). Rendered as a
+   * sub-section under the WooCommerce automations; saved via the
+   * rec-engine automations proxy (PUT), not POST /settings.
+   */
+  engineAutomations: EngineAutomationsState;
+
+  /**
    * Per-tab dirty flag — true when the tab's slice of state diverges from
    * what was last persisted via POST /settings. Settings UI surfaces Save +
    * Discard CTAs based on these flags. Wizard context ignores them — the
@@ -276,6 +348,14 @@ export const emptyCredentials: SmailyCredentials = {
 };
 
 export const idleAsync: AsyncStatus = { kind: 'idle' };
+
+export const idleEngineAutomations: EngineAutomationsState = {
+  rows: [],
+  dirty: false,
+  saveStatus: 'idle',
+  saveError: null,
+  serverErrors: [],
+};
 
 export const idleBackfill: BackfillProgress = {
   status: 'idle',
@@ -339,6 +419,19 @@ export type WizardAction =
 
   // Step 4: Recommendations -------------------------------------------------
   | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'trackBrowsing'; enabled: boolean } }
+
+  // Engine-triggered automations (contract §11–§13) ---------------------------
+  //
+  // HYDRATED fires on every section open with the freshly fetched
+  // catalog+config (the engine's GET is the truth — F3-51); keepDirty=true
+  // preserves an unsaved draft across a tab switch. UPDATE marks the slice
+  // dirty; SAVED/SAVE_FAILED come from the PUT round-trip (all-or-nothing:
+  // a failure keeps the WHOLE slice dirty).
+  | { type: 'ENGINE_AUTOMATIONS_HYDRATED'; payload: { rows: EngineAutomationRow[]; keepDirty: boolean } }
+  | { type: 'UPDATE_ENGINE_AUTOMATION'; payload: { triggerKey: string; patch: Partial<EngineAutomationRow> } }
+  | { type: 'ENGINE_AUTOMATIONS_SAVE_START' }
+  | { type: 'ENGINE_AUTOMATIONS_SAVED' }
+  | { type: 'ENGINE_AUTOMATIONS_SAVE_FAILED'; payload: { error: string; errors: EngineAutomationsIssue[] } }
 
   // Settings dirty-tab tracking ---------------------------------------------
   | { type: 'MARK_TAB_DIRTY'; payload: { tab: SettingsTabKey } }

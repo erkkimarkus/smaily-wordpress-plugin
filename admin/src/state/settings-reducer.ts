@@ -3,6 +3,7 @@ import {
   emptyCredentials,
   idleAsync,
   idleBackfill,
+  idleEngineAutomations,
   normalizeContactSyncMode,
   type RssFeedBootData,
   type WizardState,
@@ -114,6 +115,8 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     recEngineFeatures: {
       trackBrowsing: false,
     },
+
+    engineAutomations: idleEngineAutomations,
 
     dirtyTabs: {
       connection: false,
