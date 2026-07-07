@@ -2717,6 +2717,61 @@ carries a body on PUT fine, unit-pinned).
 single-source via map+constants), F3-28.6/LESSONS §2.9 (endpoints-map placeholder discipline
 — no placeholders in these URLs, plain keys), LESSONS §2.7 (mock moved in the same sync).
 
+### F3-52 — Automations config UI (T2.2): joint Save with split dirty state; upsell when unconnected; going live is a confirmed separate act
+
+**Context:** T2.2 renders the F3-51 proxy as the "Engine-run recommendation automations"
+sub-section UNDER the store-run WooCommerce automations (Step 3 / WooCommerce tab,
+`EngineAutomationsSection`), catalog-driven per §11 (no hardcoded trigger keys — an
+engine-deployed trigger appears without a plugin release; docs link from the catalog's
+`docs` field; `_et`/`_en` copy picked by the admin locale via `<html lang>`, `recipe_et`
+always shown). Design decisions locked by Erkki 2026-07-07.
+
+**Decisions:**
+1. **One Save button, TWO parallel requests, SPLIT dirty state.** The engine section joins
+   the WooCommerce tab's sticky-footer Save (and the wizard Step-3 Continue): Save fires the
+   existing `POST /settings` plus — when the engine slice is dirty — a `PUT` through the
+   automations proxy, in parallel. The engine slice keeps its OWN dirty bit
+   (`state.engineAutomations.dirty`, deliberately NOT `dirtyTabs.woocommerce`): on a partial
+   failure (local POST ok, engine PUT failed) only the engine section stays dirty, its error
+   renders inside the section, and Save stays enabled for the corrected resubmit — the
+   merchant loses neither half. §13 all-or-nothing means a 422 keeps the WHOLE slice dirty.
+   `saveEngineAutomations()` (state/engine-automations.ts) is the single orchestrator both
+   save paths call, so Settings and wizard can't drift.
+2. **Not connected → modest upsell, context-aware CTA.** In Settings the banner's CTA jumps
+   to the Campaign Intelligence tab (hash routing); in the wizard the copy points to the
+   NEXT step (connection happens in Step 4), and Step 4 shows a post-connect banner offering
+   the way back to Step 3 (`WIZARD_GO_TO_STEP` — the existing navigation). A proxy 503 at
+   fetch time renders the same upsell state.
+3. **Going live is a separate, confirmed act (fail-closed §11).** `test_mode` defaults ON
+   for a never-configured trigger; "Activate for real…" is its own button with a
+   `window.confirm` naming the consequence — never the enable toggle. `enabled=true` only
+   ever comes from the merchant's explicit toggle click.
+4. **The engine's GET is the truth in the UI too.** The section fetches catalog+config on
+   every open (unmount on tab switch, no cache); a dirty draft survives the re-fetch, a
+   clean slice is replaced. Rows live in state in the EXACT §13 wire shape (snake_case,
+   scar 3.5.3a) and the PUT sends every rendered row with all 8 fields — un-edited fields
+   (today `daily_cap`) round-trip from GET unchanged, the §12 read-only pair is stripped at
+   hydrate so it can't leak into the PUT. A config row absent from the catalog is neither
+   rendered nor sent (PUT never deletes). Client-side pre-validation at the fields is a UX
+   layer only; the engine's indexed 422 is the validator and binds back to rows by
+   trigger_key/index (F3-51 rule 2 unchanged).
+
+**Rationale:** one Save keeps the merchant's mental model ("this tab saves together") while
+the split dirty bit + section-local errors make the two destinations' independent failure
+modes visible instead of averaging them into one banner; the confirm-gated live switch keeps
+the §11 fail-closed promise a UI invariant, not a convention.
+
+**Alternatives rejected:** a separate Save button for the engine section (two buttons on one
+tab reads as a bug; the partial-failure semantics give the same safety); folding engine dirty
+into `dirtyTabs.woocommerce` (can't express "local saved, engine still dirty"); blocking the
+local POST when engine pre-validation fails (would hold the store-run automations hostage to
+an engine-side field error).
+
+**Relationships:** F3-51 (the proxy + engine-is-authority rules this UI renders), F3-29
+(Step-4 connect flow the upsell/back-banner integrates with), scar 3.5.3a (snake_case wire
+types end-to-end), LESSONS §2.3 (mock strictness — component tests mock the api module, the
+shapes come from the contract).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

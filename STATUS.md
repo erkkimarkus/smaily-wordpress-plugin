@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**T2.1 — engine-triggered automations config, PHP layer (F3-51)**.
+_Last updated: 2026-07-07 (**T2.2 — engine-triggered automations config, React UI (F3-52)**.
+The "Engine-run recommendation automations" sub-section renders UNDER the store-run
+WooCommerce automations (Step 3 / WooCommerce tab): catalog-driven trigger cards (§11 —
+no hardcoded keys, a new engine trigger appears without a plugin release; `_et`/`_en` copy
+by admin locale, `recipe_et` + catalog `docs` link always), per trigger enable-toggle +
+workflow picker (useWorkflows; per-language rows + fallback radio on multilingual A/B sites
+→ `language_mode:"per_language"`, else `single`), cooldown 1–365 (default 7), and the
+fail-closed test-mode block (`test_mode` default ON, up-to-50 test addresses, "Activate for
+real…" as a SEPARATE confirmed action — never the enable toggle). ONE Save, TWO parallel
+requests: the engine slice joins the WooCommerce tab's sticky-footer Save (and the wizard
+Step-3 Continue) but keeps its OWN dirty bit — on partial failure (local POST ok, engine PUT
+failed) only the engine section stays dirty with its error in-section; §13 all-or-nothing ⇒
+a 422 keeps the whole slice dirty, errors[] bound to rows/fields by trigger_key/index.
+Round-trip: GET on every open is the truth (dirty draft survives a tab switch), PUT sends
+every rendered row with all 8 fields, `daily_cap` passes through GET→PUT untouched, §12
+read-only fields stripped at hydrate; a config row missing from the catalog is neither
+rendered nor sent. Not connected → upsell banner (Settings: CTA to the Campaign Intelligence
+tab; wizard: next-step hint + a post-connect "back to Step 3" banner in Step 4). Errors: 503
+→ upsell state; 502 api_key_rejected → reconnect banner; other → retry banner; skeleton on
+load. New: api/automations.ts, state/engine-automations.ts (pure rows/validation/save-orch),
+hooks/useAutomationsData.ts, components/steps/EngineAutomationsSection.tsx; slice + 5 actions
+in the shared reducer. i18n: bin/build-i18n.sh run, all new strings translated in
+smaily-connect-et.po (0 untranslated). Tests: 44 new vitest (engine-automations logic 28,
+reducer slice 4, section component 9, Settings save-orchestration/partial-failure 3).
+DECISIONS F3-52. Gates: ci:strict exit=0 (PHPUnit unit 474, PHPCS 0 errors, PHPStan clean,
+vitest 208, tsc/eslint clean); PHP untouched — no integration run required for this UI
+sub-PR. **Next:** the OrderBackfill full-suite flake investigation (below); T2 live-walk
+against the sandbox when the engine side is ready. Prior same day: **T2.1 — the PHP layer**
+below.)_
+
+_(T2.1 record follows — same day:_ **T2.1 — engine-triggered automations config, PHP layer (F3-51)**.
 Contract synced to **v1.1.0** (commit 9ec2ff8, engine c16377e+7b5b922, byte-identical md5
 `7e41726bcd17fab163586b7f97093e0d`): §11 GET /automations/catalog, §12 GET /automations/config,
 §13 PUT /automations/config — the engine-run automations (replenishment/win-back enrolment into
@@ -51,10 +81,9 @@ RecEngineOrderBackfillTest failures that reproduce IDENTICALLY on clean main** (
 same env/day: 120 tests, the same 3 failures without any T2.1 code — every order-count
 assertion comes back +1 in a FULL-suite run only, while the class in isolation and in pair-runs
 is green, so it's cross-test-state dependent, NOT a T2.1 regression; last recorded full-green
-was OK 120/499 on 2026-07-03 — needs its own investigation). **Next: T2.2 — the React settings
-UI** (trigger cards from the catalog, fail-closed: never auto-enable, test_mode default ON,
-§13 errors[] bound to fields) + the OrderBackfill full-suite flake investigation. Prior:
-2026-07-03 —)_
+was OK 120/499 on 2026-07-03 — needs its own investigation). Next: T2.2 — the React settings
+UI (**shipped, see the T2.2 entry above**) + the OrderBackfill full-suite flake investigation.
+Prior: 2026-07-03 —)_
 
 **v3.3.2 — browse 0-events on CookieYes RESOLVED the RIGHT way (F3-50)**: root cause was the missing free `wp-consent-api` companion plugin, NOT a CookieYes incompatibility (CookieYes registers into the WP Consent API once it's installed). The 3.3.1 CookieYes cookie-parser was a mis-fix (Erkki caught it — per-vendor code + CookieYes docs prove standard support) and is **reverted**; 3.3.2 keeps browse consent on the standard WP Consent API + adds a `NotificationManager` admin advisory guiding merchants to install `wp-consent-api`. MiuMjau fix = install that plugin (wp-admin). Prior same day: **v3.3.1** (reverted) and **F3-49 DONE — browse events carry `smaily_visitor_token` (cold-start), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
 Managed (non-pilot) client Prike: ~1000 Smaily contacts drifted to language `en`. Root cause —

@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-3.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Smaily Connect 3.2.1\n"
+"Project-Id-Version: Smaily Connect 3.3.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/smaily-connect\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-06-30T21:24:16+00:00\n"
+"POT-Creation-Date: 2026-07-07T11:13:09+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -78,35 +78,43 @@ msgstr ""
 msgid "Subscribe to newsletter"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:294
+#: includes/Notifications/NotificationManager.php:316
+msgid "Smaily Connect: browse tracking is on, but no cookie-consent signal was found, so no browse data is being collected. Install the free WP Consent API plugin so your consent banner (CookieYes, Complianz, Real Cookie Banner, …) can tell Smaily when a visitor consents."
+msgstr ""
+
+#: includes/Notifications/NotificationManager.php:329
+msgid "Install WP Consent API"
+msgstr ""
+
+#: includes/Notifications/NotificationManager.php:352
 msgid "Invalid request."
 msgstr ""
 
 #. translators: %d: number of failed sync events in the last 24 hours.
-#: includes/Notifications/NotificationManager.php:319
+#: includes/Notifications/NotificationManager.php:377
 #, php-format
 msgid "Smaily Connect: %d sync event failed in the last 24 hours."
 msgid_plural "Smaily Connect: %d sync events failed in the last 24 hours."
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/Notifications/NotificationManager.php:330
+#: includes/Notifications/NotificationManager.php:388
 msgid "Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:337
+#: includes/Notifications/NotificationManager.php:395
 msgid "Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:343
+#: includes/Notifications/NotificationManager.php:401
 msgid "Smaily Connect: a sync health check needs your attention."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:350
+#: includes/Notifications/NotificationManager.php:408
 msgid "View Event Log"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:369
+#: includes/Notifications/NotificationManager.php:427
 msgid "Dismiss"
 msgstr ""
 
@@ -120,7 +128,7 @@ msgid "Your recommendation preferences have been saved."
 msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:97
-#: admin/src/components/steps/Step4Recommendations.tsx:120
+#: admin/src/components/steps/Step4Recommendations.tsx:141
 msgid "Smaily Campaign Intelligence"
 msgstr ""
 
@@ -134,6 +142,29 @@ msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:109
 msgid "Save preferences"
+msgstr ""
+
+#: includes/REST/AutomationsEndpoint.php:128
+#: includes/REST/RecEngineEndpoint.php:121
+msgid "You do not have permission to manage Campaign Intelligence."
+msgstr ""
+
+#: includes/REST/AutomationsEndpoint.php:179
+msgid "Request body must be a JSON object with a `configs` array."
+msgstr ""
+
+#: includes/REST/AutomationsEndpoint.php:204
+#: includes/REST/RecEngineEndpoint.php:222
+msgid "Smaily Campaign Intelligence is not configured. Finish setup first."
+msgstr ""
+
+#: includes/REST/AutomationsEndpoint.php:214
+#: includes/REST/RecEngineEndpoint.php:235
+msgid "Stored rec-engine configuration is incomplete. Re-run setup."
+msgstr ""
+
+#: includes/REST/AutomationsEndpoint.php:260
+msgid "Smaily Campaign Intelligence rejected the stored API key. Disconnect and re-run setup with a fresh setup link."
 msgstr ""
 
 #: includes/REST/BackfillEndpoint.php:128
@@ -150,10 +181,6 @@ msgstr ""
 
 #: includes/REST/EventsEndpoint.php:97
 msgid "You do not have permission to view the event log."
-msgstr ""
-
-#: includes/REST/RecEngineEndpoint.php:121
-msgid "You do not have permission to manage Campaign Intelligence."
 msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:137
@@ -174,14 +201,6 @@ msgstr ""
 
 #: includes/REST/RecEngineEndpoint.php:209
 msgid "Smaily Campaign Intelligence did not respond. Try again in a few minutes."
-msgstr ""
-
-#: includes/REST/RecEngineEndpoint.php:222
-msgid "Smaily Campaign Intelligence is not configured. Finish setup first."
-msgstr ""
-
-#: includes/REST/RecEngineEndpoint.php:235
-msgid "Stored rec-engine configuration is incomplete. Re-run setup."
 msgstr ""
 
 #: includes/REST/SettingsEndpoint.php:98
@@ -906,9 +925,18 @@ msgstr ""
 msgid "Opt-in subscribers directly to Smaily for seamless email marketing."
 msgstr ""
 
+#: admin/src/api/automations.tsx:35
+msgid "Smaily Campaign Intelligence is not connected."
+msgstr ""
+
+#: admin/src/api/automations.tsx:42
+msgid "The engine rejected the stored API key."
+msgstr ""
+
+#: admin/src/api/automations.tsx:54
 #: admin/src/api/recEngine.tsx:17
 #: admin/src/api/recEngine.tsx:35
-#: admin/src/components/wizard/Wizard.tsx:73
+#: admin/src/components/wizard/Wizard.tsx:74
 msgid "Network error"
 msgstr ""
 
@@ -1119,6 +1147,7 @@ msgid "Rec"
 msgstr ""
 
 #: admin/src/components/settings/EventLog.tsx:213
+#: admin/src/components/steps/EngineAutomationsSection.tsx:174
 msgid "Retry"
 msgstr ""
 
@@ -1180,131 +1209,142 @@ msgstr ""
 msgid "Enqueued payload"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:27
+#: admin/src/components/settings/Settings.tsx:28
 msgid "Connection"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:28
-#: admin/src/components/wizard/Wizard.tsx:21
+#: admin/src/components/settings/Settings.tsx:29
+#: admin/src/components/wizard/Wizard.tsx:22
 msgid "Subscribers"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:29
-#: admin/src/components/wizard/Wizard.tsx:25
+#: admin/src/components/settings/Settings.tsx:30
+#: admin/src/components/wizard/Wizard.tsx:26
 msgid "WooCommerce"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:30
+#: admin/src/components/settings/Settings.tsx:31
 #: admin/src/components/steps/Step4Recommendations.tsx:20
 #: admin/src/components/steps/Step6Done.tsx:135
-#: admin/src/components/wizard/Wizard.tsx:28
+#: admin/src/components/wizard/Wizard.tsx:29
 msgid "Campaign Intelligence"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:31
+#: admin/src/components/settings/Settings.tsx:32
 #: admin/src/components/steps/Step5Integrations.tsx:44
-#: admin/src/components/wizard/Wizard.tsx:30
+#: admin/src/components/wizard/Wizard.tsx:31
 msgid "Integrations"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:32
+#: admin/src/components/settings/Settings.tsx:33
 #: admin/src/components/steps/Step6Done.tsx:43
 msgid "Event Log"
 msgstr ""
 
 #. translators: %1$s is the target mode letter, %2$d is the number of credential sets.
-#: admin/src/components/settings/Settings.tsx:48
+#: admin/src/components/settings/Settings.tsx:49
 #, js-format
 msgid "Switching to Mode %1$s will discard the %2$d per-language credential set(s) you've configured. Continue?"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:95
+#: admin/src/components/settings/Settings.tsx:99
 msgid "Discard unsaved changes and reload from the server?"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:104
+#: admin/src/components/settings/Settings.tsx:111
 msgid "Smaily Connect — Settings"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:105
+#: admin/src/components/settings/Settings.tsx:112
 msgid "Manage your Smaily integration. Each tab saves independently."
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:117
+#: admin/src/components/settings/Settings.tsx:124
 msgid "Connect to Smaily first to unlock this tab."
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:122
+#: admin/src/components/settings/Settings.tsx:129
 msgid "Settings tabs"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:126
+#: admin/src/components/settings/Settings.tsx:133
 msgid "Smaily connection required"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:126
+#: admin/src/components/settings/Settings.tsx:133
 msgid "Subscribers, WooCommerce, and Campaign Intelligence are locked until your Smaily credentials authenticate. Fix the connection on the Connection tab to unlock them."
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:130
+#: admin/src/components/settings/Settings.tsx:137
 msgid "Save failed"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:131
+#: admin/src/components/settings/Settings.tsx:138
 msgid "Settings saved."
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:156
+#: admin/src/components/settings/Settings.tsx:163
 msgid "Discard changes"
 msgstr ""
 
-#: admin/src/components/settings/Settings.tsx:167
+#: admin/src/components/settings/Settings.tsx:174
 msgid "Save changes"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:24
+#: admin/src/components/steps/EngineAutomationsSection.tsx:196
 msgid "Active"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:24
+#: admin/src/components/steps/EngineAutomationsSection.tsx:196
 msgid "Off"
 msgstr ""
 
 #. translators: %s is the automation name, e.g. "welcome email".
+#. translators: %s is the automation name, e.g. "Replenishment due".
 #: admin/src/components/steps/AutomationSection.tsx:34
+#: admin/src/components/steps/EngineAutomationsSection.tsx:211
 #, js-format
 msgid "Enable %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:63
+#: admin/src/components/steps/EngineAutomationsSection.tsx:282
 msgid "Language"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:64
+#: admin/src/components/steps/EngineAutomationsSection.tsx:283
 msgid "Workflow"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:65
+#: admin/src/components/steps/EngineAutomationsSection.tsx:284
 msgid "Default fallback"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:120
+#: admin/src/components/steps/EngineAutomationsSection.tsx:359
 msgid "inactive"
 msgstr ""
 
 #. translators: %s is the error message.
 #: admin/src/components/steps/AutomationSection.tsx:154
+#: admin/src/components/steps/EngineAutomationsSection.tsx:333
 #, js-format
 msgid "Couldn't load workflows: %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:160
 #: admin/src/components/steps/AutomationSection.tsx:177
+#: admin/src/components/steps/EngineAutomationsSection.tsx:367
 msgid "Loading workflows…"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:160
 #: admin/src/components/steps/AutomationSection.tsx:177
+#: admin/src/components/steps/EngineAutomationsSection.tsx:367
 msgid "— pick a workflow —"
 msgstr ""
 
@@ -1316,6 +1356,7 @@ msgstr ""
 
 #. translators: %s is a locale code, e.g. en-US.
 #: admin/src/components/steps/AutomationSection.tsx:191
+#: admin/src/components/steps/EngineAutomationsSection.tsx:311
 #, js-format
 msgid "Mark %s as default fallback"
 msgstr ""
@@ -1329,7 +1370,7 @@ msgid "✓ Connected"
 msgstr ""
 
 #: admin/src/components/steps/CredentialBlock.tsx:47
-#: admin/src/components/steps/Step4Recommendations.tsx:173
+#: admin/src/components/steps/Step4Recommendations.tsx:194
 msgid "as"
 msgstr ""
 
@@ -1354,7 +1395,7 @@ msgid "API password"
 msgstr ""
 
 #: admin/src/components/steps/CredentialBlock.tsx:113
-#: admin/src/components/steps/Step4Recommendations.tsx:185
+#: admin/src/components/steps/Step4Recommendations.tsx:206
 msgid "Test connection"
 msgstr ""
 
@@ -1366,6 +1407,128 @@ msgstr ""
 
 #: admin/src/components/steps/CredentialBlock.tsx:120
 msgid "Connected to Smaily."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:37
+msgid "Engine-run recommendation automations"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:38
+msgid "Unlike the automations above, these are triggered by Smaily Campaign Intelligence — the engine enrols each contact into the Smaily workflow you pick at the moment it predicts (a replenishment running out, a customer at risk of churning). Your store only configures them here; sending happens engine-side."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:51
+msgid "Connect Campaign Intelligence to unlock"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:61
+msgid "Open Campaign Intelligence"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:65
+msgid "Replenishment reminders, win-back campaigns and other engine-run automations send themselves at the right moment for each customer — through your own Smaily workflows."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:70
+msgid "Connect Smaily Campaign Intelligence on the Campaign Intelligence tab to set them up."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:70
+msgid "You will connect Smaily Campaign Intelligence in the next step — this section unlocks right after."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:105
+msgid "No engine automations are available for your store yet. New triggers appear here automatically when the engine adds them."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:117
+msgid "Engine automations not saved"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:124
+msgid "Engine automations saved."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:155
+msgid "Loading engine automations…"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:167
+msgid "Campaign Intelligence rejected the stored API key"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:167
+msgid "The key was revoked or rotated. Disconnect and reconnect with a fresh setup link on the Campaign Intelligence tab, then come back here."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:173
+msgid "Couldn't load engine automations"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:196
+msgid "Test mode"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+msgid "Smaily templates guide"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:228
+msgid "Cooldown"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:236
+msgid "days"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:244
+msgid "Minimum days between two fires of this automation for the same customer (1–365)."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:262
+msgid "Smaily workflow"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:279
+msgid "Smaily workflow per language"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:346
+msgid "Workflow id, e.g. 123"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:350
+msgid "No active workflows found in Smaily — enter the workflow id manually or create the workflow first."
+msgstr ""
+
+#. translators: %s is the automation name, e.g. "Replenishment due".
+#: admin/src/components/steps/EngineAutomationsSection.tsx:387
+#, js-format
+msgid "Turn off test mode for \"%s\"? Once you save, the engine will start sending this automation to real customers. You can switch back to test mode at any time."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:404
+msgid "Live — real customers receive this automation once saved."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:405
+msgid "Back to test mode"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:410
+msgid "Test mode is on — emails go only to the test addresses below, never to customers."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:412
+msgid "Test addresses"
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:426
+msgid "Comma-separated, up to 50 addresses."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:429
+msgid "Activate for real…"
 msgstr ""
 
 #: admin/src/components/steps/RssFeedSection.tsx:29
@@ -1643,50 +1806,50 @@ msgstr ""
 msgid "Site title"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:12
+#: admin/src/components/steps/Step3WooCommerce.tsx:13
 msgid "Step 3 of 6"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:13
+#: admin/src/components/steps/Step3WooCommerce.tsx:14
 msgid "WooCommerce automations"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:14
+#: admin/src/components/steps/Step3WooCommerce.tsx:15
 msgid "Map each trigger to a Smaily workflow. Multi-language sites pick a workflow per language; single-language sites pick one workflow per trigger."
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:25
+#: admin/src/components/steps/Step3WooCommerce.tsx:26
 #: admin/src/components/steps/Step6Done.tsx:107
 msgid "Welcome email"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:26
+#: admin/src/components/steps/Step3WooCommerce.tsx:27
 msgid "Sent when a new contact subscribes (registration, created_customer, subscription-form)."
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:37
+#: admin/src/components/steps/Step3WooCommerce.tsx:38
 #: admin/src/components/steps/Step6Done.tsx:116
 msgid "First-order email"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:38
+#: admin/src/components/steps/Step3WooCommerce.tsx:39
 msgid "Sent the first time a customer completes an order (wc_get_customer_order_count === 1)."
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:49
+#: admin/src/components/steps/Step3WooCommerce.tsx:50
 #: admin/src/components/steps/Step6Done.tsx:125
 msgid "Abandoned-cart reminder"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:50
+#: admin/src/components/steps/Step3WooCommerce.tsx:51
 msgid "Fires when a cart has been idle for the cutoff time. Action Scheduler ticks every 15 minutes."
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:54
+#: admin/src/components/steps/Step3WooCommerce.tsx:55
 msgid "Cutoff time"
 msgstr ""
 
-#: admin/src/components/steps/Step3WooCommerce.tsx:68
+#: admin/src/components/steps/Step3WooCommerce.tsx:69
 msgid "Minimum 10 minutes. The cron job evaluates carts older than this."
 msgstr ""
 
@@ -1698,137 +1861,149 @@ msgstr ""
 msgid "Sync product, customer, and order data to Smaily Campaign Intelligence for personalised product recommendations in your campaigns. Optional — you can come back and set this up later."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:59
+#: admin/src/components/steps/Step4Recommendations.tsx:30
+msgid "Engine connected — now wire up the engine-run recommendation automations"
+msgstr ""
+
+#: admin/src/components/steps/Step4Recommendations.tsx:38
+msgid "Back to Step 3"
+msgstr ""
+
+#: admin/src/components/steps/Step4Recommendations.tsx:41
+msgid "Replenishment and win-back automations are configured in Step 3 (WooCommerce automations), below the store-run triggers."
+msgstr ""
+
+#: admin/src/components/steps/Step4Recommendations.tsx:80
 msgid "Connect Smaily Campaign Intelligence"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:61
+#: admin/src/components/steps/Step4Recommendations.tsx:82
 msgid "Paste the setup URL from your Smaily admin → Recommendations. The link looks like"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:65
+#: admin/src/components/steps/Step4Recommendations.tsx:86
 msgid "and is single-use — once accepted, the engine generates a long-lived API key the plugin stores encrypted on this site."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:68
+#: admin/src/components/steps/Step4Recommendations.tsx:89
 msgid "Setup URL"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:94
-#: admin/src/components/wizard/Wizard.tsx:19
+#: admin/src/components/steps/Step4Recommendations.tsx:115
+#: admin/src/components/wizard/Wizard.tsx:20
 msgid "Connect"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:108
+#: admin/src/components/steps/Step4Recommendations.tsx:129
 msgid "Regenerate the link"
 msgstr ""
 
 #. translators: 1: engine version, 2: tenant status.
-#: admin/src/components/steps/Step4Recommendations.tsx:132
+#: admin/src/components/steps/Step4Recommendations.tsx:153
 #, js-format
 msgid "Engine v%1$s responded — tenant status: %2$s."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:134
+#: admin/src/components/steps/Step4Recommendations.tsx:155
 msgid "active"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:144
+#: admin/src/components/steps/Step4Recommendations.tsx:165
 msgid "Disconnect Smaily Campaign Intelligence? The plugin will stop syncing data; existing campaigns on the engine side continue to work until you remove them there."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:155
+#: admin/src/components/steps/Step4Recommendations.tsx:176
 msgid "Disconnected."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:165
+#: admin/src/components/steps/Step4Recommendations.tsx:186
 msgid "Engine connection"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:170
+#: admin/src/components/steps/Step4Recommendations.tsx:191
 msgid "Connected"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:188
+#: admin/src/components/steps/Step4Recommendations.tsx:209
 msgid "Disconnect"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:203
+#: admin/src/components/steps/Step4Recommendations.tsx:224
 msgid "Data synchronisation"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:204
+#: admin/src/components/steps/Step4Recommendations.tsx:225
 msgid "While connected, the engine learns from your joined order, customer, and product data — all three sync automatically."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:209
+#: admin/src/components/steps/Step4Recommendations.tsx:230
 msgid "Syncing starts as soon as you connect and runs in the background — there's nothing to switch on per data type. Use"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:214
-#: admin/src/components/steps/Step4Recommendations.tsx:226
+#: admin/src/components/steps/Step4Recommendations.tsx:235
+#: admin/src/components/steps/Step4Recommendations.tsx:247
 msgid "Import existing data"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:216
+#: admin/src/components/steps/Step4Recommendations.tsx:237
 msgid "below to seed history into the engine; future changes sync on their own. Browsing telemetry is the one exception — it's opt-in and configured separately below."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:227
+#: admin/src/components/steps/Step4Recommendations.tsx:248
 msgid "The toggles above sync future changes. Import your existing catalog, customers, and orders into the engine once so recommendations have history to learn from. Runs in the background in batches."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:236
+#: admin/src/components/steps/Step4Recommendations.tsx:257
 msgid "Products"
 msgstr ""
 
 #. translators: %d: number of detected languages.
-#: admin/src/components/steps/Step4Recommendations.tsx:240
+#: admin/src/components/steps/Step4Recommendations.tsx:261
 #, js-format
 msgid "Counts one entry per language (%d detected). Translations are merged into a single product during import, so the synced total will be lower."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:252
+#: admin/src/components/steps/Step4Recommendations.tsx:273
 msgid "Customers"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:260
+#: admin/src/components/steps/Step4Recommendations.tsx:281
 msgid "Orders"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:270
+#: admin/src/components/steps/Step4Recommendations.tsx:291
 msgid "Browsing telemetry"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:271
+#: admin/src/components/steps/Step4Recommendations.tsx:292
 msgid "Tracks product / category views to power 'similar products' recommendations."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:282
+#: admin/src/components/steps/Step4Recommendations.tsx:303
 msgid "Track browsing behaviour"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:283
+#: admin/src/components/steps/Step4Recommendations.tsx:304
 msgid "Requires marketing consent (WP Consent API / Cookiebot / Complianz / CookieYes)."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:289
+#: admin/src/components/steps/Step4Recommendations.tsx:310
 msgid "Browsing telemetry only fires when the visitor has granted marketing consent. If your site doesn't have a consent banner installed, the beacon won't collect events."
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:301
+#: admin/src/components/steps/Step4Recommendations.tsx:322
 msgid "Setup URL not recognised"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:303
+#: admin/src/components/steps/Step4Recommendations.tsx:324
 msgid "Setup link already used"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:305
+#: admin/src/components/steps/Step4Recommendations.tsx:326
 msgid "Setup link not found"
 msgstr ""
 
-#: admin/src/components/steps/Step4Recommendations.tsx:308
+#: admin/src/components/steps/Step4Recommendations.tsx:329
 msgid "Engine unreachable"
 msgstr ""
 
@@ -2026,51 +2201,55 @@ msgstr ""
 msgid "Wizard steps"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:19
+#: admin/src/components/wizard/Wizard.tsx:20
 msgid "Smaily credentials"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:22
+#: admin/src/components/wizard/Wizard.tsx:23
 msgid "Field mapping + backfill"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:26
+#: admin/src/components/wizard/Wizard.tsx:27
 msgid "Automation triggers"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:28
+#: admin/src/components/wizard/Wizard.tsx:29
 msgid "Optional"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:31
+#: admin/src/components/wizard/Wizard.tsx:32
 msgid "Elementor / CF7 / Blocks"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:33
+#: admin/src/components/wizard/Wizard.tsx:34
 msgid "Done"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:33
+#: admin/src/components/wizard/Wizard.tsx:34
 msgid "Summary + finish"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:49
+#: admin/src/components/wizard/Wizard.tsx:50
 msgid "Complete Step 1 (Connect) first."
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:64
+#: admin/src/components/wizard/Wizard.tsx:65
 #: admin/src/hooks/useSaveSettings.tsx:77
 msgid "Save failed."
 msgstr ""
 
 #. translators: %1$s is the settings tab key, %2$s is the error detail.
-#: admin/src/components/wizard/Wizard.tsx:68
-#: admin/src/components/wizard/Wizard.tsx:77
+#: admin/src/components/wizard/Wizard.tsx:69
+#: admin/src/components/wizard/Wizard.tsx:78
 #, js-format
 msgid "Couldn’t save %1$s: %2$s"
 msgstr ""
 
-#: admin/src/components/wizard/Wizard.tsx:183
+#: admin/src/components/wizard/Wizard.tsx:98
+msgid "Couldn't save the engine-run automations — see that section below for details."
+msgstr ""
+
+#: admin/src/components/wizard/Wizard.tsx:198
 msgid "Test your Smaily connection to continue."
 msgstr ""
 
@@ -2109,6 +2288,42 @@ msgstr ""
 
 #: admin/src/hooks/useWorkflows.tsx:62
 msgid "Failed to load workflows"
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:59
+msgid "Workflow id must be a numeric string."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:64
+msgid "Pick a workflow before enabling this automation."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:69
+msgid "Mark one language as the default fallback before enabling."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:74
+msgid "Cooldown must be between 1 and 365 days."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:77
+msgid "At most 50 test addresses are allowed."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:85
+msgid "Invalid email address."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:138
+msgid "Fix the highlighted fields, then save again."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:158
+msgid "The engine rejected the configuration — nothing was saved. Fix the highlighted fields and save again."
+msgstr ""
+
+#: admin/src/state/engine-automations.tsx:170
+msgid "The engine rejected the stored API key — reconnect Campaign Intelligence, then save again."
 msgstr ""
 
 #: blocks/checkout-optin/src/block.json
