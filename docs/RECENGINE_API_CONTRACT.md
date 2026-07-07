@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.0
+# Smaily Recommendation Engine — API Contract v1.1
 
-**Version**: 1.0.1
+**Version**: 1.1.0
 **Published**: 2026-05-19
-**Last updated**: 2026-06-16 (production domain → intelligence.smaily.com; tri-repo sync)
+**Last updated**: 2026-07-07 (v1.1.0 — automations config API, §11–§13; MINOR bump per the versioning rule: new endpoints)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -53,6 +53,9 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [GET /api/v1/customer/{email}/export](#8-get-apiv1customeremailexport)
    - [DELETE /api/v1/customer/{email}](#9-delete-apiv1customeremail)
    - [POST /api/v1/customer/{email}/opt-out](#10-post-apiv1customeremailopt-out)
+   - [GET /api/v1/automations/catalog](#11-get-apiv1automationscatalog)
+   - [GET /api/v1/automations/config](#12-get-apiv1automationsconfig)
+   - [PUT /api/v1/automations/config](#13-put-apiv1automationsconfig)
 9. [Appendices](#appendices)
 
 ---
@@ -215,7 +218,7 @@ Every error response contains JSON:
 }
 ```
 
-> **`request_id` scope**: a `request_id` (`req_…` UUID, useful for support tickets) is currently emitted **only by `/api/setup/exchange`** responses — see §1. The v1 ingest, customer/GDPR, and identity endpoints do **not** emit `request_id`; their error bodies are `{error, message?, details?}` only. Do not depend on `request_id` outside setup/exchange.
+> **`request_id` scope**: a `request_id` (`req_…` UUID, useful for support tickets) is currently emitted **only by `/api/setup/exchange`** responses — see §1. The v1 ingest, customer/GDPR, identity, and automations endpoints do **not** emit `request_id`; their error bodies are `{error, message?, details?}` only. Do not depend on `request_id` outside setup/exchange. (Exception on the error-body shape: `PUT /api/v1/automations/config` returns its validation errors in a top-level `errors[]` array instead of `details` — see §13.)
 
 ### Validation error example
 
@@ -259,6 +262,7 @@ HTTP 400 Bad Request
 | `/api/v1/ingest/customers` | 100 requests | per 1 second |
 | `/api/v1/ingest/orders` | 100 requests | per 1 second |
 | `/api/v1/identity/merge` | 100 requests | per 1 second |
+| `/api/v1/automations/...` | 100 requests | per 1 second |
 | `/api/v1/customer/...` (GDPR) | 10 requests | per 60 seconds |
 | `/api/setup/exchange` | 10 requests | per 60 seconds (per IP) |
 
@@ -420,7 +424,9 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
     "customer_delete":   "https://intelligence.smaily.com/api/v1/customer/{email}",
     "customer_opt_out":  "https://intelligence.smaily.com/api/v1/customer/{email}/opt-out",
     "recommendations_preview": "https://intelligence.smaily.com/api/v1/recommendations/preview",
-    "recommendations_issue":   "https://intelligence.smaily.com/api/v1/recommendations/issue"
+    "recommendations_issue":   "https://intelligence.smaily.com/api/v1/recommendations/issue",
+    "automations_catalog":     "https://intelligence.smaily.com/api/v1/automations/catalog",
+    "automations_config":      "https://intelligence.smaily.com/api/v1/automations/config"
   },
   "config": {
     "tracking_cookie_name": "smaily_rec_uid",
@@ -443,7 +449,9 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
 }
 ```
 
-**Endpoint map convention**: keys use `ingest_*`, `identity_*`, `customer_*`, `recommendations_*` prefixes for the categories. Plugin code should read endpoint URLs from this map (`endpoints[ingest_catalog]`) rather than concatenating base URL + hardcoded paths. This way, future path migrations on the engine side don't require plugin updates — only the setup-response map changes.
+**Endpoint map convention**: keys use `ingest_*`, `identity_*`, `customer_*`, `recommendations_*`, `automations_*` prefixes for the categories. Plugin code should read endpoint URLs from this map (`endpoints[ingest_catalog]`) rather than concatenating base URL + hardcoded paths. This way, future path migrations on the engine side don't require plugin updates — only the setup-response map changes.
+
+> **Map age**: a connection keeps the endpoints map it received at exchange time. Connections established before a key existed (e.g. the `automations_*` keys, added v1.1.0) won't have it in their stored map — the plugin ships fallback path constants for exactly this case (the existing `resolve_url()` pattern). New keys serve future path migrations, not retroactive updates.
 
 **Response 410 Gone** (token expired or used):
 ```json
@@ -1325,6 +1333,232 @@ GDPR opt-out: data is retained, but the customer is excluded from future recomme
 
 ---
 
+### 11. GET /api/v1/automations/catalog
+
+**Engine-triggered automations** (added v1.1.0): the engine can enrol a Smaily contact into a merchant-built Smaily automation workflow at the right moment (replenishment due, win-back, etc.). The plugin's role is **configuration only** — it renders the trigger catalog (this endpoint), lets the merchant bind each trigger to a Smaily workflow id, and saves the selection to the engine (§13). Execution never goes through the plugin. **Fail-closed rule**: a trigger the merchant has not enabled never fires; the plugin must never send `enabled=true` without an explicit merchant action, and `test_mode` defaults to on in the UI.
+
+Returns the automation triggers available **for this store**. The list is filtered by the tenant's sector (`tenants.industry`) — e.g. the `life_stage` trigger is only served to `pet` tenants; a tenant in another industry does not see it. **Render the list dynamically**: a new trigger appears with an engine deploy and must not require a plugin release. Do not hardcode trigger keys or assume a fixed count.
+
+**URL**: `GET /api/v1/automations/catalog`
+
+**Auth**: `Authorization: Bearer sk_...` (the same tenant API key as ingest — no separate credential)
+
+**Rate limit**: 100 req/sec (the `rate_limit_other` default, same as ingest)
+
+**Response 200 OK**:
+```json
+{
+  "triggers": [
+    {
+      "key": "replenish_due",
+      "name_et": "Taastäitumine",
+      "name_en": "Replenishment due",
+      "description_et": "Käivitub, kui kliendi korduvtoode hakkab ennustuse järgi otsa saama (85% isiklikust ostuintervallist täis).",
+      "description_en": "Fires when a customer's recurring product is predicted to run out (85% of their personal purchase interval reached).",
+      "recipe_et": "Ehita Smailys \"form submitted\" trigeriga automatsioon, mille kiri kasutab rec_replenish_sku + soovitusslotte. Mootor enrollib kontakti õigel päeval."
+    }
+  ],
+  "language_modes": ["single", "per_language"],
+  "docs": "https://intelligence.smaily.com/docs/en/smaily-templates"
+}
+```
+
+**Field reference** (per `triggers[]` item):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `key` | string | Stable machine key — the natural key for config rows (§12/§13). |
+| `name_et` / `name_en` | string | Localized display name. |
+| `description_et` / `description_en` | string | Localized merchant-facing description (when the trigger fires). |
+| `recipe_et` | string | Recipe for the merchant: what the Smaily automation must contain. Currently Estonian-only (no `recipe_en` yet). |
+
+**Top-level fields**:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `triggers` | array | Sector-filtered trigger list (may grow/shrink per deploy — render dynamically). |
+| `language_modes` | array of strings | The closed set of valid `language_mode` values for §13. Currently `["single", "per_language"]`. |
+| `docs` | string (URL) | Help page ("Smaily templates and fields") for the merchant. **This field is stable** — the plugin should link to the URL from the response rather than hardcoding it. |
+
+**Error responses**: `401` (invalid/revoked key — see [Authentication](#authentication)), `429` (see [Rate limiting](#rate-limiting)).
+
+**Idempotency**: not applicable (read-only endpoint).
+
+**Curl example**:
+```bash
+curl -X GET https://intelligence.smaily.com/api/v1/automations/catalog \
+  -H "Authorization: Bearer sk_..."
+```
+
+---
+
+### 12. GET /api/v1/automations/config
+
+Returns the tenant's current automation configuration rows — whether configured via the plugin (§13) or engine-side by the operator. Used when (re-)opening the plugin's settings UI: **the engine's GET is the source of truth**; the plugin must not treat a local copy as authoritative (a local cache is fine).
+
+**URL**: `GET /api/v1/automations/config`
+
+**Auth**: `Authorization: Bearer sk_...`
+
+**Rate limit**: 100 req/sec
+
+**Response 200 OK**:
+```json
+{
+  "configs": [
+    {
+      "trigger_key": "replenish_due",
+      "enabled": false,
+      "language_mode": "single",
+      "automation_map": { "id": "123" },
+      "cooldown_days": 7,
+      "daily_cap": null,
+      "test_mode": true,
+      "test_emails": ["owner@shop.example"],
+      "configured_via": "plugin",
+      "updated_at": "2026-07-07T05:15:00.000Z"
+    }
+  ]
+}
+```
+
+- **Rows exist only for triggers that have been configured at least once.** A catalog trigger with no config row is simply off (fail-closed) — `configs` may be an empty array on a fresh tenant.
+- Each row carries the eight §13 fields **plus two read-only informational fields**:
+  - `configured_via` (`"plugin"` | `"admin"`) — which surface last wrote the row.
+  - `updated_at` (ISO 8601, may carry milliseconds) — when the row was last written.
+- **Do not round-trip the read-only fields**: `configured_via` and `updated_at` are set engine-side and are NOT part of the PUT body (§13). They are tolerated if sent (unknown keys are stripped, see the §13 note), but the engine always overwrites them itself.
+
+**Error responses**: `401`, `429`.
+
+**Idempotency**: not applicable (read-only endpoint).
+
+**Curl example**:
+```bash
+curl -X GET https://intelligence.smaily.com/api/v1/automations/config \
+  -H "Authorization: Bearer sk_..."
+```
+
+---
+
+### 13. PUT /api/v1/automations/config
+
+Saves the merchant's automation configuration. **Full-selection upsert**: the plugin sends every row the user saw/edited in one PUT (the entire settings form, not a delta of the changed toggle).
+
+**URL**: `PUT /api/v1/automations/config`
+
+**Auth**: `Authorization: Bearer sk_...`
+
+**Rate limit**: 100 req/sec
+
+**Request body**:
+```json
+{
+  "configs": [
+    {
+      "trigger_key": "replenish_due",
+      "enabled": true,
+      "language_mode": "single",
+      "automation_map": { "id": "123" },
+      "cooldown_days": 7,
+      "daily_cap": null,
+      "test_mode": true,
+      "test_emails": ["owner@shop.example"]
+    }
+  ]
+}
+```
+
+**Wrapper**: `{configs: [...]}`, **1..50 rows** per request. A non-array / empty / >50 `configs` is rejected (422, wrapper-level error — see below).
+
+**Field reference** (per config row — **all 8 keys are REQUIRED on every row**; no field has a server-side default):
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `trigger_key` | string | YES | Must be a catalog key (§11). An unknown key → 422 (`"tundmatu trigger"`). Natural key for the `(tenant_id, trigger_key)` UPSERT. |
+| `enabled` | boolean | YES | Fail-closed master switch. The plugin must never send `true` without an explicit merchant action. |
+| `language_mode` | `"single"` \| `"per_language"` | YES | Must be one of the catalog's `language_modes` (§11). |
+| `automation_map` | object `{string: string}` | YES | Smaily workflow/autoresponder ids. **Every value must be a numeric string** (`/^\d+$/`) — e.g. `"123"`, not `123` or `"abc"`. Keys are free-form: `"id"` (single mode), language codes + `"fallback"` (per_language mode). When `enabled=true`: `single` requires the `id` key; `per_language` requires the `fallback` key (422 otherwise). When `enabled=false` the map may be empty `{}` — but the key itself must be present. |
+| `cooldown_days` | integer 1–365 | YES | Minimum days between fires per customer per trigger. **Required even on `enabled=false` rows** (no server default — the plugin supplies its UI default, e.g. 7). |
+| `daily_cap` | integer 1–100000 \| null | YES (nullable) | Max fires per day for this trigger. **Nullable but the key must be present** — `null` = no cap. |
+| `test_mode` | boolean | YES | When true, fires only reach `test_emails` recipients. UI default: true (fail-closed). |
+| `test_emails` | array of email strings, max 50 | YES | May be empty `[]`. Each entry must be a valid email. |
+
+> **Unknown keys are stripped, not rejected** (standard Zod object behavior): extra keys in a row — including round-tripped `configured_via` / `updated_at` from §12 — are silently ignored. Cleaner to not send them.
+
+**Semantics**:
+- **UPSERT by `(tenant_id, trigger_key)`** — a row in the body creates or fully replaces that trigger's config.
+- **PUT never deletes rows**: a trigger absent from the body keeps its stored config unchanged (and if it was never configured, it stays off). There is no delete operation — to disable a trigger, send its row with `enabled: false`.
+- `configured_via` is written as `'plugin'` on every row this endpoint touches (the engine-side admin UI writes `'admin'`).
+- **Validation is all-or-nothing** (unlike ingest's per-item D6 partial success): any invalid row → 422 and **nothing** is written. Retry with the whole corrected selection.
+
+**Response 200 OK**:
+```json
+{
+  "ok": true,
+  "upserted": 4
+}
+```
+
+`upserted` = number of rows written (equals `configs.length`).
+
+**Response 400** (body is not valid JSON): `{"error": "invalid_json"}` — note: no `message`/`details`.
+
+**Response 422 validation_failed** (indexed, D6-style — added v1.1.0; the earlier Zod-`flatten()` `details` shape is gone):
+```json
+{
+  "error": "validation_failed",
+  "errors": [
+    {
+      "index": 0,
+      "trigger_key": "replenish_due",
+      "field": "automation_map",
+      "message": "automation_map.fallback on nõutav"
+    },
+    {
+      "index": 2,
+      "field": "test_emails.1",
+      "message": "Invalid email"
+    }
+  ]
+}
+```
+
+**Error object shape**: `{index?, trigger_key?, field, message}`:
+- `index` — the row's position in `configs[]`.
+- `trigger_key` — included when readable from the request body (helps the UI map the error to a row).
+- `field` — path **within** the config row: `"automation_map"`, `"automation_map.fallback"`, `"test_emails.2"`, `"cooldown_days"`, … (`"unknown"` if the row itself is not an object).
+- `message` — human-readable. **Messages may be Estonian** for the merchant-facing custom checks (`"tundmatu trigger"`, `"automation_map.id on nõutav"`, `"automation_map.fallback on nõutav"`, `"automatsiooni id peab olema number"`); structural Zod messages are English (`"Required"`, `"Invalid email"`).
+- **Wrapper-level failures** (non-array / empty / >50 `configs`) use the same 422 shape but the error entry has **no `index`** and `field: "configs"`.
+
+Multiple issues produce multiple entries (one per issue), so the plugin can bind every error to its field. This mirrors the ingest D6 `errors[]` pattern (`{index, <natural_key>?, field, message}`) — but remember the all-or-nothing note above: a 422 here means the whole PUT was rejected, not a partial success.
+
+**Other error responses**: `401`, `429` (with `Retry-After` header + `retry_after_seconds` body field — see [Rate limiting](#rate-limiting)).
+
+**Idempotency**: natural-key UPSERT on `(tenant_id, trigger_key)` (Layer 1 only — there is no `event_id` layer). Repeating the same PUT is a harmless no-op update.
+
+**Curl example**:
+```bash
+curl -X PUT https://intelligence.smaily.com/api/v1/automations/config \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "configs": [
+      {
+        "trigger_key": "replenish_due",
+        "enabled": true,
+        "language_mode": "single",
+        "automation_map": {"id": "123"},
+        "cooldown_days": 7,
+        "daily_cap": null,
+        "test_mode": true,
+        "test_emails": ["owner@shop.example"]
+      }
+    ]
+  }'
+```
+
+---
+
 ## Appendices
 
 ### Appendix A: Pagination (future)
@@ -1486,6 +1720,12 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **§8 GDPR export `consent.*` removed** — the engine does not store consent (W4 dropped it; Smaily owns it); a `consent` object in the export example was misleading for a compliance reader. Added an explicit "consent is not exported" note.
 - **§8 export example replaced with the real curl-verified body** — confirmed **email-only identity** (no `smaily_contact_id`); dropped the non-existent `rec_attribution` array and its retention-policy line (the engine's export omits attribution); `order_items` documented as a **top-level** array (not nested under `orders`); added `visitor_tokens`; `customer` shown as the full row. Empty-data example aligned to the real top-level keys.
 - After this pass the spec is reconciled doc-wide: no response example shows `request_id` as emitted outside setup/exchange, and no `consent.*` / `smaily_contact_id` survives where it would mislead.
+
+**v1.1.0** (2026-07-07) — **Automations config API (T2)**. MINOR bump per the [Versioning](#versioning) rule (new endpoints; backward-compatible — nothing existing changed shape):
+- **Three new endpoints, §11–§13**: `GET /api/v1/automations/catalog` (sector-filtered trigger catalog + `language_modes` + stable `docs` help URL), `GET /api/v1/automations/config` (current rows incl. read-only `configured_via` + `updated_at`), `PUT /api/v1/automations/config` (full-selection UPSERT, 1..50 rows, all 8 row fields required, `configured_via='plugin'`, never deletes rows). Auth = the same tenant API key as ingest; rate limit = 100 req/s (`rate_limit_other`; the `/api/v1/automations/` prefix is now registered in the limiter — previously the routes' limit checks were no-ops because the prefix was missing, so the documented 429 could never fire).
+- **Setup-exchange endpoints map gains `automations_catalog` + `automations_config`** (new `automations_*` prefix in the map convention). Existing connections keep their exchange-time map without these keys — the plugin's fallback path constants cover that (see the "Map age" note in §1).
+- **PUT 422 shape is now indexed, D6-style**: `{error: "validation_failed", errors: [{index?, trigger_key?, field, message}]}` — replaces the Zod `flatten()` `details` object, which collapsed every row error under one `fieldErrors.configs` key and made field-level display impossible. Wrapper-level failures return `field: "configs"` with no `index`. Unlike ingest D6, validation is **all-or-nothing** (422 = nothing written). Engine commit `c16377e`.
+- This resolves the plugin-team T2 gap brief (`CODE_BRIEF_T2_automations_contract_gaps.md`): §11–§13 document live behavior (`app/api/v1/automations/*`, `lib/automations/config-schema.ts`), verified against code, not the plan.
 
 ---
 
