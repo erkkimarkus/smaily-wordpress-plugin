@@ -56,7 +56,11 @@ confirm before switching test mode off"; walk proves the test_mode=true round-tr
 (confirm dialog in browser = manual pilot check); (7) missing/bad key → clear error — walk
 `invalid_key_401` + unit 401→502 `api_key_rejected` mapping + vitest key-rejected banner.
 The brief's final acceptance leg — test address receives the email on the nightly engine
-run — is engine-side, NOT plugin-provable: manual pilot check. Prior same day:
+run — is engine-side, NOT plugin-provable: manual pilot check. **Security re-audit on the
+T2 surface run same day** (`docs/audits/2026-07-07-SECURITY_RE_AUDIT_T2_AUTOMATIONS.md` +
+INDEX row): 0 Critical/High/Medium; 1 Low FIXED in the pass (engine-origin `docs` URL now
+scheme-guarded `isHttpUrl()` before rendering as an anchor href); 3 Info accepted; also
+swept the un-registered F3-49/F3-50 delta — clean. Prior same day:
 **OrderBackfill full-suite flake RESOLVED — stale live-walk
 order residue, NOT cross-test state.** The 3 recurring `RecEngineOrderBackfillTest` count
 failures (+1 on every order count) were caused by ONE order sitting in the dev wp-env

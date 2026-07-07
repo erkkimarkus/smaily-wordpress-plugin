@@ -338,10 +338,15 @@ function TriggerCard({
       {/* Recipe — what the Smaily-side automation must contain. Estonian-only
           in the catalog (no recipe_en yet), shown to everyone. */}
       <div className="rounded border border-border-subtle bg-surface-soft px-3 py-2 text-sm text-text-secondary">
-        {trigger.recipe_et}{' '}
-        <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="underline">
-          { __( 'Smaily templates guide', 'smaily-connect' ) }
-        </a>
+        {trigger.recipe_et}
+        {isHttpUrl(docsUrl) && (
+          <>
+            {' '}
+            <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="underline">
+              { __( 'Smaily templates guide', 'smaily-connect' ) }
+            </a>
+          </>
+        )}
       </div>
 
       <div className="mt-4">
@@ -738,4 +743,15 @@ function isEstonianAdminLocale(): boolean {
 
 function humaniseLocale(locale: string): string {
   return locale.replace(/_/g, '-');
+}
+
+/**
+ * The docs link href comes from the engine's §11 response. The engine is
+ * an authenticated TLS peer, but an anchor href is a scheme-sensitive
+ * sink (`javascript:` would execute in wp-admin) — so only render the
+ * link for plain http(s) URLs. Defense-in-depth, not a distrust of the
+ * engine (2026-07-07 T2 security pass, LOW-1).
+ */
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
 }
