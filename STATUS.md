@@ -26,7 +26,22 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**T2.3 — automations live-walk GREEN against the real engine
+_Last updated: 2026-07-07 (**v3.4.0 RELEASED — engine-run automations settings (T2) GA.**
+Release gate on top of the T2.3 live-walk + T2 security re-audit (both below, same day):
+version bumped in all six places (plugin header/constants, package.json, readme.txt stable
+tag + changelog + upgrade notice, ConstantsTest, both test bootstraps), committed BEFORE the
+build → clean build-hash `aa42ce6`; ci:strict exit=0 (PHPUnit unit 474, PHPCS 0 errors,
+PHPStan clean, vitest 208, tsc/eslint clean); admin+client+blocks rebuilt; i18n artifacts
+current from the T2.2 build-i18n run (no admin-string changes since — skip per CLAUDE.md);
+prod-vendor ZIP built + verified (v3.4.0 everywhere, required files present incl.
+`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`, `blocks/*/build`, `vendor/autoload.php`,
+`composer.json`, `languages/*.mo` + admin-bundle JSON; tests/docs/node_modules/admin-src/
+dev-vendor absent; ~1.05 MB); **PCP against the BUILT ZIP clean except the single intentional
+`plugin_updater_detected`** (Update URI clobber-guard, F3-35 — note the old `(BETA)` name
+finding is gone since GA). GH release `v3.4.0` on the fork (normal release, no prerelease),
+ZIP attached. No integration full-suite run in this pass (would scrub the sandbox connection;
+PHP delta since the T2.1-gated suite is zero). Prior same day:
+**T2.3 — automations live-walk GREEN against the real engine
 (sandbox).** Dev wp-env re-connected via secret-safe STDIN exchange — the stale connection
 still pointed at PRODUCTION MiuMjau (the exact CLAUDE.md trap); now `tenant_name="Smaily
 Connect test"`, verified before any traffic. New `bin/walk-t2-automations.cjs` (tenant
