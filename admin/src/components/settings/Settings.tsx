@@ -10,6 +10,7 @@ import {
 import { useSaveSettings } from '../../hooks/useSaveSettings';
 import { actionToTab } from '../../state/action-to-tab';
 import { buildTabPayload } from '../../state/buildTabPayload';
+import { saveEngineAutomations } from '../../state/engine-automations';
 import {
   buildSettingsInitialState,
   type ServerEnv,
@@ -168,6 +169,17 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
     }
     const payload = buildTabPayload(rawState, activeTab);
     void save({ tab: activeTab, data: payload });
+
+    // The engine-run automations section (T2.2) joins the WooCommerce
+    // tab's Save: TWO parallel requests — the local POST above plus a
+    // PUT through the rec-engine proxy when the engine slice is dirty.
+    // The outcomes are independent on purpose: if only the PUT fails,
+    // the local half is saved, the engine slice stays dirty and its
+    // error renders inside the section — the merchant loses neither
+    // half (F3-52).
+    if (activeTab === 'woocommerce' && rawState.engineAutomations.dirty) {
+      void saveEngineAutomations(rawState.engineAutomations.rows, rawDispatch);
+    }
   }, [activeTab, rawState, save]);
 
   const handleDiscard = useCallback((): void => {
@@ -184,6 +196,13 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
     activeTab !== 'integrations' && activeTab !== 'finish' && activeTab !== 'events'
       ? rawState.dirtyTabs[activeTab]
       : false;
+
+  // The engine-automations slice keeps its own dirty bit (a partial
+  // save failure must leave only the engine section dirty, F3-52); the
+  // WooCommerce tab's footer ORs it in so Save lights up for either half.
+  const engineDirty = activeTab === 'woocommerce' && rawState.engineAutomations.dirty;
+  const enginePending = rawState.engineAutomations.saveStatus === 'pending';
+  const canSaveOrDiscard = tabIsDirty || engineDirty;
 
   return (
     <div className="min-h-screen bg-page-bg font-sans text-text-primary">
@@ -206,7 +225,8 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
                   t.value !== 'integrations' &&
                   t.value !== 'finish' &&
                   t.value !== 'events' &&
-                  rawState.dirtyTabs[t.value]
+                  (rawState.dirtyTabs[t.value] ||
+                    (t.value === 'woocommerce' && rawState.engineAutomations.dirty))
                     ? '•'
                     : undefined,
                 disabled: isLocked,
@@ -270,7 +290,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
               variant="ghost"
               type="button"
               onClick={handleDiscard}
-              disabled={!tabIsDirty}
+              disabled={!canSaveOrDiscard}
             >
               {__('Discard changes', 'smaily-connect')}
             </Button>
@@ -278,8 +298,8 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
               variant="primary"
               type="button"
               onClick={handleSave}
-              disabled={!tabIsDirty}
-              loading={saveStatus === 'pending'}
+              disabled={!canSaveOrDiscard}
+              loading={saveStatus === 'pending' || enginePending}
             >
               {__('Save changes', 'smaily-connect')}
             </Button>

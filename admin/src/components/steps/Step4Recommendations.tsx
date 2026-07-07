@@ -63,6 +63,33 @@ export function Step4Recommendations({
         </div>
       )}
 
+      {/* Wizard-only pointer back to Step 3 (T2.2): the engine-run
+          automations section lives under the WooCommerce automations,
+          which the merchant walked past BEFORE connecting the engine
+          here — so a successful connection offers the way back. Uses
+          the existing WIZARD_GO_TO_STEP navigation. */}
+      {!inSettings && isConnected && (
+        <Banner
+          tone="success"
+          title={__('Engine connected — now wire up the engine-run recommendation automations', 'smaily-connect')}
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => dispatch({ type: 'WIZARD_GO_TO_STEP', payload: { step: 3 } })}
+            >
+              {__('Back to Step 3', 'smaily-connect')}
+            </Button>
+          }
+        >
+          {__(
+            'Replenishment and win-back automations are configured in Step 3 (WooCommerce automations), below the store-run triggers.',
+            'smaily-connect',
+          )}
+        </Banner>
+      )}
+
       {isConnected ? (
         <ConnectedView state={state} dispatch={dispatch} />
       ) : (

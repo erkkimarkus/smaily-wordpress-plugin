@@ -2,6 +2,7 @@ import { useReducer, useState } from 'react';
 
 import { saveSettings } from '../../api/saveSettings';
 import { buildTabPayload } from '../../state/buildTabPayload';
+import { saveEngineAutomations } from '../../state/engine-automations';
 import { wizardReducer } from '../../state/wizard-reducer';
 import { type SettingsTabKey, type WizardState } from '../../state/types';
 import { __, sprintf } from '@admin/lib/i18n';
@@ -120,11 +121,34 @@ export function Wizard({ initialState }: WizardProps): React.JSX.Element {
   // Each Continue persists the step's payload before navigating.
   // Step 5 (Integrations) is info-only — Continue navigates without
   // a save. Step 6 is the Finish action, not Continue.
+  //
+  // Step 3 additionally saves the engine-run automations draft (T2.2)
+  // through the rec-engine proxy, in parallel with the local POST —
+  // the same two-request split the Settings sticky footer does
+  // (F3-52). Either failure keeps the merchant on the step; an engine
+  // failure renders inside the section (all-or-nothing §13, the slice
+  // stays dirty) so nothing is silently lost.
   const handleContinue = async (): Promise<void> => {
     const tab = stepToTab(state.currentStep);
-    const ok = await saveAndAdvance(tab);
-    if (!ok) {
+    const needsEngineSave = state.currentStep === 3 && state.engineAutomations.dirty;
+    const [localOk, engineOk] = await Promise.all([
+      saveAndAdvance(tab),
+      needsEngineSave
+        ? saveEngineAutomations(state.engineAutomations.rows, dispatch)
+        : Promise.resolve(true),
+    ]);
+    if (!localOk) {
       // Stay on the current step so the merchant can correct or retry.
+      return;
+    }
+    if (!engineOk) {
+      setNavStatus('error');
+      setNavError(
+        __(
+          "Couldn't save the engine-run automations — see that section below for details.",
+          'smaily-connect',
+        ),
+      );
       return;
     }
     dispatch({ type: 'WIZARD_NEXT_STEP' });

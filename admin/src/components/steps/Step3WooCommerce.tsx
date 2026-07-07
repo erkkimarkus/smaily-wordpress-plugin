@@ -4,6 +4,7 @@ import { __ } from '@admin/lib/i18n';
 import { type WizardAction, type WizardState } from '../../state/types';
 import { Label, NumberInput } from '../primitives';
 import { AutomationSection } from './AutomationSection';
+import { EngineAutomationsSection } from './EngineAutomationsSection';
 
 export interface Step3WooCommerceProps {
   state: WizardState;
@@ -104,6 +105,12 @@ export function Step3WooCommerce({
           </div>
         }
       />
+
+      {/* Engine-run automations (contract §11–§13, T2.2) — a separate
+          sub-section: unlike the three store-run triggers above, these
+          fire engine-side and are only CONFIGURED here. Saved via the
+          rec-engine automations proxy, not POST /settings. */}
+      <EngineAutomationsSection state={state} dispatch={dispatch} inSettings={inSettings} />
     </div>
   );
 }
