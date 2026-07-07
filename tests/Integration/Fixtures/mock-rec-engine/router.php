@@ -45,6 +45,61 @@ function save_state( string $path, array $state ): void {
 	file_put_contents( $path, json_encode( $state ) );
 }
 
+/**
+ * Automation trigger catalog (§11) — shared by GET /automations/catalog and
+ * the PUT /automations/config trigger_key validation ("tundmatu trigger").
+ * Mirrors the live shape exactly: all six per-trigger fields (recipe_et is
+ * Estonian-only — there is no recipe_en yet). Keys are mock-stable so tests
+ * can PUT against them; the CONTRACT says render dynamically, so plugin
+ * tests must not assert this exact key list as "the" catalog.
+ */
+function automations_catalog_triggers(): array {
+	return array(
+		array(
+			'key'            => 'replenish_due',
+			'name_et'        => 'Taastäitumine',
+			'name_en'        => 'Replenishment due',
+			'description_et' => 'Käivitub, kui kliendi korduvtoode hakkab ennustuse järgi otsa saama.',
+			'description_en' => "Fires when a customer's recurring product is predicted to run out.",
+			'recipe_et'      => 'Ehita Smailys "form submitted" trigeriga automatsioon, mille kiri kasutab rec_replenish_sku + soovitusslotte.',
+		),
+		array(
+			'key'            => 'winback_risk',
+			'name_et'        => 'Lahkumisohus klient',
+			'name_en'        => 'Win-back risk',
+			'description_et' => 'Käivitub, kui klient on ennustuse järgi lahkumas (ostumuster katkenud).',
+			'description_en' => 'Fires when a customer is predicted to churn (purchase pattern broken).',
+			'recipe_et'      => 'Ehita Smailys "form submitted" trigeriga win-back automatsioon soovitusslottidega.',
+		),
+		array(
+			'key'            => 'life_stage',
+			'name_et'        => 'Elufaasi vahetus',
+			'name_en'        => 'Life stage change',
+			'description_et' => 'Käivitub, kui lemmiklooma elufaas vahetub (nt kutsikas → täiskasvanu).',
+			'description_en' => 'Fires when a pet transitions life stage (e.g. puppy to adult).',
+			'recipe_et'      => 'Ehita Smailys elufaasi-automatsioon; mootor enrollib kontakti õigel päeval.',
+		),
+	);
+}
+
+/**
+ * Bearer-auth check shared by the automations routes (same regex as ping).
+ */
+function require_bearer_auth(): void {
+	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
+		reply(
+			401,
+			array(
+				'error'      => 'unauthorized',
+				'message'    => 'Authorization header missing or malformed.',
+				'request_id' => 'req_' . bin2hex( random_bytes( 4 ) ),
+				'timestamp'  => gmdate( 'c' ),
+			)
+		);
+	}
+}
+
 // Sub-PR 3.1.2 — engine serves setup under /api/setup/exchange.
 // The plugin (Client::PATH_SETUP_EXCHANGE) now sends to the same
 // path; mock follows suit so integration tests exercise the live
@@ -105,8 +160,9 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 	// ABSOLUTE URLs (NOT relative paths). The plugin reads
 	// endpoints()['ingest_catalog']; a mock serving the old unprefixed/
 	// relative shape would pass while production got a null URL — exactly
-	// the mock↔engine divergence the path-bug taught us to close. All 11
-	// endpoints present (resolves the endpoints-map audit, P2 #11).
+	// the mock↔engine divergence the path-bug taught us to close. All 13
+	// endpoints present (11 from the endpoints-map audit P2 #11, plus the
+	// v1.1.0 `automations_*` keys).
 	$engine_base = sprintf( 'http://%s', $_SERVER['HTTP_HOST'] ?? 'localhost:9876' );
 	reply(
 		200,
@@ -132,6 +188,8 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 				'customer_opt_out'        => $engine_base . '/api/v1/customer/{email}/opt-out',
 				'recommendations_preview' => $engine_base . '/api/v1/recommendations/preview',
 				'recommendations_issue'   => $engine_base . '/api/v1/recommendations/issue',
+				'automations_catalog'     => $engine_base . '/api/v1/automations/catalog',
+				'automations_config'      => $engine_base . '/api/v1/automations/config',
 			),
 			'config'          => array(
 				'tracking_cookie_name' => 'smaily_rec_uid',
@@ -966,6 +1024,192 @@ if ( $method === 'POST' && preg_match( '#^/api/v1/customer/([^/]+)/opt-out$#', $
 			'previous_status' => false,
 		)
 	);
+}
+
+// Automations trigger catalog (§11, contract v1.1.0). Read-only; sector-
+// filtered live (the mock serves a fixed 3-trigger "pet" catalog). Top-level
+// shape is {triggers, language_modes, docs} — `docs` is the stable help URL
+// the plugin must link from the RESPONSE, never hardcode.
+if ( $method === 'GET' && $path === '/api/v1/automations/catalog' ) {
+	require_bearer_auth();
+	reply(
+		200,
+		array(
+			'triggers'       => automations_catalog_triggers(),
+			'language_modes' => array( 'single', 'per_language' ),
+			'docs'           => 'https://mock-engine.test/docs/en/smaily-templates',
+		)
+	);
+}
+
+// Automations config read (§12). Rows exist only for triggers configured at
+// least once — a fresh tenant returns {configs: []}. Each row carries the
+// eight §13 fields PLUS the read-only configured_via + updated_at (engine-
+// written; tolerated-but-overwritten if a client round-trips them).
+if ( $method === 'GET' && $path === '/api/v1/automations/config' ) {
+	require_bearer_auth();
+	$rows = ( isset( $state['automations_configs'] ) && is_array( $state['automations_configs'] ) )
+		? array_values( $state['automations_configs'] )
+		: array();
+	reply( 200, array( 'configs' => $rows ) );
+}
+
+// Automations config save (§13). Full-selection UPSERT on trigger_key —
+// PUT never deletes (absent trigger keeps its stored row). Validation is
+// ALL-OR-NOTHING (unlike ingest D6 partial success): any invalid row → 422
+// with the indexed D6-style errors[] and NOTHING saved. Wrapper violations
+// (non-array / empty / >50 configs) use the same 422 shape with NO index and
+// field="configs". Custom-check messages are Estonian ("tundmatu trigger",
+// "automation_map.id on nõutav"), structural ones English ("Required",
+// "Invalid email") — mirror of the live Zod schema, don't loosen it.
+if ( $method === 'PUT' && $path === '/api/v1/automations/config' ) {
+	require_bearer_auth();
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	// §13: a non-JSON body is a 400 {"error":"invalid_json"} — note: no
+	// message/details on this one.
+	if ( ! is_array( $body ) ) {
+		reply( 400, array( 'error' => 'invalid_json' ) );
+	}
+
+	$configs = isset( $body['configs'] ) ? $body['configs'] : null;
+	if ( ! is_array( $configs ) || count( $configs ) === 0 || count( $configs ) > 50 ) {
+		reply(
+			422,
+			array(
+				'error'  => 'validation_failed',
+				'errors' => array(
+					array(
+						'field'   => 'configs',
+						'message' => 'Array must contain between 1 and 50 element(s)',
+					),
+				),
+			)
+		);
+	}
+
+	$catalog_keys = array_map(
+		static function ( array $trigger ): string {
+			return $trigger['key'];
+		},
+		automations_catalog_triggers()
+	);
+	$modes        = array( 'single', 'per_language' );
+	$required     = array( 'trigger_key', 'enabled', 'language_mode', 'automation_map', 'cooldown_days', 'daily_cap', 'test_mode', 'test_emails' );
+
+	$errors       = array();
+	$rows_to_save = array();
+	foreach ( array_values( $configs ) as $index => $row ) {
+		if ( ! is_array( $row ) ) {
+			$errors[] = array( 'index' => $index, 'field' => 'unknown', 'message' => 'Expected object' );
+			continue;
+		}
+
+		$trigger_key = ( isset( $row['trigger_key'] ) && is_string( $row['trigger_key'] ) ) ? $row['trigger_key'] : '';
+		$row_error   = static function ( string $field, string $message ) use ( &$errors, $index, $trigger_key ): void {
+			$entry = array( 'index' => $index );
+			if ( $trigger_key !== '' ) {
+				// trigger_key is included when readable from the body — it
+				// helps the UI map the error to a row.
+				$entry['trigger_key'] = $trigger_key;
+			}
+			$entry['field']   = $field;
+			$entry['message'] = $message;
+			$errors[]         = $entry;
+		};
+
+		// All 8 keys REQUIRED on every row (no server-side defaults);
+		// daily_cap is nullable but its KEY must be present.
+		$missing = false;
+		foreach ( $required as $required_key ) {
+			if ( ! array_key_exists( $required_key, $row ) ) {
+				$row_error( $required_key, 'Required' );
+				$missing = true;
+			}
+		}
+		if ( $missing ) {
+			continue;
+		}
+
+		$errors_before = count( $errors );
+
+		if ( $trigger_key === '' || ! in_array( $trigger_key, $catalog_keys, true ) ) {
+			$row_error( 'trigger_key', 'tundmatu trigger' );
+		}
+		if ( ! is_bool( $row['enabled'] ) ) {
+			$row_error( 'enabled', 'Expected boolean' );
+		}
+		if ( ! is_string( $row['language_mode'] ) || ! in_array( $row['language_mode'], $modes, true ) ) {
+			$row_error( 'language_mode', 'Invalid enum value' );
+		}
+		if ( ! is_array( $row['automation_map'] ) ) {
+			$row_error( 'automation_map', 'Expected object' );
+		} else {
+			foreach ( $row['automation_map'] as $map_key => $map_value ) {
+				if ( ! is_string( $map_value ) || preg_match( '/^\d+$/', $map_value ) !== 1 ) {
+					$row_error( 'automation_map.' . $map_key, 'automatsiooni id peab olema number' );
+				}
+			}
+			// enabled=true binding requirement: single needs `id`,
+			// per_language needs `fallback` (enabled=false may be {}).
+			if ( $row['enabled'] === true && $row['language_mode'] === 'single' && ! isset( $row['automation_map']['id'] ) ) {
+				$row_error( 'automation_map', 'automation_map.id on nõutav' );
+			}
+			if ( $row['enabled'] === true && $row['language_mode'] === 'per_language' && ! isset( $row['automation_map']['fallback'] ) ) {
+				$row_error( 'automation_map', 'automation_map.fallback on nõutav' );
+			}
+		}
+		if ( ! is_int( $row['cooldown_days'] ) || $row['cooldown_days'] < 1 || $row['cooldown_days'] > 365 ) {
+			$row_error( 'cooldown_days', 'Number must be between 1 and 365' );
+		}
+		if ( $row['daily_cap'] !== null && ( ! is_int( $row['daily_cap'] ) || $row['daily_cap'] < 1 || $row['daily_cap'] > 100000 ) ) {
+			$row_error( 'daily_cap', 'Number must be between 1 and 100000, or null' );
+		}
+		if ( ! is_bool( $row['test_mode'] ) ) {
+			$row_error( 'test_mode', 'Expected boolean' );
+		}
+		if ( ! is_array( $row['test_emails'] ) ) {
+			$row_error( 'test_emails', 'Expected array' );
+		} elseif ( count( $row['test_emails'] ) > 50 ) {
+			$row_error( 'test_emails', 'Array must contain at most 50 element(s)' );
+		} else {
+			foreach ( array_values( $row['test_emails'] ) as $email_index => $email ) {
+				if ( ! is_string( $email ) || filter_var( $email, FILTER_VALIDATE_EMAIL ) === false ) {
+					$row_error( 'test_emails.' . $email_index, 'Invalid email' );
+				}
+			}
+		}
+
+		if ( count( $errors ) === $errors_before ) {
+			// Unknown keys are STRIPPED, not rejected (standard Zod object
+			// behavior) — incl. round-tripped configured_via/updated_at.
+			$clean = array();
+			foreach ( $required as $required_key ) {
+				$clean[ $required_key ] = $row[ $required_key ];
+			}
+			$rows_to_save[] = $clean;
+		}
+	}
+
+	if ( $errors !== array() ) {
+		// All-or-nothing: nothing is written on a 422.
+		reply( 422, array( 'error' => 'validation_failed', 'errors' => $errors ) );
+	}
+
+	$stored = ( isset( $state['automations_configs'] ) && is_array( $state['automations_configs'] ) )
+		? $state['automations_configs']
+		: array();
+	foreach ( $rows_to_save as $clean ) {
+		$clean['configured_via']                  = 'plugin';
+		$clean['updated_at']                      = gmdate( 'Y-m-d\TH:i:s' ) . '.000Z';
+		$stored[ $clean['trigger_key'] ]          = $clean;
+	}
+	$state['automations_configs'] = $stored;
+	save_state( $state_file, $state );
+
+	reply( 200, array( 'ok' => true, 'upserted' => count( $rows_to_save ) ) );
 }
 
 // Fallback.

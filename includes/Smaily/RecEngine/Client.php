@@ -68,13 +68,13 @@ class Client {
 	// 3.2's ingest path should prefer that map; these constants are
 	// the fallback / type-safety anchor.
 	// ---------------------------------------------------------------
-	public const PATH_SETUP_EXCHANGE       = '/api/setup/exchange';
-	public const PATH_PING                 = '/api/v1/ingest/ping';
-	public const PATH_INGEST_CATALOG       = '/api/v1/ingest/catalog';
-	public const PATH_INGEST_CUSTOMERS     = '/api/v1/ingest/customers';
-	public const PATH_INGEST_ORDERS        = '/api/v1/ingest/orders';
-	public const PATH_INGEST_BROWSE        = '/api/v1/ingest/browse';
-	public const PATH_IDENTITY_MERGE       = '/api/v1/identity/merge';
+	public const PATH_SETUP_EXCHANGE   = '/api/setup/exchange';
+	public const PATH_PING             = '/api/v1/ingest/ping';
+	public const PATH_INGEST_CATALOG   = '/api/v1/ingest/catalog';
+	public const PATH_INGEST_CUSTOMERS = '/api/v1/ingest/customers';
+	public const PATH_INGEST_ORDERS    = '/api/v1/ingest/orders';
+	public const PATH_INGEST_BROWSE    = '/api/v1/ingest/browse';
+	public const PATH_IDENTITY_MERGE   = '/api/v1/identity/merge';
 	// GDPR customer endpoints carry the email in the URL PATH. The engine's
 	// endpoints-map advertises these with a literal `{email}` placeholder (see
 	// the contract endpoints map), so the substitution convention is `{email}`,
@@ -85,6 +85,13 @@ class Client {
 	public const PATH_CUSTOMER_EXPORT_TMPL  = '/api/v1/customer/{email}/export';
 	public const PATH_CUSTOMER_DELETE_TMPL  = '/api/v1/customer/{email}';
 	public const PATH_CUSTOMER_OPT_OUT_TMPL = '/api/v1/customer/{email}/opt-out';
+	// Automations config API (contract v1.1.0, §11–§13). The endpoints map
+	// advertises these under the `automations_*` keys — but a connection
+	// exchanged BEFORE v1.1.0 keeps its exchange-time map without them
+	// (the "Map age" note in §1), so these fallbacks are load-bearing for
+	// every existing connection, not just the rare pre-exchange call.
+	public const PATH_AUTOMATIONS_CATALOG = '/api/v1/automations/catalog';
+	public const PATH_AUTOMATIONS_CONFIG  = '/api/v1/automations/config';
 
 	/** Default in-request retry ceiling — generous for one-shot calls (ping, setup). */
 	public const DEFAULT_MAX_ATTEMPTS = 5;
@@ -332,6 +339,64 @@ class Client {
 	public function customer_opt_out( string $email, array $body ): array {
 		$url = $this->customer_url( 'customer_opt_out', self::PATH_CUSTOMER_OPT_OUT_TMPL, $email );
 		return $this->request_url( 'POST', $url, $body );
+	}
+
+	/**
+	 * Trigger catalog for engine-run automations (§11) — the automation
+	 * triggers available FOR THIS STORE (sector-filtered per tenant). Returns
+	 * `{triggers: [{key, name_et, name_en, description_et, description_en,
+	 * recipe_et}], language_modes, docs}`. The list changes with engine
+	 * deploys, so callers render it dynamically — never hardcode trigger keys
+	 * or a count — and link the merchant to the response's `docs` URL rather
+	 * than a hardcoded one. Read-only; never cached plugin-side (F3-51).
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
+	 */
+	public function automations_catalog(): array {
+		$url = $this->resolve_url( 'automations_catalog', self::PATH_AUTOMATIONS_CATALOG );
+		return $this->request_url( 'GET', $url );
+	}
+
+	/**
+	 * Current automation configuration rows (§12) — `{configs: [...]}`, each
+	 * row the eight §13 fields plus the read-only `configured_via` +
+	 * `updated_at` (engine-written; never round-tripped into a PUT). Rows
+	 * exist only for triggers configured at least once — an empty `configs`
+	 * on a fresh tenant means everything is off (fail-closed). The engine's
+	 * GET is the source of truth; the plugin stores no local copy (F3-51).
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
+	 */
+	public function automations_config(): array {
+		$url = $this->resolve_url( 'automations_config', self::PATH_AUTOMATIONS_CONFIG );
+		return $this->request_url( 'GET', $url );
+	}
+
+	/**
+	 * Save the merchant's automation configuration (§13) — full-selection
+	 * UPSERT on `(tenant_id, trigger_key)`, wrapper `{configs: [...]}`,
+	 * 1..50 rows, all 8 row fields required on every row. PUT never deletes:
+	 * a trigger absent from the body keeps its stored config (disable =
+	 * send the row with `enabled: false`). Validation is ALL-OR-NOTHING
+	 * (unlike ingest's per-item D6 partial success): a 422 means NOTHING was
+	 * written — the thrown ApiException carries the body's indexed D6-style
+	 * `errors[]` (`{index?, trigger_key?, field, message}`) via `errors()`,
+	 * so the caller can bind each error to its row/field and retry the whole
+	 * corrected selection.
+	 *
+	 * @param array<int, array<string, mixed>> $configs 1..50 config rows.
+	 *
+	 * @return array<string, mixed> `{ok: true, upserted: N}` on success.
+	 *
+	 * @throws ApiException On 4xx (non-429, incl. the 422 above) or unrecoverable network failure.
+	 */
+	public function put_automations_config( array $configs ): array {
+		$url = $this->resolve_url( 'automations_config', self::PATH_AUTOMATIONS_CONFIG );
+		return $this->request_url( 'PUT', $url, array( 'configs' => $configs ) );
 	}
 
 	// ---------------------------------------------------------------
