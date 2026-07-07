@@ -476,6 +476,20 @@ never through a registered-status filter. Live-walks share the dev wp-env DB
 with the integration suite — a leaked walk order is a delayed test failure.
 (LESSONS §2.16.)
 
+### Engine-side automations config is TENANT-scoped — walk residue is visible to real stores
+`/api/v1/automations/config` rows live per TENANT, not per store/connection —
+every store connected to the same tenant (the sandbox is shared by the dev
+wp-env AND real test stores) sees and overwrites the same rows, and PUT never
+deletes. The T2.3 walk's leftover `replenish_due` row (`language_mode='single'`,
+enabled=false) rendered as a one-dropdown oddity in Erkki's real test store
+hours later (→ T2.4 made the display mode store-global). Rules: a walk that
+writes engine state must end fail-closed (`enabled=false`, `test_mode=true`)
+AND its report must name the residue it leaves; when a store shows a weird
+per-trigger inconsistency, first ask what else wrote to that tenant. Related:
+the dev wp-env's sandbox connection lives on the DEV site (port 8888 /
+`…-cli-1`) — the tests site (`…-tests-cli-1`) has its own empty options, and
+integration runs scrub only the tests site. (LESSONS §2.17.)
+
 ### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
 Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's
 call: new work targets 7.0; the earlier WP 6.9.4 baseline was an interim step).

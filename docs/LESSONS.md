@@ -603,9 +603,31 @@ whole story in one run.
    A walk that leaks doesn't fail; it poisons a test days later (§2.6's sibling:
    state you *want* gone can also persist).
 
----
+### 2.17 Engine-side state is TENANT-scoped — a walk's residue shows up in every store on that tenant (automations config, 2026-07-07)
 
-## 3. The non-technical lesson: spec errors vs bugs
+The T2.3 live-walk PUT an automations-config row (`replenish_due`,
+`language_mode='single'`) to the "Smaily Connect test" sandbox tenant and
+cleaned up only the fail-closed part (`enabled=false`) — the row itself stayed,
+by design (PUT never deletes). Hours later Erkki's REAL test store, connected
+to the SAME sandbox tenant, rendered that row's `single` mode as one dropdown
+while every other trigger got the store-derived two-dropdowns-plus-fallback —
+it looked like a UI bug (and exposed one: T2.4 made the display mode
+store-global).
+
+The generalisation, one level above §2.16's "walks share the integration DB":
+
+1. **Engine-side writes are shared per TENANT, not per store/connection.** Any
+   store (or dev wp-env) on the same tenant sees — and overwrites — the same
+   automations configs, catalog state, contacts. A walk against the sandbox is
+   never isolated from other sandbox-connected stores.
+2. **"Cleanup" for engine state means restoring the SEMANTIC baseline, not just
+   the safety property.** `enabled=false` kept it fail-closed (right priority),
+   but the leftover row still changed what another store's UI showed. When a
+   walk writes engine state that can't be deleted, the report must SAY what
+   residue remains.
+3. **When a pilot/store reports a weird per-item inconsistency, ask first:
+   did a walk or another store on this tenant write that state?** It reproduces
+   only on that tenant — a fresh tenant looks fine.
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity
 or omission in the specification). The agent implemented exactly what the spec said;
