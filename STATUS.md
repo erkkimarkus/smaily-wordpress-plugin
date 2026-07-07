@@ -26,7 +26,38 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**OrderBackfill full-suite flake RESOLVED — stale live-walk
+_Last updated: 2026-07-07 (**T2.3 — automations live-walk GREEN against the real engine
+(sandbox).** Dev wp-env re-connected via secret-safe STDIN exchange — the stale connection
+still pointed at PRODUCTION MiuMjau (the exact CLAUDE.md trap); now `tenant_name="Smaily
+Connect test"`, verified before any traffic. New `bin/walk-t2-automations.cjs` (tenant
+hard-gate `sandbox_tenant_not_production`, all calls through the plugin's
+`Client::automations_*` methods, not curl): **15/15 checks PASS** — §11 catalog 200 with the
+4 pet-sector triggers (`replenish_due, winback_rescue, life_stage, post_purchase`), all 6
+fields + `language_modes=["single","per_language"]` + `docs` URL; §12 initial config 200
+(0 rows, fresh tenant = fail-closed); §13 valid PUT (all 8 fields, test_mode=true) →
+`{ok:true, upserted:1}`; GET round-trip returns every value unchanged **and
+`configured_via='plugin'` (the brief's acceptance criterion)**; invalid PUT A (enabled
+without `automation_map.id`) → 422 with the v1.1.0 INDEXED `errors[]`
+(`{index:0, trigger_key, field:"automation_map", message:"automation_map.id on nõutav"}` —
+live proof the indexed shape is deployed); invalid PUT B (`per_language` without
+`fallback`) → 422; invalid key → 401 `unauthorised`; fail-closed cleanup PUT
+(`enabled=false, test_mode=true`) verified by GET — no enabled placeholder row left in the
+sandbox. **QA checklist (brief) coverage:** (1) catalog renders from the API/new trigger
+without a release — walk `catalog_get_200` + vitest "renders an unknown catalog trigger
+dynamically" (browser render = manual pilot check); (2) no cross-store catalog cache — code
+fact: the proxy/UI cache NOTHING (F3-51 rule 1), every GET hits the engine; (3) enabled
+without workflow-id → 422 at the field — walk `put_invalid_missing_id_422_indexed` + vitest
+`issuesByTrigger` binding + pre-validation tests (in-browser field render = manual pilot
+check); (4) per_language without fallback → 422 — walk `put_invalid_no_fallback_422` +
+vitest; (5) reopen shows GET state — walk round-trip + F3-52 rule 4 (fetch on every open,
+no cache) + vitest dirty-draft tests (browser reopen = manual pilot check); (6) test_mode
+default true + separate confirmed go-live — vitest fail-closed default row + "requires a
+confirm before switching test mode off"; walk proves the test_mode=true round-trip
+(confirm dialog in browser = manual pilot check); (7) missing/bad key → clear error — walk
+`invalid_key_401` + unit 401→502 `api_key_rejected` mapping + vitest key-rejected banner.
+The brief's final acceptance leg — test address receives the email on the nightly engine
+run — is engine-side, NOT plugin-provable: manual pilot check. Prior same day:
+**OrderBackfill full-suite flake RESOLVED — stale live-walk
 order residue, NOT cross-test state.** The 3 recurring `RecEngineOrderBackfillTest` count
 failures (+1 on every order count) were caused by ONE order sitting in the dev wp-env
 `wc_orders` table since 2026-06-19: the F3-43 live-walk's `wc-label-printed` custom-status
