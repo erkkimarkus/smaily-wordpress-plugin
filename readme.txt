@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.4.0
+Stable tag: 3.4.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -88,7 +88,13 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
-= 3.4.0 =
+= 3.4.1 =
+* Fixes to the engine-run automations settings from real-store testing:
+* Fixed: on a store whose language setup is store-wide, every automation row now shows the same uniform per-language workflow rows — a row no longer switches layout based on how it happened to be saved.
+* Fixed: the cooldown input no longer snaps to 0 while you type; you can clear it and type a new value, and it is validated when you leave the field.
+* New: a warning is shown when an automation is enabled in test mode but no test addresses are listed (the engine sends test emails only to the listed addresses, so an empty list means nobody receives anything).
+* Improved: connection-failure messages are clearer — a human-readable summary pointing to the Campaign Intelligence tab, with the technical detail shown separately.
+* Improved: on English-locale stores the automation recipe descriptions now show in English when the engine catalog provides them (recipe_en).
 * New: **Engine-run recommendation automations** settings. When Smaily Campaign Intelligence is connected, the WooCommerce automations tab (and wizard Step 3) gains a section where you enable the engine's automation triggers (replenishment due, win-back, and more — the list comes from the engine for your store's sector) and bind each to your own Smaily workflow, with per-language workflow support on multilingual stores. Everything is fail-closed: triggers start off and in test mode (emails go only to your test addresses), and going live is a separate confirmed action. Sending happens engine-side; the plugin only saves your configuration.
 
 = 3.3.2 =
@@ -261,6 +267,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.4.1 =
+Settings-screen fixes for the engine-run automations section (language rows, cooldown input, test-address warning, clearer error messages, English recipes). UI-only; safe in-place update.
 
 = 3.4.0 =
 Adds the engine-run recommendation automations settings section (visible when Smaily Campaign Intelligence is connected). Fail-closed: nothing is enabled until you configure it; safe in-place update.
