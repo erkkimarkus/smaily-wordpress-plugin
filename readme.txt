@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.3.2
+Stable tag: 3.4.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,9 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.4.0 =
+* New: **Engine-run recommendation automations** settings. When Smaily Campaign Intelligence is connected, the WooCommerce automations tab (and wizard Step 3) gains a section where you enable the engine's automation triggers (replenishment due, win-back, and more — the list comes from the engine for your store's sector) and bind each to your own Smaily workflow, with per-language workflow support on multilingual stores. Everything is fail-closed: triggers start off and in test mode (emails go only to your test addresses), and going live is a separate confirmed action. Sending happens engine-side; the plugin only saves your configuration.
 
 = 3.3.2 =
 * Browse tracking relies on the standard **WordPress Consent API** for consent. If browse tracking is on but no consent signal is present, the plugin now shows an admin notice explaining that the free **WP Consent API** plugin must be installed so your cookie banner (CookieYes, Complianz, Real Cookie Banner, …) can pass consent to Smaily — otherwise no browse data is collected. Reverts the CookieYes-specific consent reading added in 3.3.1 in favour of the standard, which CookieYes supports once the WP Consent API plugin is active.
@@ -258,6 +261,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.4.0 =
+Adds the engine-run recommendation automations settings section (visible when Smaily Campaign Intelligence is connected). Fail-closed: nothing is enabled until you configure it; safe in-place update.
 
 = 3.3.2 =
 Browse tracking uses the standard WordPress Consent API; if no consent signal is present you'll now be told to install the free WP Consent API plugin. Recommended for any store using browse tracking with a cookie banner.
