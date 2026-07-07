@@ -77,6 +77,19 @@ final class RestRequestHelper {
 	}
 
 	/**
+	 * @param array<string, mixed> $body
+	 */
+	public static function put( string $route, array $body = array() ): WP_REST_Response {
+		self::mark_rest_request();
+		$req = new WP_REST_Request( 'PUT', '/smaily-connect/v1' . $route );
+		foreach ( $body as $key => $value ) {
+			$req->set_param( $key, $value );
+		}
+		$req->set_header( 'Content-Type', 'application/json' );
+		return rest_get_server()->dispatch( $req );
+	}
+
+	/**
 	 * @param array<string, mixed> $query
 	 */
 	public static function get( string $route, array $query = array() ): WP_REST_Response {

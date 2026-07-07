@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-03 (**v3.3.2 — browse 0-events on CookieYes RESOLVED the RIGHT way (F3-50)**: root cause was the missing free `wp-consent-api` companion plugin, NOT a CookieYes incompatibility (CookieYes registers into the WP Consent API once it's installed). The 3.3.1 CookieYes cookie-parser was a mis-fix (Erkki caught it — per-vendor code + CookieYes docs prove standard support) and is **reverted**; 3.3.2 keeps browse consent on the standard WP Consent API + adds a `NotificationManager` admin advisory guiding merchants to install `wp-consent-api`. MiuMjau fix = install that plugin (wp-admin). Prior same day: **v3.3.1** (reverted) and **F3-49 DONE — browse events carry `smaily_visitor_token` (cold-start), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
+_Last updated: 2026-07-07 (**T2.1 — engine-triggered automations config, PHP layer (F3-51)**.
+Contract synced to **v1.1.0** (commit 9ec2ff8, engine c16377e+7b5b922, byte-identical md5
+`7e41726bcd17fab163586b7f97093e0d`): §11 GET /automations/catalog, §12 GET /automations/config,
+§13 PUT /automations/config — the engine-run automations (replenishment/win-back enrolment into
+merchant-built Smaily workflows) get their plugin-side CONFIGURATION surface; execution never
+touches the plugin. T2.1 ships the PHP layer in the same pass as the sync (LESSONS §2.7 — mock
++ code move with the doc): `Client::automations_catalog()/automations_config()/
+put_automations_config()` (map keys `automations_catalog`/`automations_config` + new
+`PATH_AUTOMATIONS_*` fallbacks — load-bearing for every pre-v1.1.0 connection, "Map age" §1;
+first PUT verb in the Client, wire-pinned), mock-engine routes with strict §11–§13 validation
+(all-or-nothing indexed 422, Estonian custom-check messages, engine-stamped
+`configured_via`/`updated_at`) + `automations_*` endpoints-map keys, and the admin REST proxy
+`REST\AutomationsEndpoint` (GET catalog / GET config / PUT config; `is_connected()` gate 503;
+**no cache, no wp_options copy — the engine's GET is the source of truth**; PUT forwards
+`configs` as-is, engine 422 passes through verbatim, engine 401 → 502 `api_key_rejected`; wired
+via EndpointRegistry + expected_routes). Tests: ClientAutomationsTest (8) +
+AutomationsEndpointTest (9) unit; RecEngineAutomationsTest integration (catalog shape, PUT→GET
+round-trip, all-or-nothing 422 with row/field binding, wrapper-422 without index, 401, gate).
+DECISIONS F3-51. Gates: ci:strict exit=0 (PHPUnit unit 474, PHPCS 0 errors, PHPStan clean,
+vitest 164, tsc/eslint clean); integration — RecEngineAutomationsTest `OK (6 tests, 83
+assertions)` in isolation; full suite 126 tests / 590 assertions with **3 pre-existing
+RecEngineOrderBackfillTest failures that reproduce IDENTICALLY on clean main** (stash-verified,
+same env/day: 120 tests, the same 3 failures without any T2.1 code — every order-count
+assertion comes back +1 in a FULL-suite run only, while the class in isolation and in pair-runs
+is green, so it's cross-test-state dependent, NOT a T2.1 regression; last recorded full-green
+was OK 120/499 on 2026-07-03 — needs its own investigation). **Next: T2.2 — the React settings
+UI** (trigger cards from the catalog, fail-closed: never auto-enable, test_mode default ON,
+§13 errors[] bound to fields) + the OrderBackfill full-suite flake investigation. Prior:
+2026-07-03 —)_
+
+**v3.3.2 — browse 0-events on CookieYes RESOLVED the RIGHT way (F3-50)**: root cause was the missing free `wp-consent-api` companion plugin, NOT a CookieYes incompatibility (CookieYes registers into the WP Consent API once it's installed). The 3.3.1 CookieYes cookie-parser was a mis-fix (Erkki caught it — per-vendor code + CookieYes docs prove standard support) and is **reverted**; 3.3.2 keeps browse consent on the standard WP Consent API + adds a `NotificationManager` admin advisory guiding merchants to install `wp-consent-api`. MiuMjau fix = install that plugin (wp-admin). Prior same day: **v3.3.1** (reverted) and **F3-49 DONE — browse events carry `smaily_visitor_token` (cold-start), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.
 Managed (non-pilot) client Prike: ~1000 Smaily contacts drifted to language `en`. Root cause —
 the upstream plugin's daily "sync all subscribers" cron derives language from the cron-unsafe
 `Helper::get_current_language_code()`, which in a cron tick returns `get_locale()` = the WP

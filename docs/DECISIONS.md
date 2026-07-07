@@ -2666,6 +2666,57 @@ now, YAGNI); tell CookieYes merchants nothing (leaves the silent-0-events trap).
 infra reused), LESSONS §2.15 (the assume-vs-live-probe scar, now with the deeper correction that
 the standard already covered CookieYes).
 
+### F3-51 — Automations config (T2): the engine is the authority — the plugin is a stateless proxy, no local copy, no duplicate validation
+
+**Context:** the engine can enrol Smaily contacts into merchant-built automations at the right
+moment (replenishment due, win-back, …); the plugin's role is CONFIGURATION only (contract
+v1.1.0 §11–§13, synced 9ec2ff8). T2.1 is the PHP layer: `Client::automations_catalog()/
+automations_config()/put_automations_config()` (+ `PATH_AUTOMATIONS_*` fallbacks) and the
+admin REST proxy `AutomationsEndpoint` (GET catalog / GET config / PUT config). The React
+settings UI is the next sub-PR (T2.2).
+
+**Decisions:**
+1. **The engine's GET is the source of truth — the plugin stores NOTHING.** No wp_options
+   copy, no transient, no catalog cache: the UI re-reads via GET on every open. A local copy
+   would drift against engine-side operator edits (`configured_via: "admin"`) and against
+   catalog changes that ship with engine deploys (§11 says render dynamically — a new trigger
+   must not need a plugin release).
+2. **No PHP-side duplicate validation on PUT.** The proxy forwards `{configs}` as-is (only a
+   minimal is-array check); the engine's Zod schema is the single validator and its **422 is
+   passed through verbatim**. Meaning for the UI: §13 validation is ALL-OR-NOTHING — a 422
+   means NOTHING was saved (not even the valid rows); the indexed D6-style `errors[]`
+   (`{index?, trigger_key?, field, message}`, wrapper-level entries index-less with
+   `field:"configs"`) binds each error to its row/field, and the fix is resubmitting the whole
+   corrected selection. `ApiException` already carried `errors[]` (F3-18) — no extension needed.
+3. **URLs via endpoints-map key + fallback constant, like every engine call.** Map keys
+   `automations_catalog`/`automations_config`; fallbacks `PATH_AUTOMATIONS_CATALOG/_CONFIG`.
+   The fallbacks are load-bearing for EVERY pre-v1.1.0 connection (a stored map never gains
+   keys retroactively — the contract's "Map age" note), so the endpoint factory passes
+   `RecEngineSettings::endpoints()` through (the ping factory doesn't need to).
+4. **Engine-error mapping in the proxy:** engine 401 → 502 `api_key_rejected` (a clear
+   "stored key invalid — reconnect" answer, distinct from WP-side 403 and from unreachable);
+   422 → 422 passthrough (above); other 4xx/5xx/network → 502 with the engine's error code
+   (same convention as `RecEngineEndpoint::ping`). The api_key never appears in any response.
+5. **Fail-closed stays with the merchant:** the plugin must never send `enabled: true`
+   without an explicit merchant action and the UI defaults `test_mode` on (§11) — T2.2 UI
+   requirements recorded here so the PHP layer's as-is passthrough isn't mistaken for licence
+   to auto-enable.
+
+**Rationale:** one authority (engine) + one validator (engine Zod) means zero drift surface —
+the exact class of bug (mock/local copy masking the live shape) that cost the most in Phase 3
+(LESSONS §2.3/§2.7). The mock engine gained the three routes with strict §11–§13 validation in
+the SAME pass as the contract sync, per the sync-is-not-code-complete rule.
+
+**Alternatives rejected:** caching the catalog/config in wp_options (staleness + a second
+source of truth; the GET is cheap and admin-only); PHP-side pre-validation for friendlier
+errors (duplicate rulebook that drifts — the engine's indexed 422 is already field-precise);
+POST with a custom verb param instead of PUT (the contract says PUT; `wp_remote_request`
+carries a body on PUT fine, unit-pinned).
+
+**Relationships:** F3-18 (ApiException preserves `errors[]` — reused), CC-1 (URL
+single-source via map+constants), F3-28.6/LESSONS §2.9 (endpoints-map placeholder discipline
+— no placeholders in these URLs, plain keys), LESSONS §2.7 (mock moved in the same sync).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
