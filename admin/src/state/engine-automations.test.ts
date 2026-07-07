@@ -7,10 +7,12 @@ import {
 } from '../api/automations';
 import {
   buildRows,
+  convertAutomationMap,
   defaultRow,
   deriveLanguageMode,
   fallbackLanguage,
   issuesByTrigger,
+  pickRecipe,
   saveEngineAutomations,
   setFallbackLanguage,
   updateLanguageWorkflow,
@@ -62,6 +64,35 @@ describe('deriveLanguageMode', () => {
     expect(deriveLanguageMode('C', ['et', 'en'])).toBe('single');
     expect(deriveLanguageMode('single', ['et'])).toBe('single');
     expect(deriveLanguageMode('B', ['et'])).toBe('single');
+  });
+});
+
+describe('convertAutomationMap — store-global mode conversion (T2.4/1)', () => {
+  it('copies verbatim when the modes match', () => {
+    const map = { et: '12', en: '13', fallback: '12' };
+    const converted = convertAutomationMap(map, 'per_language', 'per_language');
+    expect(converted).toEqual(map);
+    expect(converted).not.toBe(map);
+  });
+
+  it('single → per_language: the id becomes the fallback, languages unpicked', () => {
+    expect(convertAutomationMap({ id: '123' }, 'single', 'per_language')).toEqual({
+      fallback: '123',
+    });
+  });
+
+  it('single → per_language: an empty map stays empty', () => {
+    expect(convertAutomationMap({}, 'single', 'per_language')).toEqual({});
+  });
+
+  it('per_language → single: the fallback id becomes the single id', () => {
+    expect(
+      convertAutomationMap({ et: '12', en: '13', fallback: '13' }, 'per_language', 'single'),
+    ).toEqual({ id: '13' });
+  });
+
+  it('per_language → single: no fallback → empty map (merchant re-picks)', () => {
+    expect(convertAutomationMap({ et: '12' }, 'per_language', 'single')).toEqual({});
   });
 });
 
@@ -134,6 +165,39 @@ describe('buildRows — dynamic catalog-driven rows', () => {
     expect(rows[1]).toEqual(defaultRow('fresh_from_deploy', 'single'));
   });
 
+  it('renders EVERY row in the store-derived mode — a stored single row on a multilingual store converts, uniformly with its neighbours', () => {
+    // The sandbox bug: a walk-saved 'single' replenish_due row rendered one
+    // dropdown while never-configured triggers got the per_language table.
+    const rows = buildRows(
+      [catalogTrigger('replenish_due'), catalogTrigger('winback_rescue')],
+      [configuredRow({ trigger_key: 'replenish_due', language_mode: 'single', automation_map: { id: '123' } })],
+      null,
+      'per_language',
+    );
+
+    expect(rows.map((r) => r.language_mode)).toEqual(['per_language', 'per_language']);
+    // The stored id survives as the fallback; language fields start unpicked.
+    expect(rows[0]?.automation_map).toEqual({ fallback: '123' });
+  });
+
+  it('converts a stored per_language row to single on a single-language store — fallback id becomes the id', () => {
+    const rows = buildRows(
+      [catalogTrigger('replenish_due')],
+      [
+        configuredRow({
+          trigger_key: 'replenish_due',
+          language_mode: 'per_language',
+          automation_map: { et: '12', en: '13', fallback: '13' },
+        }),
+      ],
+      null,
+      'single',
+    );
+
+    expect(rows[0]?.language_mode).toBe('single');
+    expect(rows[0]?.automation_map).toEqual({ id: '13' });
+  });
+
   it('follows catalog order', () => {
     const rows = buildRows(
       [catalogTrigger('b'), catalogTrigger('a')],
@@ -142,6 +206,21 @@ describe('buildRows — dynamic catalog-driven rows', () => {
       'single',
     );
     expect(rows.map((r) => r.trigger_key)).toEqual(['b', 'a']);
+  });
+});
+
+describe('pickRecipe — forward-compatible recipe locale pick (T2.4/5)', () => {
+  it('shows recipe_en to non-Estonian locales when the engine provides it', () => {
+    expect(pickRecipe({ recipe_et: 'Retsept', recipe_en: 'Recipe' }, false)).toBe('Recipe');
+  });
+
+  it('falls back to recipe_et when recipe_en is absent or empty (pre-deploy catalogs)', () => {
+    expect(pickRecipe({ recipe_et: 'Retsept' }, false)).toBe('Retsept');
+    expect(pickRecipe({ recipe_et: 'Retsept', recipe_en: '' }, false)).toBe('Retsept');
+  });
+
+  it('always shows recipe_et to Estonian locales', () => {
+    expect(pickRecipe({ recipe_et: 'Retsept', recipe_en: 'Recipe' }, true)).toBe('Retsept');
   });
 });
 
@@ -312,6 +391,25 @@ describe('saveEngineAutomations — save orchestration', () => {
     expect(ok).toBe(false);
     const failed = dispatched.find((a) => a.type === 'ENGINE_AUTOMATIONS_SAVE_FAILED');
     expect(failed).toMatchObject({ payload: { errors: [] } });
+  });
+
+  it('keeps the human summary first and appends the technical detail on a generic failure (T2.4/4)', async () => {
+    putMock.mockResolvedValue({
+      ok: false,
+      kind: 'error',
+      message: 'Connecting to Smaily Campaign Intelligence failed (HTTP 500). Check the connection on the Campaign Intelligence tab and try again.',
+      detail: 'PUT /rec-engine/automations/config → 500',
+    });
+
+    await saveEngineAutomations([defaultRow('t', 'single')], dispatch);
+
+    const failed = dispatched.find((a) => a.type === 'ENGINE_AUTOMATIONS_SAVE_FAILED');
+    expect(failed).toMatchObject({
+      payload: {
+        error:
+          'Connecting to Smaily Campaign Intelligence failed (HTTP 500). Check the connection on the Campaign Intelligence tab and try again. (PUT /rec-engine/automations/config → 500)',
+      },
+    });
   });
 
   it('treats an empty catalog as a no-op success (§13 forbids an empty PUT)', async () => {

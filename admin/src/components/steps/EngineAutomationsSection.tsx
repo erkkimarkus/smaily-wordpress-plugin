@@ -14,6 +14,7 @@ import {
   deriveLanguageMode,
   fallbackLanguage,
   issuesByTrigger,
+  pickRecipe,
   setFallbackLanguage,
   updateLanguageWorkflow,
   validateRows,
@@ -286,7 +287,13 @@ function LoadFailure({
         </Button>
       }
     >
+      {/* Human summary as the banner body; the raw technical error
+          (e.g. "GET /… → 502") demoted to a small detail line (T2.4/4). */}
       {failure.message}
+      {failure.detail !== undefined && (
+        // span, not p — the Banner body already renders inside a <p>.
+        <span className="mt-1 block text-xs opacity-80">{failure.detail}</span>
+      )}
     </Banner>
   );
 }
@@ -335,10 +342,11 @@ function TriggerCard({
 
   return (
     <Card title={name} description={description} headerAccessory={statusPill}>
-      {/* Recipe — what the Smaily-side automation must contain. Estonian-only
-          in the catalog (no recipe_en yet), shown to everyone. */}
+      {/* Recipe — what the Smaily-side automation must contain. Locale pick
+          matches name/description: non-et locales read recipe_en when the
+          engine provides it (forward-compatible, T2.4/5), else recipe_et. */}
       <div className="rounded border border-border-subtle bg-surface-soft px-3 py-2 text-sm text-text-secondary">
-        {trigger.recipe_et}
+        {pickRecipe(trigger, et)}
         {isHttpUrl(docsUrl) && (
           <>
             {' '}
@@ -371,33 +379,74 @@ function TriggerCard({
           issues={issues}
         />
 
-        <div>
-          <Label htmlFor={`smly-engine-automation-${trigger.key}-cooldown`}>
-            { __( 'Cooldown', 'smaily-connect' ) }
-          </Label>
-          <div className="mt-1 w-40">
-            <NumberInput
-              id={`smly-engine-automation-${trigger.key}-cooldown`}
-              value={row.cooldown_days}
-              min={COOLDOWN_MIN}
-              max={COOLDOWN_MAX}
-              unit={ __( 'days', 'smaily-connect' ) }
-              invalid={hasIssue(issues, 'cooldown_days')}
-              onChange={(e) => {
-                const value = parseInt(e.target.value, 10);
-                patch({ cooldown_days: Number.isNaN(value) ? 0 : value });
-              }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-text-tertiary">
-            { __( 'Minimum days between two fires of this automation for the same customer (1–365).', 'smaily-connect' ) }
-          </p>
-          <FieldIssues issues={issues} field="cooldown_days" />
-        </div>
+        <CooldownField trigger={trigger} row={row} patch={patch} issues={issues} />
 
         <TestModeBlock trigger={trigger} row={row} name={name} patch={patch} issues={issues} />
       </div>
     </Card>
+  );
+}
+
+/**
+ * Cooldown field with a local typing draft (T2.4/2). The old inline
+ * onChange committed every keystroke through parseInt, so clearing the
+ * field snapped to 0 and typing a fresh number produced "0…" — here the
+ * raw string (empty included) lives in a local draft while the field is
+ * focused, and blur commits: a parseable value is clamped to 1–365, an
+ * empty/garbage draft reverts to the last committed value (never 0).
+ * Deliberately NOT built into the shared NumberInput primitive — its
+ * other call sites rely on the immediate-commit behaviour.
+ */
+function CooldownField({
+  trigger,
+  row,
+  patch,
+  issues,
+}: {
+  trigger: AutomationCatalogTrigger;
+  row: EngineAutomationRow;
+  patch: (fields: Partial<EngineAutomationRow>) => void;
+  issues: EngineAutomationsIssue[];
+}): React.JSX.Element {
+  // null = not editing → render the committed row value.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = (): void => {
+    if (draft === null) {
+      return;
+    }
+    const parsed = parseInt(draft, 10);
+    if (!Number.isNaN(parsed)) {
+      const clamped = Math.min(COOLDOWN_MAX, Math.max(COOLDOWN_MIN, parsed));
+      if (clamped !== row.cooldown_days) {
+        patch({ cooldown_days: clamped });
+      }
+    }
+    setDraft(null);
+  };
+
+  return (
+    <div>
+      <Label htmlFor={`smly-engine-automation-${trigger.key}-cooldown`}>
+        { __( 'Cooldown', 'smaily-connect' ) }
+      </Label>
+      <div className="mt-1 w-40">
+        <NumberInput
+          id={`smly-engine-automation-${trigger.key}-cooldown`}
+          value={draft ?? String(row.cooldown_days)}
+          min={COOLDOWN_MIN}
+          max={COOLDOWN_MAX}
+          unit={ __( 'days', 'smaily-connect' ) }
+          invalid={hasIssue(issues, 'cooldown_days')}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+        />
+      </div>
+      <p className="mt-1 text-xs text-text-tertiary">
+        { __( 'Minimum days between two fires of this automation for the same customer (1–365).', 'smaily-connect' ) }
+      </p>
+      <FieldIssues issues={issues} field="cooldown_days" />
+    </div>
   );
 }
 
@@ -652,6 +701,18 @@ function TestModeBlock({
         <p className="mt-1 text-xs text-text-tertiary">
           { __( 'Comma-separated, up to 50 addresses.', 'smaily-connect' ) }
         </p>
+        {/* T2.4/3: the engine's test-mode fire path sends ONLY to the listed
+            addresses — enabled + test mode + empty list means nobody ever
+            gets an email, silently. A warning (saving stays allowed), not
+            an error. */}
+        {row.enabled && row.test_emails.length === 0 && (
+          <p className="mt-1 text-xs font-medium text-warning-soft-text">
+            { __(
+              'This automation is enabled in test mode without any test addresses — no emails will be sent to anyone until you add at least one address.',
+              'smaily-connect',
+            ) }
+          </p>
+        )}
         <FieldIssuesPrefix issues={issues} prefix="test_emails" />
       </div>
       <div className="mt-3">

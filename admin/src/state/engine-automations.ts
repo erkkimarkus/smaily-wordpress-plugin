@@ -31,6 +31,14 @@ export const TEST_EMAILS_MAX = 50;
  * between multi-language rows and a single row: Modes A/B on a
  * multi-language site render per-language rows (+ fallback), everything
  * else (single-language, Mode C) is one workflow per trigger.
+ *
+ * The mode is STORE-GLOBAL (F3-52 addendum, 2026-07-07): every row
+ * renders in this derived mode, uniformly. A server row's stored
+ * `language_mode` is a wire fact about how it was last saved — it is
+ * never used to pick a row's display shape (a walk-saved 'single' row
+ * on a multilingual store must not render differently from its
+ * neighbours). `convertAutomationMap` translates a stored map into the
+ * derived mode at hydrate.
  */
 export function deriveLanguageMode(
   multilingualMode: WizardState['multilingualMode'],
@@ -62,16 +70,49 @@ export function defaultRow(
 }
 
 /**
+ * Convert a stored §13 automation_map from the mode it was saved in to
+ * the store-derived display mode (F3-52 addendum, 2026-07-07):
+ *
+ *  - single `{id}` → per_language: the id becomes the `fallback`
+ *    (the per-language fields start unpicked — the merchant assigns
+ *    languages; the fallback keeps the row valid and the workflow
+ *    reachable).
+ *  - per_language `{et, en, fallback}` → single: the fallback id
+ *    becomes `id` (the language split has no meaning on a
+ *    single-language store); language entries are dropped. A map
+ *    without a fallback converts to `{}` — the merchant re-picks
+ *    (validation flags it while enabled).
+ *
+ * Same mode → verbatim copy.
+ */
+export function convertAutomationMap(
+  map: Record<string, string>,
+  fromMode: EngineAutomationRow['language_mode'],
+  toMode: EngineAutomationRow['language_mode'],
+): Record<string, string> {
+  if (fromMode === toMode) {
+    return { ...map };
+  }
+  if (fromMode === 'single') {
+    return map.id !== undefined ? { fallback: map.id } : {};
+  }
+  return map.fallback !== undefined ? { id: map.fallback } : {};
+}
+
+/**
  * Build the draft rows from a fresh catalog + config fetch.
  *
  * - The CATALOG drives what renders (dynamic — an unknown new trigger
  *   appears without a plugin change); rows follow catalog order.
  * - A config row missing from the catalog is dropped: not rendered, not
  *   sent (PUT never deletes, so the engine keeps it untouched).
- * - A config row present keeps all eight §13 fields verbatim —
- *   including `daily_cap`, which this UI doesn't edit but must
- *   round-trip unchanged. The §12 read-only fields are stripped here so
- *   they can never leak into the PUT body.
+ * - A config row present keeps the §13 fields — including `daily_cap`,
+ *   which this UI doesn't edit but must round-trip unchanged — EXCEPT
+ *   `language_mode`/`automation_map`: the display mode is store-global
+ *   (`languageMode`, derived from the store's structure), so a server
+ *   row saved in the other mode is CONVERTED via `convertAutomationMap`
+ *   and the PUT sends the derived mode back. The §12 read-only fields
+ *   are stripped here so they can never leak into the PUT body.
  * - `previousDraft` (non-null when the slice was dirty) wins over the
  *   server row for triggers it already holds, so a tab switch doesn't
  *   clobber unsaved edits; triggers new to the catalog still get a
@@ -94,11 +135,17 @@ export function buildRows(
     const server = configByKey.get(trigger.key);
     if (server !== undefined) {
       // Explicit eight-field copy — strips configured_via/updated_at.
+      // Display mode is store-global: the server row's stored mode is
+      // only used as the conversion SOURCE, never as the display shape.
       return {
         trigger_key: server.trigger_key,
         enabled: server.enabled,
-        language_mode: server.language_mode,
-        automation_map: { ...server.automation_map },
+        language_mode: languageMode,
+        automation_map: convertAutomationMap(
+          server.automation_map,
+          server.language_mode,
+          languageMode,
+        ),
         cooldown_days: server.cooldown_days,
         daily_cap: server.daily_cap,
         test_mode: server.test_mode,
@@ -107,6 +154,24 @@ export function buildRows(
     }
     return defaultRow(trigger.key, languageMode);
   });
+}
+
+/**
+ * Locale pick for the catalog recipe, consistent with the name/
+ * description `_et`/`_en` logic: a non-Estonian admin locale reads
+ * `recipe_en` WHEN the engine provides it; everything else falls back
+ * to `recipe_et`. `recipe_en` is forward-compatible (T2.4/5) — the
+ * engine deploy that adds it is on its way, so the field is optional
+ * and an absent/empty value must never blank the recipe box.
+ */
+export function pickRecipe(
+  trigger: Pick<AutomationCatalogTrigger, 'recipe_et' | 'recipe_en'>,
+  estonianLocale: boolean,
+): string {
+  if (!estonianLocale && trigger.recipe_en !== undefined && trigger.recipe_en !== '') {
+    return trigger.recipe_en;
+  }
+  return trigger.recipe_et;
 }
 
 const NUMERIC_ID = /^\d+$/;
@@ -321,7 +386,11 @@ export async function saveEngineAutomations(
               'The engine rejected the stored API key — reconnect Campaign Intelligence, then save again.',
               'smaily-connect',
             )
-          : result.message,
+          : // Human summary first (T2.4/4); the raw technical error
+            // rides along in parentheses so support isn't blinded.
+            result.detail !== undefined
+            ? `${result.message} (${result.detail})`
+            : result.message,
       errors: [],
     },
   });

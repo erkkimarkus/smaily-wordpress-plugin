@@ -1,4 +1,4 @@
-import { __ } from '@admin/lib/i18n';
+import { __, sprintf } from '@admin/lib/i18n';
 
 import {
   type EngineAutomationRow,
@@ -18,7 +18,12 @@ import { apiRequest, ApiError } from './client';
  * vitest and failed live).
  */
 
-/** One §11 catalog entry. `recipe_et` is Estonian-only (no recipe_en yet). */
+/**
+ * One §11 catalog entry. `recipe_en` is forward-compatible (T2.4/5):
+ * the engine deploy that adds it is pending, so the UI must render with
+ * or without it — non-Estonian locales use it when present, else
+ * `recipe_et`. Do NOT make it required until the contract sync lands.
+ */
 export interface AutomationCatalogTrigger {
   key: string;
   name_et: string;
@@ -26,6 +31,7 @@ export interface AutomationCatalogTrigger {
   description_et: string;
   description_en: string;
   recipe_et: string;
+  recipe_en?: string;
 }
 
 export interface AutomationsCatalogResponse {
@@ -62,7 +68,14 @@ export type AutomationsFailureKind = 'not_connected' | 'key_rejected' | 'error';
 export interface AutomationsFailure {
   ok: false;
   kind: AutomationsFailureKind;
+  /** Human-readable summary — safe to show as THE banner text. */
   message: string;
+  /**
+   * The raw technical error (proxy body message or `ApiError.message`,
+   * e.g. "GET /… → 502") for the generic `error` kind — rendered as a
+   * smaller detail line, never as the headline (T2.4/4).
+   */
+  detail?: string;
 }
 
 export type PutAutomationsResult =
@@ -117,6 +130,10 @@ export async function putAutomationsConfig(
  * Map a thrown fetch error onto the shared failure union. Recognises
  * the proxy's typed bodies (503 not_configured / configuration_incomplete,
  * 502 api_key_rejected); anything else is a generic retryable error.
+ *
+ * The generic kind carries a HUMAN `message` (what happened + where to
+ * go) and keeps the raw technical text in `detail` (T2.4/4) — a raw
+ * "GET /… → 401" headline told Erkki's deleted-key case nothing.
  */
 export function classifyAutomationsFailure(err: unknown): AutomationsFailure {
   if (err instanceof ApiError) {
@@ -138,12 +155,24 @@ export function classifyAutomationsFailure(err: unknown): AutomationsFailure {
     return {
       ok: false,
       kind: 'error',
-      message: body?.message ?? err.message,
+      message: sprintf(
+        // translators: %d is the HTTP status code of the failed request.
+        __(
+          'Connecting to Smaily Campaign Intelligence failed (HTTP %d). Check the connection on the Campaign Intelligence tab and try again.',
+          'smaily-connect',
+        ),
+        err.status,
+      ),
+      detail: body?.message ?? err.message,
     };
   }
   return {
     ok: false,
     kind: 'error',
-    message: err instanceof Error ? err.message : __( 'Network error', 'smaily-connect' ),
+    message: __(
+      'Connecting to Smaily Campaign Intelligence failed. Check your network connection and try again.',
+      'smaily-connect',
+    ),
+    detail: err instanceof Error ? err.message : undefined,
   };
 }

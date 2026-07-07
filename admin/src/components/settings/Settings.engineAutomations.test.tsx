@@ -84,6 +84,10 @@ async function renderOnWooCommerceTab(): Promise<void> {
 async function editCooldown(value: string): Promise<HTMLElement> {
   const cooldown = await screen.findByLabelText(/cooldown/i);
   fireEvent.change(cooldown, { target: { value } });
+  // T2.4/2: the field keeps a local draft while typing and commits on
+  // blur — clicking Save moves focus off the input, so blur precedes
+  // the save in the real flow too.
+  fireEvent.blur(cooldown);
   return cooldown;
 }
 
