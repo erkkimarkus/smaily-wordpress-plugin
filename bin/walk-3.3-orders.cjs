@@ -198,8 +198,13 @@ $bstats = $flusher->flush();
 result( 'batch_flushed_all_sent', $bstats['sent'] === 4 && $bstats['failed'] === 0, json_encode( $bstats ) );
 
 // --- cleanup -------------------------------------------------------------
+// Orders via the WC CRUD delete — wp_delete_post() is a silent NO-OP for HPOS
+// orders (wc_orders table); the residue poisons the suite's order-count tests.
 foreach ( array_unique( $created_orders ) as $id ) {
-	wp_delete_post( $id, true );
+	$o = wc_get_order( $id );
+	if ( $o instanceof \WC_Order ) {
+		$o->delete( true );
+	}
 }
 foreach ( array_unique( $created_products ) as $id ) {
 	wp_delete_post( $id, true );

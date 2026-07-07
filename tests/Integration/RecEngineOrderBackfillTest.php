@@ -196,28 +196,37 @@ final class RecEngineOrderBackfillTest extends TestCase {
 	}
 
 	private function delete_all_orders(): void {
-		// Storage-agnostic (wp-env runs HPOS, so orders live in wc_orders, not
-		// wp_posts). wc_get_orders wants UN-prefixed statuses — passing the
-		// `wc-`-prefixed wc_get_order_statuses() keys silently matches nothing.
-		$statuses = array_map(
-			static function ( string $status ): string {
-				return strpos( $status, 'wc-' ) === 0 ? substr( $status, 3 ) : $status;
-			},
-			array_keys( wc_get_order_statuses() )
-		);
-		$ids = wc_get_orders(
-			array(
-				'limit'  => -1,
-				'return' => 'ids',
-				'status' => $statuses,
+		// STATUS-BLIND sweep straight off the ACTIVE order table (the same
+		// table_spec the job under test queries). A registered-status filter
+		// (wc_get_orders + wc_get_order_statuses()) cannot see an order whose
+		// custom status is no longer registered — e.g. the `wc-label-printed`
+		// residue a 2026-06-19 F3-43 live-walk left in the dev wp-env DB —
+		// while the backfill's denylist SQL counts exactly such a row as a
+		// sale (F3-42), so one invisible row broke every count assert here.
+		// The counts assert over the WHOLE table; the sweep must be exhaustive.
+		global $wpdb;
+		$hpos = class_exists( \Automattic\WooCommerce\Utilities\OrderUtil::class )
+			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+		$spec = OrderBackfillJob::table_spec( $hpos, $wpdb->prefix );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT {$spec['id_col']} FROM {$spec['table']} WHERE {$spec['type_col']} = %s",
+				'shop_order'
 			)
 		);
-		foreach ( $ids as $id ) {
+		foreach ( array_map( 'intval', $ids ) as $id ) {
 			$order = wc_get_order( $id );
 			if ( $order instanceof \WC_Order ) {
 				$order->delete( true );
+			} else {
+				// A row wc_get_order can't hydrate must still not poison the
+				// count — remove the raw row.
+				$wpdb->delete( $spec['table'], array( $spec['id_col'] => $id ) );
 			}
 		}
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	}
 
 	private function truncate_queue(): void {

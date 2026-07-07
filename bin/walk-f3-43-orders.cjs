@@ -151,8 +151,15 @@ $stats_b = $flusher->flush();
 result( 'deleted_product_order_accepted_by_engine', $stats_b['sent'] >= 1 && $stats_b['failed'] === 0, json_encode( $stats_b ) );
 
 // === cleanup =================================================================
+// Orders via the WC CRUD delete — wp_delete_post() is a silent NO-OP for HPOS
+// orders (wc_orders table), and the residue poisons the integration suite's
+// order-count tests (the 2026-06-19 run's `wc-label-printed` order did exactly
+// that: invisible to registered-status sweeps, counted by the backfill SQL).
 foreach ( array_unique( $created_orders ) as $id ) {
-	wp_delete_post( $id, true );
+	$o = wc_get_order( $id );
+	if ( $o instanceof \WC_Order ) {
+		$o->delete( true );
+	}
 }
 foreach ( array_unique( $created_products ) as $id ) {
 	wp_delete_post( $id, true );

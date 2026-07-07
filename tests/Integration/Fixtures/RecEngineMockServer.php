@@ -142,7 +142,9 @@ final class RecEngineMockServer {
 		if ( is_resource( $this->process ) ) {
 			$status = proc_get_status( $this->process );
 			if ( isset( $status['pid'] ) && $status['pid'] > 0 ) {
-				posix_kill( (int) $status['pid'], SIGTERM );
+				// SIGTERM the constant comes from pcntl, which the wp-env CLI
+				// PHP doesn't load — fall back to the numeric signal.
+				posix_kill( (int) $status['pid'], defined( 'SIGTERM' ) ? SIGTERM : 15 );
 			}
 			proc_close( $this->process );
 			$this->process = null;

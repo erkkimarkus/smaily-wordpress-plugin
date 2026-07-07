@@ -26,7 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**T2.2 — engine-triggered automations config, React UI (F3-52)**.
+_Last updated: 2026-07-07 (**OrderBackfill full-suite flake RESOLVED — stale live-walk
+order residue, NOT cross-test state.** The 3 recurring `RecEngineOrderBackfillTest` count
+failures (+1 on every order count) were caused by ONE order sitting in the dev wp-env
+`wc_orders` table since 2026-06-19: the F3-43 live-walk's `wc-label-printed` custom-status
+order. Its cleanup used `wp_delete_post()` — a silent NO-OP for HPOS orders — and the
+test's own `delete_all_orders()` swept via `wc_get_orders` + registered statuses, which
+cannot see an unregistered custom status, while the backfill's F3-42 denylist SQL counts
+it as a sale. Once probed (raw wc_orders dump at assert time) the failure was
+deterministic, isolation included — the earlier "green in isolation" reads reflected
+different env state, not test ordering. Fix: `delete_all_orders()` now sweeps STATUS-BLIND
+off the active order table (reuses `OrderBackfillJob::table_spec()`); order cleanup in
+`RecEngineOrdersTest::tearDown()` + `bin/walk-f3-43-orders.cjs` + `bin/walk-3.3-orders.cjs`
+switched to `wc_get_order()->delete(true)`; bonus one-liner — `RecEngineMockServer::
+terminate()` uses `defined('SIGTERM') ? SIGTERM : 15` (pcntl absent in the wp-env CLI →
+end-of-run fatal gone). Asserts untouched. Gates: full integration suite green TWICE in a
+row (`OK (126 tests, 594 assertions)` both runs, no shutdown fatal), ci:strict exit=0.
+LESSONS §2.16. Prior same day: **T2.2 — engine-triggered automations config, React UI (F3-52)**.
 The "Engine-run recommendation automations" sub-section renders UNDER the store-run
 WooCommerce automations (Step 3 / WooCommerce tab): catalog-driven trigger cards (§11 —
 no hardcoded keys, a new engine trigger appears without a plugin release; `_et`/`_en` copy
@@ -52,9 +68,9 @@ smaily-connect-et.po (0 untranslated). Tests: 44 new vitest (engine-automations 
 reducer slice 4, section component 9, Settings save-orchestration/partial-failure 3).
 DECISIONS F3-52. Gates: ci:strict exit=0 (PHPUnit unit 474, PHPCS 0 errors, PHPStan clean,
 vitest 208, tsc/eslint clean); PHP untouched — no integration run required for this UI
-sub-PR. **Next:** the OrderBackfill full-suite flake investigation (below); T2 live-walk
-against the sandbox when the engine side is ready. Prior same day: **T2.1 — the PHP layer**
-below.)_
+sub-PR. **Next:** T2 live-walk against the sandbox when the engine side is ready (the
+OrderBackfill full-suite flake is RESOLVED — see the top entry). Prior same day: **T2.1 —
+the PHP layer** below.)_
 
 _(T2.1 record follows — same day:_ **T2.1 — engine-triggered automations config, PHP layer (F3-51)**.
 Contract synced to **v1.1.0** (commit 9ec2ff8, engine c16377e+7b5b922, byte-identical md5
@@ -78,11 +94,10 @@ DECISIONS F3-51. Gates: ci:strict exit=0 (PHPUnit unit 474, PHPCS 0 errors, PHPS
 vitest 164, tsc/eslint clean); integration — RecEngineAutomationsTest `OK (6 tests, 83
 assertions)` in isolation; full suite 126 tests / 590 assertions with **3 pre-existing
 RecEngineOrderBackfillTest failures that reproduce IDENTICALLY on clean main** (stash-verified,
-same env/day: 120 tests, the same 3 failures without any T2.1 code — every order-count
-assertion comes back +1 in a FULL-suite run only, while the class in isolation and in pair-runs
-is green, so it's cross-test-state dependent, NOT a T2.1 regression; last recorded full-green
-was OK 120/499 on 2026-07-03 — needs its own investigation). Next: T2.2 — the React settings
-UI (**shipped, see the T2.2 entry above**) + the OrderBackfill full-suite flake investigation.
+same env/day: 120 tests, the same 3 failures without any T2.1 code — NOT a T2.1 regression;
+**RESOLVED 2026-07-07, see the top entry**: the cause was a stale custom-status order the
+2026-06-19 F3-43 live-walk left in the dev DB, not cross-test state). Next: T2.2 — the React
+settings UI (**shipped, see the T2.2 entry above**).
 Prior: 2026-07-03 —)_
 
 **v3.3.2 — browse 0-events on CookieYes RESOLVED the RIGHT way (F3-50)**: root cause was the missing free `wp-consent-api` companion plugin, NOT a CookieYes incompatibility (CookieYes registers into the WP Consent API once it's installed). The 3.3.1 CookieYes cookie-parser was a mis-fix (Erkki caught it — per-vendor code + CookieYes docs prove standard support) and is **reverted**; 3.3.2 keeps browse consent on the standard WP Consent API + adds a `NotificationManager` admin advisory guiding merchants to install `wp-consent-api`. MiuMjau fix = install that plugin (wp-admin). Prior same day: **v3.3.1** (reverted) and **F3-49 DONE — browse events carry `smaily_visitor_token` (cold-start), NOT rec_id/email; browse attribution stays order-signal-driven** — resolves the browse-identity gap Erkki raised 2026-07-01. The beacon sent only `session_id`, so contract §6 per-event identity-resolution + retroactive-binding never fired and the async order-attribution path-3 was inert. Engine-team answer (2026-07-03): browse does NOT feed attribution (order `smaily_rec_id` + email-click drive `direct`/`exact_later`/`indirect_*`; browse would at best give the soft `assisted_view`) — so we DON'T add rec_id/email to browse, but DO add the opaque `smaily_visitor_token` for future cold-start personalization (the engine binds the browse row via it; ingest already accepts the field). Profiling opt-out on the token path is engine-side (server-enforced 2026-07-03); guest-browse-session-only = accepted v1 limitation. Wired into `enrich()` (omit-on-empty) + JS/integration/live-walk coverage; DECISIONS F3-49. Prior: 2026-06-30 — **F3-47 SP-A DONE — contact-sync language via `ContactLanguageResolver`**.

@@ -52,7 +52,12 @@ final class RecEngineOrdersTest extends TestCase {
 
 	protected function tearDown(): void {
 		foreach ( $this->created_orders as $order_id ) {
-			wp_delete_post( $order_id, true );
+			// NOT wp_delete_post: under HPOS orders live in wc_orders, so a
+			// post-delete is a silent no-op and the order leaks across runs.
+			$order = wc_get_order( $order_id );
+			if ( $order instanceof \WC_Order ) {
+				$order->delete( true );
+			}
 		}
 		foreach ( $this->created_products as $product_id ) {
 			wp_delete_post( $product_id, true );

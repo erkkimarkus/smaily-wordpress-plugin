@@ -460,6 +460,22 @@ same shape, table_spec-verified), but if a legacy-storage order-backfill issue
 surfaces, reproduce it against a LEGACY WC env — the HPOS-mode wp-env won't show
 it. Do NOT assume "integration green" covers the legacy order path.
 
+### Delete orders via wc_get_order()->delete(true) — wp_delete_post is an HPOS no-op (2026-07-07 flake)
+Any test/walk/script that creates a WC order MUST clean it up with
+`wc_get_order( $id )->delete( true )`. `wp_delete_post( $order_id, true )` does
+NOTHING under HPOS (orders live in `wc_orders`, not `wp_posts`) and fails
+silently. The scar: the 2026-06-19 F3-43 live-walk leaked ONE `wc-label-printed`
+custom-status order this way; a registered-status sweep (`wc_get_orders` +
+`wc_get_order_statuses()`) can't see an unregistered custom status, while the
+backfill's F3-42 denylist SQL counts it as a sale — so 18 days later every
+`RecEngineOrderBackfillTest` count assert came back +1 and looked like a
+cross-test flake. Second rule from the same scar: a test asserting exact counts
+over the whole orders table sweeps it STATUS-BLIND off the active table
+(`OrderBackfillJob::table_spec()` — see `delete_all_orders()` in that test),
+never through a registered-status filter. Live-walks share the dev wp-env DB
+with the integration suite — a leaked walk order is a delayed test failure.
+(LESSONS §2.16.)
+
 ### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
 Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's
 call: new work targets 7.0; the earlier WP 6.9.4 baseline was an interim step).

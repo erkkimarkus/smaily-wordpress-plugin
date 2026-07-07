@@ -561,6 +561,48 @@ access). Also corrected alongside: there is **no** `smaily_connect_beacon_consen
 (only the JS `consentOverride` + `smaily_connect_beacon_consent_category`) — an earlier note
 claimed one.
 
+### 2.16 HPOS order cleanup: `wp_delete_post()` is a silent no-op — and residue can hide from registered-status sweeps (OrderBackfill full-suite flake, 2026-07-07)
+
+**What happened:** the full integration suite failed 3 `RecEngineOrderBackfillTest`
+count asserts, every order count +1. First read: cross-test state leaked by a
+recently-added test. The truth (found by dumping raw `wc_orders` rows at setUp and
+assert time): a **single order created 2026-06-19 by the F3-43 LIVE-WALK**
+(`bin/walk-f3-43-orders.cjs`, status `wc-label-printed`, email `f343-custom@…`) had
+sat in the dev wp-env DB for 18 days. Two independent bugs kept it alive AND
+invisible:
+
+1. **The walk's cleanup used `wp_delete_post( $order_id, true )` — a silent NO-OP
+   under HPOS** (orders live in `wc_orders`, not `wp_posts`; nothing errors, nothing
+   is deleted). `RecEngineOrdersTest::tearDown()` had the same bug — its leaked
+   orders just happened to have *registered* statuses, so the next run's sweep
+   caught them.
+2. **The test's `delete_all_orders()` swept via `wc_get_orders( status:
+   wc_get_order_statuses() )` — blind to a custom status that is no longer
+   registered.** The walk registers `wc-label-printed` only inside its own process;
+   in every later process the sweep can't match the row, while the backfill's F3-42
+   denylist SQL (`status NOT IN (non-sale)`) counts exactly such a row as a sale.
+   So the residue was invisible to the cleanup and visible to the code under test —
+   the worst combination.
+
+**Why it looked like a flake:** "isolation green, full-suite red" reports mixed runs
+against differing env state; once probed with raw-SQL dumps, the failure was fully
+deterministic (red in isolation too). Don't accept a flake-shaped description
+without dumping the actual table at assert time — one `$wpdb->get_results` told the
+whole story in one run.
+
+**Rules for next time:**
+1. **Delete orders via `wc_get_order( $id )->delete( true )`, never
+   `wp_delete_post()`** — in tests, walks, any wp-env script. `wp_delete_post` on an
+   HPOS order fails silently (generalises §2.8: storage-mode assumptions hide in
+   cleanup code too, where no assert ever looks).
+2. **A test that asserts exact counts over a whole table must sweep that table
+   status-blind** — enumerate raw ids from the same table the code under test
+   queries (`OrderBackfillJob::table_spec()`), not through a registered-status
+   filter that can't see what the query under test can.
+3. **Live-walks share the integration DB — their cleanup is suite infrastructure.**
+   A walk that leaks doesn't fail; it poisons a test days later (§2.6's sibling:
+   state you *want* gone can also persist).
+
 ---
 
 ## 3. The non-technical lesson: spec errors vs bugs
