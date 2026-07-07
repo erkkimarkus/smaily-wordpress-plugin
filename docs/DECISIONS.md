@@ -2772,6 +2772,23 @@ an engine-side field error).
 types end-to-end), LESSONS §2.3 (mock strictness — component tests mock the api module, the
 shapes come from the contract).
 
+**Addendum (2026-07-07, T2.4 — Erkki's real-store test): language mode is STORE-GLOBAL;
+a server row's `language_mode` is only a wire fact.** The display mode is derived ALWAYS
+and ONLY from the store's structure (`deriveLanguageMode`: multilingual A/B → per_language,
+else single) and applies uniformly to every row. The stored `language_mode` on a §12 config
+row records how that row was last saved — it is never honoured as a display shape. (The bug:
+a walk-saved `replenish_due` row with `language_mode='single'` rendered ONE dropdown on the
+sandbox while its never-configured neighbours rendered the per-language table — two shapes
+on one screen.) At hydrate, `convertAutomationMap` translates a stored map into the derived
+mode: single `{id}` → per_language `{fallback: id}` (language fields start unpicked; the
+workflow stays reachable and the row valid); per_language → single `{id: fallback}` (the
+language split is meaningless on a single-language store; a map without a fallback converts
+to `{}` and the merchant re-picks — validation flags it while enabled). The PUT always sends
+the derived mode + the converted map, so the engine row converges to the store's shape on
+the next save. Alternative rejected: honouring the server row's mode per row (what shipped
+in 3.4.0) — it renders an inconsistent mixed UI and lets a stale wire fact override the
+store's actual language structure.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -26,7 +26,40 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**v3.4.0 RELEASED — engine-run automations settings (T2) GA.**
+_Last updated: 2026-07-07 (**T2.4 — engine-automations UI feedback fixes (Erkki's real-store
+test of v3.4.0; F3-52 addendum).** Five fixes, all React admin — PHP untouched. (1) **Language
+mode is STORE-GLOBAL** (F3-52 addendum): the display mode derives ALWAYS from the store's
+structure (`deriveLanguageMode`), uniformly for every row; a server row's stored
+`language_mode` is a wire fact only and is never honoured for display (the sandbox's
+walk-saved `single` `replenish_due` row rendered one dropdown while its neighbours got the
+per-language table). New pure `convertAutomationMap` translates stored maps at hydrate —
+single `{id}` → per_language `{fallback:id}` (languages unpicked); per_language → single
+`{id:fallback}` (no fallback → `{}`, merchant re-picks) — and the PUT sends the derived mode.
+(2) **Cooldown input UX:** a local typing draft (empty allowed — no snap-to-0, no "0…"
+prefix), commit clamped to 1–365 on blur, an empty/garbage draft reverts to the previous
+value; implemented as a section-local `CooldownField`, the shared NumberInput primitive's
+immediate-commit behaviour untouched (other call sites). (3) **Empty test-address warning:**
+an `enabled && test_mode && test_emails=[]` row gets an inline warning-tone note (the engine's
+test fire path sends ONLY to the listed addresses — an empty list means nobody ever gets an
+email, silently); a warning, not an error — saving stays allowed. (4) **Human generic error
+banner:** `classifyAutomationsFailure`'s generic branch now leads with a human message
+("Connecting to Smaily Campaign Intelligence failed (HTTP nnn). Check the connection on the
+Campaign Intelligence tab and try again.") and demotes the raw technical error (the old
+"GET /… → 401" headline, Erkki's deleted-key case) to a new `AutomationsFailure.detail`
+rendered as a small detail line; the save path appends the detail in parentheses; the
+key_rejected banner already pointed to the Campaign Intelligence tab — unchanged.
+(5) **Forward-compatible `recipe_en?`:** the catalog type gained the optional field; non-et
+admin locales show it when present, else `recipe_et` (`pickRecipe` — consistent with the
+name/description locale logic). Mock + contract deliberately NOT touched — they sync in
+their own pass after the engine deploy lands (do not depend on it). i18n: 3 new strings,
+et translations complete (build-i18n run twice — extract then compile; 0 untranslated;
+translations verified in the admin-bundle JSON). Tests: +24 vitest (conversion both
+directions + uniform-mode buildRows, pickRecipe, save-path detail, classifier messages/detail
+×6, cooldown draft/revert/clamp ×3, empty-address warning, recipe_en render ×2, banner detail
+line; the Settings save-helper now blur-commits like the real flow). Gates: ci:strict exit=0
+(PHPUnit unit 474, PHPCS 0 errors, PHPStan clean, vitest 232, eslint/tsc clean); PHP delta
+zero — no integration run (would scrub the sandbox connection). Prior same day:
+**v3.4.0 RELEASED — engine-run automations settings (T2) GA.**
 Release gate on top of the T2.3 live-walk + T2 security re-audit (both below, same day):
 version bumped in all six places (plugin header/constants, package.json, readme.txt stable
 tag + changelog + upgrade notice, ConstantsTest, both test bootstraps), committed BEFORE the

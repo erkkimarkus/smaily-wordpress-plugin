@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-3.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Smaily Connect 3.3.2\n"
+"Project-Id-Version: Smaily Connect 3.4.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/smaily-connect\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-07T11:13:09+00:00\n"
+"POT-Creation-Date: 2026-07-07T12:58:56+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -933,7 +933,16 @@ msgstr ""
 msgid "The engine rejected the stored API key."
 msgstr ""
 
-#: admin/src/api/automations.tsx:54
+#. translators: %d is the HTTP status code of the failed request.
+#: admin/src/api/automations.tsx:50
+#, js-format
+msgid "Connecting to Smaily Campaign Intelligence failed (HTTP %d). Check the connection on the Campaign Intelligence tab and try again."
+msgstr ""
+
+#: admin/src/api/automations.tsx:62
+msgid "Connecting to Smaily Campaign Intelligence failed. Check your network connection and try again."
+msgstr ""
+
 #: admin/src/api/recEngine.tsx:17
 #: admin/src/api/recEngine.tsx:35
 #: admin/src/components/wizard/Wizard.tsx:74
@@ -1147,7 +1156,7 @@ msgid "Rec"
 msgstr ""
 
 #: admin/src/components/settings/EventLog.tsx:213
-#: admin/src/components/steps/EngineAutomationsSection.tsx:174
+#: admin/src/components/steps/EngineAutomationsSection.tsx:175
 msgid "Retry"
 msgstr ""
 
@@ -1292,59 +1301,59 @@ msgid "Save changes"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:24
-#: admin/src/components/steps/EngineAutomationsSection.tsx:196
+#: admin/src/components/steps/EngineAutomationsSection.tsx:201
 msgid "Active"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:24
-#: admin/src/components/steps/EngineAutomationsSection.tsx:196
+#: admin/src/components/steps/EngineAutomationsSection.tsx:201
 msgid "Off"
 msgstr ""
 
 #. translators: %s is the automation name, e.g. "welcome email".
 #. translators: %s is the automation name, e.g. "Replenishment due".
 #: admin/src/components/steps/AutomationSection.tsx:34
-#: admin/src/components/steps/EngineAutomationsSection.tsx:211
+#: admin/src/components/steps/EngineAutomationsSection.tsx:218
 #, js-format
 msgid "Enable %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:63
-#: admin/src/components/steps/EngineAutomationsSection.tsx:282
+#: admin/src/components/steps/EngineAutomationsSection.tsx:309
 msgid "Language"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:64
-#: admin/src/components/steps/EngineAutomationsSection.tsx:283
+#: admin/src/components/steps/EngineAutomationsSection.tsx:310
 msgid "Workflow"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:65
-#: admin/src/components/steps/EngineAutomationsSection.tsx:284
+#: admin/src/components/steps/EngineAutomationsSection.tsx:311
 msgid "Default fallback"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:120
-#: admin/src/components/steps/EngineAutomationsSection.tsx:359
+#: admin/src/components/steps/EngineAutomationsSection.tsx:386
 msgid "inactive"
 msgstr ""
 
 #. translators: %s is the error message.
 #: admin/src/components/steps/AutomationSection.tsx:154
-#: admin/src/components/steps/EngineAutomationsSection.tsx:333
+#: admin/src/components/steps/EngineAutomationsSection.tsx:360
 #, js-format
 msgid "Couldn't load workflows: %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:160
 #: admin/src/components/steps/AutomationSection.tsx:177
-#: admin/src/components/steps/EngineAutomationsSection.tsx:367
+#: admin/src/components/steps/EngineAutomationsSection.tsx:394
 msgid "Loading workflows…"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:160
 #: admin/src/components/steps/AutomationSection.tsx:177
-#: admin/src/components/steps/EngineAutomationsSection.tsx:367
+#: admin/src/components/steps/EngineAutomationsSection.tsx:394
 msgid "— pick a workflow —"
 msgstr ""
 
@@ -1356,7 +1365,7 @@ msgstr ""
 
 #. translators: %s is a locale code, e.g. en-US.
 #: admin/src/components/steps/AutomationSection.tsx:191
-#: admin/src/components/steps/EngineAutomationsSection.tsx:311
+#: admin/src/components/steps/EngineAutomationsSection.tsx:338
 #, js-format
 msgid "Mark %s as default fallback"
 msgstr ""
@@ -1409,125 +1418,129 @@ msgstr ""
 msgid "Connected to Smaily."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:37
+#: admin/src/components/steps/EngineAutomationsSection.tsx:38
 msgid "Engine-run recommendation automations"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:38
+#: admin/src/components/steps/EngineAutomationsSection.tsx:39
 msgid "Unlike the automations above, these are triggered by Smaily Campaign Intelligence — the engine enrols each contact into the Smaily workflow you pick at the moment it predicts (a replenishment running out, a customer at risk of churning). Your store only configures them here; sending happens engine-side."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:51
+#: admin/src/components/steps/EngineAutomationsSection.tsx:52
 msgid "Connect Campaign Intelligence to unlock"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:61
+#: admin/src/components/steps/EngineAutomationsSection.tsx:62
 msgid "Open Campaign Intelligence"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:65
+#: admin/src/components/steps/EngineAutomationsSection.tsx:66
 msgid "Replenishment reminders, win-back campaigns and other engine-run automations send themselves at the right moment for each customer — through your own Smaily workflows."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:70
+#: admin/src/components/steps/EngineAutomationsSection.tsx:71
 msgid "Connect Smaily Campaign Intelligence on the Campaign Intelligence tab to set them up."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:70
+#: admin/src/components/steps/EngineAutomationsSection.tsx:71
 msgid "You will connect Smaily Campaign Intelligence in the next step — this section unlocks right after."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:105
+#: admin/src/components/steps/EngineAutomationsSection.tsx:106
 msgid "No engine automations are available for your store yet. New triggers appear here automatically when the engine adds them."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:117
+#: admin/src/components/steps/EngineAutomationsSection.tsx:118
 msgid "Engine automations not saved"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:124
+#: admin/src/components/steps/EngineAutomationsSection.tsx:125
 msgid "Engine automations saved."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:155
+#: admin/src/components/steps/EngineAutomationsSection.tsx:156
 msgid "Loading engine automations…"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:167
+#: admin/src/components/steps/EngineAutomationsSection.tsx:168
 msgid "Campaign Intelligence rejected the stored API key"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:167
+#: admin/src/components/steps/EngineAutomationsSection.tsx:168
 msgid "The key was revoked or rotated. Disconnect and reconnect with a fresh setup link on the Campaign Intelligence tab, then come back here."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:173
+#: admin/src/components/steps/EngineAutomationsSection.tsx:174
 msgid "Couldn't load engine automations"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:196
+#: admin/src/components/steps/EngineAutomationsSection.tsx:201
 msgid "Test mode"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:207
 msgid "Smaily templates guide"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:228
+#: admin/src/components/steps/EngineAutomationsSection.tsx:260
 msgid "Cooldown"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:236
+#: admin/src/components/steps/EngineAutomationsSection.tsx:268
 msgid "days"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:244
+#: admin/src/components/steps/EngineAutomationsSection.tsx:274
 msgid "Minimum days between two fires of this automation for the same customer (1–365)."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:262
+#: admin/src/components/steps/EngineAutomationsSection.tsx:289
 msgid "Smaily workflow"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:279
+#: admin/src/components/steps/EngineAutomationsSection.tsx:306
 msgid "Smaily workflow per language"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:346
+#: admin/src/components/steps/EngineAutomationsSection.tsx:373
 msgid "Workflow id, e.g. 123"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:350
+#: admin/src/components/steps/EngineAutomationsSection.tsx:377
 msgid "No active workflows found in Smaily — enter the workflow id manually or create the workflow first."
 msgstr ""
 
 #. translators: %s is the automation name, e.g. "Replenishment due".
-#: admin/src/components/steps/EngineAutomationsSection.tsx:387
+#: admin/src/components/steps/EngineAutomationsSection.tsx:414
 #, js-format
 msgid "Turn off test mode for \"%s\"? Once you save, the engine will start sending this automation to real customers. You can switch back to test mode at any time."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:404
+#: admin/src/components/steps/EngineAutomationsSection.tsx:431
 msgid "Live — real customers receive this automation once saved."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:405
+#: admin/src/components/steps/EngineAutomationsSection.tsx:432
 msgid "Back to test mode"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:410
+#: admin/src/components/steps/EngineAutomationsSection.tsx:437
 msgid "Test mode is on — emails go only to the test addresses below, never to customers."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:412
+#: admin/src/components/steps/EngineAutomationsSection.tsx:439
 msgid "Test addresses"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:426
+#: admin/src/components/steps/EngineAutomationsSection.tsx:453
 msgid "Comma-separated, up to 50 addresses."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:429
+#: admin/src/components/steps/EngineAutomationsSection.tsx:454
+msgid "This automation is enabled in test mode without any test addresses — no emails will be sent to anyone until you add at least one address."
+msgstr ""
+
+#: admin/src/components/steps/EngineAutomationsSection.tsx:460
 msgid "Activate for real…"
 msgstr ""
 
@@ -2290,39 +2303,39 @@ msgstr ""
 msgid "Failed to load workflows"
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:59
+#: admin/src/state/engine-automations.tsx:78
 msgid "Workflow id must be a numeric string."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:64
+#: admin/src/state/engine-automations.tsx:83
 msgid "Pick a workflow before enabling this automation."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:69
+#: admin/src/state/engine-automations.tsx:88
 msgid "Mark one language as the default fallback before enabling."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:74
+#: admin/src/state/engine-automations.tsx:93
 msgid "Cooldown must be between 1 and 365 days."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:77
+#: admin/src/state/engine-automations.tsx:96
 msgid "At most 50 test addresses are allowed."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:85
+#: admin/src/state/engine-automations.tsx:104
 msgid "Invalid email address."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:138
+#: admin/src/state/engine-automations.tsx:157
 msgid "Fix the highlighted fields, then save again."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:158
+#: admin/src/state/engine-automations.tsx:177
 msgid "The engine rejected the configuration — nothing was saved. Fix the highlighted fields and save again."
 msgstr ""
 
-#: admin/src/state/engine-automations.tsx:170
+#: admin/src/state/engine-automations.tsx:189
 msgid "The engine rejected the stored API key — reconnect Campaign Intelligence, then save again."
 msgstr ""
 
