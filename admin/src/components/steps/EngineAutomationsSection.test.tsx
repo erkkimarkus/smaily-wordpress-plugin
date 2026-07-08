@@ -143,9 +143,14 @@ describe('EngineAutomationsSection', () => {
   it('filters INACTIVE workflows out of the dropdown', async () => {
     render(<Harness initial={connectedState()} />);
 
-    const select = await screen.findByRole('combobox');
+    // The workflow list loads AFTER the combobox first renders (placeholder
+    // option only) — await the ACTIVE option itself, not just the select;
+    // asserting on the intermediate render made this flaky under a loaded
+    // parallel run (2× on 2026-07-08).
+    expect(await screen.findByRole('option', { name: 'Replenishment flow' })).toBeInTheDocument();
+
+    const select = screen.getByRole('combobox');
     const optionLabels = Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
-    expect(optionLabels).toContain('Replenishment flow');
     expect(optionLabels).not.toContain('Old flow');
   });
 
