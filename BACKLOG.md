@@ -61,6 +61,7 @@ WP7_COMPAT Phase-4 + three audit-only gaps that were tracked nowhere)._
 | What | Why deferred | Doc location |
 |---|---|---|
 | **3.10.3 email channel** (`wp_mail`) | Admin-notice base already covers proactive-in-wp-admin; email needs working server SMTP (recommend an SMTP plugin in the doc). | STATUS L362, DECISIONS L1606 |
+| **Abandoned-cart rewrite onto the new namespaced pipeline** | Deferred 2026-07-08 (Erkki): the legacy path is hardened (F3-53 — poison-row guards, Throwable backstop, resolver language), so no urgency. Rewrite motivation: `serialize(WC()->cart->get_cart())` stores whole WC_Product objects (fragile across versions — today's poison class; store minimal scalars instead), guest carts not captured (`is_user_logged_in` gate), no Event Log observability, transient dedup. Counterweight: upstream code — a rewrite widens the upstream-merge diff. Own sub-PR with plan/checkpoint. | DECISIONS F3-53 (addendum), STATUS 2026-07-08 entry |
 | **(a) explicit opt-in if AKI tightens** | Conditional — `ProfilingConsent::is_allowed()` is invertible; flip only if the regulator requires opt-in. | STATUS L406, DECISIONS L1643 |
 | **(a) drop-count UI surface** (`smly_profiling_dropped_24h`) | Counter is wired; surfacing it in the UI is a refinement, not built. | STATUS L386, DECISIONS L1682 |
 | **Auto-retry of transient failures** | Conscious choice: Retry is **manual-only** — auto-retrying a deterministic 4xx loops. Revisit only if transient-vs-permanent classification is added. | STATUS L339, DECISIONS L1601 |

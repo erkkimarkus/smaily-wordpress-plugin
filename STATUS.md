@@ -52,10 +52,27 @@ OVERWROTE the dev-site sandbox connection with fixture values (`re-fixture.test`
 does NOT hold for the connection options, follow the CLAUDE.md snapshot/restore rule.
 Docs: DECISIONS F3-53, LESSONS §2.18 (+ restored the `## 3` header §2.17's commit
 accidentally ate). Client-side mitigation sent to Prike's dev meanwhile: abandoned cart
-OFF in settings + `wp cron event delete` × 3 legacy events. NOT yet released — needs a
-version bump so Prike's proper plugin update heals the cron residue via
-`maybe_run_upgrade → Activation::run → WPCronAuditor`. Open question (Erkki): rewrite
-abandoned-cart onto the new namespaced pipeline as its own sub-PR? Prior:
+OFF in settings + `wp cron event delete` × 3 legacy events. Same day, Erkki's call
+("teeme kohe korda ja siis release"): **F3-53 addendum — abandoned-cart `language` now
+routes through ContactLanguageResolver** (`0014d76`; the legacy helper's cron fallback
+sent `language:''` = wipes the contact's stored language — the F3-47 class at
+abandoned-cart scale; key omitted when unresolved, integration test captures the real
+wire body at the `pre_http_request` seam and pins `language='en'`). Then
+**v3.4.2 RELEASED** per the CLAUDE.md recipe: bump in all six places + CHANGELOG.md
+backfilled 3.2.0–3.4.1 (it had stalled at 3.1.0), committed BEFORE the build → clean
+build-hash `d6fb061`; ci:strict exit=0 (re-run after bump); integration FULL suite OK
+(132 tests, 627 assertions; connection snapshot/restored); admin+client+blocks rebuilt;
+i18n skip per recipe (no admin-string/.po changes, artifacts current); prod-vendor ZIP
+built + verified (v3.4.2 everywhere, required present, dev artifacts absent, ~1.06 MB);
+PCP on the BUILT ZIP clean except the intentional `plugin_updater_detected` (F3-35);
+audits-register 3.4.2 gate row added. GH release `v3.4.2` on the fork (normal release,
+Latest), ZIP attached. **Prike next step: install v3.4.2 as a proper plugin update** —
+the update itself clears the legacy WP-Cron residue (`maybe_run_upgrade → Activation::run
+→ WPCronAuditor`); then abandoned cart can be re-enabled (poison rows will terminal-mark
++ log on the first tick). **Open (BACKLOG): rewrite abandoned-cart onto the new
+namespaced pipeline** (own store shape instead of `serialize(get_cart())`, guest
+capture, Event Log observability) — deferred, legacy path is hardened; separate sub-PR
+with its own plan/checkpoint. Prior:
 **v3.4.1 RELEASED — T2.4 pilot-feedback UI fixes + contract
 v1.2.0 sync (`recipe_en`).** Patch release per the CLAUDE.md recipe: version bumped in all
 six places, committed BEFORE the build → clean build-hash `ae3bc3d`; ci:strict exit=0
