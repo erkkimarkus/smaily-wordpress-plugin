@@ -26,7 +26,38 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-08 (**F3-53 — Prike abandoned-cart PHP 8 fatal loop + legacy WP-Cron
+_Last updated: 2026-07-08 (**F3-54 — the REAL Prike fatal found and fixed; v3.4.3 RELEASED
+(critical).** Martin's correction (fatal at the option guard, line 166; admin off-toggle
+didn't stop it) invalidated the F3-53 poison-row theory: the crash is OUR seam —
+`SettingsEndpoint::save_woocommerce` wrote `smaily_connect_abandoned_cart_status` as a
+BARE BOOLEAN (WP stores `'1'`/`''`) while THREE consumers offset into it as an array
+(legacy email pass; `Options::get_woocommerce_settings_from_db`; inverted in
+`EnvDetector`, where `(bool)` on a disabled array read as ENABLED). PHP 8 repro'd:
+`'1'['enabled']` and `''['enabled']` both throw "Cannot access offset of type string on
+string". Every store that saves the WooCommerce tab / wizard Step 3 corrupts the option —
+Prike crashed loudly; the dev env never saved that tab (option absent), and the guard
+test seeded the option ITSELF in the array shape, so the seam was structurally invisible
+(LESSONS §2.19). Fix (`8c1c9d2`): (1) `Options::abandoned_cart_status()` +
+pure `normalize_abandoned_cart_status()` — ONE shape gate, all consumers read through it,
+corrupted stores heal automatically; (2) the legacy email pass dispatches ROUTER-FIRST
+(`AutomationRouter::trigger_automation('abandoned_cart', …)` — wizard mapping row is the
+workflow source; multilingual + F3-48 force_opt_in + F3-44 exchange capture; ApiException
+= transient → retry) with fallback to the legacy `autoresponder_id` for pre-wizard
+stores; enabled-with-neither-source logs once per pass, carts stay pending; (3)
+`save_woocommerce` writes the ARRAY shape and PRESERVES `autoresponder_id` (3.4.x
+destroyed it); (4) hydrate reads via the normalizer. Tests: +6 unit (normalizer), +5
+integration (`AbandonedCartSettingsSeamTest` — REAL writer + REAL reader in one
+scenario). Gates: ci:strict exit=0 (unit 480, vitest 232 — one pre-existing FLAKY:
+`EngineAutomationsSection` "filters INACTIVE workflows" failed once under the parallel
+full run, passes isolated ×2 + on rerun; T2.4 surface, untouched here); integration FULL
+137/652; sandbox connection snapshot/restored (tenant verified). **v3.4.3 RELEASED** per
+recipe (clean build-hash `597ae8f`, ZIP verified ~1.06 MB, PCP-on-ZIP clean except the
+intentional F3-35 finding, audits-register row added, GH release Latest). **Prike:
+install v3.4.3 as a proper update — no manual option cleanup needed** (the normalizer
+heals the corrupt value; the interim `wp option delete
+smaily_connect_abandoned_cart_status` remains valid until then; the v3.4.2 legacy-cron
+cleanup is included). Prior same day:
+**F3-53 — Prike abandoned-cart PHP 8 fatal loop + legacy WP-Cron
 resurrection fixed.** Prike (installed the new module over the old one, no in-place upgrade)
 hit a 15-minute fatal loop on `smly_plus_abandoned_cart`: old-writer `cart_content` rows
 deserialize to string items, `prepare_products_data()` read `$cart_item['product_id']`
