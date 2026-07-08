@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.4.3
+Stable tag: 3.5.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.5.0 =
+* Improved: the contact backfill progress now shows two honest numbers — how many WordPress users were checked, and how many contacts were actually synced to Smaily according to your contact sync mode (in consent mode only opted-in users are synced; that has always been the case, but the progress display previously showed the checked-users count labelled as synced contacts).
+* New: before starting a backfill, the panel shows an estimate of how many contacts your current sync mode will actually sync (e.g. "about 16000 of them will be synced to Smaily as contacts").
+* Fixed: the wizard's Done summary counted checked users as synced contacts.
 
 = 3.4.3 =
 * Fixed: saving the WooCommerce settings stored the abandoned-cart on/off state in a format the abandoned-cart email task could not read, which crashed the task on PHP 8 every 15 minutes — and turning the feature off did not stop it. The setting is now stored and read in one consistent format, and already-affected sites are healed automatically on update.
@@ -278,6 +283,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.5.0 =
+The contact backfill progress now reports users checked and contacts synced as separate numbers, matching your contact sync mode — no data-flow change, only honest reporting. Safe in-place update.
 
 = 3.4.3 =
 Critical fix: saving WooCommerce settings could crash the abandoned-cart email task on PHP 8 every 15 minutes (and turning the feature off did not stop it). Update immediately if you use abandoned-cart reminders; affected sites are healed automatically.

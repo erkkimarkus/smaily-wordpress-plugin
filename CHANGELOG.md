@@ -4,6 +4,27 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.5.0 — backfill progress: users walked vs contacts synced (F3-55) (2026-07-08)
+
+Prike: "contact sync shows 30k contacts going to Smaily, we have 16k opt-ins." The wire
+was correct (the F3-48 audience filter POSTs only the sync mode's audience) — but the
+progress UI labelled the WALK count "contacts synced":
+
+- **Migration 008:** cumulative `synced_count` on the backfill-job row — audience members
+  handled (POSTed + already-fresh). The walk (`processed/total`) keeps driving
+  percent/ETA; `synced` is the only number the UI may label "contacts synced".
+- **`ContactAudience::count_audience()`:** the mode-aware SQL audience count, living next
+  to `should_sync_user()`; an integration test asserts the two halves of the audience
+  definition agree in every mode.
+- **`/backfill/status`** carries `synced` + `audience_estimate` (contacts only; the
+  estimate is computed only on non-running polls).
+- **UI (wizard + Settings):** pre-start hint "about N of them will be synced to Smaily as
+  contacts" (shown only when the mode narrows the audience); running "Checked X of Y
+  users — Z contacts synced"; done "Done — Z contacts synced (X users checked)". The
+  wizard Done summary uses the synced count. Estonian translations included.
+
+No data-flow change — only honest reporting. Details: DECISIONS F3-55.
+
 ## 3.4.3 — abandoned-cart status option: normalized shape + router-first dispatch (F3-54) (2026-07-08)
 
 The REAL Prike fatal (client-dev correction to F3-53's diagnosis — the crash was at the
