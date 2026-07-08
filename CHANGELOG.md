@@ -4,6 +4,33 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.4.3 — abandoned-cart status option: normalized shape + router-first dispatch (F3-54) (2026-07-08)
+
+The REAL Prike fatal (client-dev correction to F3-53's diagnosis — the crash was at the
+option guard, not the cart-item loop):
+
+- **The writer↔reader seam fixed:** the new Settings/wizard wrote
+  `smaily_connect_abandoned_cart_status` as a bare boolean (WP stores `'1'`/`''`) while
+  the legacy cron pass, `Options::get_woocommerce_settings_from_db()` and (inverted)
+  `EnvDetector` read it as an array — `$status['enabled']` on the stored string is a
+  PHP 8 TypeError every 15 minutes, and toggling the feature off just wrote the other
+  string. Now: `Options::abandoned_cart_status()` normalizes every shape in one place,
+  all consumers read through it (already-corrupted stores heal automatically), and the
+  Settings writer produces the array shape.
+- **Abandoned-cart sends are router-first:** the legacy email pass resolves the workflow
+  through `AutomationRouter` (the wizard's automation-mapping row; multilingual modes,
+  the F3-48 force_opt_in policy, F3-44 exchange capture), falling back to the legacy
+  `autoresponder_id` on pre-wizard stores — which the Settings save now PRESERVES
+  instead of destroying. Enabled with neither source logs one line per pass; carts stay
+  pending until a workflow is mapped.
+- **Hydrate fix:** a disabled legacy array no longer `(bool)`-casts to "enabled" in the
+  wizard.
+- Tests: +6 unit (normalizer), +5 integration (`AbandonedCartSettingsSeamTest` — the
+  REAL writer and REAL reader in one scenario; the old guard test seeded the option
+  itself and structurally couldn't see the seam).
+
+Details: DECISIONS F3-54, LESSONS §2.19.
+
 ## 3.4.2 — abandoned-cart hardening + legacy WP-Cron removal (F3-53) (2026-07-08)
 
 Fixes from the Prike incident (new module installed over the old one, no in-place

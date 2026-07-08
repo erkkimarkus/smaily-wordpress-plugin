@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.4.2
+Stable tag: 3.4.3
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.4.3 =
+* Fixed: saving the WooCommerce settings stored the abandoned-cart on/off state in a format the abandoned-cart email task could not read, which crashed the task on PHP 8 every 15 minutes — and turning the feature off did not stop it. The setting is now stored and read in one consistent format, and already-affected sites are healed automatically on update.
+* Fixed: the wizard could show abandoned cart as enabled when it was actually disabled (on stores upgraded from an older plugin version).
+* Improved: abandoned-cart reminders now use the workflow you map in the setup wizard / settings (including per-language workflows on multilingual stores). Stores upgraded from an older plugin version that have not run the wizard keep using their previously configured autoresponder, which is now also preserved when settings are re-saved.
 
 = 3.4.2 =
 * Fixed: a corrupted abandoned-cart row (left behind by an older plugin version after an in-place module swap) could crash the abandoned-cart email task on PHP 8 and repeat every 15 minutes, blocking all abandoned-cart reminders. Such rows are now skipped and logged, and one bad cart can no longer stop the others.
@@ -273,6 +278,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.4.3 =
+Critical fix: saving WooCommerce settings could crash the abandoned-cart email task on PHP 8 every 15 minutes (and turning the feature off did not stop it). Update immediately if you use abandoned-cart reminders; affected sites are healed automatically.
 
 = 3.4.2 =
 Reliability fixes for stores upgraded from an older plugin version: abandoned-cart crash loop fixed, leftover legacy schedules cleaned up on update, abandoned-cart contact-language handling corrected. Recommended for all stores.
