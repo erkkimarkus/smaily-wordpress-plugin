@@ -222,6 +222,21 @@ export function Step2Subscribers({
               )
             : __( 'No existing WordPress users detected — the backfill will be a no-op.', 'smaily-connect' )}
         </p>
+        {/* F3-55: the audience estimate — on a consent-mode store only the
+            opted-in users become Smaily contacts, so "30k users processed"
+            without this line reads as "30k contacts sent". Shown only when
+            the mode actually narrows the audience. */}
+        {progress.audienceEstimate !== null
+          && state.env.storeTotals.customers > 0
+          && progress.audienceEstimate < state.env.storeTotals.customers && (
+          <p className="mt-1 text-sm text-text-secondary">
+            {sprintf(
+              // translators: %d is the number of contacts in the sync audience.
+              __( 'Based on your contact sync mode, about %d of them will be synced to Smaily as contacts.', 'smaily-connect' ),
+              progress.audienceEstimate,
+            )}
+          </p>
+        )}
 
         <div className="mt-4 flex items-center gap-3">
           <Button
@@ -249,17 +264,21 @@ export function Step2Subscribers({
               ariaLabel={ __( 'Subscriber backfill progress', 'smaily-connect' ) }
             />
             <p className="mt-2 text-xs text-text-secondary">
+              {/* F3-55: `processed` counts users WALKED (drives the bar);
+                  `synced` counts audience members actually handled — the only
+                  number that may be labelled "contacts synced". */}
               {isRunning && sprintf(
-                // translators: %1$d is processed count, %2$d is total count.
-                __( 'Synced %1$d of %2$d.', 'smaily-connect' ),
+                // translators: %1$d is users checked, %2$d is total users, %3$d is contacts synced.
+                __( 'Checked %1$d of %2$d users — %3$d contacts synced.', 'smaily-connect' ),
                 progress.processed,
                 progress.total,
+                progress.synced,
               )}
               {isComplete && sprintf(
-                // translators: %1$d is processed count, %2$d is total count.
-                __( 'Done — %1$d of %2$d contacts synced.', 'smaily-connect' ),
+                // translators: %1$d is contacts synced, %2$d is users checked.
+                __( 'Done — %1$d contacts synced (%2$d users checked).', 'smaily-connect' ),
+                progress.synced,
                 progress.processed,
-                progress.total,
               )}
               {hasFailed && (progress.error
                 ? sprintf(

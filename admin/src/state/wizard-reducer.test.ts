@@ -173,6 +173,7 @@ describe('wizardReducer — Step 2 Subscribers', () => {
         progress: {
           status: 'running',
           processed: 25,
+          synced: 25,
           sent: 25,
           failed: 0,
           total: 100,
@@ -181,6 +182,7 @@ describe('wizardReducer — Step 2 Subscribers', () => {
           error: null,
           startedAt: '2026-05-21 09:00:00',
           completedAt: null,
+          audienceEstimate: null,
         },
       },
     });

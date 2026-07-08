@@ -13,6 +13,7 @@ import { type BackfillProgress } from '../state/types';
 const idleProgress: BackfillProgress = {
   status: 'idle',
   processed: 0,
+  synced: 0,
   sent: 0,
   failed: 0,
   total: 0,
@@ -21,6 +22,7 @@ const idleProgress: BackfillProgress = {
   error: null,
   startedAt: null,
   completedAt: null,
+  audienceEstimate: null,
 };
 
 export interface UseBackfillProgressOptions {
@@ -100,6 +102,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         setProgress({
           status: response.status,
           processed: response.processed,
+          synced: response.synced,
           sent: response.sent,
           failed: response.failed,
           total: response.total,
@@ -108,6 +111,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
           error: null,
           startedAt: response.started_at,
           completedAt: response.completed_at,
+          audienceEstimate: response.audience_estimate,
         });
       } catch {
         // Soft-fail: stay on idleProgress. The Start-backfill button still
@@ -129,6 +133,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       setProgress({
         status: response.status,
         processed: response.processed,
+        synced: response.synced,
         sent: response.sent,
         failed: response.failed,
         total: response.total,
@@ -137,6 +142,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         error: null,
         startedAt: response.started_at,
         completedAt: response.completed_at,
+        audienceEstimate: response.audience_estimate,
       });
       setPollError(null);
 
@@ -197,6 +203,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       setProgress({
         status: 'running',
         processed: 0,
+        synced: 0,
         sent: 0,
         failed: 0,
         total: response.total,
@@ -205,6 +212,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         error: null,
         startedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
         completedAt: null,
+        audienceEstimate: null,
       });
     } catch (err) {
       if (mountedRef.current) {

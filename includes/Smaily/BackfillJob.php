@@ -141,7 +141,7 @@ class BackfillJob implements BackfillJobInterface {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query(
 			$wpdb->prepare(
-				"INSERT INTO {$table} (job_type, target, status, total_count, processed_count, started_at) VALUES (%s, %s, %s, %d, %d, %s) ON DUPLICATE KEY UPDATE status = VALUES(status), total_count = VALUES(total_count), processed_count = 0, cursor_value = NULL, started_at = VALUES(started_at), completed_at = NULL, error_message = NULL",
+				"INSERT INTO {$table} (job_type, target, status, total_count, processed_count, synced_count, started_at) VALUES (%s, %s, %s, %d, %d, 0, %s) ON DUPLICATE KEY UPDATE status = VALUES(status), total_count = VALUES(total_count), processed_count = 0, synced_count = 0, cursor_value = NULL, started_at = VALUES(started_at), completed_at = NULL, error_message = NULL",
 				self::BACKFILL_TYPE,
 				self::BACKFILL_TARGET,
 				'running',
@@ -247,7 +247,7 @@ class BackfillJob implements BackfillJobInterface {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$state = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT id, cursor_value, processed_count, total_count FROM {$table} WHERE job_type = %s AND target = %s",
+				"SELECT id, cursor_value, processed_count, synced_count, total_count FROM {$table} WHERE job_type = %s AND target = %s",
 				self::BACKFILL_TYPE,
 				self::BACKFILL_TARGET
 			),
@@ -325,19 +325,26 @@ class BackfillJob implements BackfillJobInterface {
 		);
 
 		$processed = (int) $state['processed_count'] + count( $users );
-		$cursor    = empty( $users ) ? $after : (int) end( $users )->ID;
-		$completed = count( $users ) < $batch_size;
+		// F3-55: the cumulative "contacts synced" the UI shows — audience
+		// members handled (POSTed now + already-fresh). processed_count keeps
+		// counting rows WALKED (drives percent/ETA); the two diverge exactly
+		// by the audience skips, which is the number Prike read as "30k
+		// contacts go to Smaily".
+		$synced_total = ( isset( $state['synced_count'] ) ? (int) $state['synced_count'] : 0 ) + $synced + $fresh_skips;
+		$cursor       = empty( $users ) ? $after : (int) end( $users )->ID;
+		$completed    = count( $users ) < $batch_size;
 
 		$wpdb->update(
 			$table,
 			array(
 				'processed_count' => $processed,
+				'synced_count'    => $synced_total,
 				'cursor_value'    => (string) $cursor,
 				'status'          => $completed ? 'completed' : 'running',
 				'completed_at'    => $completed ? current_time( 'mysql', true ) : null,
 			),
 			array( 'id' => (int) $state['id'] ),
-			array( '%d', '%s', '%s', '%s' ),
+			array( '%d', '%d', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 

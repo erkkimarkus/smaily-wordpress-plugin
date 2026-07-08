@@ -66,6 +66,8 @@ export type AsyncStatus =
 export interface BackfillProgress {
   status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
   processed: number;
+  /** Contacts job (F3-55): audience members handled — the "contacts synced" number. */
+  synced: number;
   /** Engine-confirmed rows (sent + deduplicated) for this run (3.10.0). */
   sent: number;
   /** Terminal failed rows for this run — per-row detail in the Event Log. */
@@ -78,6 +80,8 @@ export interface BackfillProgress {
   startedAt: string | null;
   /** UTC datetime string set on terminal status, else null. */
   completedAt: string | null;
+  /** Contacts job, non-running only: the sync mode's audience size (F3-55). */
+  audienceEstimate: number | null;
 }
 
 /**
@@ -360,6 +364,7 @@ export const idleEngineAutomations: EngineAutomationsState = {
 export const idleBackfill: BackfillProgress = {
   status: 'idle',
   processed: 0,
+  synced: 0,
   sent: 0,
   failed: 0,
   total: 0,
@@ -368,6 +373,7 @@ export const idleBackfill: BackfillProgress = {
   error: null,
   startedAt: null,
   completedAt: null,
+  audienceEstimate: null,
 };
 
 /**

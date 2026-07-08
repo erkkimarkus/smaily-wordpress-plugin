@@ -156,10 +156,10 @@ function computeSummary(state: WizardState): SummaryItem[] {
         _n(
           '%d contact synced.',
           '%d contacts synced.',
-          state.contactsBackfill.processed,
+          state.contactsBackfill.synced,
           'smaily-connect',
         ),
-        state.contactsBackfill.processed,
+        state.contactsBackfill.synced,
       ),
     });
   }

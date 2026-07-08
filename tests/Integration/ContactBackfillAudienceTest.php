@@ -1,0 +1,182 @@
+<?php
+/**
+ * Integration: audience-aware contact-backfill accounting (F3-55).
+ *
+ * @package Smaily\Connect\Tests\Integration
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Integration;
+
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Smaily\BackfillJob;
+use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\ContactAudience;
+use Smaily\Connect\Smaily\ContactSyncMode;
+use Smaily\Connect\Tests\Integration\Support\EnvScrub;
+use Smaily\Connect\Tests\Integration\Support\RestRequestHelper;
+
+/**
+ * What F3-55 bug class this pins (Prike, 2026-07-08):
+ *
+ *   The contact backfill WALKS every WP user but POSTs only the contact-sync
+ *   mode's audience (F3-48). total_count/processed_count track the WALK, and
+ *   the UI labelled that number "contacts synced" — a consent-mode store with
+ *   30k users and 16k opt-ins read "30k contacts go to Smaily".
+ *
+ *   Pinned here against the real table + real REST route:
+ *   - ContactAudience::count_audience() (the SQL count) AGREES with
+ *     should_sync_user() (the per-user predicate) in every mode — the two
+ *     implementations of one audience definition must not drift;
+ *   - a real backfill run reports walked (processed_count) and audience
+ *     (synced_count) separately, and the /backfill/status payload carries
+ *     `synced` + `audience_estimate` for the UI.
+ */
+final class ContactBackfillAudienceTest extends TestCase {
+
+	/** @var array<int, int> */
+	private array $created_users = array();
+
+	protected function setUp(): void {
+		parent::setUp();
+		EnvScrub::reset();
+	}
+
+	protected function tearDown(): void {
+		foreach ( $this->created_users as $user_id ) {
+			wp_delete_user( $user_id );
+		}
+		$this->created_users = array();
+		parent::tearDown();
+	}
+
+	public function test_count_audience_agrees_with_the_per_user_predicate_in_every_mode(): void {
+		$this->make_user( 'optin-a', '1' );
+		$this->make_user( 'optin-b', '1' );
+		$this->make_user( 'optout', '0' );
+		$this->make_user( 'no-meta', null );
+		$this->make_user( 'empty-meta', '' );
+
+		foreach ( array( ContactSyncMode::MODE_CONSENT, ContactSyncMode::MODE_LEGITIMATE_INTEREST, ContactSyncMode::MODE_CHECKOUT_OPTIN ) as $mode ) {
+			update_option( ContactSyncMode::OPTION_MODE, $mode );
+
+			// Fresh instance per mode — the predicate and the SQL count must
+			// answer for the SAME mode.
+			$audience = new ContactAudience();
+
+			$expected = 0;
+			foreach ( get_users( array( 'fields' => 'all' ) ) as $user ) {
+				if ( $audience->should_sync_user( $user ) ) {
+					++$expected;
+				}
+			}
+
+			self::assertSame(
+				$expected,
+				$audience->count_audience(),
+				sprintf( 'count_audience() and should_sync_user() disagree in mode "%s" — the two halves of the audience definition have drifted.', $mode )
+			);
+		}
+	}
+
+	public function test_backfill_reports_walked_and_synced_separately_and_the_status_payload_carries_both(): void {
+		update_option( ContactSyncMode::OPTION_MODE, ContactSyncMode::MODE_CONSENT );
+
+		$this->make_user( 'bf-optin-a', '1' );
+		$this->make_user( 'bf-optin-b', '1' );
+		$this->make_user( 'bf-optout', '0' );
+		$this->make_user( 'bf-nometa-a', null );
+		$this->make_user( 'bf-nometa-b', null );
+
+		$audience = new ContactAudience();
+		$expected_synced = 0;
+		$all_users       = get_users( array( 'fields' => 'all' ) );
+		foreach ( $all_users as $user ) {
+			if ( $audience->should_sync_user( $user ) ) {
+				++$expected_synced;
+			}
+		}
+		$expected_walked = count( $all_users );
+
+		// Fake Smaily transport: every upsert succeeds (HTTP 200).
+		$fake = static function () {
+			return array(
+				'headers'  => array(),
+				'body'     => '{}',
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+
+		$job = new BackfillJob( new Client( 'testsub', 'tester', 'pw' ) );
+
+		add_filter( 'pre_http_request', $fake );
+		try {
+			$job->start();
+			$guard = 0;
+			do {
+				$result = $job->process_batch( 200 );
+			} while ( ! $result['completed'] && ++$guard < 50 );
+		} finally {
+			remove_filter( 'pre_http_request', $fake );
+		}
+		self::assertTrue( $result['completed'], 'Backfill did not complete within the batch guard.' );
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT status, total_count, processed_count, synced_count FROM {$wpdb->prefix}smly_plus_backfill_job WHERE job_type = %s AND target = %s",
+				BackfillJob::BACKFILL_TYPE,
+				BackfillJob::BACKFILL_TARGET
+			),
+			ARRAY_A
+		);
+
+		self::assertSame( 'completed', $row['status'] );
+		self::assertSame( $expected_walked, (int) $row['processed_count'], 'processed_count tracks users WALKED.' );
+		self::assertSame( $expected_synced, (int) $row['synced_count'], 'synced_count tracks AUDIENCE members handled.' );
+		self::assertLessThan(
+			(int) $row['processed_count'],
+			(int) $row['synced_count'],
+			'On a consent-mode store with non-opted-in users the two numbers MUST differ — equality means the walk count is being sold as the contact count again.'
+		);
+
+		// The REST status payload the UI reads.
+		RestRequestHelper::login_as_admin();
+		$response = RestRequestHelper::get( '/backfill/status', array( 'job_type' => 'contacts' ) );
+		self::assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		self::assertSame( $expected_synced, $data['synced'], 'The UI "contacts synced" number comes from synced_count.' );
+		self::assertSame( $expected_walked, $data['processed'] );
+		self::assertSame( $expected_synced, $data['audience_estimate'], 'Post-run (non-running) status carries the audience estimate for the panel hint.' );
+	}
+
+	// --- helpers -------------------------------------------------------------
+
+	/**
+	 * @param string|null $newsletter user_newsletter meta value; null = no meta row.
+	 */
+	private function make_user( string $slug, ?string $newsletter ): int {
+		$user_id = wp_insert_user(
+			array(
+				'user_login' => 'smly_aud_' . $slug . '_' . wp_generate_password( 6, false ),
+				'user_email' => $slug . '-' . wp_generate_password( 6, false ) . '@example.test',
+				'user_pass'  => wp_generate_password( 20 ),
+			)
+		);
+		self::assertIsInt( $user_id );
+		$this->created_users[] = $user_id;
+
+		if ( $newsletter !== null ) {
+			update_user_meta( $user_id, ContactAudience::OPTIN_META, $newsletter );
+		}
+
+		return $user_id;
+	}
+}

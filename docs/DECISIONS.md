@@ -2898,6 +2898,45 @@ depth), F3-48.4 (force_opt_in policy now applied to abandoned cart via the route
 F3-44 (router sends are exchange-captured), LESSONS §2.19, the BACKLOG abandoned-cart
 rewrite item (the queue-producer end-state).
 
+### F3-55 — Backfill progress: users WALKED and contacts SYNCED are different numbers with different labels
+
+**Context:** Prike (2026-07-08): "contact sync shows 30k contacts going to Smaily, we have
+16k opt-ins." The wire was correct — the F3-48 audience filter POSTs only the mode's
+audience — but `total_count` = `count_users()` (every WP user), `processed_count` counts
+rows WALKED, and the UI labelled that walk count "contacts synced"
+(`Step2Subscribers`, `Step6Done`). On a consent-mode store the label reads as a consent
+violation.
+
+**Decisions:**
+1. **Two numbers, both shown, each with its own noun.** The walk (`processed/total`)
+   keeps driving percent + ETA — it is monotonic and always completes, where an
+   audience-based denominator would freeze through opted-out ID ranges and drift when
+   users opt in/out mid-run. A new cumulative `synced_count` (migration 008) counts
+   AUDIENCE members handled (POSTed + already-fresh); it is the ONLY number the UI may
+   label "contacts synced". Copy: running "Checked X of Y users — Z contacts synced",
+   done "Done — Z contacts synced (X users checked)".
+2. **The audience definition has one home.** `ContactAudience::count_audience()` (the
+   SQL count) lives next to `should_sync_user()` (the per-user predicate) and an
+   integration test asserts they agree in every mode — two implementations of one
+   definition must not drift (CC-9 spirit).
+3. **The estimate is shown BEFORE the run** ("about N of them will be synced to Smaily
+   as contacts"), only when the mode actually narrows the audience, and is computed
+   only on non-running status polls (no usermeta COUNT per 2-second tick).
+4. Engine backfills (products/customers/orders) are untouched — they enqueue everything
+   they walk and already show engine-confirmed `sent` (3.10.0); `synced_count` stays 0
+   for them and their UI ignores it.
+
+**Rationale:** a count a merchant sees must be denominated in the unit its label claims;
+"walked" sold as "synced" made a working consent feature look broken.
+
+**Alternatives rejected:** setting `total_count` to the audience size (percent/ETA freeze
+on skip-heavy stretches, completion drift when consent changes mid-run); relabeling the
+existing number without adding `synced` (hides the number the merchant actually wants).
+
+**Relationships:** F3-48 (the audience filter whose correctness this makes visible),
+3.10.0 engine-confirmed counts (the same walked-vs-confirmed distinction for engine
+jobs), migration 008.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

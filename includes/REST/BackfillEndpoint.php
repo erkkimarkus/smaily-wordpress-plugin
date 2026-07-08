@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Constants;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
+use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Backfill\AbstractBackfillJob;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -198,13 +199,15 @@ class BackfillEndpoint {
 		if ( $row === null ) {
 			return new WP_REST_Response(
 				array(
-					'status'       => 'idle',
-					'processed'    => 0,
-					'total'        => 0,
-					'percent'      => 0,
-					'eta_seconds'  => null,
-					'started_at'   => null,
-					'completed_at' => null,
+					'status'            => 'idle',
+					'processed'         => 0,
+					'synced'            => 0,
+					'total'             => 0,
+					'percent'           => 0,
+					'eta_seconds'       => null,
+					'started_at'        => null,
+					'completed_at'      => null,
+					'audience_estimate' => $this->contact_audience_estimate( $job_type, 'idle' ),
 				),
 				200
 			);
@@ -232,18 +235,41 @@ class BackfillEndpoint {
 		// payload didn't include this state.
 		return new WP_REST_Response(
 			array(
-				'status'       => (string) $row['status'],
-				'processed'    => $processed,
-				'sent'         => $counts['sent'],
-				'failed'       => $counts['failed'],
-				'total'        => $total,
-				'percent'      => min( 100, max( 0, $percent ) ),
-				'eta_seconds'  => $this->estimate_eta( $row, $processed, $total ),
-				'started_at'   => isset( $row['started_at'] ) ? (string) $row['started_at'] : null,
-				'completed_at' => isset( $row['completed_at'] ) ? (string) $row['completed_at'] : null,
+				'status'            => (string) $row['status'],
+				'processed'         => $processed,
+				// F3-55: contacts job — cumulative AUDIENCE members handled
+				// (POSTed + already-fresh). processed counts rows WALKED, so
+				// on a consent-mode store the two differ by the opted-out
+				// majority; the UI labels THIS number "contacts synced".
+				// Engine jobs never write the column (stays 0) — their UI
+				// keeps using processed/sent.
+				'synced'            => isset( $row['synced_count'] ) ? (int) $row['synced_count'] : 0,
+				'sent'              => $counts['sent'],
+				'failed'            => $counts['failed'],
+				'total'             => $total,
+				'percent'           => min( 100, max( 0, $percent ) ),
+				'eta_seconds'       => $this->estimate_eta( $row, $processed, $total ),
+				'started_at'        => isset( $row['started_at'] ) ? (string) $row['started_at'] : null,
+				'completed_at'      => isset( $row['completed_at'] ) ? (string) $row['completed_at'] : null,
+				'audience_estimate' => $this->contact_audience_estimate( $job_type, (string) $row['status'] ),
 			),
 			200
 		);
+	}
+
+	/**
+	 * The contact-sync mode's audience size (F3-55) — what the panel shows as
+	 * "N contacts will sync" BEFORE a run and can sanity-label the result
+	 * after one. Contacts-only, and skipped while a run is live so the 2s
+	 * status poll doesn't pay a usermeta COUNT per tick; null = not
+	 * applicable, the UI hides the hint.
+	 */
+	private function contact_audience_estimate( string $job_type, string $status ): ?int {
+		if ( $job_type !== 'contacts' || $status === 'running' ) {
+			return null;
+		}
+
+		return ( new ContactAudience() )->count_audience();
 	}
 
 	/**
@@ -408,7 +434,7 @@ class BackfillEndpoint {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT id, status, processed_count, total_count, started_at, completed_at FROM {$table} WHERE job_type = %s AND target = %s",
+				"SELECT id, status, processed_count, synced_count, total_count, started_at, completed_at FROM {$table} WHERE job_type = %s AND target = %s",
 				$job_type,
 				$this->target_for( $job_type )
 			),

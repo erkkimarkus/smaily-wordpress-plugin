@@ -69,6 +69,7 @@ describe('useBackfillProgress', () => {
       .mockResolvedValueOnce({
         status: 'idle',
         processed: 0,
+        synced: 0,
         sent: 0,
         failed: 0,
         total: 0,
@@ -76,10 +77,12 @@ describe('useBackfillProgress', () => {
         eta_seconds: null,
         started_at: null,
         completed_at: null,
+        audience_estimate: null,
       })
       .mockResolvedValueOnce({
         status: 'running',
         processed: 50,
+        synced: 50,
         sent: 50,
         failed: 0,
         total: 100,
@@ -87,10 +90,12 @@ describe('useBackfillProgress', () => {
         eta_seconds: 30,
         started_at: '2026-05-21 09:00:00',
         completed_at: null,
+        audience_estimate: null,
       })
       .mockResolvedValueOnce({
         status: 'completed',
         processed: 100,
+        synced: 100,
         sent: 100,
         failed: 0,
         total: 100,
@@ -98,6 +103,7 @@ describe('useBackfillProgress', () => {
         eta_seconds: null,
         started_at: '2026-05-21 09:00:00',
         completed_at: '2026-05-21 09:01:30',
+        audience_estimate: null,
       });
 
     const { result } = renderHook(() => useBackfillProgress({ intervalMs: 50 }));

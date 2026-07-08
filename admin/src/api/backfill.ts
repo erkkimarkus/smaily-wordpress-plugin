@@ -11,6 +11,12 @@ export interface BackfillStartResponse {
 export interface BackfillStatusResponse {
   status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
   processed: number;
+  /**
+   * Contacts job (F3-55): cumulative audience members handled (POSTed +
+   * already-fresh). `processed` counts rows WALKED — on a consent-mode
+   * store the two differ by the opted-out majority. Engine jobs leave it 0.
+   */
+  synced: number;
   /** Engine-confirmed rows (sent + deduplicated) for this run (3.10.0). */
   sent: number;
   /** Terminal failed rows for this run — per-row detail in the Event Log. */
@@ -22,6 +28,11 @@ export interface BackfillStatusResponse {
   started_at: string | null;
   /** Set once the job reaches a terminal status; null while running/idle. */
   completed_at: string | null;
+  /**
+   * Contacts job only, and only while NOT running: the sync mode's audience
+   * size (consent → opted-in count). Null = not applicable / running.
+   */
+  audience_estimate: number | null;
 }
 
 export interface BackfillCancelResponse {

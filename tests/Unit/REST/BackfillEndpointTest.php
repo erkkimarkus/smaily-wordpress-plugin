@@ -29,6 +29,14 @@ final class BackfillEndpointTest extends TestCase {
 		Functions\when( 'current_user_can' )->justReturn( true );
 		Functions\when( 'as_enqueue_async_action' )->justReturn( 1 );
 		Functions\when( 'as_unschedule_all_actions' )->justReturn( null );
+		// F3-55: a non-running contacts status computes the audience estimate
+		// (ContactAudience → ContactSyncMode → get_option). checkout_optin
+		// short-circuits to 0 before any $wpdb read, keeping the fake wpdb
+		// fixtures untouched; the real count paths are integration-tested
+		// (ContactBackfillAudienceTest).
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key, $default = false ) => $key === 'smly_plus_contact_sync_mode' ? 'checkout_optin' : $default
+		);
 	}
 
 	protected function tearDown(): void {

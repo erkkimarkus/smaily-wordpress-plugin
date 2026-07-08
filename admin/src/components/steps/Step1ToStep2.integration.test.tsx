@@ -46,6 +46,7 @@ describe('Step 1 → Step 2 integration', () => {
       .mockResolvedValueOnce({
         status: 'idle',
         processed: 0,
+        synced: 0,
         sent: 0,
         failed: 0,
         total: 0,
@@ -53,10 +54,12 @@ describe('Step 1 → Step 2 integration', () => {
         eta_seconds: null,
         started_at: null,
         completed_at: null,
+        audience_estimate: null,
       })
       .mockResolvedValue({
         status: 'running',
         processed: 0,
+        synced: 0,
         sent: 0,
         failed: 0,
         total: 1_234,
@@ -64,6 +67,7 @@ describe('Step 1 → Step 2 integration', () => {
         eta_seconds: null,
         started_at: null,
         completed_at: null,
+        audience_estimate: null,
       });
 
     const seeded = {
@@ -114,6 +118,6 @@ describe('Step 1 → Step 2 integration', () => {
     });
 
     // 4. The reducer carried the customer total from env into Step 2's display.
-    expect(screen.getByText(/1,?234 users/i)).toBeInTheDocument();
+    expect(screen.getByText(/1,?234 users will be processed/i)).toBeInTheDocument();
   });
 });

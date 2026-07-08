@@ -7,6 +7,7 @@ import { BackfillPanel } from './BackfillPanel';
 const IDLE = {
   status: 'idle' as const,
   processed: 0,
+  synced: 0,
   sent: 0,
   failed: 0,
   total: 0,
@@ -14,6 +15,7 @@ const IDLE = {
   eta_seconds: null,
   started_at: null,
   completed_at: null,
+  audience_estimate: null,
 };
 
 describe('BackfillPanel', () => {
@@ -59,6 +61,7 @@ describe('BackfillPanel', () => {
     vi.spyOn(api, 'getBackfillStatus').mockResolvedValue({
       status: 'completed',
       processed: 7794,
+      synced: 7794,
       sent: 1354,
       failed: 0,
       total: 7794,
@@ -66,6 +69,7 @@ describe('BackfillPanel', () => {
       eta_seconds: null,
       started_at: '2026-06-14 10:00:00',
       completed_at: '2026-06-14 10:05:00',
+      audience_estimate: null,
     });
 
     render(<BackfillPanel jobType="products" label="Products" recordCount={1354} />);

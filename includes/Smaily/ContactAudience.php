@@ -78,6 +78,40 @@ final class ContactAudience {
 		return $this->mode->requires_optin() ? $opted_in : true;
 	}
 
+	/**
+	 * How many registered users are in the sync audience (F3-55) — the
+	 * mode-aware count behind the backfill's "N contacts will sync" number.
+	 * MUST agree with should_sync_user(): both live in this class and the
+	 * integration test seeds users and asserts SQL count == per-user filter.
+	 *
+	 *   - checkout_optin      → 0 (no account-based sync)
+	 *   - legitimate_interest → every registered user
+	 *   - consent             → users with user_newsletter=1
+	 */
+	public function count_audience(): int {
+		if ( ! $this->mode->syncs_accounts() ) {
+			return 0;
+		}
+
+		if ( ! $this->mode->requires_optin() ) {
+			$counts = count_users();
+			return (int) $counts['total_users'];
+		}
+
+		global $wpdb;
+
+		// The SQL twin of opted_in(): meta_value compares as the string '1'
+		// because opted_in() casts to int and requires === 1 — any other
+		// stored value ('0', '', 'yes') is not opted in there either.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value = '1'",
+				self::OPTIN_META
+			)
+		);
+	}
+
 	private function opted_in( int $user_id ): bool {
 		if ( $user_id <= 0 || ! function_exists( 'get_user_meta' ) ) {
 			return false;
