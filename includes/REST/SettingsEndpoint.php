@@ -338,7 +338,25 @@ class SettingsEndpoint {
 
 		update_option( 'smly_plus_welcome_enabled', $welcome );
 		update_option( 'smly_plus_first_order_enabled', $first );
-		update_option( self::LEGACY_OPTION_CART_STATUS, $cart );
+
+		/*
+		 * The legacy cron pass reads this option as an ARRAY
+		 * {enabled, autoresponder_id}. Until 3.4.3 this wrote the bare
+		 * boolean — WordPress stores it as the string '1'/'' and every
+		 * array-offset consumer fataled on PHP 8, on every 15-minute tick
+		 * (F3-54, the Prike crash loop). Write the array shape and keep
+		 * whatever autoresponder id an upgraded store still carries — the
+		 * legacy pass uses it as the fallback when no automation-mapping
+		 * row exists yet.
+		 */
+		$existing = \Smaily_Connect\Includes\Options::abandoned_cart_status();
+		update_option(
+			self::LEGACY_OPTION_CART_STATUS,
+			array(
+				'enabled'          => $cart,
+				'autoresponder_id' => $existing['autoresponder_id'],
+			)
+		);
 		update_option( self::LEGACY_OPTION_CART_CUTOFF, $cutoff );
 
 		// Replace the mapping table contents in one shot — Settings always

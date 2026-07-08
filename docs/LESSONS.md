@@ -664,6 +664,36 @@ Three lessons, each a general class:
    `add_action` removed; a scheduler you've migrated off gets its re-arm code
    removed — not just its events cleared once. (F3-53.)
 
+### 2.19 A test fixture that seeds state ITSELF hides the writer↔reader seam — and a client's error line number beats your whole theory (Prike, 2026-07-08)
+
+Follow-up to §2.18, same incident, deeper root cause. The F3-53 diagnosis
+(poison cart rows) was built from the symptom description; the client dev's
+correction — "the fatal is at cron.class.php:166, the empty-option guard, and
+turning it off in admin doesn't help" — invalidated it in one line. The real
+bug: the new Settings wrote the abandoned-cart status option as a bare boolean
+while the legacy cron read it as an array (`$status['enabled']` on WP's stored
+`'1'`/`''` string = PHP 8 TypeError, every 15 minutes; toggling off just wrote
+the other string).
+
+1. **A fixture that seeds shared state itself proves nothing about the seam.**
+   `AbandonedCartGuardTest` wrote the option in setUp — in the ARRAY shape the
+   READER expects — so writer-shape drift was structurally invisible, exactly
+   like a mock built to your own assumption (§2.4). Any state with more than
+   one owner (an option a REST endpoint writes and a cron job reads) needs at
+   least one test that drives the REAL writer and the REAL reader in the same
+   scenario (`AbandonedCartSettingsSeamTest`). The existing round-trip test
+   (§2.H.19) checked writer↔HYDRATE, but the cron pass was a third, unchecked
+   reader with a different shape expectation.
+2. **When a bug report names an exact line, re-anchor the diagnosis there
+   before shipping.** The F3-53 hardening was correct defense-in-depth but
+   built one loop too deep — the reported fatal never reached the loop. Ask
+   for the stack line FIRST; it's the cheapest piece of ground truth a client
+   can give.
+3. **`(bool)`-casting an option that might be an array is its own bug class.**
+   `(bool) array('enabled' => false)` is TRUE — the wizard hydrate read
+   "disabled" as "enabled". A multi-shape option gets ONE normalizer, and
+   every consumer goes through it (F3-54).
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

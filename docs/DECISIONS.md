@@ -2847,6 +2847,57 @@ same wipe/clobber, every 15-minute tick). Now: `ContactLanguageResolver::for_use
 omit the key when it returns '' (F3-47 rule 2). This is the interim fix; the full
 abandoned-cart rewrite onto the new namespaced pipeline is a separate future decision.
 
+### F3-54 — Abandoned-cart status option: one normalized shape, router-first dispatch (the REAL Prike fatal)
+
+**Context:** Martin's (Prike dev) correction to the F3-53 diagnosis: the PHP 8 fatal was at
+the EMPTY-OPTION GUARD (`$status['enabled']`, cron.class.php:166), not in the cart-item
+loop — and turning the feature off in wp-admin didn't stop it. Root cause is OUR seam:
+`SettingsEndpoint::save_woocommerce()` wrote `smaily_connect_abandoned_cart_status` as a
+BARE BOOLEAN (WP stores `'1'`/`''`), while three consumers offset into it as an ARRAY
+(the legacy email pass, `Options::get_woocommerce_settings_from_db()`, and — inverted —
+`EnvDetector`'s `(bool)` cast, which read a DISABLED array as enabled). A string offset
+with a string key is a PHP 8 TypeError (repro'd: both `'1'['enabled']` and `''['enabled']`
+throw "Cannot access offset of type string on string"). Toggling off just wrote the other
+string. The old guard test never caught it because it seeded the option ITSELF in the
+array shape — the fixture's shape, not the real writer's. The new save also DESTROYED the
+legacy `autoresponder_id`, and no producer feeds `automation.abandoned_cart` — so the
+legacy email pass is the only abandoned-cart sender, reading a workflow id the new UI no
+longer maintains.
+
+**Decisions:**
+1. **One normalized read path.** `Options::abandoned_cart_status()` (+ pure
+   `normalize_abandoned_cart_status()`) accepts array, bare-boolean-string, and garbage,
+   always returning `{enabled: bool, autoresponder_id: int}`. Every consumer (cron pass,
+   get_woocommerce_settings_from_db, EnvDetector hydrate) reads through it — never a raw
+   `get_option` + offset. Heals already-corrupted stores (Prike) with no manual step.
+2. **Router-first dispatch in the legacy email pass.** The pass now tries
+   `AutomationRouter::trigger_automation('abandoned_cart', …)` first — the wizard's
+   automation-mapping row is the workflow source on new-path stores (multilingual modes,
+   the F3-48 force_opt_in policy, F3-44 exchange capture come free; the router docblock
+   always claimed this trigger). `ApiException` = transient → cart stays unmarked for
+   retry (same semantics as the legacy error-array path). **Fallback:** no mapping row +
+   a non-zero legacy `autoresponder_id` → the legacy client path, unchanged — zero
+   regression for upgraded-but-unwizarded stores. Enabled with NEITHER source = config
+   gap: carts stay pending (they send once the merchant maps a workflow; the backlog
+   guard bounds the pile), logged once per pass.
+3. **The writer produces the array shape and PRESERVES `autoresponder_id`** — it is the
+   no-mapping fallback; destroying it (what 3.4.x did) silently killed upgraded stores'
+   abandoned cart even where the shape didn't fatal.
+
+**Rationale:** normalize-at-the-reader alone would have silently disabled the feature on
+every new-path store (boolean shape carries no workflow id); router-first makes the
+mapping table the id source so the feature actually works post-wizard.
+
+**Alternatives rejected:** keeping the boolean option and porting all consumers to it
+(loses the fallback id upgraded stores still need); building the
+`automation.abandoned_cart` queue producer now (the right end-state, but a bigger change
+than a crash-fix release should carry — folded into the BACKLOG rewrite item).
+
+**Relationships:** F3-53 (the incident; the poison-row hardening stays as defense in
+depth), F3-48.4 (force_opt_in policy now applied to abandoned cart via the router),
+F3-44 (router sends are exchange-captured), LESSONS §2.19, the BACKLOG abandoned-cart
+rewrite item (the queue-producer end-state).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -416,7 +416,10 @@ class EnvDetector {
 			'abandonedCartCutoffMinutes'    => (int) get_option( 'smaily_connect_abandoned_cart_cutoff', 30 ),
 			'welcomeEnabled'                => (bool) get_option( 'smly_plus_welcome_enabled', false ),
 			'firstOrderEnabled'             => (bool) get_option( 'smly_plus_first_order_enabled', false ),
-			'abandonedCartEnabled'          => (bool) get_option( 'smaily_connect_abandoned_cart_status', false ),
+			// Normalized read (F3-54): the option holds an array
+			// {enabled, autoresponder_id} on upgraded stores — a raw (bool)
+			// cast read a disabled array ({enabled: false}) as TRUE.
+			'abandonedCartEnabled'          => \Smaily_Connect\Includes\Options::abandoned_cart_status()['enabled'],
 			'automationMappings'            => $this->automation_mappings(),
 
 			// Step 4: rec-engine connection state (sub-PR 3.1). The

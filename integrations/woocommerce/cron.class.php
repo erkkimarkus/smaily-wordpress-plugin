@@ -6,6 +6,8 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
 
+use Smaily\Connect\Smaily\ApiException;
+use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Support\ContactLanguageResolver;
 use Smaily_Connect\Includes\Logger;
 use Smaily_Connect\Includes\Options;
@@ -164,10 +166,11 @@ class Cron {
 	 * @return void
 	 */
 	public function smaily_abandoned_carts_email() {
-		$status = get_option(
-			Options::ABANDONED_CART_STATUS_OPTION,
-			Options::ABANDONED_CART_DEFAULT_STATUS
-		);
+		// Normalized read (F3-54): the option may hold the legacy array OR
+		// the bare boolean the pre-3.4.3 Settings wrote — a raw
+		// $status['enabled'] on the boolean's stored string was a PHP 8
+		// fatal on every tick (the Prike crash loop).
+		$status = Options::abandoned_cart_status();
 		if ( ! $status['enabled'] ) {
 			return;
 		}
@@ -194,8 +197,9 @@ class Cron {
 		 * and a string compare across the two formats breaks on the
 		 * separator byte (' ' < 'T') for same-day values.
 		 */
-		$max_age = (int) apply_filters( 'smaily_connect_abandoned_cart_max_age_seconds', DAY_IN_SECONDS );
-		$expired = 0;
+		$max_age  = (int) apply_filters( 'smaily_connect_abandoned_cart_max_age_seconds', DAY_IN_SECONDS );
+		$expired  = 0;
+		$unmapped = 0;
 
 		foreach ( $this->get_abandoned_carts() as $cart ) {
 			$updated_ts = isset( $cart['cart_updated'] ) ? strtotime( (string) $cart['cart_updated'] ) : false;
@@ -245,9 +249,51 @@ class Cron {
 				$addresses = $this->prepare_user_data( $user, $sync_fields );
 				$products  = $this->prepare_products_data( $cart_content, $sync_fields );
 
+				/*
+				 * New-path dispatch first (F3-54): a wizard-configured store
+				 * maps the abandoned-cart workflow in the automation-mapping
+				 * table; AutomationRouter resolves it (multilingual modes,
+				 * the contact-sync force_opt_in policy, F3-44 exchange
+				 * capture). The pre-3.4.3 Settings stopped writing
+				 * autoresponder_id, so on those stores the mapping table is
+				 * the ONLY workflow source. ApiException = transient — leave
+				 * the cart unmarked (retried next tick), same semantics as
+				 * the legacy error-array path below.
+				 */
+				$router = $this->automation_router();
+				if ( $router instanceof AutomationRouter ) {
+					$contact = array( 'email' => $user->user_email );
+					if ( isset( $addresses['language'] ) && $addresses['language'] !== '' ) {
+						$contact['language'] = $addresses['language'];
+					}
+
+					try {
+						if ( $router->trigger_automation( 'abandoned_cart', $contact, array_merge( $addresses, $products ) ) ) {
+							$this->update_mail_sent_status( $cart['customer_id'] );
+							continue;
+						}
+					} catch ( ApiException $e ) {
+						$this->logger->error( sprintf( 'Failed to send abandoned cart email (mapped workflow) with an error: %s', $e->getMessage() ) );
+						continue;
+					}
+				}
+
+				/*
+				 * No mapping row — legacy fallback: a pre-wizard store's
+				 * option array still carries the merchant's autoresponder id.
+				 * Enabled with NEITHER source is a config gap: the cart stays
+				 * unmarked (it sends once the merchant maps a workflow; the
+				 * backlog guard expires anything older than the window) and
+				 * the pass logs one line, not one per cart.
+				 */
+				if ( $status['autoresponder_id'] <= 0 ) {
+					++$unmapped;
+					continue;
+				}
+
 				$request  = new Smaily_Client( $this->options );
 				$response = $request->trigger_automation(
-					(int) $status['autoresponder_id'],
+					$status['autoresponder_id'],
 					array( array_merge( $addresses, $products ) ),
 					false
 				);
@@ -299,6 +345,31 @@ class Cron {
 				)
 			);
 		}
+
+		if ( $unmapped > 0 ) {
+			$this->logger->error(
+				sprintf(
+					'Abandoned cart is enabled but no workflow is configured (no automation mapping, no legacy autoresponder id) - %d cart(s) left pending. Map an abandoned-cart workflow in the plugin settings.',
+					$unmapped
+				)
+			);
+		}
+	}
+
+	/**
+	 * The new-path automation router, when the namespaced bootstrap is
+	 * loaded (always, in the combined plugin — the class_exists guard is
+	 * belt-and-braces for a partial load). Protected so tests can inject
+	 * a double.
+	 *
+	 * @return AutomationRouter|null
+	 */
+	protected function automation_router() {
+		if ( ! class_exists( '\Smaily\Connect\Bootstrap' ) ) {
+			return null;
+		}
+
+		return \Smaily\Connect\Bootstrap::instance()->automation_router();
 	}
 
 	/**
