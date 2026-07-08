@@ -26,7 +26,28 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-08 (**F3-54 — the REAL Prike fatal found and fixed; v3.4.3 RELEASED
+_Last updated: 2026-07-08 (**F3-55 — backfill progress: users WALKED vs contacts SYNCED;
+v3.5.0 RELEASED.** Prike: "contact sync shows 30k contacts going to Smaily, we have 16k
+opt-ins" — the WIRE was correct (F3-48 audience filter POSTs only the mode's audience),
+but `total_count=count_users()`, `processed_count` counts rows walked, and the UI
+labelled that walk count "contacts synced" (`Step2Subscribers` + `Step6Done`). Fix
+(`5104950`): migration 008 adds cumulative `synced_count` (audience members handled =
+POSTed + already-fresh; the walk keeps driving percent/ETA — an audience-based
+denominator would freeze through opted-out ID ranges); `ContactAudience::
+count_audience()` = mode-aware SQL count NEXT TO `should_sync_user()`, integration test
+pins the two halves agree in every mode; `/backfill/status` carries `synced` +
+`audience_estimate` (contacts only, estimate only on non-running polls); UI copy —
+pre-start "about N of them will be synced to Smaily as contacts" (only when the mode
+narrows), running "Checked X of Y users — Z contacts synced", done "Done — Z contacts
+synced (X users checked)"; et translations, i18n rebuilt (build-i18n ×2, admin-bundle
+JSON verified). Engine backfills untouched. Also STABILIZED the recurring
+`EngineAutomationsSection` dropdown vitest flake (`f92e4ef` — await the option, not the
+select; failed 2× today under loaded parallel runs). Gates: ci:strict exit=0 (unit 480,
+vitest 236); integration FULL 139/674 (+2); connection snapshot/restored. **v3.5.0
+RELEASED** per recipe (build-hash `ea5bce0`, ZIP ~1.07 MB verified incl. migration 008,
+PCP clean except intentional F3-35, audits-register row, GH release Latest). Prike saab
+öelda: andmevoog oli kogu aeg õige — 3.5.0 näitab seda ausalt. Prior same day:
+**F3-54 — the REAL Prike fatal found and fixed; v3.4.3 RELEASED
 (critical).** Martin's correction (fatal at the option guard, line 166; admin off-toggle
 didn't stop it) invalidated the F3-53 poison-row theory: the crash is OUR seam —
 `SettingsEndpoint::save_woocommerce` wrote `smaily_connect_abandoned_cart_status` as a
