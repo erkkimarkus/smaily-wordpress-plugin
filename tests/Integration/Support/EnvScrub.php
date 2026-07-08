@@ -49,6 +49,7 @@ final class EnvScrub {
 			'smaily_connect_wp_subscription_enabled',
 			'smaily_connect_abandoned_cart_cutoff',
 			'smaily_connect_abandoned_cart_status',
+			'smaily_connect_abandoned_cart_fields',
 		);
 		foreach ( $legacy_options as $opt ) {
 			delete_option( $opt );

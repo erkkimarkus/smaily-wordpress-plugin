@@ -629,6 +629,43 @@ The generalisation, one level above §2.16's "walks share the integration DB":
    did a walk or another store on this tenant write that state?** It reproduces
    only on that tenant — a fresh tenant looks fine.
 
+### 2.18 An "orphaned" legacy callback isn't dead while a legacy scheduler can still fire it — and one poison row must never own the whole pass (Prike, 2026-07-08)
+
+Prike installed the new module over the old one (no in-place upgrade). Result,
+starting minutes after their setup wizard: a PHP 8 fatal
+(`Cannot access offset of type string on string`) every 15 minutes on the
+abandoned-cart tick, plus the legacy WP-Cron events alive in the cron option.
+
+Three lessons, each a general class:
+
+1. **Foreign-written rows are wire input, not trusted state.** The legacy
+   email pass assumed `cart_content` deserializes to the exact array shape
+   OUR `cart.class.php` serializes. Rows surviving a module swap (older/
+   foreign plugin version) deserialized to an array of bare STRINGS —
+   `$cart_item['product_id']` on a string is a fatal on PHP 8 (a silent
+   notice on PHP 7, which is why the code never looked broken). Any reader
+   of persisted data another writer could have produced needs shape guards,
+   same as an API payload.
+2. **A poison row must never own the whole pass.** The failing cart stayed
+   `mail_sent NULL`, the fatal aborted the tick before the per-cart
+   `continue` (F3-37 covered API errors, not Throwables), so the SAME row
+   re-fataled every 15 minutes forever — and blocked every healthy cart
+   behind it. The fix mirrors the D6 philosophy: guard + per-item skip +
+   per-cart Throwable backstop that terminal-marks (observable in the log),
+   never an eternal silent retry loop.
+3. **"Orphaned" ≠ dead.** F3-48.3 stopped the AS tick from bridging to the
+   legacy `smaily_sync_subscribers` mass-send and called the still-registered
+   callback "dead, harmless." It wasn't: the legacy `Lifecycle` re-scheduled
+   the WP-Cron events from `activate()`/`activated_plugin` (any WooCommerce
+   re-activation) AFTER WPCronAuditor's one-time activation clear — and a
+   surviving `smaily_connect_cron_sync_subscribers` event fires that callback
+   daily, resurrecting the exact F3-47 language clobber, on the exact store
+   it originally hit. A callback you've decided must never run again gets its
+   `add_action` removed; a scheduler you've migrated off gets its re-arm code
+   removed — not just its events cleared once. (F3-53.)
+
+## 3. The non-technical lesson: spec errors vs bugs
+
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity
 or omission in the specification). The agent implemented exactly what the spec said;
 the error was in the spec.

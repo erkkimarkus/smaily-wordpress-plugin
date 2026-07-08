@@ -100,6 +100,77 @@ final class AbandonedCartGuardTest extends TestCase {
 		self::assertNull( $this->mail_sent_of( $user ), 'A 2h-old cart is inside the 24h window — it must be attempted (and here fail), never expired.' );
 	}
 
+	public function test_poison_cart_content_is_terminal_and_string_items_do_not_fatal_the_pass(): void {
+		// F3-53 (Prike, 2026-07-08): rows written by an older/foreign plugin
+		// version survive an in-place module swap. Two poison shapes:
+		//   (a) cart_content deserializes to an ARRAY whose items are bare
+		//       strings — pre-fix, `$cart_item['product_id']` on a string is
+		//       a PHP 8 fatal ("Cannot access offset of type string on
+		//       string") that aborted the WHOLE pass, every 15 min, forever;
+		//   (b) cart_content that is not unserializable at all —
+		//       maybe_unserialize() hands the raw string through.
+		// Product fields ON so prepare_products_data() actually iterates the
+		// items (the config under which the fatal fired).
+		update_option(
+			'smaily_connect_abandoned_cart_fields',
+			array_merge(
+				\Smaily_Connect\Includes\Options::ABANDONED_CART_DEFAULT_FIELDS,
+				array(
+					'product_name'     => true,
+					'product_quantity' => true,
+				)
+			)
+		);
+
+		$string_items_user = $this->make_user( 'poison-items' );
+		$garbage_user      = $this->make_user( 'poison-content' );
+		$valid_user        = $this->make_user( 'valid-after-poison' );
+
+		$fresh = gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- deliberately seeding the poison shape.
+		$this->seed_cart( $string_items_user, $fresh, serialize( array( 'k1' => 'i-am-a-string-not-a-cart-item', 'k2' => 'me-too' ) ) );
+		$this->seed_cart( $garbage_user, $fresh, 'not-serialized-garbage' );
+		$this->seed_cart( $valid_user, $fresh );
+
+		do_action( 'smaily_connect_cron_abandoned_carts_email' );
+
+		// (a) String ITEMS are skipped item-level; the cart itself is
+		// structurally sound, so it is attempted (send fails here: no
+		// credentials) and stays retryable. Reaching these asserts at all
+		// proves the pass no longer fatals.
+		self::assertNull( $this->mail_sent_of( $string_items_user ), 'A cart whose items are strings must be attempted (items skipped), not fatal the pass.' );
+		// (b) Non-array cart_content can never be emailed — terminally marked.
+		self::assertSame( '1', $this->mail_sent_of( $garbage_user ), 'Non-array cart_content must be terminally marked, not retried forever.' );
+		// The pass ran to completion past both poison rows.
+		self::assertNull( $this->mail_sent_of( $valid_user ), 'A valid cart after the poison rows must still be attempted (send fails, stays NULL).' );
+	}
+
+	public function test_throwing_cart_is_terminally_marked_and_does_not_abort_the_pass(): void {
+		// F3-53 backstop: a Throwable inside one cart's processing is
+		// deterministic (same data next tick) — it must terminal-mark THAT
+		// cart and continue, never abort the pass. Simulated at the real
+		// transport seam: pre_http_request fires inside trigger_automation.
+		$boom = static function () {
+			throw new \RuntimeException( 'simulated transport explosion' );
+		};
+
+		$user_a = $this->make_user( 'throwing-a' );
+		$user_b = $this->make_user( 'throwing-b' );
+		$fresh  = gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS );
+		$this->seed_cart( $user_a, $fresh );
+		$this->seed_cart( $user_b, $fresh );
+
+		add_filter( 'pre_http_request', $boom );
+		try {
+			do_action( 'smaily_connect_cron_abandoned_carts_email' );
+		} finally {
+			remove_filter( 'pre_http_request', $boom );
+		}
+
+		self::assertSame( '1', $this->mail_sent_of( $user_a ), 'A throwing cart is terminally marked (would recur every tick otherwise).' );
+		self::assertSame( '1', $this->mail_sent_of( $user_b ), 'The pass continues past a throwing cart — the second cart was processed too.' );
+	}
+
 	// --- helpers -------------------------------------------------------------
 
 	/**
@@ -128,7 +199,7 @@ final class AbandonedCartGuardTest extends TestCase {
 		return $user_id;
 	}
 
-	private function seed_cart( int $customer_id, string $cart_updated ): void {
+	private function seed_cart( int $customer_id, string $cart_updated, ?string $cart_content = null ): void {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$inserted = $wpdb->insert(
@@ -136,7 +207,7 @@ final class AbandonedCartGuardTest extends TestCase {
 			array(
 				'customer_id'         => $customer_id,
 				'cart_updated'        => $cart_updated,
-				'cart_content'        => maybe_serialize( array( 'item' => array( 'product_id' => 1, 'quantity' => 1 ) ) ),
+				'cart_content'        => $cart_content ?? maybe_serialize( array( 'item' => array( 'product_id' => 1, 'quantity' => 1 ) ) ),
 				'cart_status'         => 'abandoned',
 				'cart_abandoned_time' => gmdate( 'Y-m-d H:i:s' ),
 				'mail_sent'           => null,

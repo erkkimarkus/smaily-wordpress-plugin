@@ -2789,6 +2789,53 @@ the next save. Alternative rejected: honouring the server row's mode per row (wh
 in 3.4.0) — it renders an inconsistent mixed UI and lets a stale wire fact override the
 store's actual language structure.
 
+### F3-53 — Abandoned-cart poison-row hardening + the legacy WP-Cron scheduler is removed for good (Prike fatal loop)
+
+**Context:** Prike (2026-07-08) installed the new module over the old one (no in-place
+upgrade). From minutes after their setup wizard: a PHP 8 fatal (`Cannot access offset of
+type string on string`) on every 15-minute `smly_plus_abandoned_cart` tick — old-writer
+`cart_content` rows deserialize to an array of bare STRINGS, and the legacy
+`prepare_products_data()` read `$cart_item['product_id']` unguarded. The failing cart
+stayed `mail_sent NULL` (retried forever) and the fatal aborted the whole pass (F3-37's
+per-cart `continue` covered API errors, not Throwables). Separately, the legacy WP-Cron
+events were alive in their cron option: `Lifecycle::activate()` and `activated_plugin`
+(`check_for_dependency`, any WooCommerce re-activation) re-scheduled them AFTER
+WPCronAuditor's one-time activation clear — and `Cron::smaily_sync_subscribers` was still
+`add_action`-registered, so the surviving daily event ran the F3-47 language-clobber
+mass-send that F3-48.3 had declared "orphaned, dead, harmless."
+
+**Decisions:**
+1. **Poison rows are terminal-marked, never eternally retried.** Non-array
+   `cart_content` → log + `update_mail_sent_status` + continue. Non-array / keyless
+   cart ITEMS are skipped item-level (the cart itself still sends). A per-cart
+   `try/catch (Throwable)` backstop terminal-marks a throwing cart — a data-shape
+   throw is deterministic and would recur every tick. Observable in the log, never
+   a silent infinite loop (LESSONS §2.11 spirit).
+2. **The legacy WP-Cron scheduler is deleted, not just its events cleared.**
+   `Lifecycle::set_scheduled_actions()` and both call sites removed; scheduling is
+   owned by the AS `smly_plus_*` recurring actions. `deactivate()`'s clears stay as
+   residue defense. A version upgrade heals an already-polluted site
+   (`maybe_run_upgrade → Activation::run → WPCronAuditor` clear) and nothing re-arms.
+3. **The legacy subscriber mass-send is made UNINVOCABLE.** The
+   `add_action('smaily_connect_cron_sync_subscribers', …)` registration is removed
+   (method body stays for the upstream diff). F3-48.3's intent becomes structural: no
+   scheduler event, stray or future, can fire the cron-unsafe language path again.
+
+**Rationale:** every layer that "should never happen" happened at once on a real client;
+each fix removes a whole class (untrusted persisted shape, poison-pill pass abortion,
+resurrectable legacy scheduler) rather than the single symptom.
+
+**Alternatives rejected:** rewriting abandoned-cart onto the new namespaced pipeline now
+(bigger scope; hardening makes the legacy path safe and the bridge keeps business logic
+unchanged — a rewrite is a separate decision); leaving a throwing cart `mail_sent NULL`
+for retry (deterministic error ⇒ infinite 15-min loop, the exact bug); keeping
+`set_scheduled_actions` as a no-op shell (dead code invites re-wiring; the deactivate
+clears document the hook names already).
+
+**Relationships:** F3-37 (backlog guard + per-cart API-error handling this extends),
+F3-47/F3-48.3 (the language clobber this permanently de-fangs), sub-PR 5.D /
+WPCronAuditor (the migration whose one-time clear the re-arm defeated), LESSONS §2.18.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

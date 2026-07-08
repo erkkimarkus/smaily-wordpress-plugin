@@ -487,8 +487,13 @@ writes engine state must end fail-closed (`enabled=false`, `test_mode=true`)
 AND its report must name the residue it leaves; when a store shows a weird
 per-trigger inconsistency, first ask what else wrote to that tenant. Related:
 the dev wp-env's sandbox connection lives on the DEV site (port 8888 /
-`…-cli-1`) — the tests site (`…-tests-cli-1`) has its own empty options, and
-integration runs scrub only the tests site. (LESSONS §2.17.)
+`…-cli-1`), the tests site (`…-tests-cli-1`) has its own options — but do NOT
+conclude the dev connection is safe from a suite run: the 2026-07-08 (F3-53)
+full-suite run overwrote the DEV site's `smly_rec_*` options with fixture
+values (`re-fixture.test` base URL, a fixture tenant named "MiuMjau"). Always
+follow the snapshot/restore rule above (`wp option list --search='smly_rec_*'
+--format=json` before the suite; restore via a STDIN-fed `wp eval-file` after,
+then verify `tenant_name`). (LESSONS §2.17.)
 
 ### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
 Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's
@@ -599,6 +604,17 @@ done. Don't let a breaking change wait for an unrelated sub-PR to surface it.
   verified against the plugin code AND the mock in the same pass, then live-walked.
   The W2 `items`->`products` drift hid for five syncs because none of these
   happened. (LESSONS §2.7.)
+- **Don't re-add legacy WP-Cron scheduling, and don't call a callback "orphaned"
+  while anything can still fire it (F3-53, Prike).** Scheduling is owned by the
+  AS `smly_plus_*` recurring actions; `Lifecycle::set_scheduled_actions()` was
+  removed because its re-arm (activation + any WooCommerce re-activation) ran
+  AFTER WPCronAuditor's one-time clear and resurrected the daily legacy
+  `smaily_sync_subscribers` mass-send — the F3-47 language clobber — on a real
+  client. Same incident: the legacy abandoned-cart pass now terminal-marks
+  poison `cart_content` rows (old-writer rows deserialize to string items; a
+  PHP 8 offset read on them is a FATAL that aborted the whole 15-min tick,
+  forever). Keep the shape guards + per-cart Throwable backstop; a reader of
+  rows another plugin version may have written treats them as wire input.
 
 ---
 

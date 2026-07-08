@@ -49,8 +49,13 @@ class Cron {
 	public function register_hooks() {
 		// Register the custom schedule early
 		add_filter( 'cron_schedules', array( $this, 'smaily_cron_schedules' ) );
-		// Action hook for subscriber synchronization.
-		add_action( 'smaily_connect_cron_sync_subscribers', array( $this, 'smaily_sync_subscribers' ) );
+		// F3-53: smaily_connect_cron_sync_subscribers is deliberately NOT
+		// registered. F3-48.3 stopped the AS tick from bridging to
+		// smaily_sync_subscribers (its language source is cron-unsafe — the
+		// F3-47 clobber), but the callback stayed registered and a legacy
+		// WP-Cron event surviving/re-armed on a client site fired the
+		// mass-send daily anyway. The new contact-sync path owns this; the
+		// method stays for the upstream diff but nothing may invoke it.
 		// Cron for updating abandoned cart statuses.
 		add_action( 'smaily_connect_cron_abandoned_carts_status', array( $this, 'smaily_abandoned_carts_status' ) );
 		// Cron for sending abandoned cart emails.
@@ -200,8 +205,27 @@ class Cron {
 				continue;
 			}
 
+			/*
+			 * Poison-row guard (F3-53): cart_content this pipeline didn't
+			 * write (an older/foreign plugin version's rows surviving an
+			 * in-place module swap) can deserialize to something other than
+			 * a cart-items array. Such a row can never be emailed — mark it
+			 * terminally (observable in the log) instead of leaving it
+			 * mail_sent NULL, where it would be retried forever.
+			 */
 			$cart_content = maybe_unserialize( $cart['cart_content'] );
 			if ( empty( $cart_content ) ) {
+				continue;
+			}
+			if ( ! is_array( $cart_content ) ) {
+				$this->logger->error(
+					sprintf(
+						'Abandoned cart for customer %d has malformed cart_content (%s) - marked sent without emailing.',
+						(int) $cart['customer_id'],
+						gettype( $cart_content )
+					)
+				);
+				$this->update_mail_sent_status( $cart['customer_id'] );
 				continue;
 			}
 
@@ -210,15 +234,35 @@ class Cron {
 				continue;
 			}
 
-			$addresses = $this->prepare_user_data( $user, $sync_fields );
-			$products  = $this->prepare_products_data( $cart_content, $sync_fields );
+			/*
+			 * Per-cart Throwable backstop (F3-53): a data-shape error in one
+			 * cart is deterministic — it would recur on every 15-minute tick
+			 * and, uncaught, abort the WHOLE pass before the other carts (the
+			 * Prike PHP 8 "Cannot access offset of type string on string"
+			 * fatal loop). Mark the cart terminally and move on.
+			 */
+			try {
+				$addresses = $this->prepare_user_data( $user, $sync_fields );
+				$products  = $this->prepare_products_data( $cart_content, $sync_fields );
 
-			$request  = new Smaily_Client( $this->options );
-			$response = $request->trigger_automation(
-				(int) $status['autoresponder_id'],
-				array( array_merge( $addresses, $products ) ),
-				false
-			);
+				$request  = new Smaily_Client( $this->options );
+				$response = $request->trigger_automation(
+					(int) $status['autoresponder_id'],
+					array( array_merge( $addresses, $products ) ),
+					false
+				);
+			} catch ( \Throwable $e ) {
+				$this->logger->error(
+					sprintf(
+						'Abandoned cart for customer %d failed with %s: %s - marked sent without emailing.',
+						(int) $cart['customer_id'],
+						get_class( $e ),
+						$e->getMessage()
+					)
+				);
+				$this->update_mail_sent_status( $cart['customer_id'] );
+				continue;
+			}
 
 			/*
 			 * Per-cart error handling (F3-37): log and move to the NEXT cart.
@@ -446,6 +490,13 @@ class Cron {
 		if ( ! empty( $selected_fields ) ) {
 			$products_data = array();
 			foreach ( $cart_data as $cart_item ) {
+				// A cart item this pipeline didn't write (foreign/older rows
+				// after an in-place module swap) may be a bare string — on
+				// PHP 8 an offset read on it is fatal, not a notice (F3-53).
+				if ( ! is_array( $cart_item ) || ! isset( $cart_item['product_id'] ) || ! is_scalar( $cart_item['product_id'] ) ) {
+					continue;
+				}
+
 				$product = array();
 
 				// Get product details if selected from user settings.
@@ -466,7 +517,9 @@ class Cron {
 							$product['product_sku'] = $details->get_sku();
 							break;
 						case 'product_quantity':
-							$product['product_quantity'] = $cart_item['quantity'];
+							$product['product_quantity'] = isset( $cart_item['quantity'] ) && is_scalar( $cart_item['quantity'] )
+								? (string) $cart_item['quantity']
+								: '';
 							break;
 						case 'product_price':
 							$product['product_price'] = $this->get_sale_price_with_tax( $details );

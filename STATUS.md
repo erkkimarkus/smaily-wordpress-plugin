@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-07 (**v3.4.1 RELEASED — T2.4 pilot-feedback UI fixes + contract
+_Last updated: 2026-07-08 (**F3-53 — Prike abandoned-cart PHP 8 fatal loop + legacy WP-Cron
+resurrection fixed.** Prike (installed the new module over the old one, no in-place upgrade)
+hit a 15-minute fatal loop on `smly_plus_abandoned_cart`: old-writer `cart_content` rows
+deserialize to string items, `prepare_products_data()` read `$cart_item['product_id']`
+unguarded (PHP 8 fatal, cart stayed `mail_sent NULL`, whole pass aborted every tick) — and
+the legacy WP-Cron events were alive because `Lifecycle::activate()`/`check_for_dependency`
+re-scheduled them after WPCronAuditor's one-time clear, with `Cron::smaily_sync_subscribers`
+still add_action-registered (= the F3-47 language clobber runnable daily, on Prike of all
+stores). Fixes: (1) poison-row hardening in the legacy email pass — non-array cart_content
+terminal-marked + logged, non-array/keyless items skipped, per-cart `try/catch (Throwable)`
+backstop terminal-marks a throwing cart (deterministic ⇒ would recur forever); (2)
+`Lifecycle::set_scheduled_actions()` + both call sites REMOVED (AS owns scheduling;
+deactivate clears stay); (3) the `smaily_connect_cron_sync_subscribers` add_action removed —
+the mass-send is uninvocable (method kept for the upstream diff). Tests: +2
+AbandonedCartGuardTest (poison shapes incl. the exact Prike string-items case + the
+Throwable backstop via a throwing `pre_http_request`), +3 new LegacyCronScheduleTest
+(no callback registered; WC activation doesn't re-arm; scheduler method gone);
+EnvScrub now also clears `smaily_connect_abandoned_cart_fields`. Gates: ci:strict exit=0
+(PHPUnit unit 474, PHPCS 0 errors, PHPStan clean, vitest 232, tsc/eslint clean);
+integration full suite OK (131 tests, 620 assertions; +5 new). NB the full suite
+OVERWROTE the dev-site sandbox connection with fixture values (`re-fixture.test` /
+"MiuMjau"-named fixture) — snapshotted before, restored after, verified
+`tenant=Smaily Connect test, connected=1`; §2.17's "scrub touches only the tests site"
+does NOT hold for the connection options, follow the CLAUDE.md snapshot/restore rule.
+Docs: DECISIONS F3-53, LESSONS §2.18 (+ restored the `## 3` header §2.17's commit
+accidentally ate). Client-side mitigation sent to Prike's dev meanwhile: abandoned cart
+OFF in settings + `wp cron event delete` × 3 legacy events. NOT yet released — needs a
+version bump so Prike's proper plugin update heals the cron residue via
+`maybe_run_upgrade → Activation::run → WPCronAuditor`. Open question (Erkki): rewrite
+abandoned-cart onto the new namespaced pipeline as its own sub-PR? Prior:
+**v3.4.1 RELEASED — T2.4 pilot-feedback UI fixes + contract
 v1.2.0 sync (`recipe_en`).** Patch release per the CLAUDE.md recipe: version bumped in all
 six places, committed BEFORE the build → clean build-hash `ae3bc3d`; ci:strict exit=0
 (PHPUnit unit 474, PHPCS 0 errors, PHPStan clean, vitest 232, tsc/eslint clean);
