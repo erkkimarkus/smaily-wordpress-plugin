@@ -6,7 +6,7 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
 
-use Smaily_Connect\Includes\Helper as Smaily_Base_Helper;
+use Smaily\Connect\Support\ContactLanguageResolver;
 use Smaily_Connect\Includes\Logger;
 use Smaily_Connect\Includes\Options;
 use Smaily_Connect\Includes\Smaily_Client;
@@ -443,7 +443,18 @@ class Cron {
 					$addresses['email'] = $user->user_email;
 					break;
 				case 'language':
-					$addresses['language'] = Smaily_Base_Helper::get_user_language_code( $user->ID );
+					/*
+					 * F3-53 addendum: the legacy helper's fallback is the
+					 * context-dependent get_current_language_code() — in this
+					 * cron/AS pass that's the F3-47 clobber class (its own
+					 * docblock says "not suitable for use in cron jobs").
+					 * Route through the resolver; omit when unresolved —
+					 * Smaily leaves an absent language intact, '' wipes it.
+					 */
+					$language = ( new ContactLanguageResolver() )->for_user( $user );
+					if ( $language !== '' ) {
+						$addresses['language'] = $language;
+					}
 					break;
 				case 'first_name':
 					$addresses['first_name'] = $user->first_name;

@@ -171,6 +171,48 @@ final class AbandonedCartGuardTest extends TestCase {
 		self::assertSame( '1', $this->mail_sent_of( $user_b ), 'The pass continues past a throwing cart — the second cart was processed too.' );
 	}
 
+	public function test_language_field_comes_from_the_contact_language_resolver(): void {
+		// F3-53 addendum: the legacy Helper::get_user_language_code() falls
+		// back to the context-dependent get_current_language_code(), which in
+		// this cron/AS pass resolves NOTHING (or the wrong context) — here it
+		// yielded language:'' on the wire, and Smaily treats '' as "wipe the
+		// contact's language" (the F3-47 clobber class, abandoned-cart scale).
+		// The resolver returns the real site default and the builder omits the
+		// key entirely when unresolved. Captured at the transport seam with a
+		// fake 101 success so the full mark-sent path runs too.
+		$captured = null;
+		$fake     = static function ( $pre, $args ) use ( &$captured ) {
+			$captured = isset( $args['body'] ) ? $args['body'] : null;
+			return array(
+				'headers'  => array(),
+				'body'     => wp_json_encode( array( 'code' => 101, 'message' => 'OK' ) ),
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+
+		$user = $this->make_user( 'lang-cart' );
+		$this->seed_cart( $user, gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ) );
+
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			do_action( 'smaily_connect_cron_abandoned_carts_email' );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertIsArray( $captured, 'The abandoned-cart send must have reached the transport.' );
+		self::assertArrayHasKey( 'addresses', $captured );
+		$address = $captured['addresses'][0];
+		self::assertArrayHasKey( 'language', $address, 'Default fields have language enabled — the resolver must produce one on this single-language env.' );
+		self::assertSame( 'en', $address['language'], 'language must come from ContactLanguageResolver (site default), never \'\' — Smaily would wipe the contact\'s stored language.' );
+		self::assertSame( '1', $this->mail_sent_of( $user ), 'The faked 101 success must mark the cart sent.' );
+	}
+
 	// --- helpers -------------------------------------------------------------
 
 	/**

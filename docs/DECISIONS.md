@@ -2836,6 +2836,17 @@ clears document the hook names already).
 F3-47/F3-48.3 (the language clobber this permanently de-fangs), sub-PR 5.D /
 WPCronAuditor (the migration whose one-time clear the re-arm defeated), LESSONS §2.18.
 
+**Addendum (2026-07-08, same day): the abandoned-cart `language` field routes through
+ContactLanguageResolver.** Reviewing the pass for the fix above surfaced the same F3-47
+class ON THIS PATH: `prepare_user_data()`'s language case called the legacy
+`Helper::get_user_language_code()`, whose fallback is the context-dependent
+`get_current_language_code()` — in this cron/AS pass that resolved '' (or the wrong
+context), and Smaily treats `language: ''` as "wipe the contact's stored language"
+(smaller scale than F3-47 — only abandoned-cart contacts missing per-user meta, but the
+same wipe/clobber, every 15-minute tick). Now: `ContactLanguageResolver::for_user()`,
+omit the key when it returns '' (F3-47 rule 2). This is the interim fix; the full
+abandoned-cart rewrite onto the new namespaced pipeline is a separate future decision.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
