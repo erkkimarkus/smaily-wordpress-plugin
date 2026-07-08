@@ -4,6 +4,79 @@ All notable changes to the Smaily Connect plugin. The `readme.txt` changelog
 carries the same content in WordPress.org format; this file is the fuller
 repo-side log.
 
+## 3.4.2 — abandoned-cart hardening + legacy WP-Cron removal (F3-53) (2026-07-08)
+
+Fixes from the Prike incident (new module installed over the old one, no in-place
+upgrade — a PHP 8 fatal loop on the abandoned-cart tick + resurrected legacy WP-Cron):
+
+- **Poison-row hardening (legacy abandoned-cart email pass):** `cart_content` rows an
+  older/foreign plugin version wrote can deserialize to non-array values or string
+  items; the unguarded `$cart_item['product_id']` read was a PHP 8 fatal that aborted
+  the WHOLE pass every 15 minutes forever (the bad cart stayed `mail_sent NULL`).
+  Non-array cart_content is now terminal-marked + logged; non-array/keyless items are
+  skipped; a per-cart `try/catch (Throwable)` backstop terminal-marks a throwing cart.
+- **Legacy WP-Cron scheduler removed for good:** `Lifecycle::set_scheduled_actions()`
+  and its call sites (activation, WooCommerce re-activation) are gone — the re-arm ran
+  AFTER WPCronAuditor's one-time clear and resurrected a duplicate scheduler. A plugin
+  update now heals polluted sites (`maybe_run_upgrade → Activation::run → auditor
+  clear`) and nothing re-arms. `deactivate()`'s clears stay as residue defense.
+- **Legacy daily subscriber mass-send made uninvocable:** the
+  `smaily_connect_cron_sync_subscribers` callback registration is removed (F3-48.3's
+  "orphaned" intent made structural) — a surviving legacy WP-Cron event could otherwise
+  run the F3-47 language-clobber path daily.
+- **Abandoned-cart `language` via ContactLanguageResolver:** the legacy helper's
+  fallback is context-dependent and produced an empty/wrong language in cron runs
+  (Smaily treats `''` as "wipe the contact's language") — the same F3-47 class at
+  abandoned-cart scale. Now resolver-routed; the key is omitted when unresolved.
+
+Details: DECISIONS F3-53 (+ addendum), LESSONS §2.18.
+
+## 3.4.1 — engine-automations settings fixes from real-store testing (2026-07-07)
+
+React-admin-only fixes (T2.4): store-global language mode for automation rows, cooldown
+input typing UX, empty test-address warning, human-readable connection-failure messages,
+English recipe support (`recipe_en`). Contract synced to v1.2.0. See readme.txt 3.4.1
+and DECISIONS F3-52 (addendum).
+
+## 3.4.0 — engine-run recommendation automations settings (T2) (2026-07-07)
+
+New settings section (WooCommerce automations tab + wizard Step 3) for the engine-run
+automation triggers: catalog-driven trigger list, per-language workflow binding on
+multilingual stores, fail-closed defaults (off + test mode; going live is a separate
+confirmed action). The plugin is a stateless proxy — the engine stores and validates
+the config (DECISIONS F3-51/F3-52). Verified by the T2.3 live-walk (15/15) + a T2
+security re-audit.
+
+## 3.3.2 — browse consent back on the standard WP Consent API (2026-07-03)
+
+Reverts 3.3.1's CookieYes-specific consent reading; consent comes from the WP Consent
+API standard (which CookieYes supports via the companion plugin). Adds an admin notice
+when browse tracking is on but no consent signal exists — the fix is installing the
+free `wp-consent-api` plugin (DECISIONS F3-50, the MiuMjau 0-events root cause).
+
+## 3.3.1 — CookieYes consent reading (2026-07-03; superseded by 3.3.2)
+
+Vendor-specific CookieYes cookie parsing for browse consent — shipped on the wrong
+assumption and reverted in 3.3.2 in favour of the standard.
+
+## 3.3.0 — visitor token on browse events (F3-49) (2026-07-03)
+
+Browse events carry the opaque `smaily_visitor_token` (cold-start personalization) when
+the cookie is present. Deliberately NOT attribution: no rec id / email on browse events
+(data minimization) — purchase attribution rides order signals.
+
+## 3.2.1 — contact-sync mode selector UX (2026-07-01)
+
+Contact-sync mode selector shown only when sync is enabled; "checkout opt-in only" mode
+selectable only with the checkout checkbox on (F3-48.5a).
+
+## 3.2.0 — contact-sync correctness: language resolver + sync modes (2026-06-30)
+
+The F3-47/F3-48 line: `ContactLanguageResolver` as the single, cron-safe source of a
+contact's Smaily `language` (the Prike site-locale clobber fix), audience/sync-mode
+work (F3-48), and rec-attribution edge-case hardening on `LandingCapture`. See
+DECISIONS F3-47/F3-48.
+
 ## 3.1.0 — recommendation attribution: server-side landing capture (2026-06-26)
 
 - **Rec attribution (F3-46):** new `Integrations\WooCommerce\LandingCapture` captures the

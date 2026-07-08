@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.4.1
+Stable tag: 3.4.2
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,12 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.4.2 =
+* Fixed: a corrupted abandoned-cart row (left behind by an older plugin version after an in-place module swap) could crash the abandoned-cart email task on PHP 8 and repeat every 15 minutes, blocking all abandoned-cart reminders. Such rows are now skipped and logged, and one bad cart can no longer stop the others.
+* Fixed: the plugin no longer re-creates the old WP-Cron schedules (for example after WooCommerce is re-activated) — scheduling is fully owned by the new task scheduler. Updating also cleans up leftover old schedules automatically.
+* Fixed: the retired daily subscriber sync can no longer run even if an old scheduled event still exists on the site (it could overwrite contact languages with the wrong value).
+* Fixed: abandoned-cart reminder emails now resolve the contact's language with the same logic as contact sync, instead of a method that could produce an empty or wrong language in scheduled runs.
 
 = 3.4.1 =
 * Fixes to the engine-run automations settings from real-store testing:
@@ -267,6 +273,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.4.2 =
+Reliability fixes for stores upgraded from an older plugin version: abandoned-cart crash loop fixed, leftover legacy schedules cleaned up on update, abandoned-cart contact-language handling corrected. Recommended for all stores.
 
 = 3.4.1 =
 Settings-screen fixes for the engine-run automations section (language rows, cooldown input, test-address warning, clearer error messages, English recipes). UI-only; safe in-place update.
