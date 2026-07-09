@@ -236,8 +236,12 @@ of orders ingest; update if the build evolves.)
 The user-facing documentation (install, wizard, settings, imports, errors, FAQ,
 privacy) is a **single self-contained HTML page** at `docs/site/index.html`,
 built to look and work like the Shopify docs at `connect.smaily.com/docs`. It is
-**hosted separately** (Erkki puts it on the web) — it is NOT shipped in the
-plugin ZIP (`docs/` is excluded by `.zipignore`), so it never bloats the build.
+**hosted separately** — live at `https://smaily.com/connect-woo/` — NOT shipped in
+the plugin ZIP (`docs/` is excluded by `.zipignore`), so it never bloats the build.
+The plugin links to it from the wizard/Settings screens + the Plugins page; every
+UI link resolves through `Constants::docs_url()` (const `DOCS_URL`, filter
+`smaily_connect_docs_url`) — **one line to change** when Smaily plugin docs move to
+`connect.smaily.com` (the long-term plan: each plugin its own home there).
 
 Facts that must stay true when you touch it:
 - **Bilingual, one file.** EN and ET are parallel sibling blocks toggled by a
