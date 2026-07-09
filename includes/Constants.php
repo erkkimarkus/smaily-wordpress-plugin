@@ -44,6 +44,16 @@ final class Constants {
 	public const SETUP_BASE_URL = 'https://intelligence.smaily.com/setup/exchange';
 
 	/**
+	 * Merchant documentation site (install / wizard / settings / troubleshooting).
+	 *
+	 * Currently hosted at smaily.com; the long-term plan is to move every Smaily
+	 * plugin's docs under connect.smaily.com (each plugin its own home). When that
+	 * lands this is a one-line change — every UI link resolves through docs_url().
+	 * Per-site overrides via the smaily_connect_docs_url filter.
+	 */
+	public const DOCS_URL = 'https://smaily.com/connect-woo/';
+
+	/**
 	 * REST namespace exposed by the plugin (e.g. /wp-json/smaily-connect/v1/...).
 	 */
 	public const REST_NAMESPACE = 'smaily-connect/v1';
@@ -65,6 +75,15 @@ final class Constants {
 		$url = (string) apply_filters( 'smaily_connect_setup_url', self::SETUP_BASE_URL );
 
 		return $url !== '' ? $url : self::SETUP_BASE_URL;
+	}
+
+	/**
+	 * Resolves the merchant documentation URL, allowing per-site overrides.
+	 */
+	public static function docs_url(): string {
+		$url = (string) apply_filters( 'smaily_connect_docs_url', self::DOCS_URL );
+
+		return $url !== '' ? $url : self::DOCS_URL;
 	}
 
 	/**

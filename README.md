@@ -64,10 +64,13 @@ The 3.x code lives under the `Smaily\Connect` namespace (PSR-4); the legacy 1.x 
 
 ## Documentation
 
-All project documentation lives in [`docs/`](docs/) — start with [`docs/INDEX.md`](docs/INDEX.md).
+**Merchant documentation** (install, setup wizard, settings, troubleshooting) lives at **[smaily.com/connect-woo](https://smaily.com/connect-woo/)** — the bilingual (EN/ET) source is [`docs/site/index.html`](docs/site/index.html), a single self-contained page.
+
+Project / developer documentation lives in [`docs/`](docs/) — start with [`docs/INDEX.md`](docs/INDEX.md).
 
 | Document | Purpose |
 |----------|---------|
+| [`docs/site/index.html`](docs/site/index.html) | Merchant docs site (bilingual; hosted at [smaily.com/connect-woo](https://smaily.com/connect-woo/)) |
 | [`docs/INDEX.md`](docs/INDEX.md) | Catalog of every document in the project |
 | [`docs/MIGRATION.md`](docs/MIGRATION.md) | Step-by-step upgrade from the legacy 1.x plugin |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Every significant architectural decision, with rationale |

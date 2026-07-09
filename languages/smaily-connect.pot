@@ -2402,3 +2402,7 @@ msgstr ""
 msgctxt "block keyword"
 msgid "form"
 msgstr ""
+
+#: admin/wizard.php includes/smaily.class.php
+msgid "Documentation"
+msgstr ""

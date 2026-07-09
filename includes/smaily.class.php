@@ -18,6 +18,7 @@ use Smaily_Connect\Integrations\WooCommerce\Profile_Settings;
 use Smaily_Connect\Integrations\WooCommerce\Rss;
 use Smaily_Connect\Integrations\WooCommerce\Subscriber_Synchronization;
 use Smaily_Connect\Public_Base;
+use Smaily\Connect\Constants;
 
 class Smaily_Connect {
 	/**
@@ -267,13 +268,42 @@ class Smaily_Connect {
 				register_widget( new Widget( $this->options ) );
 			}
 		);
-		// 2) the Plugins-page "Settings" link — now points at the new Settings page.
+		// 2) the Plugins-page "Settings" + "Documentation" links. Settings points
+		//    at the new Settings page; Documentation opens the merchant docs site
+		//    (Constants::docs_url() — one place to change when docs move to
+		//    connect.smaily.com). External link, so new tab + rel="noopener".
 		add_filter(
 			'plugin_action_links_' . plugin_basename( SMAILY_CONNECT_PLUGIN_FILE ),
 			static function ( array $links ): array {
-				array_unshift( $links, '<a href="admin.php?page=smaily-connect-settings">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>' );
+				array_unshift(
+					$links,
+					'<a href="admin.php?page=smaily-connect-settings">' . esc_html__( 'Settings', 'smaily-connect' ) . '</a>',
+					sprintf(
+						'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+						esc_url( Constants::docs_url() ),
+						esc_html__( 'Documentation', 'smaily-connect' )
+					)
+				);
 				return $links;
 			}
+		);
+
+		// Documentation link in the Plugins-page row meta (under the description,
+		// alongside "View details") — a second, conventional discovery spot.
+		add_filter(
+			'plugin_row_meta',
+			static function ( array $meta, string $file ): array {
+				if ( $file === plugin_basename( SMAILY_CONNECT_PLUGIN_FILE ) ) {
+					$meta[] = sprintf(
+						'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+						esc_url( Constants::docs_url() ),
+						esc_html__( 'Documentation', 'smaily-connect' )
+					);
+				}
+				return $meta;
+			},
+			10,
+			2
 		);
 
 		$this->admin_notices = new Notices();

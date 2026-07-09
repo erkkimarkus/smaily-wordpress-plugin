@@ -2402,3 +2402,7 @@ msgstr "Kontrollitud %1$d kasutajat %2$d-st — %3$d kontakti sünkroonitud."
 #, js-format
 msgid "Done — %1$d contacts synced (%2$d users checked)."
 msgstr "Valmis — %1$d kontakti sünkroonitud (%2$d kasutajat kontrollitud)."
+
+#: admin/wizard.php includes/smaily.class.php
+msgid "Documentation"
+msgstr "Dokumentatsioon"
