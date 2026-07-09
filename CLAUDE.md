@@ -30,6 +30,14 @@ not a separate chore; it's part of the work that changed them.
 - **README roadmap / INDEX.md** — if you change what's done or which files
   exist, refresh these too. They went stale once (README said Customers/Orders
   were pending after they shipped); don't let it recur.
+- **Merchant docs site (`docs/site/index.html`)** — the bilingual (EN/ET)
+  user-facing documentation that mirrors `connect.smaily.com/docs`. When a change
+  alters **user-visible behavior** — a wizard step, a Settings control, an error
+  or notice string, a consent/companion-plugin requirement, an import's behavior,
+  a requirement (WP/WC/PHP floor) — update the site **in the same commit, in BOTH
+  languages** (the two `data-lang="en"`/`data-lang="et"` blocks are siblings; edit
+  the pair together or they drift). It's a single self-contained page — no build
+  step; open it in a browser to verify. See the note below.
 
 **The rule across all of them:** if your change makes a doc wrong, your change
 isn't finished until the doc is fixed in the same commit. If you notice a doc is
@@ -223,6 +231,29 @@ drifted store is the backfill running the SAME resolver (SP-B), not a one-off.
 
 (Verify exact paths/scripts against the repo — this list is the working set as
 of orders ingest; update if the build evolves.)
+
+### Merchant docs site lives in `docs/site/index.html` — one bilingual HTML file
+The user-facing documentation (install, wizard, settings, imports, errors, FAQ,
+privacy) is a **single self-contained HTML page** at `docs/site/index.html`,
+built to look and work like the Shopify docs at `connect.smaily.com/docs`. It is
+**hosted separately** (Erkki puts it on the web) — it is NOT shipped in the
+plugin ZIP (`docs/` is excluded by `.zipignore`), so it never bloats the build.
+
+Facts that must stay true when you touch it:
+- **Bilingual, one file.** EN and ET are parallel sibling blocks toggled by a
+  `data-lang` attribute on `<html>` (JS in the page, choice saved to
+  `localStorage`). Every translatable unit exists twice — `data-lang="en"` and
+  `data-lang="et"`. Edit the pair together; a lone-language edit is a drift bug.
+- **No build step, no external deps.** Inline CSS+JS, system/Inter font stack, no
+  CDN/webfont/script src — so it renders identically whether opened as a local
+  file, hosted anywhere, or previewed as a Claude Artifact. Keep it dependency-free.
+- **Brand:** Smaily pink `#e91e63` (light) / `#ff5c9d` (dark accent for legibility);
+  light+dark via `prefers-color-scheme` + a `data-theme` override.
+- **Content source of truth is the real plugin**, not the Shopify copy — don't
+  paste Shopify-isms that don't hold here (no Shopify OAuth "permission prompts";
+  no 60-day order window; consent is the **WP Consent API** companion plugin;
+  background work is **Action Scheduler**; GDPR is the **WP Privacy tools**). The
+  keep-current rule is in "Keeping the docs current" above.
 
 ### Audits live in `docs/audits/` — re-run after bigger changes
 All audit reports + the register table live in `docs/audits/` (start at

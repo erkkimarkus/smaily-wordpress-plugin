@@ -6,6 +6,9 @@ where something is.
 
 **Language convention:**
 - All published documents in repos: **English**
+  - *Exception:* the **merchant docs site** (`docs/site/index.html`) is **bilingual
+    EN/ET** — it faces end-user merchants and mirrors the ET/EN Smaily docs sites.
+    Keep both languages in sync in the same commit.
 - Internal drafts and notes (only Erkki): **Estonian or English** (Erkki's choice)
 - Code comments, commit messages, technical PR/issue text: **English**
 - Conversations with Claude (development workflow): **Estonian** (Erkki's working
@@ -25,9 +28,10 @@ where something is.
 | Document | Audience | Status | Description |
 |----------|----------|--------|-------------|
 | `README.md` | Anyone evaluating the plugin | **Exists** | First impression. What the plugin does, who it's for, install summary, links to deeper docs. Lives at repo root, also surfaces in marketplace listings. (Refined further at Phase 3 end.) |
-| `docs/INSTALL.md` | Pilot merchant installing + setting up | **Written** (P4) | Merchant-facing: install (ZIP upload) → setup wizard (Smaily + rec-engine connect, browser-cookie consent + browse toggle) → verify (engine-confirmed backfill, Event Log, live smoke test) → troubleshoot (Event Log → Retry, health notices). Screenshot placeholders inline. Add the profiling-consent section once Smaily-consent (a) ships. |
+| `docs/site/index.html` | Any merchant (install → use → troubleshoot) | **Written** (2026-07-09) | **The merchant documentation site.** Single self-contained bilingual (EN/ET) HTML page mirroring the Shopify docs at `connect.smaily.com/docs`: Overview, Getting started (install + 6-step wizard), Settings, Importing existing data, Error messages & fixes, FAQ, Data & privacy. No build step, no external deps; hosted separately by Erkki, **not shipped in the ZIP** (`.zipignore` excludes `docs/`). Keep current in the same commit that changes user-visible behavior, **in both languages** — see CLAUDE.md "Keeping the docs current" + "Merchant docs site". |
+| `docs/INSTALL.md` | Links from README/STATUS/INDEX | **Stub → site** (2026-07-09) | Now a thin pointer to `docs/site/index.html` (which superseded it) + the requirements table + a "where to look" map. The full install/wizard/verify/troubleshoot content moved into the site so it can't drift in two places. |
 | `MIGRATION.md` | WP-admin running the legacy `sendsmaily/smaily-wordpress-plugin` | **Written** (`docs/MIGRATION.md`) | How to migrate from the legacy plugin to this one: in-place upgrade, what persists, wizard takeover, rollback path. (This row previously said TODO after the doc had shipped — fixed 2026-06-11.) |
-| `FAQ.md` / `TROUBLESHOOTING.md` | WP-admin running into problems | **TODO** (after pilot, ~2-4 weeks in) | Real user questions and symptom→cause→fix patterns. Written **after** the pilot is in production and asks real questions. Drafting it earlier would just be guesses. |
+| `FAQ.md` / `TROUBLESHOOTING.md` | WP-admin running into problems | **Partly done** — first pass lives in the docs site (2026-07-09); real-questions pass still post-pilot | A first FAQ + "Error messages & fixes" now lives in `docs/site/index.html` (built from the known error/notice surfaces). The **real user questions** — symptom→cause→fix patterns from live pilot support — are still written **after** the pilot asks them; fold them back into the site. |
 | `CHANGELOG.md` | Anyone tracking versions | **Written** (2026-06-11, repo root) | Version-by-version what changed: full 2.0.0-beta.1 entry + the 1.x history. `readme.txt` carries the same content in wp.org format. |
 | `docs/TESTING.md` (pilot-acceptance) | Pilot engagement: is it production-ready? | **Written** (2026-06-11, from Erkki's criteria) | Business pass/fail criteria for the pilot engagement (distinct from INSTALL.md's technical verify): two gating dimensions (technical stability + merchant experience), business metrics tracked-not-gated, and logistics (4–6 wk, real data from start, check-in cadence, go/no-go review). NB: the existing root `/TESTING.md` is a separate Phase-2 dev sanity-test, not this. |
 
