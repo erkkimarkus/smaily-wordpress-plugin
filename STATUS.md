@@ -26,7 +26,29 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-08 (**F3-55 — backfill progress: users WALKED vs contacts SYNCED;
+_Last updated: 2026-07-09 (**Merchant documentation site + in-plugin docs links —
+landed on main, UNRELEASED.** New `docs/site/index.html`: a single self-contained
+**bilingual (EN/ET)** HTML page (7 sections — Overview, Getting started/wizard,
+Settings, Importing, Error messages, FAQ, Data & privacy) built to look and work like
+the Shopify docs at `connect.smaily.com/docs`; content written from real plugin
+behavior (no Shopify-isms — no OAuth prompts, no 60-day order window, WP Consent API
+companion, Action Scheduler, WP Privacy tools). No build step, no external deps; hosted
+separately, **live at https://smaily.com/connect-woo/**, excluded from the ZIP via
+`.zipignore`. `docs/INSTALL.md` → thin pointer; CLAUDE.md/INDEX.md carry the keep-current
+rule (update the site in BOTH languages in the same commit user-visible behavior
+changes). Plugin now links to the docs from the **wizard + Settings screens** (a visible
+"Documentation" link at the top of `admin/wizard.php`'s mount — help material one click
+away on install) and the **Plugins page** (action link + row meta); every UI link
+resolves through `Constants::docs_url()` (const `DOCS_URL`, filter
+`smaily_connect_docs_url`) — one line to change when Smaily docs move to
+`connect.smaily.com` (the long-term plan: each plugin its own home there). New string
+"Documentation"/"Dokumentatsioon" in `.pot`+`-et.po` (`.mo`/`.json` regenerate at
+package time). Commits `e57bcea` (site+doc updates), `df8a9c0` (in-plugin links),
+`5db99cd` (CLAUDE note). Gates: **ci:strict exit=0** (PHPCS 0 errors, PHPStan OK, unit
+480, vitest 236); PHPCS clean on the 3 touched PHP files. Integration NOT run (wp-env
+down; change touches no ingest/queue/REST data path the suite covers — admin-UI-only,
+ci:strict is the relevant gate). No release cut. Prior: **F3-55 — backfill progress:
+users WALKED vs contacts SYNCED;
 v3.5.0 RELEASED.** Prike: "contact sync shows 30k contacts going to Smaily, we have 16k
 opt-ins" — the WIRE was correct (F3-48 audience filter POSTs only the mode's audience),
 but `total_count=count_users()`, `processed_count` counts rows walked, and the UI
