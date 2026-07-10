@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.5.0
+Stable tag: 3.6.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,12 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.6.0 =
+* Changed: products sent to Smaily Campaign Intelligence are now identified by a stable platform id (`woo-<id>`) instead of the merchant-entered SKU field. Merchant SKUs are optional, blank, or reused on many real stores, which could collapse distinct products into one and silently lose recommendation history; the platform id is unique and permanent. The merchant SKU field is no longer sent at all. **For stores already connected to Campaign Intelligence:** the product keys change on update, so the engine-side catalog needs a one-time coordinated cleanup and a full catalog + order re-import (re-backfill) — this is coordinated per store with the Smaily team; do not update a connected store without that coordination.
+* New: permanently deleting a product (emptying it from the trash or deleting it outright) now tells the engine to remove that product and all its variants from the recommendation catalog. Trashing a product still keeps it in the catalog as out-of-stock (restorable), as before.
+* New: product data sent to the engine now carries a product-level grouping id, so variants of the same product are recognized as one product for recommendation cadence and removal.
+* New: a Documentation link in the setup wizard, the Settings screen, and the Plugins page, pointing to the new Smaily Connect user documentation site (in English and Estonian).
 
 = 3.5.0 =
 * Improved: the contact backfill progress now shows two honest numbers — how many WordPress users were checked, and how many contacts were actually synced to Smaily according to your contact sync mode (in consent mode only opted-in users are synced; that has always been the case, but the progress display previously showed the checked-users count labelled as synced contacts).
@@ -283,6 +289,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.6.0 =
+Product identity sent to Smaily Campaign Intelligence changes from the merchant SKU to a stable platform id (woo-<id>). Stores already connected to Campaign Intelligence need a coordinated engine-side catalog cleanup + full re-import after updating — coordinate with the Smaily team before updating a connected store. Stores not using Campaign Intelligence are unaffected; safe in-place update.
 
 = 3.5.0 =
 The contact backfill progress now reports users checked and contacts synced as separate numbers, matching your contact sync mode — no data-flow change, only honest reporting. Safe in-place update.
