@@ -26,7 +26,20 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**Contract re-synced byte-identical (engine `2ff57e8`, md5
+_Last updated: 2026-07-10 (**v3.6.0 RELEASED.** Full GH release on the fork, tag
+`v3.6.0`, target main, **Latest** (non-prerelease); asset `smaily-connect.zip` is the
+locally-built verified ZIP (clean build-hash `f8903ce`, 1 075 310 B — re-verified
+byte-identical AFTER `release.yml` fired on publish and failed harmlessly as expected
+(no wp-cli in the runner); the asset was NOT clobbered, per the CLAUDE.md release
+note). Contents: PRO-1224 canonical `woo-<id>` identity + `tags.product_id`, PRO-1230
+§3b `catalog/remove` on hard delete, merchant docs site + in-plugin Documentation
+links. Gates were green at prep (3.6.0 release-gate row in `docs/audits/INDEX.md`):
+delta security+quality re-audit **0 Crit/High/Med**, PCP on the built ZIP clean except
+the intentional `Update URI` (F3-35), ci:strict exit=0, integration 144 OK,
+PRO-1224/1230 live-walk LIVE OK 20/20. **Deployment dependency:** MiuMjau's update to
+3.6.0 must ride the coordinated engine-side purge + full re-backfill (engine PRO-1233,
+week of 2026-07-14) — do not update the pilot store before the engine flip. Prior same
+day: **Contract re-synced byte-identical (engine `2ff57e8`, md5
 `1777746b…`) — PRO-1234.** Doc-only delta since our `8a0749f` sync, two engine commits:
 `2ff57e8` (§3 identity clarify: a merchant-entered SKU, if ever sent, goes in
 `tags.merchant_sku` — NEVER in `external_id`, which carries the platform variant id and
@@ -41,8 +54,8 @@ in the same sync: setup-exchange map now serves `ingest_catalog_remove` (14 keys
 "speculative key" Client docblock fixed. **No wire-SHAPE change → no live-walk needed**
 (prose clarify + map addition already exercised by ClientTest both ways). Gates:
 ci:strict exit=0; integration not run (doc + mock-map + comment delta only). Prior:
-**v3.6.0 RELEASE PREPARED — NOT YET PUBLISHED** (publish =
-Erkki's one-way door; this release is the prerequisite for the MiuMjau key-migration,
+**v3.6.0 RELEASE PREPARED** (published later the same day — see
+the head of this note; the release is the prerequisite for the MiuMjau key-migration,
 engine PRO-1233, week of 2026-07-14). Version bumped 3.5.0→3.6.0 in all pinned spots
 (`e1d20e5`); changelog + upgrade notice call out that already-connected stores need the
 coordinated engine-side purge + full re-backfill (keys change to `woo-<id>`) BEFORE the
@@ -60,7 +73,8 @@ restored). **PCP on the built ZIP: clean except the intentional `Update URI`** (
 gate-time fix: upgrade notice shortened under the 300-char limit). ZIP verified: clean
 build-hash `f8903ce`, v3.6.0, required present, dev artifacts absent, ~1.07 MB —
 `smaily-connect.zip` at the repo root, release notes drafted (scratchpad
-`release-notes-3.6.0.md`). NOT done: `gh release create` / tag — waiting on Erkki.
+`release-notes-3.6.0.md`). The `gh release create` / tag followed the same day —
+RELEASED, see the head of this note.
 Prior: **PRO-1224 + PRO-1230 LIVE-WALK DONE against the "Smaily
 Connect test" sandbox** — `bin/walk-pro1224-1230.cjs`, LIVE OK, 20 checks. Proven on the
 REAL engine: catalog rows key `sku=woo-<id>` + `tags.product_id` = RAW canonical parent
