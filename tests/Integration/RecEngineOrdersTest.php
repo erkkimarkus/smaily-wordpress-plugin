@@ -131,11 +131,11 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertStringContainsString( '"outcome":"accepted"', (string) $row['last_response'] );
 	}
 
-	public function test_skuless_product_order_ingests_with_synthetic_key(): void {
-		// F3-36 (pilot find): the pilot store has no SKUs at all. The order
-		// must still ingest, keyed wc-{product id} by SkuResolver — before
-		// this, every line dropped and the empty items[] D6-failed the order
-		// on every retry.
+	public function test_skuless_product_order_ingests_with_woo_key(): void {
+		// PRO-1224 (pilot find): the pilot store has no SKUs at all. The order
+		// must still ingest, keyed woo-{product id} by SkuResolver (the platform
+		// id, never the merchant SKU) — before this, every line dropped and the
+		// empty items[] D6-failed the order on every retry.
 		$product = $this->make_skuless_product( '7.00' );
 		$this->make_order( 'skuless@example.test', 'completed', $product );
 
@@ -146,7 +146,7 @@ final class RecEngineOrdersTest extends TestCase {
 
 		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
 		self::assertIsArray( $payloads );
-		self::assertSame( 'wc-' . $product->get_id(), $payloads[0]['items'][0]['sku'] );
+		self::assertSame( 'woo-' . $product->get_id(), $payloads[0]['items'][0]['sku'] );
 	}
 
 	public function test_deleted_product_order_is_kept_and_sent_not_dropped(): void {
@@ -155,7 +155,7 @@ final class RecEngineOrdersTest extends TestCase {
 		// product deletion ZEROES the order items' _product_id reference. The
 		// order must NOT be dropped — that empties items[] and the whole order is
 		// silently lost (marked "sent" with no POST). The line keys on the
-		// order-item id (wc-oi-{id}) so the order ingests; the engine accepts it.
+		// order-item id (woo-oi-{id}) so the order ingests; the engine accepts it.
 		$product = $this->make_skuless_product( '9.00' );
 		$pid     = $product->get_id();
 		$this->make_order( 'deleted-product@example.test', 'completed', $product );
@@ -172,7 +172,7 @@ final class RecEngineOrdersTest extends TestCase {
 		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
 		self::assertIsArray( $payloads );
 		self::assertNotEmpty( $payloads[0]['items'], 'items[] must be non-empty — the line is kept from the snapshot.' );
-		self::assertStringStartsWith( 'wc-oi-', (string) $payloads[0]['items'][0]['sku'], 'A zeroed-id deleted line keys on the order-item id.' );
+		self::assertStringStartsWith( 'woo-oi-', (string) $payloads[0]['items'][0]['sku'], 'A zeroed-id deleted line keys on the order-item id.' );
 	}
 
 	public function test_order_with_no_product_lines_is_terminal_skipped(): void {

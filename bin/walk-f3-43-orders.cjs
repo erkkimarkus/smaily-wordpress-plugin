@@ -11,12 +11,12 @@
  *   - F3-43 (deleted product): an order whose product is permanently DELETED
  *     (this wp-env runs WC 10.7, which ZEROES the line's stored ids — the exact
  *     #58922 condition) still serialises a NON-EMPTY items[] (the line keys on
- *     the order-item id, `wc-oi-{id}`), and the engine ACCEPTS the order — where
+ *     the order-item id, `woo-oi-{id}`), and the engine ACCEPTS the order — where
  *     the order was previously dropped (empty items → terminal skip → marked
  *     "sent" with no POST → silently lost).
  *
  * Why live: the mock validates loosely; only the engine's strict Zod proves it
- * accepts `status:"processing"` for a custom-status order and a `wc-oi-…` sku on
+ * accepts `status:"processing"` for a custom-status order and a `woo-oi-…` sku on
  * a deleted line (CLAUDE.md — catalog/order wire changes are live-walked).
  *
  * Gated on RECENGINE_LIVE=1. Hard-aborts if the connected tenant is production
@@ -145,7 +145,7 @@ $obj_b     = $builder->build( $order_b, wp_generate_uuid4() );
 $items_b   = isset( $obj_b['items'] ) && is_array( $obj_b['items'] ) ? $obj_b['items'] : array();
 $first_sku = isset( $items_b[0]['sku'] ) ? (string) $items_b[0]['sku'] : '';
 result( 'deleted_product_items_not_empty', count( $items_b ) >= 1 && $first_sku !== '', 'items=' . wp_json_encode( $items_b ) );
-result( 'deleted_product_line_keyed_synthetically', strpos( $first_sku, 'wc-' ) === 0, 'sku=' . $first_sku );
+result( 'deleted_product_line_keyed_synthetically', strpos( $first_sku, 'woo-' ) === 0, 'sku=' . $first_sku );
 
 $stats_b = $flusher->flush();
 result( 'deleted_product_order_accepted_by_engine', $stats_b['sent'] >= 1 && $stats_b['failed'] === 0, json_encode( $stats_b ) );

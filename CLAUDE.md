@@ -118,16 +118,39 @@ tests, WC objects are built with PHPUnit `createMock` + shared shims (e.g. the
 `WC_Order` shim in HookHandlerTest, `WC_Order_Item_Product`). Reuse this pattern
 for any new WC-dependent unit test.
 
-### Use SkuResolver for the engine product key — never raw get_sku()
-The engine keys catalog, order items, AND browse events on `sku`, but WC
-doesn't require SKUs — the pilot store has none at all (F3-36). Every place
-that puts a product key on the wire goes through `Support\SkuResolver`
-(real SKU else synthetic `wc-{id}`; deleted-product order lines key from the
-ids stored on the line item). A raw `get_sku()` + empty-check reintroduces
-the pilot's day-1 breakage: silently empty catalog (pre-enqueue drop, no
-Event Log trace), D6-failed orders, rejected browse events. If you add a new
-SKU surface, use the resolver; if a record still can't be keyed, make it
-observable (terminal skip), never a silent pre-enqueue drop (LESSONS §2.11).
+### Use SkuResolver for the engine product key — ALWAYS `woo-<id>`, NEVER the merchant SKU (PRO-1224)
+The engine keys catalog, order items, AND browse events on `sku`, but the
+engine's `sku` is a **join/identity key, not a human SKU** (contract §3, identity
+rule sharpened 2026-07-09). Every place that puts a product key on the wire goes
+through `Support\SkuResolver`, which ALWAYS emits `woo-<canonical_id>` — the
+platform id (variation id for a variable product, product id for a simple one),
+namespaced `woo-`, **never the merchant WC SKU field, not even as a fallback**.
+Deleted-product order lines key from the ids stored on the line item, else the
+order-item id (`woo-oi-<item_id>`); a line is never dropped (F3-43).
+- **Why the reversal (PRO-1224 supersedes F3-36's "real SKU else `wc-{id}`"):**
+  the merchant SKU is optional, blank, reused, or garbage on real stores (a price
+  `"63.00"`, a seq `"12"` shared by dozens of products, an EAN) — keying on it
+  collapses distinct products onto one `(tenant, sku)` row and silently destroys
+  history (Urban Green 605→330, PRO-1223). The engine is adding fail-loud
+  namespace validation that rejects off-scheme keys. Prefix is `woo-`, NOT `wc-`.
+- **`tags.product_id` (added PRO-1224):** every catalog row carries the RAW
+  (un-prefixed) canonical PARENT product id via `SkuResolver::product_group_id()`
+  — the grouping key (cross-variant cadence, PRO-1227) and the product-level
+  removal key (`catalog/remove` §3b, PRO-1230). RAW, not `woo-`-prefixed —
+  deliberate Shopify parity (`tags.product_id = product.id`) + the §3b example
+  (`product_ids: ["7620134"]`). Do not namespace it.
+- **Merchant SKU is dropped entirely** (engine answer PRO-1225, 2026-07-10): the
+  engine consumes it nowhere (ranking/serving key on `sku`; no console/report/
+  export shows it). NEVER put it in `catalog.external_id` (that field is the raw
+  platform variant id + drives collision detection). If a future operator-debug
+  need appears, it goes in `tags.merchant_sku`, never `external_id`/`sku`.
+- **Migration:** a store already synced under the old scheme keeps its stale rows
+  (UPSERT-only, no delete-by-absence) — the `woo-<id>` keys make fresh rows.
+  Orphan removal is a one-time manual purge coordinated per store with the engine.
+- A raw `get_sku()` + empty-check reintroduces the pilot's day-1 breakage (silently
+  empty catalog, D6-failed orders, rejected browse events) AND the collision bug.
+  If you add a new SKU surface, use the resolver; if a record still can't be keyed,
+  make it observable (terminal skip), never a silent pre-enqueue drop (LESSONS §2.11).
 
 ### Order status: custom statuses go THROUGH; deleted-product lines are NEVER dropped (F3-42/F3-43)
 Two pilot data-loss fixes (engine brief 2026-06-19, order #58922) that flip

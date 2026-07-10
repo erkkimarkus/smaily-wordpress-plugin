@@ -1837,6 +1837,15 @@ found" (version pointer corrected — composer.json never carried a version).
 
 ### F3-36 — SkuResolver: synthetic `wc-{id}` product keys for SKU-less stores (pilot find)
 
+> **⚠️ SUPERSEDED by PRO-1224 (2026-07-10).** The "real SKU when set, else
+> synthetic `wc-{id}`" rule below is REVERSED: SkuResolver now ALWAYS emits
+> `woo-<id>` (the platform id, prefix `woo-` not `wc-`) and NEVER the merchant SKU
+> field. The engine's `sku` is a join/identity key, not a human code, and merchant
+> SKUs collapse distinct products (PRO-1223). The SkuResolver *pattern* (one
+> chokepoint, canonicalization, deleted-line fallback, never-drop) survives intact;
+> only the "prefer the merchant SKU" branch and the `wc-` prefix are gone. See the
+> PRO-1224 entry at the end of this file. The context below is kept for the history.
+
 **Context:** first day of pilot debugging (2026-06-12). The pilot store has
 **no SKUs on any product**, and its older orders reference deleted products.
 The engine keys its entire pipeline on `sku` (catalog natural key
@@ -2936,6 +2945,57 @@ existing number without adding `synced` (hides the number the merchant actually 
 **Relationships:** F3-48 (the audience filter whose correctness this makes visible),
 3.10.0 engine-confirmed counts (the same walked-vs-confirmed distinction for engine
 jobs), migration 008.
+
+### PRO-1224 — Product `sku` is ALWAYS `woo-<id>` (platform id), never the merchant SKU; catalog rows carry `tags.product_id`
+
+**Context (2026-07-10):** the engine sharpened the contract's identity rule
+(§3, v1.3.0): the ingest `sku` is a **join/identity key, not a human SKU**. On
+Shopify (PRO-1223) the plugin's "fall back to the merchant SKU field" collapsed
+Urban Green's catalog 605→330 rows — distinct products sharing a blank/reused/
+garbage merchant SKU (`"63.00"`, `"12"`, an EAN) landed on one `(tenant, sku)`
+key and silently overwrote each other. Woo had the same defect. The engine is
+adding fail-loud namespace validation that rejects off-scheme keys.
+
+**Decision:** `Support\SkuResolver::resolve()` ALWAYS emits `woo-<canonical_id>`
+(variation id for a variable product, product id for a simple one), prefix
+`woo-`, **never** the merchant WC SKU field — not even as a fallback. This
+REVERSES F3-36's "real SKU when set, else `wc-{id}`" (prefix and the merchant-SKU
+branch both gone); the resolver *pattern* — one chokepoint for catalog + order +
+browse, translation canonicalization (CC.2), the never-drop deleted-line fallback
+now `woo-oi-<item_id>` (F3-43) — is unchanged. Additionally, every catalog row
+now carries `tags.product_id` = the RAW (un-prefixed) canonical PARENT product id
+(`SkuResolver::product_group_id()`): the cross-variant grouping key (PRO-1227) and
+the product-level removal key (`catalog/remove` §3b, PRO-1230). The raw platform
+id continues to ride in `external_id`.
+
+**Rationale:** the merchant SKU is optional/blank/reused on real stores; keying on
+it destroys history. The platform id is stable, unique, and namespaced so `woo-`
+and `shp-` never cross-join. `tags.product_id` is RAW (not `woo-`-prefixed) for
+deliberate parity with Shopify Connect (which ships `tags.product_id = product.id`,
+the raw legacyResourceId) and the §3b contract example (`product_ids: ["7620134"]`)
+— caught by reading the shipped Shopify code + contract, NOT trusting PRO-1230's
+looser "`woo-<product_id>`" phrasing (LESSONS). The merchant SKU is dropped
+ENTIRELY (engine answer PRO-1225, 2026-07-10): the engine consumes it nowhere;
+if ever needed it goes in `tags.merchant_sku`, never `external_id` (that field is
+the platform variant id + drives collision detection) or `sku`.
+
+**Alternatives rejected:** a tenant-level "key mode" setting (merchant-SKU vs
+platform-id) — more code, and there is no case where keying on the merchant SKU is
+correct; emitting the merchant SKU in `external_id` for display — the engine
+surfaces it nowhere, so it is wire + storage for no consumer (data-minimization).
+
+**Migration:** UPSERT-only means old `wc-<id>`/merchant-SKU rows are NOT
+auto-removed — the new `woo-<id>` keys create fresh rows and the old ones linger.
+Orphan removal is a one-time manual purge on the engine side, coordinated per
+already-synced store (contract §3 "changing the SKU scheme"). The pilot is
+SKU-less, so every key changes `wc-<id>`→`woo-<id>` — it needs the purge + a full
+re-backfill before/at the flip.
+
+**Relationships:** supersedes F3-36 (the pattern lives on); contract v1.3.0 sync
+(commit `a5c3ea6`); PRO-1223 (engine fail-loud namespace validation), PRO-1225
+(merchant-SKU/external_id engine answer), PRO-1227 (engine groups by
+`tags.product_id`), PRO-1230 (hard-delete → `catalog/remove` §3b, consumes
+`tags.product_id`); Shopify PRO-1226 (parity).
 
 ## How to keep this document going
 

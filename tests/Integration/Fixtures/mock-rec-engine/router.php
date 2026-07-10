@@ -245,9 +245,10 @@ if ( $method === 'GET' && $path === '/api/v1/ingest/ping' ) {
 // Catalog ingest. Mirrors RECENGINE_API_CONTRACT.md §3 + the engine
 // team's catalog sanity (6/6): Bearer auth, per-product event_id dedup
 // keyed on (tenant, event_id), and a 200 {"deduplicated": true} body when
-// the whole batch is a resend. Scenario triggers (by SKU prefix on the
-// first product) let a test force transient failures + a revoked key to
-// exercise the Client's retry policy deterministically.
+// the whole batch is a resend. Scenario triggers key on the EVENT_ID prefix
+// (auth-401 / retry-429 / retry-500 / d6err), mirroring the other ingest
+// endpoints — the `sku` is now the woo-<id> platform key (PRO-1224), never a
+// test-controllable string, so triggering on it no longer works.
 if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
@@ -283,10 +284,10 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 
 	$products = $body['products'];
 
-	$first_sku = ( isset( $products[0]['sku'] ) ) ? (string) $products[0]['sku'] : '';
+	$first_event_id = ( isset( $products[0]['event_id'] ) ) ? (string) $products[0]['event_id'] : '';
 
 	// Revoked / invalid key — terminal 4xx, the Client must NOT retry.
-	if ( strpos( $first_sku, 'AUTH-401' ) === 0 ) {
+	if ( strpos( $first_event_id, 'auth-401' ) === 0 ) {
 		reply(
 			401,
 			array(
@@ -299,16 +300,16 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 	}
 
 	// Transient failure on the FIRST attempt only, then succeed on retry.
-	// The per-sku counter survives across the Client's retry HTTP calls via
-	// the state file.
-	if ( strpos( $first_sku, 'RETRY-429' ) === 0 || strpos( $first_sku, 'RETRY-500' ) === 0 ) {
-		$counter_key = 'attempts_' . $first_sku;
+	// The per-event_id counter survives across the Client's retry HTTP calls via
+	// the state file (the Client resends the same event_id on each retry).
+	if ( strpos( $first_event_id, 'retry-429' ) === 0 || strpos( $first_event_id, 'retry-500' ) === 0 ) {
+		$counter_key = 'attempts_' . $first_event_id;
 		$seen_count  = isset( $state[ $counter_key ] ) ? (int) $state[ $counter_key ] : 0;
 		$state[ $counter_key ] = $seen_count + 1;
 		save_state( $state_file, $state );
 
 		if ( $seen_count === 0 ) {
-			if ( strpos( $first_sku, 'RETRY-429' ) === 0 ) {
+			if ( strpos( $first_event_id, 'retry-429' ) === 0 ) {
 				header( 'Retry-After: 1' );
 				reply(
 					429,
@@ -333,10 +334,12 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		// seen_count >= 1 → fall through to the success path on retry.
 	}
 
-	// Per-product D6 (N-7 retrofit): error (by `D6ERR` sku trigger) /
+	// Per-product D6 (N-7 retrofit): error (by `d6err` EVENT_ID trigger) /
 	// deduplicated (event_id seen) / processed. Natural key is sku; transport
-	// dedup is per-item event_id. (The old all-or-nothing + created/updated/
-	// skipped/unmapped_attributes shape is gone — the plugin never consumed it.)
+	// dedup is per-item event_id. The per-item error trigger keys on event_id
+	// (the sku is now the woo-<id> platform key, PRO-1224 — not test-controllable).
+	// (The old all-or-nothing + created/updated/skipped/unmapped_attributes shape
+	// is gone — the plugin never consumed it.)
 	$seen         = ( isset( $state['catalog_event_ids'] ) && is_array( $state['catalog_event_ids'] ) )
 		? $state['catalog_event_ids']
 		: array();
@@ -349,7 +352,7 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		$event_id   = isset( $product['event_id'] ) ? (string) $product['event_id'] : '';
 		$received[] = $event_id;
 
-		if ( strpos( $sku, 'D6ERR' ) === 0 ) {
+		if ( strpos( $event_id, 'd6err' ) === 0 ) {
 			$errors[] = array(
 				'index'   => $index,
 				'sku'     => $sku,
@@ -395,6 +398,18 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		}
 	}
 	$state['last_catalog_in_stock'] = $in_stock_by_sku;
+	// Record tags per sku so a test can assert tags.product_id (the raw
+	// canonical parent id) reached the wire — PRO-1224 grouping / §3b removal
+	// key. Optional + backward-compatible, but the mock must not mask whether
+	// the plugin actually emits it (CC-8).
+	$tags_by_sku = array();
+	foreach ( $products as $product ) {
+		$sku = isset( $product['sku'] ) ? (string) $product['sku'] : '';
+		if ( $sku !== '' ) {
+			$tags_by_sku[ $sku ] = ( isset( $product['tags'] ) && is_array( $product['tags'] ) ) ? $product['tags'] : array();
+		}
+	}
+	$state['last_catalog_tags'] = $tags_by_sku;
 	save_state( $state_file, $state );
 
 	$response = array(
@@ -677,8 +692,8 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 		},
 		$orders
 	);
-	// Full wire payloads, so tests can assert items[].sku etc. (F3-36 asserts
-	// the synthetic wc-{id} key reached the wire).
+	// Full wire payloads, so tests can assert items[].sku etc. (PRO-1224 asserts
+	// the woo-{id} platform key reached the wire).
 	$state['last_orders_payload'] = $orders;
 	save_state( $state_file, $state );
 

@@ -87,13 +87,13 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
-				'items'  => array( $this->mock_item( 'POC-DENT', 2, '50.00', '44.51' ) ),
+				'items'  => array( $this->mock_item( 'POC-DENT', 2, '50.00', '44.51', array( 'product_id' => 500 ) ) ),
 			)
 		);
 
 		$item = ( new OrderPayloadBuilder() )->build( $order, 'u' )['items'][0];
 
-		self::assertSame( 'POC-DENT', $item['sku'] );
+		self::assertSame( 'woo-500', $item['sku'] );
 		self::assertSame( 2, $item['qty'] );
 		self::assertSame( 25.0, $item['unit_price'] );
 		self::assertSame( 44.51, $item['line_total'] );
@@ -158,25 +158,26 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
-				'items'  => array( $this->mock_item( 'REAL', 1, '10.00', '10.00' ), new \stdClass() ),
+				'items'  => array( $this->mock_item( 'REAL', 1, '10.00', '10.00', array( 'product_id' => 100 ) ), new \stdClass() ),
 			)
 		);
 
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
 		self::assertCount( 1, $payload['items'], 'Only WC_Order_Item_Product lines are mapped.' );
-		self::assertSame( 'REAL', $payload['items'][0]['sku'] );
+		self::assertSame( 'woo-100', $payload['items'][0]['sku'] );
 	}
 
-	public function test_skuless_line_gets_synthetic_product_key(): void {
-		// F3-36: §5 requires items[].sku; a SKU-less line used to be dropped,
-		// which on a SKU-less store emptied items[] and D6-rejected the whole
-		// order. SkuResolver keys it wc-{product id} instead.
+	public function test_every_line_keys_on_woo_id_ignoring_merchant_sku(): void {
+		// PRO-1224: §5 requires items[].sku; SkuResolver keys EVERY line on
+		// `woo-{product id}` — the merchant SKU field is never emitted, so a
+		// line with a SKU and a line without one key the same way (the order-line
+		// key must equal the catalog row's key so they join engine-side).
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
 				'items'  => array(
-					$this->mock_item( 'HAS-SKU', 1, '10.00', '10.00' ),
+					$this->mock_item( 'HAS-SKU', 1, '10.00', '10.00', array( 'product_id' => 100 ) ),
 					$this->mock_item( '', 1, '5.00', '5.00', array( 'product_id' => 432 ) ),
 				),
 			)
@@ -185,8 +186,8 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
 		self::assertCount( 2, $payload['items'] );
-		self::assertSame( 'HAS-SKU', $payload['items'][0]['sku'] );
-		self::assertSame( 'wc-432', $payload['items'][1]['sku'] );
+		self::assertSame( 'woo-100', $payload['items'][0]['sku'], 'A line WITH a merchant SKU still keys woo-<id>.' );
+		self::assertSame( 'woo-432', $payload['items'][1]['sku'] );
 	}
 
 	public function test_deleted_product_line_keys_from_stored_item_ids(): void {
@@ -208,15 +209,15 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
 		self::assertCount( 2, $payload['items'] );
-		self::assertSame( 'wc-432', $payload['items'][0]['sku'] );
-		self::assertSame( 'wc-433', $payload['items'][1]['sku'] );
+		self::assertSame( 'woo-432', $payload['items'][0]['sku'] );
+		self::assertSame( 'woo-433', $payload['items'][1]['sku'] );
 	}
 
 	public function test_deleted_line_with_zeroed_ids_keys_from_order_item_id_never_dropped(): void {
 		// The zeroed-id case (current WC permanent delete): the product doesn't
 		// load AND product_id/variation_id are 0. The line MUST NOT be dropped —
 		// that would empty items[] and silently lose the whole order (#58922,
-		// F3-43). It keys on the order-item id (`wc-oi-{id}`) so the order still
+		// F3-43). It keys on the order-item id (`woo-oi-{id}`) so the order still
 		// ingests; the snapshot qty/total come from the line item.
 		$order = $this->mock_order(
 			array(
@@ -228,7 +229,7 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
 
 		self::assertCount( 1, $payload['items'], 'A deleted-product line is kept, never dropped — the order is never lost.' );
-		self::assertSame( 'wc-oi-5512', $payload['items'][0]['sku'] );
+		self::assertSame( 'woo-oi-5512', $payload['items'][0]['sku'] );
 		self::assertSame( 2, $payload['items'][0]['qty'] );
 		self::assertSame( 14.0, $payload['items'][0]['line_total'] );
 	}

@@ -26,19 +26,29 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**Contract synced to v1.3.0 (engine commit `8a0749f`,
-byte-identical md5 `1886669e…`).** Additive MINOR bump (PRO-1229/PRO-1228): new
-`POST /api/v1/ingest/catalog/remove` (§3b — product-level SOFT tombstone by parent
-`product_id`, for hard-deletes), the **`sku` identity rule sharpened** (§3: `sku` MUST be
-the platform id namespaced by source — `woo-<variation_id>`/`woo-<product_id>` — **never**
-the merchant SKU field, not even as fallback; engine adding fail-loud namespace validation
-PRO-1223), new optional `tags.product_id` (parent id, shared by variants), and a lifecycle
-clarification (removal is always soft; product-`delete` is a best-effort fast-path, the
-periodic full re-sync reconciles). **Plugin code does NOT yet follow (CC-8: a sync is not
-code-complete):** `SkuResolver` still prefers the merchant `get_sku()` and emits the `wc-`
-prefix, and no path emits `tags.product_id` — tracked by **PRO-1224** (canonical `woo-<id>`
-key everywhere, High) and **PRO-1230** (hard-delete → §3b, blocked on this sync + PRO-1224).
-Mock not yet moved to the new shape. Prior: **Merchant documentation site + in-plugin docs links —
+_Last updated: 2026-07-10 (**PRO-1224 CORE DONE — canonical `woo-<id>` key everywhere +
+`tags.product_id`; landed on main, UNRELEASED.** `Support\SkuResolver::resolve()` now ALWAYS
+emits `woo-<canonical_id>` (the platform id; prefix `woo-`, not `wc-`) and NEVER the merchant
+WC SKU field — reversing F3-36's "real SKU else `wc-{id}`" (the resolver PATTERN — one
+chokepoint for catalog+order+browse, canonicalization, never-drop deleted-line fallback now
+`woo-oi-<id>` — is unchanged). `CatalogPayloadBuilder` now emits `tags.product_id` = the RAW
+canonical PARENT id (`SkuResolver::product_group_id()`) — grouping (PRO-1227) + removal
+(§3b/PRO-1230) key; RAW, not `woo-`-prefixed, for **Shopify parity** (`tags.product_id =
+product.id`) + the §3b example `["7620134"]` (caught by reading the shipped Shopify code +
+contract, NOT PRO-1230's looser `woo-<product_id>` prose — LESSONS §2.20). Merchant SKU
+**dropped entirely** (engine answer PRO-1225: consumed nowhere; never in `external_id` —
+that's the raw platform id + collision key). Docs: F3-36 SUPERSEDED banner + full PRO-1224
+entry in DECISIONS; CLAUDE.md SkuResolver note rewritten; LESSONS §2.20. Mock moved to the new
+shape (records `tags`; scenario triggers re-keyed sku→`event_id` since `sku` is no longer
+test-controllable). Gates: **ci:strict exit=0** (PHPCS clean, PHPStan OK, unit 483, tsc,
+vitest 236) + **integration 140 OK** (`sg docker`). NOT YET DONE: a PRO-1224 **live-walk**
+against the sandbox tenant (fail-loud namespace confirm) + the **one-time engine-side purge +
+full re-backfill** of already-synced stores (every key changes `wc-<id>`→`woo-<id>`) — must be
+coordinated with the engine before the pilot flip. **PRO-1230** (hard-delete → §3b) now
+unblocked on the contract + `tags.product_id`. `external_id` decision resolved (omit merchant
+SKU). Prior: **Contract synced to v1.3.0 (engine `8a0749f`, md5 `1886669e…`)** — additive MINOR
+(PRO-1229/1228): §3b `catalog/remove`, sharpened `sku` identity rule, `tags.product_id`,
+soft-removal lifecycle. Prior: **Merchant documentation site + in-plugin docs links —
 landed on main, UNRELEASED.** New `docs/site/index.html`: a single self-contained
 **bilingual (EN/ET)** HTML page (7 sections — Overview, Getting started/wizard,
 Settings, Importing, Error messages, FAQ, Data & privacy) built to look and work like

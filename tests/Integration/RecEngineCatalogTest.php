@@ -126,8 +126,10 @@ final class RecEngineCatalogTest extends TestCase {
 
 	public function test_transient_429_then_retry_succeeds(): void {
 		$client  = $this->connected_client();
-		$product = $this->make_product( 'RETRY-429', '5.00' );
-		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'evt-429' );
+		$product = $this->make_product( 'CAT-429', '5.00' );
+		// Scenario trigger keys on the event_id prefix (the wire sku is now the
+		// woo-<id> platform key, PRO-1224 — not test-controllable).
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'retry-429-cat' );
 
 		$result = $client->ingest_catalog( array( $payload ) );
 
@@ -139,8 +141,8 @@ final class RecEngineCatalogTest extends TestCase {
 
 	public function test_transient_500_then_retry_succeeds(): void {
 		$client  = $this->connected_client();
-		$product = $this->make_product( 'RETRY-500', '5.00' );
-		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'evt-500' );
+		$product = $this->make_product( 'CAT-500', '5.00' );
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'retry-500-cat' );
 
 		$result = $client->ingest_catalog( array( $payload ) );
 
@@ -152,8 +154,8 @@ final class RecEngineCatalogTest extends TestCase {
 
 	public function test_revoked_key_401_throws_without_retry(): void {
 		$client  = $this->connected_client();
-		$product = $this->make_product( 'AUTH-401', '1.00' );
-		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'evt-401' );
+		$product = $this->make_product( 'CAT-401', '1.00' );
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'auth-401-cat' );
 
 		try {
 			$client->ingest_catalog( array( $payload ) );
@@ -269,9 +271,11 @@ final class RecEngineCatalogTest extends TestCase {
 
 	public function test_catalog_d6_partial_success_marks_errored_product_failed(): void {
 		// N-7 lock fix: catalog is D6 now. A batch with one rejected product
-		// (mock `D6ERR` sku trigger) must mark exactly that row FAILED and the
-		// rest sent — before N-7 the catalog flusher marked the whole batch
-		// sent on any 2xx, silently losing the rejected product.
+		// (mock `d6err` EVENT_ID trigger — the wire sku is the woo-<id> platform
+		// key now, PRO-1224, so the bad row is enqueued with a known event_uuid)
+		// must mark exactly that row FAILED and the rest sent — before N-7 the
+		// catalog flusher marked the whole batch sent on any 2xx, silently losing
+		// the rejected product.
 		$base = (string) self::$engine->base_url();
 		EnvSeed::connect(
 			array(
@@ -285,11 +289,18 @@ final class RecEngineCatalogTest extends TestCase {
 		$builder  = new CatalogPayloadBuilder();
 
 		CatalogHookHandler::reset_seen();
-		$good    = $this->make_product( 'CAT-D6-OK', '9.99' );
-		$bad     = $this->make_product( 'D6ERR-CAT-BAD', '9.99' );
-		$handler = new CatalogHookHandler( $queue, $builder, $settings, new SiteLocaleAdapter() );
-		$handler->on_save_product( (int) $good->get_id() );
-		$handler->on_save_product( (int) $bad->get_id() );
+		RecEngineMockServer::reset();
+		$good = $this->make_product( 'CAT-D6-OK', '9.99' );
+		$bad  = $this->make_product( 'CAT-D6-BAD', '9.99' );
+		// Deterministic: drop any live-save-hook rows, then enqueue exactly the two
+		// rows under test with KNOWN event_uuids. The wire sku is now the woo-<id>
+		// platform key (PRO-1224), so the mock's per-item error trigger keys on the
+		// event_id — `d6err-cat-bad` flags exactly the bad row (the flusher rebuilds
+		// each payload from its product at flush time, carrying the event_uuid
+		// through as event_id).
+		$this->truncate_queue();
+		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $good->get_id(), array(), 'ok-cat-good' );
+		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bad->get_id(), array(), 'd6err-cat-bad' );
 
 		$flusher = new IngestFlusher(
 			$queue,
@@ -342,7 +353,8 @@ final class RecEngineCatalogTest extends TestCase {
 
 		$this->flush_catalog( $queue );
 		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
-		self::assertFalse( $in_stock['CAT-TRASH-1'] ?? null, 'A trashed product reaches the engine in_stock=false — kept for the join, not recommended.' );
+		// Keyed by the wire sku woo-<id>, not the merchant SKU (PRO-1224).
+		self::assertFalse( $in_stock[ 'woo-' . $pid ] ?? null, 'A trashed product reaches the engine in_stock=false — kept for the join, not recommended.' );
 
 		// --- Untrash → catalog.upsert (real stock = in_stock=true) ---
 		RecEngineMockServer::reset();
@@ -362,7 +374,7 @@ final class RecEngineCatalogTest extends TestCase {
 
 		$this->flush_catalog( $queue );
 		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
-		self::assertTrue( $in_stock['CAT-TRASH-1'] ?? null, 'Untrash restores in_stock=true — the product is sellable again.' );
+		self::assertTrue( $in_stock[ 'woo-' . $pid ] ?? null, 'Untrash restores in_stock=true — the product is sellable again.' );
 	}
 
 	/**

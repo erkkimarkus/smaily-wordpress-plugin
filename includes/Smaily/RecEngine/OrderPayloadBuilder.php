@@ -202,14 +202,15 @@ class OrderPayloadBuilder {
 	/**
 	 * Order line items → wire `items[]`. Shipping / fee / tax / coupon lines
 	 * are skipped (only product lines). The engine keys order items on SKU
-	 * (§5 `items[].sku` is required); SkuResolver (F3-36) supplies it — the
-	 * real SKU when set, else the synthetic `wc-{id}` key, so a store that
-	 * never set SKUs stays fully ingestable. A DELETED product keeps its line:
-	 * qty / totals come from the line-item SNAPSHOT (which survives deletion),
-	 * and the SKU keys from the stored product/variation id, or — when current
-	 * WC has zeroed those (empirical, WC 10.7) — from the order-item id
-	 * (`wc-oi-{item_id}`). So a product line is NEVER dropped (F3-43, reversing
-	 * F3-36): the order is never silently lost for one unkeyable line. An order
+	 * (§5 `items[].sku` is required); SkuResolver (PRO-1224) supplies it — the
+	 * `woo-{id}` platform key (never the merchant SKU field), so a store that
+	 * never set SKUs stays fully ingestable and the order line joins the catalog
+	 * row on the same key. A DELETED product keeps its line: qty / totals come
+	 * from the line-item SNAPSHOT (which survives deletion), and the SKU keys
+	 * from the stored product/variation id, or — when current WC has zeroed those
+	 * (empirical, WC 10.7) — from the order-item id
+	 * (`woo-oi-{item_id}`). So a product line is NEVER dropped (F3-43): the order
+	 * is never silently lost for one unkeyable line. An order
 	 * with NO product lines at all (only shipping/fee) still wires an empty
 	 * items[] and OrderFlusher terminal-skips it (engine requires min 1) — that
 	 * is the only remaining empty-items case. unit_price is the pre-discount

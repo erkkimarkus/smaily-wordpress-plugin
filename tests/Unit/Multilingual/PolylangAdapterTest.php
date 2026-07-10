@@ -47,8 +47,8 @@ final class PolylangAdapterTest extends TestCase {
 	}
 
 	public function test_canonical_collapses_a_translation_to_the_default_language_post(): void {
-		// The Latvian translation (wc-59221) must collapse to the Estonian
-		// canonical (wc-59199) — the real MiuMjau shampoo case from the brief.
+		// The Latvian translation (woo-59221) must collapse to the Estonian
+		// canonical (woo-59199) — the real MiuMjau shampoo case from the brief.
 		Functions\when( 'pll_default_language' )->justReturn( 'et' );
 		Functions\when( 'pll_get_post' )->alias(
 			static function ( int $post_id, string $lang ): int {

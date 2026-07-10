@@ -264,28 +264,33 @@ try {
 
 // --- 6b. FLUSHER D6 split — the N-7 lock proof ---------------------------
 // A valid product + a product the engine genuinely D6-rejects, both through
-// the REAL flusher. The reject lever WAS an empty sku, but F3-36's
-// SkuResolver now keys SKU-less products synthetically (wc-{id}) — a no-SKU
-// product is VALID. The new lever is a sku LONGER THAN THE ENGINE'S 64-CHAR
-// CAP (contract §3: sku string max 64): the builder passes a real product
-// SKU through untouched, the engine errors[] that one row. The flusher must
-// mark THAT row failed and the valid one sent. Before N-7 the catalog
-// flusher marked the whole batch sent on any 2xx — silently losing the
-// rejected product. This is the lock condition's actual proof.
+// the REAL flusher. The reject lever WAS an over-64-char merchant SKU, but
+// PRO-1224 no longer emits the merchant SKU at all (the wire `sku` is always the
+// short `woo-{id}` platform key) — so that lever is DEAD. The new lever is an
+// EMPTY category_path (contract §3: category_path required, min 1 char; the
+// 3.2.4 live probe confirmed the engine rejects ""): the bad product has its
+// product_cat terms cleared, so the builder emits category_path="" and the
+// engine errors[] that one row per-item. The flusher must mark THAT row failed
+// and the valid one sent. Before N-7 the catalog flusher marked the whole batch
+// sent on any 2xx — silently losing the rejected product. This is the lock
+// condition's actual proof. (NB: re-confirm this lever is a per-item errors[]
+// reject — not a wrapper 400 — on the PRO-1224 live-walk.)
 CatalogHookHandler::reset_seen();
 $good_pid  = live_make_simple( 'LIVE-LOCK-OK', '4.00' );
 $created[] = $good_pid;
 $handler->on_save_product( $good_pid );
 
-// Over-64-char SKU → builder passes it through → engine per-item reject.
+// Empty category_path → builder emits "" → engine per-item reject.
 $badp = new WC_Product_Simple();
-$badp->set_name( 'Lock Bad (sku over 64 chars)' );
-$badp->set_sku( 'LIVE-LOCK-BAD-' . str_repeat( 'X', 64 ) );
+$badp->set_name( 'Lock Bad (empty category_path)' );
+$badp->set_sku( 'LIVE-LOCK-BAD' );
 $badp->set_regular_price( '4.00' );
 $badp->set_price( '4.00' );
 $badp->set_stock_status( 'instock' );
 $bad_pid   = (int) $badp->save();
 $created[] = $bad_pid;
+// Clear any auto-assigned category so category_path resolves empty (the reject).
+wp_set_object_terms( $bad_pid, array(), 'product_cat' );
 $queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bad_pid, array() );
 
 $lstats = $flusher->flush();

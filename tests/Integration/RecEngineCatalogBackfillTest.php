@@ -183,9 +183,9 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		self::assertSame( 2, $result['processed'], 'Both posts were walked (progress counts every enumerated post).' );
 		self::assertSame( 1, $result['sent'], 'The translation collapsed into the canonical — one row sent, not two.' );
 		self::assertSame(
-			array( 'CANON-A' ),
+			array( 'woo-' . $canonical ),
 			self::$engine->state()['last_catalog_skus'] ?? array(),
-			'The canonical (default-language) product is the one ingested; the translation was skipped.'
+			'The canonical (default-language) product is the one ingested (keyed woo-<canonical id>); the translation was skipped.'
 		);
 	}
 
@@ -211,9 +211,9 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 
 		self::assertSame( 1, $result['sent'], 'The published translation is ingested — not dropped for its draft canonical.' );
 		self::assertSame(
-			array( 'PUB-B' ),
+			array( 'woo-' . $translation ),
 			self::$engine->state()['last_catalog_skus'] ?? array(),
-			'The published post stands in; its draft default-language canonical is not enumerable.'
+			'The published post stands in and keys on ITS OWN id (woo-<translation>) — the flusher rebuilds the wire sku with the active passthrough detector; its draft default-language canonical is not enumerable.'
 		);
 	}
 
@@ -236,9 +236,26 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		$this->run_to_completion( $job );
 
 		$in_stock = self::$engine->state()['last_catalog_in_stock'] ?? array();
-		self::assertArrayHasKey( 'BF-TRASH-1', $in_stock, 'The trashed product is kept in the catalog, not dropped from the sync.' );
-		self::assertFalse( $in_stock['BF-TRASH-1'], 'A trashed product reaches the engine in_stock=false — joinable but unrecommendable.' );
-		self::assertTrue( $in_stock['BF-LIVE-1'] ?? null, 'A published product still backfills with its real (in_stock=true) state.' );
+		// Keyed by the wire sku (woo-<id>), not the merchant SKU (PRO-1224).
+		self::assertArrayHasKey( 'woo-' . $trashed, $in_stock, 'The trashed product is kept in the catalog, not dropped from the sync.' );
+		self::assertFalse( $in_stock[ 'woo-' . $trashed ], 'A trashed product reaches the engine in_stock=false — joinable but unrecommendable.' );
+		self::assertTrue( $in_stock[ 'woo-' . $live ] ?? null, 'A published product still backfills with its real (in_stock=true) state.' );
+	}
+
+	public function test_catalog_row_carries_tags_product_id_raw_canonical_parent(): void {
+		// PRO-1224: every catalog row carries tags.product_id — the RAW canonical
+		// parent id (no woo- prefix) — the grouping / §3b removal key. For a simple
+		// product it equals its own id; the sku is the woo-<id> platform key.
+		$id = $this->make_product( 'BF-TAGS-1' );
+		$this->truncate_queue(); // ignore the create-time save-hook row.
+
+		$job = $this->job();
+		$job->start();
+		$this->run_to_completion( $job );
+
+		$tags = self::$engine->state()['last_catalog_tags'] ?? array();
+		self::assertArrayHasKey( 'woo-' . $id, $tags, 'The row is keyed on the woo-<id> platform sku.' );
+		self::assertSame( (string) $id, $tags[ 'woo-' . $id ]['product_id'] ?? null, 'tags.product_id is the RAW canonical parent id (no woo- prefix).' );
 	}
 
 	// The is_removable guard (a category-less trashed product is skipped, not sent

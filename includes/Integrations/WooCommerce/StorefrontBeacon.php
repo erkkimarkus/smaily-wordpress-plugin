@@ -152,9 +152,9 @@ class StorefrontBeacon {
 			$context['pageType'] = 'product';
 			$product             = wc_get_product( get_the_ID() );
 			if ( $product instanceof \WC_Product ) {
-				// SkuResolver (F3-36): always non-empty — real SKU or the
-				// synthetic wc-{id} key, matching what catalog ingest sent,
-				// so the engine can join product_view to the catalog row.
+				// SkuResolver (PRO-1224): always non-empty — the `woo-{id}`
+				// platform key (never the merchant SKU), matching what catalog
+				// ingest sent, so the engine joins product_view to the catalog row.
 				$context['sku'] = \Smaily\Connect\Smaily\RecEngine\Support\SkuResolver::resolve( $product );
 				$path = ( new CatalogPayloadBuilder() )->primary_category_path( $product );
 				if ( $path !== '' ) {

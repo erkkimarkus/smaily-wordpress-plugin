@@ -62,7 +62,7 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'evt-uuid-aaaa' );
 
 		self::assertSame( 'evt-uuid-aaaa', $payload['event_id'] );
-		self::assertSame( 'ACA-DOG-3KG', $payload['sku'] );
+		self::assertSame( 'woo-12345', $payload['sku'] );
 		self::assertSame( 'Acana Adult Dog 3kg', $payload['name'] );
 		self::assertSame( 22.99, $payload['price'] );
 		self::assertTrue( $payload['in_stock'] );
@@ -83,6 +83,7 @@ final class CatalogPayloadBuilderTest extends TestCase {
 	public function test_optional_fields_omitted_when_source_empty(): void {
 		$product = $this->fake_product(
 			array(
+				'id'                => 88,
 				'sku'               => 'BARE-1',
 				'name'              => 'Bare product',
 				'price'             => '10.00',
@@ -98,7 +99,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertArrayNotHasKey( 'on_sale_until', $payload );
 		self::assertArrayNotHasKey( 'description', $payload );
 		self::assertArrayNotHasKey( 'image_url', $payload );
-		self::assertArrayNotHasKey( 'tags', $payload, 'No brand + no category → tags must be absent, not {}.' );
+		// tags is no longer fully optional: product_id is ALWAYS present (PRO-1224);
+		// only brand + category_path are omitted when empty.
+		self::assertSame( array( 'product_id' => '88' ), $payload['tags'], 'No brand + no category → tags carries product_id only.' );
 		self::assertArrayNotHasKey( 'raw_attributes', $payload );
 	}
 
@@ -202,12 +205,24 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( $product, $units[0] );
 	}
 
-	public function test_build_skuless_product_gets_synthetic_wc_id_key(): void {
+	public function test_build_skuless_product_gets_woo_id_key(): void {
 		$product = $this->fake_product( array( 'id' => 77, 'sku' => '', 'price' => '1.00' ) );
 
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'uuid-77' );
 
-		self::assertSame( 'wc-77', $payload['sku'] );
+		self::assertSame( 'woo-77', $payload['sku'] );
+	}
+
+	public function test_build_ignores_merchant_sku_keys_on_woo_id(): void {
+		// PRO-1224: a product WITH a merchant SKU still keys `woo-<id>` — the
+		// merchant SKU field is never emitted as `sku` (the raw id rides in
+		// external_id instead). Reverses F3-36.
+		$product = $this->fake_product( array( 'id' => 77, 'sku' => 'REAL-1', 'price' => '1.00' ) );
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'uuid-77' );
+
+		self::assertSame( 'woo-77', $payload['sku'] );
+		self::assertSame( '77', $payload['external_id'], 'The raw platform id rides in external_id.' );
 	}
 
 	public function test_expand_variable_fans_out_to_all_variations(): void {
@@ -233,11 +248,12 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( 'V-3', $units[2]->get_sku() );
 	}
 
-	public function test_tags_carry_brand_and_category_path(): void {
+	public function test_tags_carry_product_id_brand_and_category_path(): void {
 		Functions\when( 'get_the_terms' )->justReturn( array( (object) array( 'term_id' => 5, 'slug' => 'toys' ) ) );
 
 		$product = $this->fake_product(
 			array(
+				'id'            => 555,
 				'sku'           => 'T',
 				'price'         => '1.00',
 				'attribute_map' => array( 'brand' => 'Acana' ),
@@ -246,7 +262,12 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
 
-		self::assertSame( array( 'brand' => 'Acana', 'category_path' => 'toys' ), $payload['tags'] );
+		// product_id (PRO-1224) is the RAW canonical parent id — always present —
+		// alongside brand + category_path.
+		self::assertSame(
+			array( 'product_id' => '555', 'brand' => 'Acana', 'category_path' => 'toys' ),
+			$payload['tags']
+		);
 	}
 
 	public function test_raw_attributes_custom_attribute_values_pass_through(): void {
@@ -358,6 +379,10 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$payload = ( new CatalogPayloadBuilder() )->build( $variation, 'u' );
 
 		self::assertSame( 'food', $payload['category_path'], 'A variation must inherit its parent product category.' );
+		// The variation keys on its OWN id (woo-101) while tags.product_id groups
+		// it to the RAW parent id (50) — PRO-1224 / PRO-1227 grouping key.
+		self::assertSame( 'woo-101', $payload['sku'] );
+		self::assertSame( '50', $payload['tags']['product_id'] );
 	}
 
 	// --- structural signal (product_type / virtual / downloadable, CC.4) -----

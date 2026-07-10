@@ -694,6 +694,36 @@ the other string).
    "disabled" as "enabled". A multi-shape option gets ONE normalizer, and
    every consumer goes through it (F3-54).
 
+### 2.20 A field's wire shape comes from the shipped reference + the contract example — NOT an issue's prose (PRO-1224 `tags.product_id`, 2026-07-10)
+
+Implementing the Woo canonical-key work (PRO-1224), the new `tags.product_id`
+field had **two conflicting descriptions**: the tracking issue PRO-1230 said emit
+`"woo-<product_id>"` (namespaced), while the sibling Shopify code (shipped, the
+parity reference) emitted `tags.product_id = product.id` — the RAW parent id — and
+the contract's own §3b example was `product_ids: ["7620134"]` (raw, not
+`"shp-7620134"`). Trusting the issue prose would have made Woo emit a `woo-`-prefixed
+group id that **doesn't match Shopify**, so the engine's cross-plugin grouping and
+its remove-by-`product_id` matching would silently diverge per source — a bug the
+mock (built to whatever I assumed) would happily hide.
+
+**Lessons:**
+1. **A tracking issue's field description is intent, not the wire contract.** When
+   an issue and the shipped reference/contract disagree on a shape, the running
+   code + the contract example win. I read `catalog-builder.server.ts` and the §3b
+   JSON before choosing `raw` — that's what caught it. (Generalizes §2.7: a sync
+   isn't code-complete; here, an *issue* isn't the wire truth either.)
+2. **Parity fields must be verified against the OTHER implementation, not derived
+   independently.** Two plugins feeding one engine field is a cross-repo contract;
+   diverging by a prefix is exactly the kind of drift that reads fine in isolation
+   and breaks only when the engine joins both.
+3. **Changing the wire meaning of a key breaks every mock trigger keyed on it.**
+   The catalog mock forced its retry/revoke/D6 scenarios by prefix-matching the
+   `sku` (`AUTH-401`, `D6ERR`). Once `sku` became the un-controllable `woo-<id>`,
+   those triggers silently stopped firing — one test even PASSED anyway (a revoke
+   that no longer happened still returned `ok`). Moving the triggers to `event_id`
+   (which the test controls) restored them. When you change what a field carries,
+   grep the mock for every trigger keyed on it.
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

@@ -31,9 +31,10 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
  *     queue row with its own event_uuid, so the engine dedups each
  *     variation independently (a price change on one variation must not
  *     be masked by another variation's idempotency key). SKU-less units
- *     get a synthetic `wc-{id}` key from SkuResolver (F3-36) — they used
- *     to be dropped here, which on a SKU-less store silently emptied the
- *     whole catalog with zero Event Log trace.
+ *     key on `woo-{id}` from SkuResolver (PRO-1224) — the platform id, never
+ *     the merchant SKU field — so a SKU-less store still keys consistently
+ *     (units used to be dropped when SKU-less, silently emptying the whole
+ *     catalog with zero Event Log trace).
  *
  *   - build()   maps ONE unit + its queue-row event_uuid into the wire
  *     object. The event_uuid → `event_id` field rename is the single
@@ -278,14 +279,20 @@ class CatalogPayloadBuilder {
 
 	/**
 	 * Best-effort tag map the engine consumes immediately (vs
-	 * raw_attributes, which feeds the mapping wizard). Brand is pulled
-	 * from a `brand` / `pa_brand` attribute when present; category_path
-	 * is echoed so the engine can group without re-deriving.
+	 * raw_attributes, which feeds the mapping wizard). Always carries
+	 * `product_id` — the RAW canonical PARENT product id (SkuResolver::
+	 * product_group_id) that groups this variation's `woo-<variation_id>`
+	 * row back to its product for the engine's cross-variant grouping
+	 * (PRO-1227) and product-level removal (`catalog/remove` §3b, PRO-1230).
+	 * Brand is pulled from a `brand` / `pa_brand` attribute when present;
+	 * category_path is echoed so the engine can group without re-deriving.
 	 *
 	 * @return array<string, string>
 	 */
 	private function tags( \WC_Product $product, string $category_path ): array {
-		$tags = array();
+		// product_id: parent id shared by all variations of one product, RAW
+		// (no `woo-` prefix) for Shopify parity + the §3b remove-by-id shape.
+		$tags = array( 'product_id' => SkuResolver::product_group_id( $product, $this->detector() ) );
 
 		$brand = $this->attribute_value( $product, 'brand' );
 		if ( $brand === '' ) {

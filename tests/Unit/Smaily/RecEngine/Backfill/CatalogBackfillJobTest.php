@@ -250,6 +250,7 @@ if ( ! class_exists( \WC_Product::class ) ) {
 		<<<'PHP'
 		class WC_Product {
 			public function get_id( $context = 'view' ) { return 0; }
+			public function get_parent_id( $context = 'view' ) { return 0; }
 			public function get_sku( $context = 'view' ) { return ''; }
 		}
 PHP

@@ -67,7 +67,7 @@ interface DetectorInterface {
 	/**
 	 * Collapse a possibly-translated product post to its CANONICAL post id —
 	 * the single record the catalog should ingest, identical across every
-	 * language so the synthetic `wc-{id}` key is stable (catalog-correctness
+	 * language so the `woo-{id}` key is stable (catalog-correctness
 	 * P1; RECENGINE_API_CONTRACT.md §3 "one row per canonical product").
 	 *
 	 * For WPML/Polylang (translations are separate wp_posts rows) this is the

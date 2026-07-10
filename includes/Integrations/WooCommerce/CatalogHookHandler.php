@@ -25,13 +25,14 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  * Variable products fan out: each variation is its own ingest unit with
  * its own queue row and event_uuid (CatalogPayloadBuilder::expand), so the
  * engine dedups variations independently. SKU-less units are NOT dropped —
- * SkuResolver keys them `wc-{id}` in the builder (F3-36).
+ * SkuResolver keys every unit `woo-{id}` (the platform id, never the merchant
+ * SKU field) in the builder (PRO-1224).
  *
  * Multilingual collapse (catalog-correctness P1): Polylang/WPML store each
  * translation as its own product post, so a save/stock/delete arriving for a
  * translation is first mapped to its CANONICAL (default-language) product via
- * the DetectorInterface — we always enqueue the canonical so its synthetic
- * `wc-{canonical_id}` key is stable across languages (one engine row per real
+ * the DetectorInterface — we always enqueue the canonical so its
+ * `woo-{canonical_id}` key is stable across languages (one engine row per real
  * product, RECENGINE_API_CONTRACT.md §3). Single-language sites resolve every
  * post to itself (passthrough), so this is a no-op there.
  *
