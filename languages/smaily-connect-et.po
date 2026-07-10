@@ -71,7 +71,7 @@ msgstr "Nimi"
 
 #: admin/wizard.php:61
 #: admin/wizard.php:62
-#: includes/smaily.class.php:274
+#: includes/smaily.class.php:280
 #: blocks/landingpage/src/edit.js:89
 msgid "Settings"
 msgstr "Seaded"
@@ -93,7 +93,7 @@ msgstr "Seadistusviisard"
 msgid "You do not have permission to view this page."
 msgstr "Sul ei ole õigust seda lehte vaadata."
 
-#: admin/wizard.php:156
+#: admin/wizard.php:168
 msgid "Smaily Connect admin bundle not built. Run `npm run build` in the plugin directory."
 msgstr "Smaily Connecti halduriliidese komplekt on ehitamata. Käivita plugina kataloogis `npm run build`."
 
@@ -203,7 +203,7 @@ msgstr "See ühendus on veel seadistamata. Lõpeta kõigepealt seadistamine."
 msgid "Unsupported job_type."
 msgstr "Toetamata töötüüp (job_type)."
 
-#: includes/REST/EventsEndpoint.php:97
+#: includes/REST/EventsEndpoint.php:98
 msgid "You do not have permission to view the event log."
 msgstr "Sul ei ole õigust sündmuste logi vaadata."
 
@@ -2403,6 +2403,8 @@ msgstr "Kontrollitud %1$d kasutajat %2$d-st — %3$d kontakti sünkroonitud."
 msgid "Done — %1$d contacts synced (%2$d users checked)."
 msgstr "Valmis — %1$d kontakti sünkroonitud (%2$d kasutajat kontrollitud)."
 
-#: admin/wizard.php includes/smaily.class.php
+#: admin/wizard.php:134
+#: includes/smaily.class.php:284
+#: includes/smaily.class.php:300
 msgid "Documentation"
 msgstr "Dokumentatsioon"
