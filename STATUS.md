@@ -26,7 +26,22 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**PRO-1230 DONE — hard-delete → §3b `catalog/remove`;
+_Last updated: 2026-07-10 (**PRO-1224 + PRO-1230 LIVE-WALK DONE against the "Smaily
+Connect test" sandbox** — `bin/walk-pro1224-1230.cjs`, LIVE OK, 20 checks. Proven on the
+REAL engine: catalog rows key `sku=woo-<id>` + `tags.product_id` = RAW canonical parent
+id (simple AND variable — variation rows key `woo-<variation_id>`, group to the parent);
+a product WITH a merchant WC SKU still keys `woo-<id>` and the merchant SKU appears
+NOWHERE in any wire payload; an order's `items[]` join on the same `woo-<id>` keys —
+all accepted (processed, no errors[]; F3-44 exchanges stored). §3b live proof
+(PRO-1230): trash enqueues ONLY the soft in_stock=false row (zero `catalog.remove`);
+a hard-deleted PARENT flushes ONE `catalog/remove` → live engine `outcome=removed`
+(variable parent: removed_products=1, rows_tombstoned=2; simple: removed_products=1)
+— a REAL removal, not a not_found, because the §3b match hit the walk's own freshly
+synced `tags.product_id`. Dev wp-env re-connected to the sandbox via a fresh setup
+token (secret-safe STDIN exchange; token consumed + file deleted); `smly_rec_*`
+snapshot saved host-side for post-suite restore (LESSONS §2.17). Still pending: the
+one-time engine-side purge + full re-backfill of already-synced stores (coordinate
+with the engine before the pilot flip). Prior: **PRO-1230 DONE — hard-delete → §3b `catalog/remove`;
 landed on main, UNRELEASED.** A permanently deleted PARENT product (incl. purge-from-
 trash — `before_delete_post` fires for both) now enqueues ONE `catalog.remove` row via
 `CatalogHookHandler::on_hard_delete_product` (Bootstrap rebind; `wp_trash_post` keeps
@@ -49,10 +64,9 @@ Docs: DECISIONS PRO-1230 (+ F3-40 gap-closed note), CLAUDE.md trash/hard-delete 
 rewritten; merchant docs site unchanged (background ingest detail, no user-visible
 behavior change). Gates: **ci:strict exit=0** + **integration OK** (`sg docker`; new
 E2E: hard-delete→§3b wire w/ tombstone match, trash-no-remove + purge-removes,
-variation-delete soft path, variable-parent family remove). NOT YET DONE: a §3b
-live-walk against the sandbox tenant (rides the pending PRO-1224 live-walk — same
-`tags.product_id` dependency); pre-PRO-1224 rows lack `tags.product_id` → §3b
-not_found until the coordinated purge + re-backfill. Prior: **PRO-1224 CORE DONE —
+variation-delete soft path, variable-parent family remove). The §3b live-walk is DONE
+(2026-07-10, see the head of this note); pre-PRO-1224 rows lack `tags.product_id` →
+§3b not_found until the coordinated purge + re-backfill. Prior: **PRO-1224 CORE DONE —
 canonical `woo-<id>` key everywhere +
 `tags.product_id`; landed on main, UNRELEASED.** `Support\SkuResolver::resolve()` now ALWAYS
 emits `woo-<canonical_id>` (the platform id; prefix `woo-`, not `wc-`) and NEVER the merchant
@@ -68,8 +82,8 @@ that's the raw platform id + collision key). Docs: F3-36 SUPERSEDED banner + ful
 entry in DECISIONS; CLAUDE.md SkuResolver note rewritten; LESSONS §2.20. Mock moved to the new
 shape (records `tags`; scenario triggers re-keyed sku→`event_id` since `sku` is no longer
 test-controllable). Gates: **ci:strict exit=0** (PHPCS clean, PHPStan OK, unit 483, tsc,
-vitest 236) + **integration 140 OK** (`sg docker`). NOT YET DONE: a PRO-1224 **live-walk**
-against the sandbox tenant (fail-loud namespace confirm) + the **one-time engine-side purge +
+vitest 236) + **integration 140 OK** (`sg docker`). The PRO-1224 **live-walk** is DONE
+(2026-07-10, see the head of this note); still NOT done: the **one-time engine-side purge +
 full re-backfill** of already-synced stores (every key changes `wc-<id>`→`woo-<id>`) — must be
 coordinated with the engine before the pilot flip. **PRO-1230** (hard-delete → §3b) now
 unblocked on the contract + `tags.product_id`. `external_id` decision resolved (omit merchant
