@@ -26,7 +26,19 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-09 (**Merchant documentation site + in-plugin docs links —
+_Last updated: 2026-07-10 (**Contract synced to v1.3.0 (engine commit `8a0749f`,
+byte-identical md5 `1886669e…`).** Additive MINOR bump (PRO-1229/PRO-1228): new
+`POST /api/v1/ingest/catalog/remove` (§3b — product-level SOFT tombstone by parent
+`product_id`, for hard-deletes), the **`sku` identity rule sharpened** (§3: `sku` MUST be
+the platform id namespaced by source — `woo-<variation_id>`/`woo-<product_id>` — **never**
+the merchant SKU field, not even as fallback; engine adding fail-loud namespace validation
+PRO-1223), new optional `tags.product_id` (parent id, shared by variants), and a lifecycle
+clarification (removal is always soft; product-`delete` is a best-effort fast-path, the
+periodic full re-sync reconciles). **Plugin code does NOT yet follow (CC-8: a sync is not
+code-complete):** `SkuResolver` still prefers the merchant `get_sku()` and emits the `wc-`
+prefix, and no path emits `tags.product_id` — tracked by **PRO-1224** (canonical `woo-<id>`
+key everywhere, High) and **PRO-1230** (hard-delete → §3b, blocked on this sync + PRO-1224).
+Mock not yet moved to the new shape. Prior: **Merchant documentation site + in-plugin docs links —
 landed on main, UNRELEASED.** New `docs/site/index.html`: a single self-contained
 **bilingual (EN/ET)** HTML page (7 sections — Overview, Getting started/wizard,
 Settings, Importing, Error messages, FAQ, Data & privacy) built to look and work like

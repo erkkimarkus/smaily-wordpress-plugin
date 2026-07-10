@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.2
+# Smaily Recommendation Engine — API Contract v1.3
 
-**Version**: 1.2.0
+**Version**: 1.3.0
 **Published**: 2026-05-19
-**Last updated**: 2026-07-07 (v1.2.0 — `recipe_en` added to the §11 catalog triggers; MINOR bump per the versioning rule: new optional field)
+**Last updated**: 2026-07-10 (v1.3.0 — new endpoint `POST /api/v1/ingest/catalog/remove` (product-level soft removal) + documented `tags.product_id`; MINOR bump per the versioning rule: additive, backward-compatible — PRO-1229 / PRO-1228)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -46,6 +46,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [POST /api/setup/exchange](#1-post-apisetupexchange)
    - [GET /api/v1/ingest/ping](#2-get-apiv1ingestping)
    - [POST /api/v1/ingest/catalog](#3-post-apiv1ingestcatalog)
+   - [POST /api/v1/ingest/catalog/remove](#3b-post-apiv1ingestcatalogremove)
    - [POST /api/v1/ingest/customers](#4-post-apiv1ingestcustomers)
    - [POST /api/v1/ingest/orders](#5-post-apiv1ingestorders)
    - [POST /api/v1/ingest/browse](#6-post-apiv1ingestbrowse)
@@ -602,7 +603,7 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `event_id` | UUID v4 string | NO | Per-product transport-level dedup key. See [Idempotency](#idempotency). |
-| `sku` | string (max 64) | YES | Unique product identifier (natural key for UPSERT) |
+| `sku` | string (max 64) | YES | **Canonical product-identity token — NOT the merchant's SKU field.** The stable platform product/variant id, namespaced by source (`shp-<variant_id>`, `woo-<id>`). Never the merchant-entered SKU string, and never a fallback to it. See [Product identity](#catalog-identity). |
 | `name` | string \| `{lang: string}` | YES | Product name |
 | `category_path` | string | YES | Hierarchical category (`food/dry`, `accessories/leashes`) |
 | `price` | number | YES | Customer's current selling price (NOT regular_price) |
@@ -629,11 +630,15 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 > The engine has no separate "discount price" field. A discounted product is expressed purely as `price` (the discounted price the customer pays) plus `compare_price` (the higher pre-sale price).
 
 <a name="catalog-identity"></a>
-**Catalog identity, multilingual & lifecycle** (added 2026-06-13):
+**Catalog identity, multilingual & lifecycle** (added 2026-06-13; identity rule sharpened 2026-07-09):
 
-- **One row per canonical product — collapse translations.** Send exactly one catalog row per real, purchasable product. Do **NOT** send a separate row per language: a multilingual product (WPML/Polylang) must be a **single `sku`** whose translations are carried in the `{lang: value}` object form of `name` / `description` / `product_url` (see *Multilingual variant* above). The `sku` is a **stable canonical key** — keep it identical across languages and across syncs (e.g. the canonical/default-language product id). Emitting one row per translation creates duplicate SKUs that the engine **cannot** dedupe (there is no language tag or parent link), producing language-mixed recommendations.
+- **`sku` is the platform product/variant id — NEVER the merchant SKU field.** The engine's `sku` is a join/identity key, not a human-facing code. It **must** be the platform's stable internal id, namespaced by source: Shopify → `shp-<variant_id>` (the order line's `variant_id`, **not** `line_item.sku`); WooCommerce → `woo-<variation_id>` for variable products, `woo-<product_id>` for simple. The merchant-entered "SKU" field is **optional, frequently blank, reused, or garbage** (real-world examples seen: a price `"63.00"`, a sequence number `"12"` shared by dozens of products, an EAN barcode) — using it, **even as a fallback when the platform id is momentarily unavailable**, collapses distinct products onto one `(tenant_id, sku)` key and silently destroys history. If you need the merchant SKU for display/debugging, send it in `external_id` (or `tags`), never as `sku`.
+  - **Same key from every path.** The identical token must be emitted from catalog **and** order-line **and** browse ingest for the same product. Consistency is required only *within one tenant/source* (one store = one plugin); `shp-` and `woo-` namespaces never cross-join.
+  - **Fail-loud enforcement (rolling out — see PRO-1223).** The engine will validate that each `sku` matches the sender's declared namespace pattern and route a non-conforming row to `errors[]` / `import_errors` rather than silently UPSERTing it. Senders must not rely on silent acceptance of off-scheme keys.
+- **One row per canonical product — collapse translations.** Send exactly one catalog row per real, purchasable product. Do **NOT** send a separate row per language: a multilingual product (WPML/Polylang) must be a **single `sku`** whose translations are carried in the `{lang: value}` object form of `name` / `description` / `product_url` (see *Multilingual variant* above). Keep the `sku` identical across languages and across syncs. Emitting one row per translation creates duplicate SKUs that the engine **cannot** dedupe (there is no language tag or parent link), producing language-mixed recommendations.
+- **Parent product id — `tags.product_id`.** Alongside the variant-level `sku`, emit the platform **parent product id** as `tags.product_id` (Shopify `<product_id>`, Woo `<product_id>`). All variants of one product share one `tags.product_id`. The engine uses it for **product-level removal** (see [§3b](#3b-post-apiv1ingestcatalogremove)) and for future cross-variant grouping (cadence / sample→full). Shopify emits it today; Woo and Magento roll it in with their canonical-key work. Where a sender does not emit it, product-level removal is unavailable for that sender (per-SKU `in_stock=false` still works).
 - **Real products only.** Do not send non-purchasable artifacts: language-switcher pseudo-products, gift cards, donation items, or virtual config entries. *(The engine additionally derives an internal `recommendable` flag at ingest to defensively exclude such items — see [Engine-internal fields](#engine-internal). The source should still not send them, to avoid catalog bloat.)*
-- **Lifecycle is UPSERT-only — no delete-by-absence.** The engine UPSERTs by `sku`; it never removes a `sku` merely because it stopped appearing in a sync. Removal is explicit: re-send the product with `in_stock=false`. **Consequence when changing the SKU scheme:** if a sender migrates SKUs (e.g. from per-language `wc-<translation_id>` to canonical `wc-<canonical_id>`), the old SKUs are **not** auto-removed — they linger as stale rows. The engine does **not** offer a full-catalog replace/reconcile; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
+- **Lifecycle is UPSERT-only — no delete-by-absence; removal is soft, never a hard delete.** The engine UPSERTs by `sku` and never removes a `sku` merely because it stopped appearing in a sync. **Removal is explicit and always *soft*:** either re-send the product with `in_stock=false` (per-SKU), or call [`POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove) with the parent `product_id` to tombstone all of a product's SKUs at once (the path for a platform hard-delete, where the webhook gives only the product id). A tombstone sets `in_stock=false` + `recommendable=false` — it drops the product from every recommendation path but **keeps the row**. Catalog rows (like `orders` / `order_items`) are **retained as a learning corpus** and are **never hard-deleted** except on GDPR erasure or tenant offboarding; the engine offers no full-catalog replace/reconcile and does not delete by absence. A product-`delete` webhook is a **best-effort fast-path**; the **periodic full re-sync is the reconciler** that converges catalog state, so missed or out-of-order events self-heal on the next full push. **Consequence when changing the SKU scheme:** migrated old SKUs are **not** auto-removed — they linger as stale rows; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
 
 <a name="engine-internal"></a>
 **Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): the engine's **exclusion decision** (a per-store/business-model call the connector must NOT make). Derived primarily from the **`product_type` signal** (gift-card types → excluded), with `sku`/`category_path`/`name` heuristics as fallback (test artifacts `LIVE-*`/`live-test`, name-matched gift cards/donations). `is_virtual`/`is_downloadable` are **stored but do NOT auto-exclude** (digital-goods stores sell those). Recomputed on every upsert, so a corrected sync self-heals; tunable engine-side without redeploying connectors. Excluded products are never recommended via any path. **Division of labour: the connector sends structural signal; the engine owns the exclusion.**
@@ -695,6 +700,50 @@ Returned when every product carrying an `event_id` in the request was already pr
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1** (always active): `(tenant_id, sku)` natural-key UPSERT. Same SKU sent twice → second call updates.
 - **Layer 2** (optional, per-item `event_id`): an item whose `event_id` was already seen is counted in `deduplicated` and not re-UPSERTed (the whole request is a no-op when `deduplicated_all: true`).
+
+---
+
+### 3b. POST /api/v1/ingest/catalog/remove
+
+**Product-level soft removal (tombstone).** Removes every SKU of one or more products from all recommendation paths in a single call, without the sender needing to know the products' SKUs. This is the path for a platform **hard-delete** (Shopify `products/delete`, Woo product delete, …) where the webhook gives only the product id, not its variants/SKUs. Archive / unpublish / out-of-stock do **not** need this — send those as `in_stock=false` on the normal catalog sync (§3).
+
+**URL**: `POST /api/v1/ingest/catalog/remove`
+
+**Auth**: `Authorization: Bearer sk_...`
+
+**Rate limit**: 100 req/sec, up to 1000 product ids per request
+
+**Request body**:
+```json
+{
+  "product_ids": ["7620134", "7620135"]
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `product_ids` | string[] | YES | Platform **parent product ids** — the value the sender emits as `tags.product_id` (1–1000 per request). Matched against `catalog.tags.product_id` for the calling tenant. |
+
+**Semantics**:
+- **Soft tombstone, never a row delete.** For every catalog row of the tenant whose `tags.product_id` is in `product_ids`, the engine sets `in_stock=false` **and** `recommendable=false`. The rows — and their attributes, orders and attribution — are kept (see the retention invariant under [Catalog identity & lifecycle](#catalog-identity)). A hard row delete is **never** performed here.
+- **All SKUs at once.** A product's variants share one `tags.product_id`, so one id removes the whole product.
+- **Idempotent.** Re-removing an already-removed product is a no-op. A product id matching no rows is counted in `not_found`, not an error.
+- **Effect on serving.** A tombstoned product is excluded from every recommendation path (hard-gate, tier-0, orchestrator); if it was in a customer's replenishment set, the `stock_status_change` trigger surfaces a substitute.
+- **Not authoritative on its own.** The delete event is a best-effort fast-path — keep sending the full catalog on your normal cadence; the periodic full re-sync is the reconciler (see [lifecycle](#catalog-identity)).
+
+**Response 200 OK**:
+```json
+{
+  "ok": true,
+  "removed_products": 2,
+  "rows_tombstoned": 7,
+  "not_found": []
+}
+```
+
+`removed_products` = ids that matched ≥1 row; `rows_tombstoned` = catalog rows set to `in_stock=false` + `recommendable=false`; `not_found` = ids that matched no row for this tenant (safe to ignore — already removed, or never sent).
+
+**Errors**: a malformed wrapper (`product_ids` missing / not an array / empty / >1000) → `400 validation_failed` (same shape as §3). Auth and rate-limit behave as the other ingest routes.
 
 ---
 
@@ -1731,6 +1780,12 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 **v1.2.0** (2026-07-07) — **`recipe_en` on §11 catalog triggers**. MINOR bump per the [Versioning](#versioning) rule (new optional field; backward-compatible — nothing existing changed shape):
 - **Every `triggers[]` item now carries `recipe_en`** alongside `recipe_et` (pilot feedback 2026-07-07: a WooCommerce store with an English admin locale saw the Estonian-only recipe). Content-equivalent English recipe, same guidance as `recipe_et`; `name_*` / `description_*` were already bilingual.
 - Plugin side: treat `recipe_en` as optional and fall back to `recipe_et` when absent (an older engine won't send it).
+
+**v1.3.0** (2026-07-10) — **Product-level soft removal + `tags.product_id`**. MINOR bump per the [Versioning](#versioning) rule (new endpoint + new optional field; backward-compatible — nothing existing changed shape). PRO-1229 / PRO-1228:
+- **New endpoint [§3b `POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove)** — tombstones all SKUs of a product (`in_stock=false` + `recommendable=false`) by parent `product_id`, for platform hard-deletes where the webhook gives only the product id. **Soft only:** catalog rows are never hard-deleted (retained as a learning corpus; GDPR / offboarding is the sole hard-delete path). Idempotent; response `{ok, removed_products, rows_tombstoned, not_found}`.
+- **`tags.product_id` documented** (§3 identity) — the platform parent product id, shared by a product's variants; consumed by §3b removal and future cross-variant grouping. Shopify emits it (PRO-1226); Woo (PRO-1224) / Magento follow.
+- **Lifecycle bullet clarified**: removal is always *soft*; a product-`delete` webhook is a best-effort fast-path; the **periodic full re-sync is the reconciler** (still no delete-by-absence, no full reconcile).
+- Plugin side: subscribe the platform product-delete webhook and forward the parent product id to §3b — no local SKU map needed. An older engine returns 404 on this path; treat its absence as "not yet available."
 
 ---
 
