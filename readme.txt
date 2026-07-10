@@ -291,7 +291,7 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 == Upgrade Notice ==
 
 = 3.6.0 =
-Product identity sent to Smaily Campaign Intelligence changes from the merchant SKU to a stable platform id (woo-<id>). Stores already connected to Campaign Intelligence need a coordinated engine-side catalog cleanup + full re-import after updating — coordinate with the Smaily team before updating a connected store. Stores not using Campaign Intelligence are unaffected; safe in-place update.
+Product identity sent to Smaily Campaign Intelligence changes from the merchant SKU to a stable platform id. Already-connected stores need a coordinated engine-side catalog cleanup and full re-import — coordinate with Smaily before updating. Stores without Campaign Intelligence: safe update.
 
 = 3.5.0 =
 The contact backfill progress now reports users checked and contacts synced as separate numbers, matching your contact sync mode — no data-flow change, only honest reporting. Safe in-place update.
