@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**PRO-1224 + PRO-1230 LIVE-WALK DONE against the "Smaily
+_Last updated: 2026-07-10 (**v3.6.0 RELEASE PREPARED — NOT YET PUBLISHED** (publish =
+Erkki's one-way door; this release is the prerequisite for the MiuMjau key-migration,
+engine PRO-1233, week of 2026-07-14). Version bumped 3.5.0→3.6.0 in all pinned spots
+(`e1d20e5`); changelog + upgrade notice call out that already-connected stores need the
+coordinated engine-side purge + full re-backfill (keys change to `woo-<id>`) BEFORE the
+pilot flip. Re-audit policy TRIGGERED (REST retry-kick change + new outbound
+`Client::catalog_remove()` + new `before_delete_post` surface, ~3.4k lines) → delta
+security + code-quality re-audit run by a clean-context agent: **0 Crit/High/Med, 1 Low
+(cross-flusher tombstone ordering race, accepted — follow-up: ask the engine whether a
+plain upsert clears a tombstone's `recommendable=false`), 4 Info accepted** —
+`docs/audits/2026-07-10-SECURITY_QUALITY_RE_AUDIT_PRO1224_PRO1230.md` + two INDEX rows.
+Gates: ci:strict exit=0 (unit 500, vitest 236); integration not re-run (delta past the
+integration-green feature commits is version/readme/i18n-refs only; sandbox connection
+untouched). Full local build sequence run (admin+client JS, blocks, `bin/build-i18n.sh`
+— new "Documentation" string now in the `.mo` — prod-vendor package, dev vendor
+restored). **PCP on the built ZIP: clean except the intentional `Update URI`** (one
+gate-time fix: upgrade notice shortened under the 300-char limit). ZIP verified: clean
+build-hash `f8903ce`, v3.6.0, required present, dev artifacts absent, ~1.07 MB —
+`smaily-connect.zip` at the repo root, release notes drafted (scratchpad
+`release-notes-3.6.0.md`). NOT done: `gh release create` / tag — waiting on Erkki.
+Prior: **PRO-1224 + PRO-1230 LIVE-WALK DONE against the "Smaily
 Connect test" sandbox** — `bin/walk-pro1224-1230.cjs`, LIVE OK, 20 checks. Proven on the
 REAL engine: catalog rows key `sku=woo-<id>` + `tags.product_id` = RAW canonical parent
 id (simple AND variable — variation rows key `woo-<variation_id>`, group to the parent);
