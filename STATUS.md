@@ -26,7 +26,22 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**v3.6.0 RELEASE PREPARED — NOT YET PUBLISHED** (publish =
+_Last updated: 2026-07-10 (**Contract re-synced byte-identical (engine `2ff57e8`, md5
+`1777746b…`) — PRO-1234.** Doc-only delta since our `8a0749f` sync, two engine commits:
+`2ff57e8` (§3 identity clarify: a merchant-entered SKU, if ever sent, goes in
+`tags.merchant_sku` — NEVER in `external_id`, which carries the platform variant id and
+drives collision detection; engine consumes `tags.merchant_sku` nowhere today) and
+`6b225fb` (setup-exchange endpoints map now carries `ingest_catalog_remove`). CC-8
+conformance verified: plugin already conforms — merchant SKU appears on NO rec-engine
+wire path (PRO-1224 dropped it entirely; `CatalogPayloadBuilder` `external_id` = raw
+`get_id()`), and `Client::catalog_remove()` already resolves
+`endpoints[ingest_catalog_remove]` with the absolute-path fallback (the fallback is now
+for pre-`6b225fb` stored maps, no longer load-bearing for fresh connections). Mock moved
+in the same sync: setup-exchange map now serves `ingest_catalog_remove` (14 keys); stale
+"speculative key" Client docblock fixed. **No wire-SHAPE change → no live-walk needed**
+(prose clarify + map addition already exercised by ClientTest both ways). Gates:
+ci:strict exit=0; integration not run (doc + mock-map + comment delta only). Prior:
+**v3.6.0 RELEASE PREPARED — NOT YET PUBLISHED** (publish =
 Erkki's one-way door; this release is the prerequisite for the MiuMjau key-migration,
 engine PRO-1233, week of 2026-07-14). Version bumped 3.5.0→3.6.0 in all pinned spots
 (`e1d20e5`); changelog + upgrade notice call out that already-connected stores need the

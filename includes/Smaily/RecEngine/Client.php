@@ -200,9 +200,9 @@ class Client {
 	 * {ok, removed_products, rows_tombstoned, not_found}. A malformed wrapper
 	 * (empty / >1000 / non-array) is a 400 → ApiException.
 	 *
-	 * Endpoint key `ingest_catalog_remove` is speculative (the v1.3.0 map does
-	 * not carry it) — the PATH_INGEST_CATALOG_REMOVE fallback serves every
-	 * current connection.
+	 * Endpoint key `ingest_catalog_remove` is in the live setup-exchange map
+	 * since engine 6b225fb — the PATH_INGEST_CATALOG_REMOVE fallback serves
+	 * connections whose stored exchange-time map predates it.
 	 *
 	 * @param array<int, string> $product_ids 1..1000 raw parent product ids.
 	 *

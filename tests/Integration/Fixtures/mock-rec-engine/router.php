@@ -163,9 +163,11 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 	// ABSOLUTE URLs (NOT relative paths). The plugin reads
 	// endpoints()['ingest_catalog']; a mock serving the old unprefixed/
 	// relative shape would pass while production got a null URL — exactly
-	// the mock↔engine divergence the path-bug taught us to close. All 13
+	// the mock↔engine divergence the path-bug taught us to close. All 14
 	// endpoints present (11 from the endpoints-map audit P2 #11, plus the
-	// v1.1.0 `automations_*` keys).
+	// v1.1.0 `automations_*` keys, plus `ingest_catalog_remove` — added to
+	// the live map by engine 6b225fb; the Client keeps its absolute-path
+	// fallback for pre-6b225fb connections whose stored map lacks the key).
 	$engine_base = sprintf( 'http://%s', $_SERVER['HTTP_HOST'] ?? 'localhost:9876' );
 	reply(
 		200,
@@ -178,6 +180,7 @@ if ( $method === 'POST' && $path === '/api/setup/exchange' ) {
 			'endpoints'       => array(
 				'ingest_ping'             => $engine_base . '/api/v1/ingest/ping',
 				'ingest_catalog'          => $engine_base . '/api/v1/ingest/catalog',
+				'ingest_catalog_remove'   => $engine_base . '/api/v1/ingest/catalog/remove',
 				'ingest_customers'        => $engine_base . '/api/v1/ingest/customers',
 				'ingest_orders'           => $engine_base . '/api/v1/ingest/orders',
 				'ingest_browse'           => $engine_base . '/api/v1/ingest/browse',
