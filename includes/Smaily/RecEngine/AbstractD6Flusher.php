@@ -150,7 +150,7 @@ abstract class AbstractD6Flusher {
 
 		try {
 			$response = $this->send( $objects );
-			$this->apply_d6_response( $response, $batch_rows, $objects, $stats );
+			$this->apply_response( $response, $batch_rows, $objects, $stats );
 		} catch ( ApiException $e ) {
 			$terminal = $this->is_terminal( $e );
 			foreach ( $batch_rows as $index => $row ) {
@@ -159,6 +159,23 @@ abstract class AbstractD6Flusher {
 		}
 
 		return $stats;
+	}
+
+	/**
+	 * Apply a 2xx response to the index-aligned batch. Default = the D6
+	 * per-item split below; the one non-D6 ingest endpoint (catalog/remove §3b
+	 * — response {ok, removed_products, rows_tombstoned, not_found}, no
+	 * per-item errors[]) overrides this so the shared flush skeleton (gate →
+	 * drain → build → send) and the ApiException terminal/retry policy stay
+	 * inherited, not copied.
+	 *
+	 * @param array<string, mixed>                                            $response
+	 * @param array<int, array<string, mixed>>                                $batch_rows
+	 * @param array<int, array<string, mixed>>                                $objects    Wire objects, index-aligned with $batch_rows.
+	 * @param array{processed:int,sent:int,failed:int,retried:int,skipped:int} $stats
+	 */
+	protected function apply_response( array $response, array $batch_rows, array $objects, array &$stats ): void {
+		$this->apply_d6_response( $response, $batch_rows, $objects, $stats );
 	}
 
 	/**
@@ -288,11 +305,12 @@ abstract class AbstractD6Flusher {
 	/**
 	 * JSON-encode + cap a value for the stored `sent_payload` (F3-44). Returns
 	 * '' for null / unencodable so the column stores an empty string, not a
-	 * literal "null".
+	 * literal "null". Protected so an apply_response() override stores its
+	 * exchanges through the same bounded encoder.
 	 *
 	 * @param mixed $value
 	 */
-	private function trim_json( $value ): string {
+	protected function trim_json( $value ): string {
 		if ( $value === null ) {
 			return '';
 		}
@@ -301,7 +319,7 @@ abstract class AbstractD6Flusher {
 	}
 
 	/** Cap a string at EXCHANGE_MAX chars, flagging the truncation. */
-	private function trim_text( string $text ): string {
+	protected function trim_text( string $text ): string {
 		return strlen( $text ) <= self::EXCHANGE_MAX
 			? $text
 			: substr( $text, 0, self::EXCHANGE_MAX ) . '…[truncated]';

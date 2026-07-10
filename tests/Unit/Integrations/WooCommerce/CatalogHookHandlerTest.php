@@ -213,6 +213,149 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertSame( array(), $queue->enqueued, 'A removal object with an empty product_url is contract-guaranteed to 400 — not enqueued.' );
 	}
 
+	// --- hard delete → §3b catalog.remove (PRO-1230) --------------------------
+
+	public function test_hard_delete_of_parent_product_enqueues_catalog_remove_with_raw_parent_id(): void {
+		// A permanent delete of a parent product enqueues ONE catalog.remove
+		// carrying the RAW un-prefixed canonical parent id (= tags.product_id;
+		// §3b matches on that exact string) — and NO per-SKU catalog.delete
+		// rows (§3b tombstones every SKU already).
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, 'GONE-1' );
+		$handler = $this->handler( $queue, true, array( 100 => $product ), array( $product ) );
+
+		$handler->on_hard_delete_product( 100 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_REMOVE, $queue->enqueued[0]['type'] );
+		self::assertSame( '100', $queue->enqueued[0]['entity_id'] );
+		self::assertSame(
+			array( 'product_id' => '100' ),
+			$queue->enqueued[0]['payload'],
+			'The removal key is the RAW canonical parent id (tags.product_id) — never woo-100 and never the merchant SKU.'
+		);
+	}
+
+	public function test_hard_delete_when_not_connected_enqueues_nothing(): void {
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, 'GONE-1' );
+		$handler = $this->handler( $queue, false, array( 100 => $product ), array( $product ) );
+
+		$handler->on_hard_delete_product( 100 );
+
+		self::assertSame( array(), $queue->enqueued );
+	}
+
+	public function test_hard_delete_of_a_variation_keeps_the_per_sku_soft_path(): void {
+		// §3b is PRODUCT-level: removing a single variation of a still-existing
+		// product via catalog/remove would wrongly tombstone all its siblings.
+		// A variation hard-delete keeps the existing per-SKU in_stock=false path.
+		$queue     = $this->fake_queue();
+		$variation = $this->fake_product( 101, 'VAR-1' );
+		$handler   = $this->handler(
+			$queue,
+			true,
+			array( 101 => $variation ),
+			array( $variation ),
+			null,
+			array(),
+			array( 101 => 'product_variation' )
+		);
+
+		$handler->on_hard_delete_product( 101 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_DELETE, $queue->enqueued[0]['type'], 'A variation delete is a per-SKU soft removal, never a §3b product tombstone.' );
+	}
+
+	public function test_hard_delete_of_a_translation_resyncs_canonical_not_remove(): void {
+		// P4: hard-deleting the LV translation must not tombstone the product —
+		// it still exists in ET. Re-sync the canonical instead.
+		$queue     = $this->fake_queue();
+		$canonical = $this->fake_product( 100, '' );
+		$handler   = $this->handler(
+			$queue,
+			true,
+			array( 100 => $canonical ),
+			array( $canonical ),
+			$this->detector( array( 200 => 100 ) )
+		);
+
+		$handler->on_hard_delete_product( 200 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_UPSERT, $queue->enqueued[0]['type'] );
+		self::assertSame( '100', $queue->enqueued[0]['entity_id'] );
+	}
+
+	public function test_hard_delete_of_auto_draft_is_skipped(): void {
+		// WordPress's daily auto-draft GC hard-deletes piles of never-published
+		// artifacts — they were never ingested; a §3b call each would only burn
+		// queue rows on not_found answers.
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, '' );
+		$handler = $this->handler( $queue, true, array( 100 => $product ), array( $product ), null, array( 100 => 'auto-draft' ) );
+
+		$handler->on_hard_delete_product( 100 );
+
+		self::assertSame( array(), $queue->enqueued );
+	}
+
+	public function test_hard_delete_of_trashed_product_still_enqueues_remove(): void {
+		// Purging from trash IS a before_delete_post moment: the trash already
+		// sent in_stock=false (F3-40); the purge adds the §3b tombstone
+		// (recommendable=false across all SKUs).
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, '' );
+		$handler = $this->handler( $queue, true, array( 100 => $product ), array( $product ), null, array( 100 => 'trash' ) );
+
+		$handler->on_hard_delete_product( 100 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_REMOVE, $queue->enqueued[0]['type'] );
+	}
+
+	public function test_hard_delete_of_non_product_post_is_ignored(): void {
+		// before_delete_post fires for EVERY post type.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true, array(), array(), null, array(), array( 999 => 'post' ) );
+
+		$handler->on_hard_delete_product( 999 );
+
+		self::assertSame( array(), $queue->enqueued );
+	}
+
+	public function test_hard_delete_of_variable_parent_preclaims_variation_delete_slots(): void {
+		// Deleting a variable product makes WC hard-delete each variation right
+		// after, each firing before_delete_post. §3b already tombstones every
+		// SKU, so the per-variation soft-path rows in the same request must
+		// collapse into the one catalog.remove.
+		$queue   = $this->fake_queue();
+		$parent  = $this->fake_product( 50, '' );
+		$v1      = $this->fake_product( 101, 'V-1' );
+		$handler = $this->handler(
+			$queue,
+			true,
+			array(
+				50  => $parent,
+				101 => $v1,
+			),
+			array( $v1 ), // expand(parent) → its variations.
+			null,
+			array(),
+			array(
+				50  => 'product',
+				101 => 'product_variation',
+			)
+		);
+
+		$handler->on_hard_delete_product( 50 );  // parent → catalog.remove + pre-claim.
+		$handler->on_hard_delete_product( 101 ); // WC deleting the variation next.
+
+		self::assertCount( 1, $queue->enqueued, 'The variation soft-path row is pre-claimed by the parent removal — one catalog.remove, no noise.' );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_REMOVE, $queue->enqueued[0]['type'] );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	private function fake_queue(): IngestQueue {
@@ -246,8 +389,9 @@ final class CatalogHookHandlerTest extends TestCase {
 	 * @param array<int, \WC_Product> $products_by_id get_product() lookup table.
 	 * @param array<int, \WC_Product> $expand_units   builder->expand() result.
 	 * @param array<int, string>      $status_map     post id → status ('publish' default).
+	 * @param array<int, string>      $type_map       post id → post type ('product' default).
 	 */
-	private function handler( IngestQueue $queue, bool $connected, array $products_by_id, array $expand_units, ?DetectorInterface $detector = null, array $status_map = array() ): CatalogHookHandler {
+	private function handler( IngestQueue $queue, bool $connected, array $products_by_id, array $expand_units, ?DetectorInterface $detector = null, array $status_map = array(), array $type_map = array() ): CatalogHookHandler {
 		$settings = new class( $connected ) extends RecEngineSettings {
 			private bool $connected;
 			public function __construct( bool $connected ) {
@@ -284,25 +428,32 @@ final class CatalogHookHandlerTest extends TestCase {
 
 		$detector = $detector ?? $this->detector( array() );
 
-		return new class( $queue, $builder, $settings, $detector, $products_by_id, $status_map ) extends CatalogHookHandler {
+		return new class( $queue, $builder, $settings, $detector, $products_by_id, $status_map, $type_map ) extends CatalogHookHandler {
 			/** @var array<int, \WC_Product> */
 			private array $products_by_id;
 			/** @var array<int, string> */
 			private array $status_map;
+			/** @var array<int, string> */
+			private array $type_map;
 			/**
 			 * @param array<int, \WC_Product> $products_by_id
 			 * @param array<int, string>      $status_map
+			 * @param array<int, string>      $type_map
 			 */
-			public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, DetectorInterface $detector, array $products_by_id, array $status_map ) {
+			public function __construct( IngestQueue $queue, CatalogPayloadBuilder $builder, RecEngineSettings $settings, DetectorInterface $detector, array $products_by_id, array $status_map, array $type_map ) {
 				parent::__construct( $queue, $builder, $settings, $detector );
 				$this->products_by_id = $products_by_id;
 				$this->status_map     = $status_map;
+				$this->type_map       = $type_map;
 			}
 			protected function get_product( int $product_id ): ?\WC_Product {
 				return $this->products_by_id[ $product_id ] ?? null;
 			}
 			protected function post_status( int $post_id ): string {
 				return $this->status_map[ $post_id ] ?? 'publish';
+			}
+			protected function post_type( int $post_id ): string {
+				return $this->type_map[ $post_id ] ?? 'product';
 			}
 		};
 	}

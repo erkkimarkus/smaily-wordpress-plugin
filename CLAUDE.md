@@ -199,9 +199,16 @@ a `catalog.delete` row IS an `in_stock=false` upsert): `Bootstrap` binds
 red integration cycle):** `wp_trash_post()` then calls `wp_update_post(trash)`,
 which fires `save_post_product` → `on_save_product` AFTER the removal — re-upserting
 `in_stock=true` and undoing it. `on_save_product` early-returns when the saved
-post's status is `trash`; don't remove that guard. A *permanently* deleted
-product can't be recovered (no WC data to build a row) — that's accepted, not a
-bug. After any change here the pilot needs a catalog re-backfill.
+post's status is `trash`; don't remove that guard. A *permanently* deleted PARENT
+product (incl. a purge-from-trash) now fires the §3b product-level tombstone
+(PRO-1230): `before_delete_post → on_hard_delete_product` enqueues ONE
+`catalog.remove` row whose payload is the RAW un-prefixed canonical parent id
+(`SkuResolver::product_group_id()` = `tags.product_id` — §3b matches that exact
+string, never the `woo-` sku), drained by `CatalogRemoveFlusher` on its own AS
+hook (NOT D6: response has no per-item errors[]; `not_found` is a success). A
+single VARIATION's hard-delete keeps the per-SKU soft path — §3b would tombstone
+its surviving siblings — and trash still never fires §3b. After any change here
+the pilot needs a catalog re-backfill.
 
 ### Use the IsoDate helper for datetimes — never raw format
 The engine's strict Zod `.datetime()` requires Z-suffix (`Y-m-d\TH:i:s\Z`), NOT

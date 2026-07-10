@@ -18,6 +18,7 @@ use Smaily\Connect\Multilingual\SiteLocaleAdapter;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
+use Smaily\Connect\Smaily\RecEngine\CatalogRemoveFlusher;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
@@ -377,6 +378,182 @@ final class RecEngineCatalogTest extends TestCase {
 		self::assertTrue( $in_stock[ 'woo-' . $pid ] ?? null, 'Untrash restores in_stock=true — the product is sellable again.' );
 	}
 
+	public function test_hard_delete_reaches_engine_as_catalog_remove_with_raw_parent_id(): void {
+		// PRO-1230 end-to-end through the REAL Bootstrap wiring: a permanent
+		// delete fires before_delete_post → on_hard_delete_product → ONE
+		// catalog.remove row (no per-SKU catalog.delete) → CatalogRemoveFlusher
+		// POSTs §3b {product_ids:[<RAW parent id>]} → the mock tombstones the
+		// product's ingested SKUs (matched on tags.product_id, exact string).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		self::assertNotFalse( has_action( 'before_delete_post' ), 'Bootstrap must route permanent deletes through the catalog handler.' );
+
+		// Ingest the product first so the mock's catalog carries its
+		// tags.product_id — removal must then find it (not not_found).
+		$product = $this->make_categorized_product( 'CAT-REMOVE-1', '12.00' );
+		$pid     = (int) $product->get_id();
+		$this->truncate_queue();
+		$queue = new IngestQueue();
+		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $pid, array() );
+		$this->flush_catalog( $queue );
+		$tags = self::$engine->state()['last_catalog_tags'] ?? array();
+		self::assertSame( (string) $pid, $tags[ 'woo-' . $pid ]['product_id'] ?? null, 'Precondition: the ingested row carries tags.product_id (PRO-1224).' );
+
+		// --- Hard delete (no trash) → catalog.remove, and ONLY that ---
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue();
+		wp_delete_post( $pid, true );
+
+		$remove_rows = $queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_REMOVE ) );
+		self::assertCount( 1, $remove_rows, 'A parent-product hard-delete enqueues exactly one catalog.remove row.' );
+		$payload = json_decode( (string) $remove_rows[0]['payload'], true );
+		self::assertSame(
+			array( 'product_id' => (string) $pid ),
+			$payload,
+			'The removal key is the RAW un-prefixed parent id (= tags.product_id) — not woo-<id>, not the merchant SKU.'
+		);
+		self::assertSame(
+			array(),
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_DELETE ) ),
+			'No per-SKU catalog.delete rows ride along — §3b already tombstones every SKU of the product.'
+		);
+
+		// --- Flush → §3b on the wire, tombstone applied ---
+		$stats = $this->flush_catalog_remove( $queue );
+		self::assertSame( 1, $stats['sent'] );
+		self::assertSame( array(), $queue->pending( 10 ), 'The remove row reached a terminal state.' );
+
+		$state = self::$engine->state();
+		self::assertSame( array( (string) $pid ), $state['last_catalog_removed'] ?? null, 'The engine received product_ids = [<raw parent id>].' );
+		self::assertArrayHasKey( 'woo-' . $pid, $state['catalog_tombstoned'] ?? array(), 'The ingested SKU was tombstoned via its tags.product_id — not not_found.' );
+	}
+
+	public function test_trash_enqueues_no_catalog_remove_but_purge_from_trash_does(): void {
+		// F3-40 stays untouched: trashing keeps the in_stock=false soft path
+		// and NEVER fires §3b. Purging the trashed product (empty trash) DOES
+		// fire before_delete_post — that is the intended §3b moment too.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$product = $this->make_categorized_product( 'CAT-REMOVE-TRASH-1', '5.00' );
+		$pid     = (int) $product->get_id();
+
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue();
+		$queue = new IngestQueue();
+
+		wp_trash_post( $pid );
+		self::assertCount(
+			1,
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_DELETE ) ),
+			'Trash keeps the F3-40 soft path (in_stock=false).'
+		);
+		self::assertSame(
+			array(),
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_REMOVE ) ),
+			'Trash is NOT a hard delete — no §3b removal.'
+		);
+
+		wp_delete_post( $pid, true ); // Empty-trash purge.
+		$remove_rows = $queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_REMOVE ) );
+		self::assertCount( 1, $remove_rows, 'Purging from trash fires before_delete_post → the §3b removal.' );
+		self::assertSame(
+			array( 'product_id' => (string) $pid ),
+			json_decode( (string) $remove_rows[0]['payload'], true )
+		);
+	}
+
+	public function test_variation_hard_delete_keeps_per_sku_soft_path_not_product_remove(): void {
+		// §3b is PRODUCT-level: deleting ONE variation of a surviving product
+		// must not tombstone its siblings — it keeps the per-variation
+		// in_stock=false path (the variation is its own ingest unit).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$parent = new \WC_Product_Variable();
+		$parent->set_name( 'Remove Var Parent' );
+		$parent_id                = (int) $parent->save();
+		$this->created_products[] = $parent_id;
+		// Category on the parent → the variation's captured removal object
+		// carries a non-empty category_path (is_removable guard).
+		$cat     = term_exists( 'rec-trash-cat', 'product_cat' );
+		$cat     = $cat ? $cat : wp_insert_term( 'Rec Trash Cat', 'product_cat', array( 'slug' => 'rec-trash-cat' ) );
+		$term_id = (int) ( is_array( $cat ) ? $cat['term_id'] : $cat );
+		wp_set_object_terms( $parent_id, array( $term_id ), 'product_cat' );
+
+		$variation = new \WC_Product_Variation();
+		$variation->set_parent_id( $parent_id );
+		$variation->set_regular_price( '4.00' );
+		$variation_id = (int) $variation->save();
+
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue();
+		$queue = new IngestQueue();
+
+		wc_get_product( $variation_id )->delete( true );
+
+		self::assertSame(
+			array(),
+			$queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_REMOVE ) ),
+			'A single variation delete must NOT tombstone the whole product family via §3b.'
+		);
+		$delete_rows = $queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_DELETE ) );
+		$entity_ids  = array_map( static fn( array $row ): string => (string) $row['entity_id'], $delete_rows );
+		self::assertContains( (string) $variation_id, $entity_ids, 'The variation keeps the per-SKU in_stock=false soft path.' );
+	}
+
+	public function test_variable_parent_hard_delete_enqueues_one_remove_for_the_family(): void {
+		// Deleting the whole variable product → ONE §3b removal keyed on the
+		// parent id; the per-variation soft-path rows fired by WC's cascade
+		// delete collapse into it (pre-claimed dedupe slots).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$parent = new \WC_Product_Variable();
+		$parent->set_name( 'Remove Family Parent' );
+		$parent_id = (int) $parent->save();
+
+		$variation = new \WC_Product_Variation();
+		$variation->set_parent_id( $parent_id );
+		$variation->set_regular_price( '4.00' );
+		$variation->save();
+
+		CatalogHookHandler::reset_seen();
+		$this->truncate_queue();
+		$queue = new IngestQueue();
+
+		wc_get_product( $parent_id )->delete( true ); // Cascades to the variations.
+
+		$remove_rows = $queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_REMOVE ) );
+		self::assertCount( 1, $remove_rows, 'One product family → one catalog.remove, whatever the variation count.' );
+		self::assertSame(
+			array( 'product_id' => (string) $parent_id ),
+			json_decode( (string) $remove_rows[0]['payload'], true ),
+			'The family removal is keyed on the PARENT id — the tags.product_id every variation row shares.'
+		);
+	}
+
 	/**
 	 * Seed a connected tenant pointed at the mock and build a Client from
 	 * the stored settings (api_key + base_url + endpoints map).
@@ -549,6 +726,23 @@ final class RecEngineCatalogTest extends TestCase {
 		$loaded = wc_get_product( (int) $product->get_id() );
 		self::assertInstanceOf( \WC_Product::class, $loaded );
 		return $loaded;
+	}
+
+	/**
+	 * Drain catalog.remove rows through the real §3b flusher against the mock.
+	 *
+	 * @return array{processed: int, sent: int, failed: int, retried: int, skipped: int}
+	 */
+	private function flush_catalog_remove( IngestQueue $queue ): array {
+		$settings = new RecEngineSettings();
+		$flusher  = new CatalogRemoveFlusher(
+			$queue,
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		return $flusher->flush();
 	}
 
 	private function flush_catalog( IngestQueue $queue ): void {

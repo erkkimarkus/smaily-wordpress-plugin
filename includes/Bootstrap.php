@@ -46,6 +46,7 @@ use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\Flusher;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
+use Smaily\Connect\Smaily\RecEngine\CatalogRemoveFlusher;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
 use Smaily\Connect\Smaily\RecEngine\CustomerPayloadBuilder;
@@ -92,14 +93,15 @@ final class Bootstrap {
 	private ?AutomationRouter $automation_router = null;
 	private ?Flusher $flusher                    = null;
 
-	private ?IngestQueue $ingest_queue                = null;
-	private ?CatalogPayloadBuilder $catalog_builder   = null;
-	private ?RecEngineSettings $rec_settings          = null;
-	private ?IngestFlusher $ingest_flusher            = null;
-	private ?CustomerPayloadBuilder $customer_builder = null;
-	private ?CustomerFlusher $customer_flusher        = null;
-	private ?OrderPayloadBuilder $order_builder       = null;
-	private ?OrderFlusher $order_flusher              = null;
+	private ?IngestQueue $ingest_queue                    = null;
+	private ?CatalogPayloadBuilder $catalog_builder       = null;
+	private ?RecEngineSettings $rec_settings              = null;
+	private ?IngestFlusher $ingest_flusher                = null;
+	private ?CatalogRemoveFlusher $catalog_remove_flusher = null;
+	private ?CustomerPayloadBuilder $customer_builder     = null;
+	private ?CustomerFlusher $customer_flusher            = null;
+	private ?OrderPayloadBuilder $order_builder           = null;
+	private ?OrderFlusher $order_flusher                  = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -152,6 +154,10 @@ final class Bootstrap {
 		// enqueues a one-off flush per change; the recurring schedule below
 		// re-ticks for row-level retries (next_retry_at).
 		add_action( IngestQueue::FLUSH_HOOK, array( $this, 'on_flush_ingest_queue' ) );
+		// §3b product-level removals (catalog.remove) drain on their own hook —
+		// a different endpoint + response shape than the catalog D6 batch
+		// (PRO-1230).
+		add_action( CatalogRemoveFlusher::FLUSH_HOOK, array( $this, 'on_flush_catalog_remove_queue' ) );
 		// Customers drain on their own hook — the shared queue routes catalog.*
 		// and customer.* rows to separate flushers (3.3.3).
 		add_action( CustomerFlusher::FLUSH_HOOK, array( $this, 'on_flush_customer_queue' ) );
@@ -421,8 +427,12 @@ final class Bootstrap {
 		// Same ($id, $status, $product) signature; the handler covers both.
 		add_action( 'woocommerce_variation_set_stock_status', array( $catalog, 'on_stock_change' ), 10, 3 );
 		// before_delete_post (not delete_post): the product is still loadable,
-		// so the handler can capture its catalog object before it's gone.
-		add_action( 'before_delete_post', array( $catalog, 'on_delete_product' ), 10, 1 );
+		// so the handler can capture its removal key before it's gone. A HARD
+		// delete of a parent product goes to the engine as a §3b catalog.remove
+		// (tombstones every SKU by tags.product_id, PRO-1230); a variation's
+		// hard-delete keeps the per-SKU in_stock=false soft path — see
+		// on_hard_delete_product for the routing.
+		add_action( 'before_delete_post', array( $catalog, 'on_hard_delete_product' ), 10, 1 );
 		// Trashing is NOT a delete — before_delete_post never fires for it, so a
 		// trashed product would silently keep its stale (in_stock=true) engine row
 		// while it can no longer be bought. Route trash through the same removal
@@ -546,6 +556,12 @@ final class Bootstrap {
 			as_schedule_recurring_action( time(), 60, OrderFlusher::FLUSH_HOOK, array(), OrderFlusher::AS_GROUP );
 		}
 
+		// Catalog product-level removal flush (§3b, PRO-1230) — its own
+		// recurring tick so parked retries drain without a fresh delete.
+		if ( ! as_has_scheduled_action( CatalogRemoveFlusher::FLUSH_HOOK, array(), CatalogRemoveFlusher::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, CatalogRemoveFlusher::FLUSH_HOOK, array(), CatalogRemoveFlusher::AS_GROUP );
+		}
+
 		// Proactive health check (3.10.2) — every 15 min, recompute the admin-notice
 		// signals (failed-count > threshold in 24h; engine unreachable > 1h). Slow
 		// cadence: it makes a network ping and the signals are coarse-grained.
@@ -577,6 +593,14 @@ final class Bootstrap {
 	 */
 	public function on_flush_ingest_queue(): void {
 		$this->ingest_flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_rec_flush_catalog_remove — drains the
+	 * rec-engine ingest queue's catalog.remove rows to §3b (PRO-1230).
+	 */
+	public function on_flush_catalog_remove_queue(): void {
+		$this->catalog_remove_flusher()->flush();
 	}
 
 	/**
@@ -794,6 +818,21 @@ final class Bootstrap {
 		}
 
 		return $this->ingest_flusher;
+	}
+
+	public function catalog_remove_flusher(): CatalogRemoveFlusher {
+		if ( $this->catalog_remove_flusher === null ) {
+			$bootstrap                    = $this;
+			$this->catalog_remove_flusher = new CatalogRemoveFlusher(
+				$this->ingest_queue(),
+				$this->rec_engine_settings(),
+				static function () use ( $bootstrap ): RecEngineClient {
+					return $bootstrap->rec_client();
+				}
+			);
+		}
+
+		return $this->catalog_remove_flusher;
 	}
 
 	public function customer_payload_builder(): CustomerPayloadBuilder {

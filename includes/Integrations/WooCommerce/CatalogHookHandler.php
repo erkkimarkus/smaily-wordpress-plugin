@@ -14,7 +14,9 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Multilingual\DetectorInterface;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
+use Smaily\Connect\Smaily\RecEngine\CatalogRemoveFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
 
 /**
  * Fans WooCommerce product changes into the rec-engine ingest queue
@@ -60,6 +62,15 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  * (re-sync real stock). Removing a TRANSLATION must NOT remove the canonical SKU
  * (P4) — see on_delete_product.
  *
+ * HARD delete (PRO-1230, contract v1.3.0 §3b): a permanently deleted PARENT
+ * product additionally stops being recommendable engine-side via one
+ * catalog.remove row (POST /ingest/catalog/remove) carrying the RAW canonical
+ * parent id — `tags.product_id`, un-prefixed — which tombstones ALL of the
+ * product's SKUs (in_stock=false + recommendable=false, rows kept). Only
+ * before_delete_post routes here (on_hard_delete_product); trash stays on the
+ * F3-40 soft path above. A single VARIATION's hard-delete keeps the per-SKU
+ * soft path — §3b is product-level and would wrongly tombstone its siblings.
+ *
  * Not final: tests subclass to stub get_product() while recording enqueues
  * through a doubled IngestQueue.
  */
@@ -67,6 +78,7 @@ class CatalogHookHandler {
 
 	public const EVENT_CATALOG_UPSERT = 'catalog.upsert';
 	public const EVENT_CATALOG_DELETE = 'catalog.delete';
+	public const EVENT_CATALOG_REMOVE = 'catalog.remove';
 
 	/** @var array<string, bool> per-request dedupe keyed by "{event}:{product_id}". */
 	private static array $seen = array();
@@ -169,6 +181,75 @@ class CatalogHookHandler {
 	}
 
 	/**
+	 * A product post is being PERMANENTLY deleted (before_delete_post — fires
+	 * for a direct hard-delete AND for an empty-trash purge; never for a mere
+	 * trashing). The WC data is still loadable here, so this is the moment to
+	 * capture the removal key before it is gone (PRO-1230).
+	 *
+	 * Routing:
+	 *   - PARENT product → one catalog.remove row carrying the RAW canonical
+	 *     parent id (`tags.product_id`); the engine tombstones every SKU of the
+	 *     product (§3b: in_stock=false + recommendable=false). The per-SKU
+	 *     catalog.delete rows are NOT also enqueued — §3b is strictly stronger,
+	 *     and a later in_stock=false UPSERT racing the tombstone across two
+	 *     flush cycles is avoidable wire noise.
+	 *   - Single VARIATION (parent lives on) → the existing per-SKU soft path
+	 *     (on_delete_product → in_stock=false). §3b is product-level; firing it
+	 *     here would wrongly tombstone the surviving sibling variations.
+	 *   - TRANSLATION of a surviving canonical → re-sync the canonical (P4),
+	 *     exactly like trash — the product still exists.
+	 *   - auto-draft → skip: WordPress's daily GC hard-deletes piles of
+	 *     never-published artifacts that were never ingested; a §3b call for
+	 *     each is a not_found round-trip for nothing.
+	 *   - any other post type → not ours (before_delete_post fires for all).
+	 */
+	public function on_hard_delete_product( int $post_id ): void {
+		if ( ! $this->gate_open() ) {
+			return;
+		}
+
+		$post_type = $this->post_type( $post_id );
+
+		if ( 'product_variation' === $post_type ) {
+			$this->on_delete_product( $post_id );
+			return;
+		}
+
+		if ( 'product' !== $post_type ) {
+			return;
+		}
+
+		if ( 'auto-draft' === $this->post_status( $post_id ) ) {
+			return;
+		}
+
+		// P4: hard-deleting a TRANSLATION must NOT tombstone the product — it
+		// still exists in other languages. Re-sync the canonical instead.
+		$canonical_id = $this->detector->get_canonical_post_id( $post_id );
+		if ( $canonical_id > 0 && $canonical_id !== $post_id ) {
+			$canonical = $this->get_product( $canonical_id );
+			if ( $canonical !== null ) {
+				foreach ( $this->builder->expand( $canonical ) as $unit ) {
+					$this->enqueue_upsert( $unit );
+				}
+				return;
+			}
+			// Canonical gone too → fall through; product_group_id() collapses
+			// to the canonical id, so the removal still keys the engine rows.
+		}
+
+		$product = $this->get_product( $post_id );
+		if ( $product === null ) {
+			// Already unloadable — nothing to key the removal from. The engine
+			// row (if any) stays until the coordinated purge; the periodic full
+			// re-sync is the contract's reconciler.
+			return;
+		}
+
+		$this->enqueue_remove( $product );
+	}
+
+	/**
 	 * Resolve a (possibly translated) product post to its canonical
 	 * default-language product, loading it. Falls back to the saved post itself
 	 * when the canonical can't be loaded — never drops a save silently.
@@ -235,6 +316,42 @@ class CatalogHookHandler {
 	}
 
 	/**
+	 * Enqueue the §3b product-level removal for a hard-deleted PARENT product.
+	 *
+	 * The payload's `product_id` is SkuResolver::product_group_id() — the RAW
+	 * (un-prefixed) canonical parent id, byte-identical to the `tags.product_id`
+	 * the catalog sync stamped on every row of this product; §3b matches on
+	 * exactly that string. NEVER the `woo-`-prefixed `sku`.
+	 *
+	 * Also pre-claims the per-request catalog.delete dedupe slots of the
+	 * product's units: deleting a variable product makes WC hard-delete each
+	 * variation right after (each firing before_delete_post → the variation
+	 * soft path in on_hard_delete_product). §3b already tombstones every SKU of
+	 * the product, so those per-variation in_stock=false rows would be pure
+	 * noise — claiming their slots collapses them within this request.
+	 */
+	private function enqueue_remove( \WC_Product $product ): void {
+		$group_id = SkuResolver::product_group_id( $product, $this->detector );
+		if ( $group_id === '' ) {
+			return;
+		}
+		if ( $this->already_seen( self::EVENT_CATALOG_REMOVE, (int) $group_id ) ) {
+			return;
+		}
+		foreach ( $this->builder->expand( $product ) as $unit ) {
+			$this->already_seen( self::EVENT_CATALOG_DELETE, (int) $unit->get_id() );
+		}
+		$this->queue->enqueue(
+			self::EVENT_CATALOG_REMOVE,
+			(string) $product->get_id(),
+			array( 'product_id' => $group_id ),
+			null,
+			CatalogRemoveFlusher::FLUSH_HOOK,
+			CatalogRemoveFlusher::AS_GROUP
+		);
+	}
+
+	/**
 	 * Whether a captured catalog object carries the engine's REQUIRED non-empty
 	 * removal fields (category_path + product_url). product_url may be the
 	 * multilingual `{lang: value}` object form, so an empty array counts as blank
@@ -287,5 +404,13 @@ class CatalogHookHandler {
 	 */
 	protected function post_status( int $post_id ): string {
 		return (string) get_post_status( $post_id );
+	}
+
+	/**
+	 * The post's type slug ('product' / 'product_variation' / …). Protected so
+	 * tests can drive the hard-delete routing without WordPress.
+	 */
+	protected function post_type( int $post_id ): string {
+		return (string) get_post_type( $post_id );
 	}
 }

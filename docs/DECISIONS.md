@@ -2090,7 +2090,9 @@ one trash is non-obvious.
 **Scope / known limits:** this closes the **trash** gap, not the hard-delete one — a
 *permanently* deleted product's data is gone from WC, so no catalog row can be built
 (the engine must tolerate such order lines; it already does, it just can't infer from
-them). Multilingual: the collapse keys on a *published* canonical only, so a published
+them). *(The hard-delete gap is closed later by PRO-1230: contract v1.3.0 §3b
+`catalog/remove` needs only the parent product id, capturable at before_delete_post —
+see the PRO-1230 entry.)* Multilingual: the collapse keys on a *published* canonical only, so a published
 translation of a trashed default-language product is kept (stands in as in_stock=true);
 a fully-trashed multilingual product may emit a harmless duplicate `in_stock=false`
 per language (idempotent on the engine's SKU upsert). After deploy the pilot needs a
@@ -2996,6 +2998,76 @@ re-backfill before/at the flip.
 (merchant-SKU/external_id engine answer), PRO-1227 (engine groups by
 `tags.product_id`), PRO-1230 (hard-delete → `catalog/remove` §3b, consumes
 `tags.product_id`); Shopify PRO-1226 (parity).
+
+### PRO-1230 — Hard-deleted parent product → §3b `catalog/remove` (product-level tombstone); trash and variation deletes keep the soft path
+
+**Context (2026-07-10):** contract v1.3.0 added `POST /api/v1/ingest/catalog/remove`
+(§3b): a soft tombstone — `in_stock=false` + `recommendable=false` on every catalog
+row whose `tags.product_id` matches; rows are kept (learning corpus), never
+hard-deleted. This is the designed path for a platform HARD delete, where the
+product's variants/SKUs are no longer enumerable. Until now a permanent delete only
+got the F3-40 in_stock=false upsert (captured at before_delete_post) — the product
+could still linger recommendable-adjacent, and F3-40 explicitly named the hard-delete
+gap as accepted.
+
+**Decision:** `before_delete_post` now routes to `CatalogHookHandler::
+on_hard_delete_product` (Bootstrap rebind; `wp_trash_post` stays on the F3-40 path
+untouched), which routes by post type:
+- **PARENT product** (incl. a purge-from-trash — that also fires before_delete_post):
+  ONE `catalog.remove` queue row whose payload `product_id` is `SkuResolver::
+  product_group_id()` — the RAW un-prefixed CANONICAL parent id, byte-identical to
+  the `tags.product_id` the catalog sync stamps (engine confirmed 2026-07-10:
+  removal matches the exact string stored in `catalog.tags.product_id`; the issue's
+  original `woo-<product_id>` wording was an error). The per-SKU `catalog.delete`
+  rows are NOT also enqueued: §3b is strictly stronger, and an in_stock=false UPSERT
+  racing the tombstone across two independent flush cycles is avoidable wire noise.
+  The handler also PRE-CLAIMS the per-request `catalog.delete` dedupe slots of the
+  product's variations — WC cascade-deletes them right after the parent, each firing
+  before_delete_post; without the pre-claim each would enqueue a redundant soft
+  removal.
+- **Single VARIATION** (parent lives on): keeps the existing per-SKU soft path
+  (`on_delete_product` → in_stock=false). §3b is PRODUCT-level — firing it for one
+  variation would wrongly tombstone all surviving siblings.
+- **TRANSLATION of a surviving canonical**: re-sync the canonical (P4), same as trash.
+- **auto-draft**: skipped (the daily GC burst was never ingested; each §3b call would
+  be a not_found round-trip for nothing). Other never-ingested statuses may still
+  fire a removal — idempotent, `not_found` is a contract-defined success.
+
+**Plumbing:** new event type `catalog.remove` through the shared IngestQueue, drained
+ONLY by the new `CatalogRemoveFlusher` (own AS hook `smly_rec_flush_catalog_remove` /
+group, 60s recurring tick; IngestFlusher's catalog.upsert/delete scoping is untouched).
+§3b is NOT D6 — the response is `{ok, removed_products, rows_tombstoned, not_found}`
+with no per-item errors[] — so `AbstractD6Flusher` grew a protected `apply_response()`
+seam (default = the D6 split); the remove flusher overrides it to mark every batched
+row SENT on 2xx, storing the per-row outcome (`removed` / `not_found`) in the F3-44
+exchange. HTTP failures inherit the shared terminal-4xx / transient-retry policy; a
+keyless row is an observable terminal skip (LESSONS §2.11). `Client::catalog_remove()`
+resolves `endpoints[ingest_catalog_remove]` with fallback
+`PATH_INGEST_CATALOG_REMOVE` — the v1.3.0 endpoints map does not advertise the key, so
+the fallback serves every current connection ("Map age", contract §1). The mock engine
+gained the §3b route in the same pass (CC-8): wrapper validation (1..1000, 400 on
+malformed) + exact-string matching against the `tags.product_id` values it ingested.
+
+**Rationale for enqueue-not-inline:** hooks must never block on HTTP (established
+architecture); the queue gives durable retry + Event Log observability. Removal is
+best-effort by contract ("the periodic full re-sync is the reconciler"), so a lost
+fast-path event self-heals.
+
+**Alternatives rejected:** (a) sending BOTH §3b and the per-SKU in_stock=false rows on
+hard-delete — redundant, plus the cross-flusher ordering hazard above; (b) firing §3b
+for a variation delete with the parent id — tombstones surviving siblings; (c) a
+separate queue table — the shared queue's event-type scoping already isolates
+flushers.
+
+**Migration note:** §3b matches on `tags.product_id`, which rows synced BEFORE
+PRO-1224 don't carry — those return `not_found` until the coordinated purge + full
+re-backfill (the PRO-1224 migration) has run. Acceptable: same stores, same window.
+
+**Relationships:** PRO-1224 (`tags.product_id` is the removal key; SkuResolver::
+product_group_id), PRO-1229/PRO-1228 (contract v1.3.0 sync `a5c3ea6`), F3-40 (trash
+soft path unchanged; its "hard-delete gap accepted" limit is now closed), F3-44
+(store_exchange per row), F3-18/N-7 (the D6 base this deliberately deviates from,
+via the apply_response seam).
 
 ## How to keep this document going
 

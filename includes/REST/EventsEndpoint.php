@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
 use Smaily\Connect\Smaily\EventQueue;
+use Smaily\Connect\Smaily\RecEngine\CatalogRemoveFlusher;
 use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\RecEngine\OrderFlusher;
@@ -235,7 +236,7 @@ class EventsEndpoint {
 	}
 
 	/**
-	 * The rec queue is drained by three flushers, each on its own hook/group;
+	 * The rec queue is drained by four flushers, each on its own hook/group;
 	 * kick all so a reset row of any event type re-sends promptly.
 	 *
 	 * @return array<int, array{0: string, 1: string}>
@@ -243,6 +244,7 @@ class EventsEndpoint {
 	private function rec_flush_hooks(): array {
 		return array(
 			array( IngestQueue::FLUSH_HOOK, IngestQueue::AS_GROUP ),
+			array( CatalogRemoveFlusher::FLUSH_HOOK, CatalogRemoveFlusher::AS_GROUP ),
 			array( CustomerFlusher::FLUSH_HOOK, CustomerFlusher::AS_GROUP ),
 			array( OrderFlusher::FLUSH_HOOK, OrderFlusher::AS_GROUP ),
 		);

@@ -26,7 +26,34 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**PRO-1224 CORE DONE — canonical `woo-<id>` key everywhere +
+_Last updated: 2026-07-10 (**PRO-1230 DONE — hard-delete → §3b `catalog/remove`;
+landed on main, UNRELEASED.** A permanently deleted PARENT product (incl. purge-from-
+trash — `before_delete_post` fires for both) now enqueues ONE `catalog.remove` row via
+`CatalogHookHandler::on_hard_delete_product` (Bootstrap rebind; `wp_trash_post` keeps
+the F3-40 in_stock=false soft path untouched). Payload = the RAW un-prefixed CANONICAL
+parent id (`SkuResolver::product_group_id()` = `tags.product_id`; engine confirmed
+2026-07-10 the §3b match is that exact string — NOT `woo-<id>`). Routing: single
+VARIATION delete keeps the per-SKU soft path (§3b would tombstone surviving siblings);
+translation delete re-syncs the canonical (P4); auto-draft GC skipped; per-variation
+soft rows from WC's cascade delete are pre-claimed into the one remove. New
+`CatalogRemoveFlusher` (own AS hook `smly_rec_flush_catalog_remove`, 60s tick, added to
+the Event-Log retry kick list) drains the new `catalog.remove` event type from the
+shared queue — §3b is NOT D6 ({ok, removed_products, rows_tombstoned, not_found}, no
+errors[]), so `AbstractD6Flusher` grew a protected `apply_response()` seam; on 2xx every
+row is SENT with the per-row outcome (`removed`/`not_found` — a not_found is contract-
+success, never a retry) stored per F3-44. `Client::catalog_remove()` resolves
+`endpoints[ingest_catalog_remove]` w/ fallback `PATH_INGEST_CATALOG_REMOVE` (the v1.3.0
+map doesn't carry the key — fallback is load-bearing). Mock moved in the same pass
+(CC-8): §3b route w/ wrapper validation + exact-string `tags.product_id` matching.
+Docs: DECISIONS PRO-1230 (+ F3-40 gap-closed note), CLAUDE.md trash/hard-delete note
+rewritten; merchant docs site unchanged (background ingest detail, no user-visible
+behavior change). Gates: **ci:strict exit=0** + **integration OK** (`sg docker`; new
+E2E: hard-delete→§3b wire w/ tombstone match, trash-no-remove + purge-removes,
+variation-delete soft path, variable-parent family remove). NOT YET DONE: a §3b
+live-walk against the sandbox tenant (rides the pending PRO-1224 live-walk — same
+`tags.product_id` dependency); pre-PRO-1224 rows lack `tags.product_id` → §3b
+not_found until the coordinated purge + re-backfill. Prior: **PRO-1224 CORE DONE —
+canonical `woo-<id>` key everywhere +
 `tags.product_id`; landed on main, UNRELEASED.** `Support\SkuResolver::resolve()` now ALWAYS
 emits `woo-<canonical_id>` (the platform id; prefix `woo-`, not `wc-`) and NEVER the merchant
 WC SKU field — reversing F3-36's "real SKU else `wc-{id}`" (the resolver PATTERN — one

@@ -410,6 +410,21 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		}
 	}
 	$state['last_catalog_tags'] = $tags_by_sku;
+	// Accumulate sku → tags.product_id across requests so the §3b
+	// catalog/remove route can compute removed vs not_found against what was
+	// actually ingested (the live engine matches removal on the exact string
+	// stored in catalog.tags.product_id).
+	$group_by_sku = ( isset( $state['catalog_group_by_sku'] ) && is_array( $state['catalog_group_by_sku'] ) )
+		? $state['catalog_group_by_sku']
+		: array();
+	foreach ( $products as $product ) {
+		$sku      = isset( $product['sku'] ) ? (string) $product['sku'] : '';
+		$group_id = ( isset( $product['tags']['product_id'] ) ) ? (string) $product['tags']['product_id'] : '';
+		if ( $sku !== '' && $group_id !== '' ) {
+			$group_by_sku[ $sku ] = $group_id;
+		}
+	}
+	$state['catalog_group_by_sku'] = $group_by_sku;
 	save_state( $state_file, $state );
 
 	$response = array(
@@ -422,6 +437,76 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		$response['deduplicated_all'] = true;
 	}
 	reply( 200, $response );
+}
+
+// Catalog product-level removal — §3b (contract v1.3.0, PRO-1229/PRO-1230).
+// Soft tombstone by parent product id: the wrapper carries RAW un-prefixed
+// `product_ids` (the exact `tags.product_id` strings the catalog sync
+// emitted — NOT the `woo-`-prefixed sku), 1..1000 per request; a malformed
+// wrapper is a 400 validation_failed. Idempotent: ids matching no ingested
+// row land in `not_found` (a success). NOT D6 — the response is
+// {ok, removed_products, rows_tombstoned, not_found}, no per-item errors[].
+if ( $method === 'POST' && $path === '/api/v1/ingest/catalog/remove' ) {
+	require_bearer_auth();
+
+	$raw  = (string) file_get_contents( 'php://input' );
+	$body = json_decode( $raw, true );
+
+	$ids = ( is_array( $body ) && isset( $body['product_ids'] ) && is_array( $body['product_ids'] ) )
+		? $body['product_ids']
+		: null;
+	if ( $ids === null || count( $ids ) === 0 || count( $ids ) > 1000 ) {
+		reply(
+			400,
+			array(
+				'error'   => 'validation_failed',
+				'details' => array( 'fieldErrors' => array( 'product_ids' => array( 'Array must contain between 1 and 1000 element(s)' ) ) ),
+			)
+		);
+	}
+	$ids = array_map( 'strval', $ids );
+
+	// Match against the accumulated tags.product_id of everything ingested via
+	// /ingest/catalog — exact-string match, like the live engine.
+	$group_by_sku = ( isset( $state['catalog_group_by_sku'] ) && is_array( $state['catalog_group_by_sku'] ) )
+		? $state['catalog_group_by_sku']
+		: array();
+	$tombstoned   = ( isset( $state['catalog_tombstoned'] ) && is_array( $state['catalog_tombstoned'] ) )
+		? $state['catalog_tombstoned']
+		: array();
+
+	$removed_products = 0;
+	$rows_tombstoned  = 0;
+	$not_found        = array();
+	foreach ( array_values( array_unique( $ids ) ) as $product_id ) {
+		$matched = 0;
+		foreach ( $group_by_sku as $sku => $group_id ) {
+			if ( (string) $group_id === $product_id ) {
+				++$matched;
+				$tombstoned[ (string) $sku ] = true;
+			}
+		}
+		if ( $matched > 0 ) {
+			++$removed_products;
+			$rows_tombstoned += $matched;
+		} else {
+			$not_found[] = $product_id;
+		}
+	}
+
+	$state['catalog_tombstoned']   = $tombstoned;
+	$state['last_catalog_removed'] = $ids;
+	save_state( $state_file, $state );
+
+	reply(
+		200,
+		array(
+			'ok'               => true,
+			'removed_products' => $removed_products,
+			'rows_tombstoned'  => $rows_tombstoned,
+			'not_found'        => array_values( $not_found ),
+		)
+	);
 }
 
 // Customers ingest — W4 email-first + D6 per-item errors[]. Wrapper key is

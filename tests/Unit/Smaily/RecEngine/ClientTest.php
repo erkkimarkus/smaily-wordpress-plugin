@@ -85,6 +85,38 @@ final class ClientTest extends TestCase {
 		);
 	}
 
+	public function test_catalog_remove_posts_product_ids_wrapper_to_engine_map_url(): void {
+		$client = $this->capturing_client(
+			'sk_live',
+			'https://base.test',
+			array( 'ingest_catalog_remove' => 'https://engine.test/api/v1/ingest/catalog/remove' )
+		);
+
+		$client->catalog_remove( array( '7620134', '7620135' ) );
+
+		self::assertSame( 'POST', $client->captured['method'] );
+		self::assertSame( 'https://engine.test/api/v1/ingest/catalog/remove', $client->captured['url'] );
+		self::assertSame(
+			array( 'product_ids' => array( '7620134', '7620135' ) ),
+			$client->captured['body'],
+			'§3b wrapper key is `product_ids`, carrying RAW un-prefixed parent ids (the tags.product_id values) — never woo-<id> skus.'
+		);
+	}
+
+	public function test_catalog_remove_falls_back_to_constant_path_without_map(): void {
+		// The v1.3.0 endpoints map does NOT advertise a catalog-remove key, so
+		// this fallback serves EVERY current connection, not just pre-exchange.
+		$client = $this->capturing_client( 'sk_live', 'https://base.test' );
+
+		$client->catalog_remove( array( '100' ) );
+
+		self::assertSame(
+			'https://base.test' . Client::PATH_INGEST_CATALOG_REMOVE,
+			$client->captured['url'],
+			'With no endpoints map, catalog_remove falls back to base_url + PATH_INGEST_CATALOG_REMOVE.'
+		);
+	}
+
 	public function test_ingest_customers_posts_customers_wrapper_to_engine_map_url(): void {
 		$client = $this->capturing_client(
 			'sk_live',

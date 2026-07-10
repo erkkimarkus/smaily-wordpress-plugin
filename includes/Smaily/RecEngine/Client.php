@@ -68,13 +68,18 @@ class Client {
 	// 3.2's ingest path should prefer that map; these constants are
 	// the fallback / type-safety anchor.
 	// ---------------------------------------------------------------
-	public const PATH_SETUP_EXCHANGE   = '/api/setup/exchange';
-	public const PATH_PING             = '/api/v1/ingest/ping';
-	public const PATH_INGEST_CATALOG   = '/api/v1/ingest/catalog';
-	public const PATH_INGEST_CUSTOMERS = '/api/v1/ingest/customers';
-	public const PATH_INGEST_ORDERS    = '/api/v1/ingest/orders';
-	public const PATH_INGEST_BROWSE    = '/api/v1/ingest/browse';
-	public const PATH_IDENTITY_MERGE   = '/api/v1/identity/merge';
+	public const PATH_SETUP_EXCHANGE = '/api/setup/exchange';
+	public const PATH_PING           = '/api/v1/ingest/ping';
+	public const PATH_INGEST_CATALOG = '/api/v1/ingest/catalog';
+	// §3b product-level soft removal (contract v1.3.0). The endpoints map does
+	// NOT advertise a key for it yet (the v1.3.0 map is unchanged), so this
+	// fallback is load-bearing for EVERY connection today, not just pre-exchange
+	// calls — the "Map age" note in §1 is exactly this case.
+	public const PATH_INGEST_CATALOG_REMOVE = '/api/v1/ingest/catalog/remove';
+	public const PATH_INGEST_CUSTOMERS      = '/api/v1/ingest/customers';
+	public const PATH_INGEST_ORDERS         = '/api/v1/ingest/orders';
+	public const PATH_INGEST_BROWSE         = '/api/v1/ingest/browse';
+	public const PATH_IDENTITY_MERGE        = '/api/v1/identity/merge';
 	// GDPR customer endpoints carry the email in the URL PATH. The engine's
 	// endpoints-map advertises these with a literal `{email}` placeholder (see
 	// the contract endpoints map), so the substitution convention is `{email}`,
@@ -177,6 +182,37 @@ class Client {
 	public function ingest_catalog( array $products ): array {
 		$url = $this->resolve_url( 'ingest_catalog', self::PATH_INGEST_CATALOG );
 		return $this->request_url( 'POST', $url, array( 'products' => $products ) );
+	}
+
+	/**
+	 * Product-level soft removal (tombstone) — POST /api/v1/ingest/catalog/remove
+	 * (contract v1.3.0 §3b, PRO-1230). Tombstones EVERY catalog row whose
+	 * `tags.product_id` matches (in_stock=false + recommendable=false; the rows
+	 * are kept — the engine never hard-deletes catalog). The path for a platform
+	 * HARD-delete, where the product's variants/SKUs are no longer enumerable.
+	 *
+	 * `$product_ids` carry the RAW (un-prefixed) canonical PARENT product ids —
+	 * exactly what the catalog sync emits as `tags.product_id`
+	 * (SkuResolver::product_group_id()), NEVER the `woo-`-prefixed `sku`.
+	 *
+	 * Idempotent: a re-removed or never-ingested id lands in the response's
+	 * `not_found` (a success, not an error). Response:
+	 * {ok, removed_products, rows_tombstoned, not_found}. A malformed wrapper
+	 * (empty / >1000 / non-array) is a 400 → ApiException.
+	 *
+	 * Endpoint key `ingest_catalog_remove` is speculative (the v1.3.0 map does
+	 * not carry it) — the PATH_INGEST_CATALOG_REMOVE fallback serves every
+	 * current connection.
+	 *
+	 * @param array<int, string> $product_ids 1..1000 raw parent product ids.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws ApiException On 4xx (non-429) or unrecoverable network failure.
+	 */
+	public function catalog_remove( array $product_ids ): array {
+		$url = $this->resolve_url( 'ingest_catalog_remove', self::PATH_INGEST_CATALOG_REMOVE );
+		return $this->request_url( 'POST', $url, array( 'product_ids' => $product_ids ) );
 	}
 
 	/**
