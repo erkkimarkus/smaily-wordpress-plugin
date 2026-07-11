@@ -26,7 +26,21 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-10 (**v3.6.0 RELEASED.** Full GH release on the fork, tag
+_Last updated: 2026-07-11 (**PRO-1240 DONE — automatic `smly_rec_*` snapshot/restore
+around integration runs.** `bin/run-integration-tests.sh` (= `composer run
+test:integration`) now snapshots the DEV site's `smly_rec_*` options to
+`~/.local/state/smaily-connect/smly_rec_snapshot.json` (mode 600, outside the repo,
+`.prev.json` rotation) before the suite and — even on suite failure, via an EXIT
+trap — restores them secret-safely afterwards (JSON over STDIN into `docker exec -i …
+wp eval-file bin/restore-smly-rec-options.php`, never on a command line) and verifies
+the restored `tenant_name` (loud warning on `MiuMjau`/fixture). A fixture/empty state
+never overwrites a good snapshot; an intentionally disconnected dev site is not
+auto-reconnected. Closes the F3-53 / LESSONS §2.17 memory-based-discipline gap that
+twice killed the dev sandbox connection. Proof run: integration 144 OK (697
+assertions) via the new path, restore verified `tenant_name='Smaily Connect test'`;
+ci:strict exit=0. Docs updated same commit: CLAUDE.md (live-walk + filtered-runs +
+TENANT-scoped notes), LESSONS §2.17 mechanical-guard addendum. Prior:
+**v3.6.0 RELEASED.** Full GH release on the fork, tag
 `v3.6.0`, target main, **Latest** (non-prerelease); asset `smaily-connect.zip` is the
 locally-built verified ZIP (clean build-hash `f8903ce`, 1 075 310 B — re-verified
 byte-identical AFTER `release.yml` fired on publish and failed harmlessly as expected

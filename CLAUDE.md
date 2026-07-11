@@ -60,19 +60,22 @@ sg docker -c "composer run test:integration"
 Integration tests run real WP + WooCommerce + MariaDB via wp-env. Do NOT
 conclude "Docker unavailable" from a bare `docker info` failure — use `sg`.
 
-**Filtered/single-test integration runs:** the wrapper runs the suite in the
-`…-tests-cli-1` container with `phpunit.integration.xml.dist`. A hand-rolled
-`docker exec` into a `…-wordpress-1` container with the default
-`phpunit.xml.dist` loads the UNIT bootstrap (no wp-load, no WooCommerce) —
-the test then fails with `undefined function update_option()` / "WooCommerce
-missing" even though the real suite is green. Correct form:
+**Filtered/single-test integration runs:** prefer the wrapper — it passes
+extra args through to phpunit AND keeps the PRO-1240 smly_rec_* snapshot/
+restore guard (the suite boots the DEV site's WordPress in the `…-cli-1`
+container, so even a filtered run can clobber the dev site's engine
+connection):
 
 ```
-sg docker -c "docker exec wp-env-connect-<hash>-tests-cli-1 \
-  php /var/www/html/wp-content/plugins/smaily-connect/vendor/bin/phpunit \
-  --configuration /var/www/html/wp-content/plugins/smaily-connect/phpunit.integration.xml.dist \
-  --filter <TestName>"
+sg docker -c "bash bin/run-integration-tests.sh --filter <TestName>"
 ```
+
+If you must hand-roll a `docker exec`, use `phpunit.integration.xml.dist` —
+the default `phpunit.xml.dist` loads the UNIT bootstrap (no wp-load, no
+WooCommerce) and the test then fails with `undefined function
+update_option()` / "WooCommerce missing" even though the real suite is green.
+A hand-rolled run also bypasses the snapshot guard — snapshot/restore
+manually (see the wp-env snapshot note in the TENANT-scoped section below).
 
 ### Live-walk needs a fresh setup-token — from the SANDBOX tenant, never MiuMjau
 **MiuMjau IS the pilot's PRODUCTION tenant** (engine-side correction,
@@ -89,9 +92,11 @@ issues per-connection keys (migration 0036), so this can't recur — but it's
 the template for why dev work never touches a production tenant.
 
 Mechanics (unchanged): the setup-token is **one-time** (consumed on
-exchange) and connections get scrubbed by integration test runs (snapshot/
-restore the `smly_rec_*` options around a suite run to keep one alive). When
-a live-walk reports `is_connected = 0`:
+exchange) and connections get scrubbed by integration test runs. Since
+PRO-1240 the `test:integration` wrapper snapshots/restores the dev site's
+`smly_rec_*` options AUTOMATICALLY around a suite run (see the wp-env
+snapshot note below) — only a hand-rolled `docker exec` phpunit run
+bypasses that guard. When a live-walk reports `is_connected = 0`:
 - Ask the user to mint a fresh SANDBOX token (or a full setup URL
   `https://<engine>/setup/<token>`) into a `/tmp/smaily_re_setup_*` file
   (plain token/URL, secret-safe file method).
@@ -555,10 +560,22 @@ the dev wp-env's sandbox connection lives on the DEV site (port 8888 /
 `…-cli-1`), the tests site (`…-tests-cli-1`) has its own options — but do NOT
 conclude the dev connection is safe from a suite run: the 2026-07-08 (F3-53)
 full-suite run overwrote the DEV site's `smly_rec_*` options with fixture
-values (`re-fixture.test` base URL, a fixture tenant named "MiuMjau"). Always
-follow the snapshot/restore rule above (`wp option list --search='smly_rec_*'
---format=json` before the suite; restore via a STDIN-fed `wp eval-file` after,
-then verify `tenant_name`). (LESSONS §2.17.)
+values (`re-fixture.test` base URL, a fixture tenant named "MiuMjau"), and the
+2026-07-10 PRO-1224 walk found the connection fixture-dead with no snapshot to
+restore from. **Since PRO-1240 this is mechanically guarded:**
+`bin/run-integration-tests.sh` (= `composer run test:integration`)
+automatically snapshots the dev site's `smly_rec_*` options to
+`~/.local/state/smaily-connect/smly_rec_snapshot.json` (mode 600, outside the
+repo; a fixture/empty state never overwrites a good snapshot) before the
+suite, and after it — even on failure — restores them secret-safely (JSON
+piped over STDIN into `docker exec -i … wp eval-file
+bin/restore-smly-rec-options.php`, never on a command line) and prints the
+restored `tenant_name`, warning loudly on `MiuMjau`/fixture. An intentionally
+DISCONNECTED dev site is left alone (no auto-reconnect). The manual rule
+survives only for runs that bypass the wrapper (hand-rolled `docker exec`
+phpunit, walks that scrub the connection): `wp option list
+--search='smly_rec_*' --format=json` before; restore via the same STDIN-fed
+`wp eval-file` script after; verify `tenant_name`. (LESSONS §2.17.)
 
 ### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
 Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's

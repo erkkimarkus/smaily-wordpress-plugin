@@ -629,6 +629,18 @@ The generalisation, one level above §2.16's "walks share the integration DB":
    did a walk or another store on this tenant write that state?** It reproduces
    only on that tenant — a fresh tenant looks fine.
 
+**Mechanical guard (2026-07-11, PRO-1240):** the plugin-side half of this
+lesson's failure family — an integration-suite run overwriting the DEV site's
+`smly_rec_*` options with fixture values (F3-53, and again found fixture-dead
+with no snapshot on 2026-07-10) — is no longer discipline-based.
+`bin/run-integration-tests.sh` now snapshots the dev site's `smly_rec_*`
+options (durable, mode-600, outside the repo, never clobbering a good
+snapshot with a fixture state) before every suite run and restores + verifies
+`tenant_name` after it, even when the suite fails. The manual
+snapshot/restore rule survives only for runs that bypass the wrapper. The
+ENGINE-side half (tenant-scoped walk residue) remains discipline: a walk's
+report must still name the residue it leaves.
+
 ### 2.18 An "orphaned" legacy callback isn't dead while a legacy scheduler can still fire it — and one poison row must never own the whole pass (Prike, 2026-07-08)
 
 Prike installed the new module over the old one (no in-place upgrade). Result,
