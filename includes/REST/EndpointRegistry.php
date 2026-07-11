@@ -149,6 +149,21 @@ final class EndpointRegistry {
 				'method' => 'POST',
 				'path'   => '/settings',
 			),
+			// Event Log (F3-44). These three shipped with EventsEndpoint but
+			// were missing here until PRO-1258 — the registration test
+			// under-covered them (an accidental removal wouldn't have failed).
+			array(
+				'method' => 'GET',
+				'path'   => '/events',
+			),
+			array(
+				'method' => 'GET',
+				'path'   => '/events/detail',
+			),
+			array(
+				'method' => 'POST',
+				'path'   => '/events/retry',
+			),
 			array(
 				'method' => 'POST',
 				'path'   => '/rec-engine/setup-exchange',

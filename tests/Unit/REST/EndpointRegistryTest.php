@@ -35,10 +35,30 @@ final class EndpointRegistryTest extends TestCase {
 		self::assertContains( 'GET /workflows', $paths );
 		self::assertContains( 'POST /settings', $paths );
 
+		// Event Log (F3-44) — added to expected_routes() in PRO-1258
+		// (EventsEndpoint registered them all along; the list under-covered).
+		self::assertContains( 'GET /events', $paths );
+		self::assertContains( 'GET /events/detail', $paths );
+		self::assertContains( 'POST /events/retry', $paths );
+
 		// Sub-PR 3.1 — rec-engine connect/health/disconnect.
 		self::assertContains( 'POST /rec-engine/setup-exchange', $paths );
 		self::assertContains( 'POST /rec-engine/ping', $paths );
 		self::assertContains( 'POST /rec-engine/disconnect', $paths );
+
+		// T2 automations proxy (§11–§13).
+		self::assertContains( 'GET /rec-engine/automations/catalog', $paths );
+		self::assertContains( 'GET /rec-engine/automations/config', $paths );
+		self::assertContains( 'PUT /rec-engine/automations/config', $paths );
+
+		// Public browse-beacon proxy (F3-41: `/relay`, never `/beacon`).
+		self::assertContains( 'POST /relay', $paths );
+
+		// Pin the TOTAL so a route can't silently drop out of the list
+		// (PRO-1258: the /events triple was missing for months and nothing
+		// failed). A new endpoint bumps this number on purpose.
+		self::assertCount( 16, $paths );
+		self::assertSame( $paths, array_unique( $paths ), 'Duplicate method+path pair in expected_routes()' );
 	}
 
 	public function test_every_expected_route_uses_supported_http_method(): void {

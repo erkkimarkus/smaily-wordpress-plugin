@@ -26,7 +26,18 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1195 DONE — abandoned cart REWRITTEN onto the
+_Last updated: 2026-07-11 (**PRO-1258 DONE — `EndpointRegistry::expected_routes()`
+now lists the `/events` triple** (GET `/events`, GET `/events/detail`, POST
+`/events/retry`) — the PRO-1197 follow-up below. The route surface is confirmed
+against every `register_rest_route()` call in `includes/REST/`: 16
+method+path pairs total, matching `docs/API.md` §1 exactly (the legacy
+`smaily/*` namespace in `smaily-api.class.php` is out of this list's scope on
+purpose). `RestRouteRegistrationTest` now pins all 16 against the live
+`rest_get_server()`, and `EndpointRegistryTest` asserts every pair plus
+`assertCount(16)` so a route can't silently drop out again. Code-only test-coverage
+fix, no wire/behavior change. Gates: ci:strict exit=0 + integration suite green
+via the wrapper. Prior:
+**PRO-1195 DONE — abandoned cart REWRITTEN onto the
 namespaced pipeline; legacy pass RETIRED. Landed on main, UNRELEASED** (rides a
 later cut AFTER the 2026-07-14 MiuMjau window — no version bump, readme.txt
 untouched). Erkki-approved design: `CartHookHandler` (WC cart hooks; **guest
@@ -93,9 +104,9 @@ of duplicating them. `FAQ.md`/`TROUBLESHOOTING.md` stays **deliberately deferred
 until pilot support traffic supplies real symptom→cause→fix questions (recorded in
 INDEX.md; the PRO-1197 issue stays open for that part). docs/INDEX.md rows moved
 TODO→Written in the same commit. Gate: ci:strict as the docs-only sanity gate.
-Noticed, not fixed (follow-up): `EndpointRegistry::expected_routes()` does not list
+Noticed, not fixed at the time: `EndpointRegistry::expected_routes()` did not list
 the three `/events` routes the registry registers — the route-registration test
-under-covers them. Prior:
+under-covered them (FIXED as PRO-1258, see the entry above). Prior:
 **PRO-1256 DONE — shared `smly_rec_*` snapshot/restore
 guard + `--restore-only`** (dev tooling, follow-up to PRO-1240). The guard logic
 moved out of `bin/run-integration-tests.sh` into `bin/lib-smly-snapshot.sh` —
