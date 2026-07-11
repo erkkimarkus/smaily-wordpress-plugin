@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1250 DONE — contract-staleness CI guard**
+_Last updated: 2026-07-11 (**PRO-1194 DRAFT DELIVERED — merchant privacy-policy
+template (EN+ET) + fail-open GDPR window review, in `docs/DATA_MODEL_GDPR.md`**
+(docs-only; the issue stays OPEN for Erkki/legal sign-off — nothing published to
+any user-visible surface, merchant docs site untouched). Two new sections: (1) a
+clearly-marked DRAFT privacy-policy template block, EN + ET siblings, written
+from verified plugin behavior (profiling = purchase history + consented browse;
+customer/order payload fields; F3-49 visitor-token-only browse identity; F3-46
+consent-ungated attribution cookies `smaily_rec_id`/`smaily_rec_ctx` 30 d +
+`smaily_rec_uid` 365 d defaults; My Account opt-out via `ProfilingConsentAccount`;
+WP Privacy export/erase via `GdprHandler`; ≤24 h opt-out propagation from the
+`ProfilingConsent` daily-TTL cache), with a template↔code fact map and explicit
+placeholders — Smaily legal entity name, Smaily privacy-policy URL, engine-side
+retention period (`[CONFIRM WITH ENGINE TEAM]`), and the lawful-basis framing
+(legitimate interest + Art 21 opt-out per F3-31) all need Erkki/legal
+confirmation; (2) a fail-open GDPR window decision review (behavior restated
+from `ProfilingConsent.php`, risk analysis incl. the transient-eviction
+sharpening F3-31 didn't cover, 5 alternatives) — **recommendation: keep the
+F3-31 fail-open default but harden with serve-stale-on-error + durably persisted
+known opt-outs (options B+C, follow-up sub-PR)**; no code/behavior change in
+this pass. Gate: ci:strict as the docs-only sanity gate. Prior:
+**PRO-1250 DONE — contract-staleness CI guard**
 (Decision A on PRO-1247): new standalone workflow
 `.github/workflows/contract-staleness.yml` (push to main / PR / daily 05:17 UTC
 schedule — the schedule is the real guard — / dispatch) runs

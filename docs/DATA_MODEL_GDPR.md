@@ -172,3 +172,286 @@ Full deletion, asymmetric to export (export is conservative, erase is complete):
   back.
 - **WooCommerce** — owns commerce data; out of scope for this plugin's GDPR
   handlers.
+
+---
+
+## Merchant privacy-policy template (PRO-1194)
+
+> **DRAFT — pending Erkki/legal review (PRO-1194).** Nothing below is final
+> legal text. It is a TEMPLATE for merchants to adapt into their own store
+> privacy policy, and it is NOT legal advice — every merchant must have their
+> own legal counsel review the adapted text (including the lawful-basis choice
+> and, for a legitimate-interest basis, a documented balancing test / LIA).
+> The `[BRACKETED]` items are placeholders the merchant (or we) must fill.
+> Do not publish this to the merchant docs site or any user-visible surface
+> until Erkki/legal signs it off.
+
+**Roles, for the merchant's orientation (not part of the pasted text):** the
+store is the **data controller**; Smaily (the Smaily marketing platform + the
+Campaign Intelligence recommendation engine) acts as the store's **data
+processor**. The template below is written from the store's voice to the
+store's customers. Every factual claim in it is derived from what the plugin
+actually does (see the inventory above and DECISIONS F3-31/F3-46/F3-49/F3-50);
+if the merchant disables browse tracking or is not connected to Campaign
+Intelligence, the corresponding sentences must be removed.
+
+### EN template — "Personalised product recommendations (profiling)"
+
+```
+Personalised product recommendations (profiling)
+
+Who processes the data. [STORE NAME] ("we") is the data controller. To
+personalise our email marketing we use the Smaily Campaign Intelligence
+service provided by [CONFIRM: Smaily legal entity name] ("Smaily"), which
+processes this data on our behalf as our data processor, under a data
+processing agreement. Smaily's own privacy information is available at
+[LINK: Smaily privacy policy].
+
+What we do. We use your purchase history and — if you have accepted
+marketing cookies — your browsing activity in our online store to
+personalise the product recommendations shown in the emails we send you.
+This is "profiling" within the meaning of the GDPR: an automated analysis
+of your shopping behaviour to predict which products may interest you. It
+only affects which products we show you in our emails and recommendations —
+it has no legal or similarly significant effect on you, and no automated
+decisions within the meaning of Article 22 GDPR are made about you.
+
+What data is used.
+- Contact and account details: e-mail address, name, phone number, country
+  and preferred language.
+- Purchase history: products ordered, quantities, prices, order dates and
+  order statuses.
+- Browsing activity in our store (only if you have accepted marketing
+  cookies): pages and products viewed, cart events and searches, linked to
+  a pseudonymous visitor identifier.
+- Technical identifiers: a pseudonymous visitor token and session
+  identifier, and first-party cookies we set when you arrive in our store
+  through a recommendation link in one of our emails (cookies
+  `smaily_rec_id` and `smaily_rec_ctx`, kept for up to 30 days, and
+  `smaily_rec_uid`, kept for up to 365 days, by default). These are used to
+  measure which recommendations led to purchases.
+
+Legal basis. We process this data on the basis of our legitimate interest
+(Article 6(1)(f) GDPR) in offering relevant marketing to our customers,
+combined with your right to object at any time (Article 21 GDPR).
+Personalisation is on by default; you can switch it off at any time (see
+below). Browsing data is collected only with your cookie consent
+(marketing cookies). [MERCHANT LEGAL REVIEW: confirm the lawful basis for
+your store and document a legitimate-interest assessment.]
+
+How to opt out. Log in to your account and open My Account: under
+"Smaily Campaign Intelligence", untick "Use my data for personalised
+recommendations" and save. Opting out stops the use of your data for
+personalised recommendations — you will still receive our emails, just
+without personalisation. You can also opt out by contacting us at
+[CONTACT E-MAIL]. We act on an opt-out without undue delay; it may take up
+to 24 hours to take effect across all systems. Withdrawing your
+marketing-cookie consent (in the cookie settings) stops the collection of
+browsing data.
+
+Your rights. You have the right to access the personal data used for
+recommendations and receive a copy of it, to have it erased, to object to
+profiling (as described above), and to lodge a complaint with your data
+protection supervisory authority [FOR ESTONIAN STORES: Andmekaitse
+Inspektsioon]. To exercise access or erasure, contact us at
+[CONTACT E-MAIL].
+
+Retention. Recommendation data is kept while you remain our customer
+[CONFIRM WITH ENGINE TEAM: engine-side retention period for browse events,
+visitor tokens and computed recommendations]. If you ask us to erase your
+data, the recommendation data is deleted; we retain only a record showing
+that the deletion was carried out.
+```
+
+### ET template — "Personaalsed tootesoovitused (profileerimine)"
+
+```
+Personaalsed tootesoovitused (profileerimine)
+
+Kes andmeid töötleb. [POE NIMI] ("meie") on vastutav töötleja. E-posti
+turunduse personaliseerimiseks kasutame Smaily Campaign Intelligence'i
+teenust, mida osutab [KINNITADA: Smaily juriidilise isiku nimi] ("Smaily")
+ja mis töötleb neid andmeid meie nimel volitatud töötlejana,
+andmetöötluslepingu alusel. Smaily enda privaatsusteave on kättesaadav
+aadressil [LINK: Smaily privaatsuspoliitika].
+
+Mida me teeme. Kasutame sinu ostuajalugu ja — kui oled andnud nõusoleku
+turundusküpsisteks — sinu sirvimistegevust meie e-poes, et personaliseerida
+meie saadetavates e-kirjades kuvatavaid tootesoovitusi. See on
+profileerimine isikuandmete kaitse üldmääruse (GDPR) tähenduses: sinu
+ostukäitumise automaatne analüüs eesmärgiga ennustada, millised tooted
+võiksid sind huvitada. See mõjutab üksnes seda, milliseid tooteid sulle
+meie kirjades ja soovitustes näitame — sellel ei ole sinu jaoks õiguslikke
+ega muid samaväärselt olulisi tagajärgi ning sinu suhtes ei tehta
+automatiseeritud otsuseid GDPR artikli 22 tähenduses.
+
+Milliseid andmeid kasutatakse.
+- Kontakt- ja kontoandmed: e-posti aadress, nimi, telefoninumber, riik ja
+  eelistatud keel.
+- Ostuajalugu: tellitud tooted, kogused, hinnad, tellimuste kuupäevad ja
+  staatused.
+- Sirvimistegevus meie poes (ainult turundusküpsiste nõusolekul): vaadatud
+  lehed ja tooted, ostukorvisündmused ja otsingud, seotuna pseudonüümse
+  külastajatunnusega.
+- Tehnilised identifikaatorid: pseudonüümne külastajatunnus (visitor
+  token) ja seansitunnus ning esimese osapoole küpsised, mille paigaldame,
+  kui jõuad meie poodi meie e-kirjas olnud soovituslingi kaudu (küpsised
+  `smaily_rec_id` ja `smaily_rec_ctx`, säilivad vaikimisi kuni 30 päeva,
+  ning `smaily_rec_uid`, säilib vaikimisi kuni 365 päeva). Nende abil
+  mõõdame, millised soovitused viisid ostuni.
+
+Õiguslik alus. Töötleme neid andmeid oma õigustatud huvi alusel (GDPR
+art 6 lg 1 p f) pakkuda oma klientidele asjakohast turundust, koos sinu
+õigusega esitada igal ajal vastuväide (GDPR art 21). Personaliseerimine on
+vaikimisi sisse lülitatud; saad selle igal ajal välja lülitada (vt allpool).
+Sirvimisandmeid kogume ainult sinu küpsisenõusolekul (turundusküpsised).
+[POE ÕIGUSNÕUSTAJA: kinnita oma poe õiguslik alus ja dokumenteeri
+õigustatud huvi kaalumisotsus.]
+
+Kuidas loobuda. Logi sisse ja ava Minu konto: eemalda jaotises "Smaily
+Campaign Intelligence" linnuke valikult "Kasuta minu andmeid personaalsete
+soovituste jaoks" ja salvesta. Loobumine peatab sinu andmete kasutamise
+personaalsete soovituste jaoks — e-kirju saad edasi, lihtsalt ilma
+personaliseerimiseta. Loobuda saad ka, kirjutades meile aadressil
+[KONTAKT-E-POST]. Rakendame loobumise põhjendamatu viivituseta; kõigis
+süsteemides jõustumine võib võtta kuni 24 tundi. Turundusküpsiste
+nõusoleku tagasivõtmine (küpsiste seadetes) peatab sirvimisandmete
+kogumise.
+
+Sinu õigused. Sul on õigus tutvuda soovituste jaoks kasutatavate
+isikuandmetega ja saada neist koopia, nõuda nende kustutamist, esitada
+vastuväide profileerimisele (nagu eespool kirjeldatud) ning esitada kaebus
+andmekaitse järelevalveasutusele [EESTI POODIDELE: Andmekaitse
+Inspektsioon]. Andmetega tutvumiseks või kustutamiseks kirjuta meile
+aadressil [KONTAKT-E-POST].
+
+Säilitamine. Soovitusandmeid säilitame seni, kuni oled meie klient
+[KINNITADA MOOTORITIIMIGA: mootoripoolne säilitustähtaeg
+sirvimissündmustele, külastajatunnustele ja arvutatud soovitustele]. Kui
+palud oma andmed kustutada, kustutatakse soovitusandmed; alles jääb üksnes
+kirje, mis tõendab, et kustutamine on tehtud.
+```
+
+### Template ↔ code fact map (why each claim is true)
+
+| Template claim | Source in this repo |
+|---|---|
+| Profiling = purchase history + (consented) browse | Engine ingest: orders/customers always when connected; browse only behind the WP Consent API `marketing` gate (`beacon-core.ts detectConsent`, F3-50) AND the profiling gate (`BeaconEndpoint` second gate, F3-31 (a).1) |
+| Contact/account fields listed | `CustomerPayloadBuilder`: email, first/last name, phone, country, language, first_seen_at |
+| Purchase-history fields listed | `OrderPayloadBuilder`: items (sku/qty/prices), amounts, status, ordered_at, currency |
+| Pseudonymous visitor token / session id; no rec_id/email on browse | F3-49 (`enrich()` sends `session_id` + `smaily_visitor_token` only) |
+| Attribution cookies `smaily_rec_id`/`smaily_rec_ctx` 30 d, `smaily_rec_uid` 365 d (defaults; engine config can override) | `LandingCapture` (`rec_id_ttl_days` 30, `context_ttl_days` 30, `cookie_ttl_days` 365); set consent-ungated per F3-46 (Erkki) — hence they MUST be disclosed in the policy |
+| Opt-out via My Account, still receives emails | `ProfilingConsentAccount` (My Account dashboard section "Smaily Campaign Intelligence", checkbox "Use my data for personalised recommendations" / et: "Kasuta minu andmeid personaalsete soovituste jaoks") |
+| "Up to 24 hours to take effect across all systems" | `ProfilingConsent` daily-TTL cache: a WP-side opt-out is immediate (cache + engine §10 fire at once); a Smaily-side opt-out propagates at the next cache refresh, ≤ 24 h (see the fail-open review below) |
+| Access / erasure | `GdprHandler` — WP Privacy API exporter (Art 15) + eraser (Art 17); erase = engine §9 CASCADE + plugin `_smaily_*` meta removal |
+| "We retain only a record showing that the deletion was carried out" | Engine `gdpr_audit_log` row retained (this doc, inventory) |
+| No Art 22 automated decisions | Recommendations only select email/on-site content; no legal or similarly significant effect (this doc; F3-31 model) |
+| Retention placeholder | Engine-side retention duration is NOT knowable from this repo → `[CONFIRM WITH ENGINE TEAM]` |
+
+Open placeholders needing confirmation before sign-off:
+1. `[CONFIRM: Smaily legal entity name]` — the exact controller-facing legal
+   entity (do not guess).
+2. `[LINK: Smaily privacy policy]` — the real URL (do not fabricate).
+3. `[CONFIRM WITH ENGINE TEAM: retention period]` — engine-side retention for
+   browse events / visitor tokens / recommendations.
+4. Lawful basis: the template drafts **legitimate interest + Art 21 opt-out**
+   (matches the F3-31 opt-out/default-on model and the AKI reading recorded
+   there: transparent action + working opt-out). Erkki/legal must confirm this
+   framing — if AKI tightens to explicit opt-in, `ProfilingConsent::is_allowed()`
+   is built invertible (F3-31 TODO) and this template must be rewritten.
+
+---
+
+## Fail-open GDPR window — decision review (PRO-1194 — DRAFT, no behavior change)
+
+**Status: review only.** This section restates the shipped behavior, analyses
+the risk, lists alternatives, and records a recommendation for Erkki/legal.
+No code or behavior was changed in this pass.
+
+### Current behavior (code facts, `includes/Privacy/ProfilingConsent.php`)
+
+- `may_profile( $email )` reads a per-email transient
+  (`smly_profiling_<md5(email)>`, TTL **1 day**). Cache hit → cached answer.
+- Cache miss → `refresh()`: read the contact back from Smaily and apply the
+  pure rule (`is_allowed()`: don't-profile only on `is_unsubscribed === '1'`
+  or `smaily_rec_profiling === '0'`; missing/unknown → profile).
+- **Fail-open:** a read-back **error** (Smaily API failure) — or an
+  unconfigured Smaily client — resolves to `allowed = true` and is **cached
+  for the full TTL**. This is deliberate (DECISIONS F3-31): consistent with
+  the opt-out/default-on model; an undeterminable state defaults to profiling
+  rather than a silent block.
+- A **WP-side** opt-out (`ProfilingConsentAccount` → `opt_out()`) is immediate:
+  cache set to `'0'` and the engine §10 `customer_opt_out` fired in the same
+  call. A **Smaily-side** opt-out is only seen at the next cache refresh
+  (≤ 24 h), which then also fires the engine opt-out.
+- Enforcement consumers: the `BeaconEndpoint` second gate (drops browse events
+  whose `customer_email` resolves to opted-out, pre-forward),
+  `IdentityHookHandler` (skips `identity.merge` for opted-out), and — since
+  2026-07-03 — **engine-side server enforcement** on the visitor-token path
+  (F3-49 pt 3: an opted-out contact's browse event is never bound to a
+  customer, engine-side, regardless of what the plugin forwards).
+
+### The window, precisely
+
+Two distinct exposures, often conflated:
+
+1. **The fail-open window proper (read error).** Someone is profiled without
+   a valid basis only when ALL of: (a) their cache entry is absent/expired,
+   (b) the Smaily read-back errors, and (c) they had actually opted out —
+   *and* (d) the engine does not already hold their opt-out state (i.e. the
+   opt-out was Smaily-side-only and had never yet propagated; a WP-side
+   opt-out already fired §10, so the engine keeps excluding them even if the
+   plugin briefly fails open). The wrong `'1'` is then cached, so a single
+   failed read extends the exposure to up to the TTL (≤ 24 h) past the outage.
+2. **The propagation window (no error at all).** A Smaily-side opt-out takes
+   effect plugin-side at the next refresh — up to 24 h. This is not a failure
+   mode; it is the designed cache freshness.
+
+One sharpening not in F3-31: **transients are not guaranteed storage** (an
+external object cache can evict them at any time), so a cached `'0'` can
+disappear before its TTL — meaning a known opt-out's continued enforcement
+does ultimately depend on the read-back succeeding at the next miss. That
+makes the fail-open slightly wider than the F3-31 wording implies, and it is
+the strongest argument for hardening option C below.
+
+### Risk analysis
+
+- **Worst realistic case:** contact opts out on the Smaily side; before the
+  daily refresh sees it, Smaily's API has an outage; their browse events keep
+  being forwarded and bound, and personalised sends continue, for the outage
+  duration + up to 24 h of wrong-cache. Data involved is behavioral
+  (browse/purchase signals), not special-category; no Art 22 effects.
+- **Legal shape:** Art 21(3) says once an objection is made the data "shall
+  no longer be processed" for that purpose. Regulators read this as "without
+  undue delay" — a short, bounded, disclosed technical propagation delay is
+  defensible; an unbounded fail-open that can override a *known* objection is
+  much harder to defend. Today's design keeps known WP-side objections safe
+  (immediate cache + engine §10) but a Smaily-side-only objection combined
+  with a read failure can be overridden — narrow, transient, but real
+  (F3-31 already flags exactly this for Erkki's review).
+- **Mitigating layers already shipped:** engine-side opt-out enforcement on
+  every binding path (server-side, since 2026-07-03), the WP-side immediate
+  path, and the 24 h TTL bound (the wrong state can never persist past a day
+  after Smaily recovers).
+
+### Alternatives
+
+| Option | What it is | Assessment |
+|---|---|---|
+| A. Fail-closed on read error | Read error → don't profile | Any Smaily outage silently stops profiling for EVERY contact — the exact "silent 0 events, indistinguishable from feature-off" failure class this project has been burned by (F3-50, LESSONS). Disproportionate to the narrow risk; contradicts the F3-31 default-on decision. Not recommended. |
+| B. Serve-stale-on-error | On read error, reuse the last known (even expired) cached value; fail open only for never-seen contacts | Removes the worst case (a KNOWN opt-out re-profiled during an outage) at trivial cost. Small, contained change to `refresh()` + cache bookkeeping. Recommended hardening. |
+| C. Persist opt-outs durably | Mirror a known opt-out into non-expiring storage (user meta / option), checked before fail-open; cleared on opt-in | Makes a known objection immune to transient eviction AND outages. Complements B (covers cache-evicted entries B alone cannot). Recommended hardening. |
+| D. Shorter cache TTL | e.g. 1 h instead of 24 h | Shrinks only the propagation window, at ~24× the Smaily read volume; 24 h is already within "undue delay" tolerance for marketing profiling (F3-31: "a week would be a problem", a day is not). Not recommended alone. |
+| E. Switch to explicit opt-in | Flip `is_allowed()` per the F3-31 TODO | The fallback if AKI/legal tightens. A model change, not a window fix — out of scope here; kept invertible by design. |
+
+### Recommendation (draft, for Erkki/legal sign-off)
+
+**Keep the fail-open default (F3-31 stands), but harden it with B + C** so
+that an opt-out the plugin has *ever seen* can never be overridden by a read
+failure or transient eviction — the residual fail-open then covers only
+contacts whose objection no plugin-side system has ever observed, and the
+engine-side enforcement layer covers most of that remainder. Additionally,
+the privacy-policy template above discloses the ≤ 24 h propagation ("may take
+up to 24 hours to take effect across all systems"), which keeps the designed
+propagation window transparent. B + C are follow-up code work (own sub-PR,
+normal plan/checkpoint rhythm), NOT part of this docs pass.
