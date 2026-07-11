@@ -26,7 +26,22 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1256 DONE — shared `smly_rec_*` snapshot/restore
+_Last updated: 2026-07-11 (**PRO-1197 — developer docs written: `docs/ARCHITECTURE.md`,
+`docs/DEVELOPER.md`, `docs/API.md`** (docs-only). The three long-TODO developer-facing
+docs now exist, written from the actual repo (EndpointRegistry route surface incl. the
+`/events` triple + the public `/relay` defense layers; all 11 `smaily_connect_*` filters
+enumerated from code; the `window.smailyConnectBeacon` boot shape from
+`StorefrontBeacon::beacon_config()`/`page_context()`; the AS job table from
+`Bootstrap::register_action_scheduler_jobs()`; custom tables from `migrations/`).
+They LINK to the deep docs (contract, DATA_MODEL_GDPR, DECISIONS, CLAUDE.md) instead
+of duplicating them. `FAQ.md`/`TROUBLESHOOTING.md` stays **deliberately deferred**
+until pilot support traffic supplies real symptom→cause→fix questions (recorded in
+INDEX.md; the PRO-1197 issue stays open for that part). docs/INDEX.md rows moved
+TODO→Written in the same commit. Gate: ci:strict as the docs-only sanity gate.
+Noticed, not fixed (follow-up): `EndpointRegistry::expected_routes()` does not list
+the three `/events` routes the registry registers — the route-registration test
+under-covers them. Prior:
+**PRO-1256 DONE — shared `smly_rec_*` snapshot/restore
 guard + `--restore-only`** (dev tooling, follow-up to PRO-1240). The guard logic
 moved out of `bin/run-integration-tests.sh` into `bin/lib-smly-snapshot.sh` —
 sourced by the wrapper (NO behavior change: EXIT-trap restore,
