@@ -1,17 +1,18 @@
-# Smaily Recommendation Engine — API Contract v1.3
+# Smaily Recommendation Engine — API Contract v1.4
 
-**Version**: 1.3.0
+**Version**: 1.4.0
 **Published**: 2026-05-19
-**Last updated**: 2026-07-10 (v1.3.0 — new endpoint `POST /api/v1/ingest/catalog/remove` (product-level soft removal) + documented `tags.product_id`; MINOR bump per the versioning rule: additive, backward-compatible — PRO-1229 / PRO-1228)
+**Last updated**: 2026-07-10 (v1.4.0 — order amount semantics normatively **gross/tax-inclusive** (§5) + `plugin_magento` source constant (§6) + browse profiling opt-out enforcement documented (§6); MINOR bump per the versioning rule: wire shapes unchanged — PRO-1202)
 **Status**: Stable — basis for plugin implementation
 
 ---
 
 ## Document location and synchronization
 
-This contract lives in three repositories and must stay byte-for-byte synchronized:
+This contract lives in four repositories and must stay byte-for-byte synchronized:
 - `connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — WooCommerce plugin)
 - `shopify-connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — Shopify app)
+- `magento-connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — Magento extension)
 - `re/docs/RECENGINE_API_CONTRACT.md` (rec engine)
 
 When proposing a change (either side):
@@ -21,7 +22,7 @@ When proposing a change (either side):
 
 When you spot a drift (one side has a field, the other doesn't; an endpoint moved; a response shape changed) — fix both copies immediately, don't defer. Past drifts (`/api` path prefix, `event_id` body coverage) caused integration bugs that took days to trace.
 
-Why not git submodule or a separate contracts repo right now: over-engineering for two consumers. Revisit when a third consumer arrives (Shopify app, Milestone 3 on the plugin roadmap).
+Why not git submodule or a separate contracts repo right now: manual byte-sync has held across four consumers so far. Revisit if drift incidents recur at this consumer count.
 
 ---
 
@@ -880,7 +881,7 @@ Batch upload of orders + line items. **Order natural key is `(tenant_id, externa
 | `external_order_id` | string | YES | Plugin/platform order ID (UNIQUE per tenant — natural key) |
 | `customer_email` | string | YES | Customer reference is by email (not external_id). Engine lowercases on ingest. |
 | `ordered_at` | ISO 8601 | YES | Order placement timestamp |
-| `total_amount` | number | YES | Total after discounts |
+| `total_amount` | number | YES | Grand total charged — **gross/tax-inclusive**, incl. shipping, after discounts (see Amount semantics) |
 | `discount_amount` | number | NO | Total discount (default 0) |
 | `currency` | string (ISO 4217) | NO | Default `EUR`. Stored **as sent** — not strictly ISO-validated. |
 | `status` | enum | YES | `completed` / `processing` / `cancelled` / `refunded`. **Required** — a missing or out-of-enum `status` is a per-item `errors[]` entry. |
@@ -891,9 +892,17 @@ Batch upload of orders + line items. **Order natural key is `(tenant_id, externa
 | `items[]` | array | YES | Order line items |
 | `items[].sku` | string | YES | |
 | `items[].qty` | integer | YES | Quantity |
-| `items[].unit_price` | number | YES | Per-unit price |
-| `items[].line_total` | number | YES | Line total (qty × unit_price − discount) |
+| `items[].unit_price` | number | YES | Per-unit price, **gross** (see Amount semantics) |
+| `items[].line_total` | number | YES | Line total, **gross**, after line discounts (see Amount semantics) |
 | `items[].discount_amount` | number | NO | Line-specific discount |
+
+**Amount semantics (tax basis)** (v1.4.0):
+- All money fields on this endpoint are **gross amounts — tax-inclusive, in the order's `currency`**: what the customer actually paid.
+- `total_amount` = the order's grand total as charged (products + shipping + tax − discounts). This was already every sender's de-facto behavior.
+- `items[].line_total` = the line's charged amount **including its share of tax**, after line-level discounts. `items[].unit_price` = the same gross basis ÷ qty. `discount_amount` fields are gross.
+- Platform notes: **Shopify** — `taxes_included=true` shops send line prices as-is (already gross); `taxes_included=false` shops add the line's `tax_lines` sum. **WooCommerce** — `$item->get_total() + $item->get_total_tax()` (NOT bare `get_total()`, which is net). **Magento** — `row_total_incl_tax` (current Magento payloads already conform).
+- Sender invariant: `Σ items[].line_total + shipping ≈ total_amount` (± rounding). The engine may monitor drift as a data-quality signal; it does not reject on it.
+- The engine stores amounts as sent and never recomputes tax. Rows ingested on the wrong basis are corrected by re-syncing the affected orders (re-ingest fully replaces line items — see [Idempotency](#idempotency)).
 
 **Items are fully replaced on update.** Re-ingesting an existing `external_order_id` UPSERTs the order and **fully replaces its line items** (the previous `order_items` are deleted and the new set inserted) — the order is the unit, not the line item. Send the complete item set on every order.
 
@@ -989,7 +998,7 @@ Browse events batch. The highest-volume endpoint.
 | `search_query` | string | NO | Required for `search` |
 | `dwell_seconds` | integer | NO | Time on page (for `product_view`) |
 | `event_ts` | ISO 8601 | YES | Event occurrence timestamp |
-| `source` | string | NO | Defaults to `web` if omitted. Constant: `web`, `plugin_woo`, `plugin_shopify`, `make`, `custom` |
+| `source` | string | NO | Defaults to `web` if omitted. Constant: `web`, `plugin_woo`, `plugin_shopify`, `plugin_magento`, `make`, `custom`. The engine stores `source` as an opaque label (not enum-validated); senders must use their listed constant so per-source analytics stay clean. |
 | `customer_email` | string | NO | Identity hint (if user is logged in) |
 | `smaily_visitor_token` | string | NO | Identity hint (from cookie) |
 | `smaily_rec_id` | string | NO | Attribution (from cookie) |
@@ -1005,6 +1014,10 @@ For each event, the engine resolves `customer_id` as follows:
 4. Otherwise → INSERT browse_event with `customer_id = NULL` (anonymous)
 
 **Retroactive binding**: when `customer_id` is resolved (steps 1–3), the engine UPDATEs all earlier `browse_events` with the same `session_id` where `customer_id IS NULL`. The customer gets full session history even if their first click was anonymous.
+
+**Profiling opt-out (Art 21) — engine-side enforcement at ingest:** if the resolved customer has opted out ([§10](#10-post-apiv1customeremailopt-out)), the engine does **not** bind the event on any resolution path (visitor token, email, external_id); the event is stored **anonymous** (`customer_id = NULL`) and excluded from retroactive binding. Enforcement is engine-side because the visitor token is engine-issued — a sender cannot know which customer it maps to, so the token path cannot be filtered client-side.
+
+**Sender-side anonymous mode (recommended, complementary):** when the shopper has not granted profiling consent, the beacon should omit the identity hints (`customer_email`, `external_id`, `smaily_visitor_token`) and still send the event with `session_id` + `event_id` (data minimization; anonymous events still feed popularity/co-view signals). Sender omission is a courtesy layer; the engine-side gate is the guarantee.
 
 **Response 200 OK**:
 ```json
@@ -1789,6 +1802,13 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **Setup-exchange `endpoints` map gains `ingest_catalog_remove`** (§1) — plugins discover the new endpoint via the map; older installs whose exchange-time map predates it use the absolute path.
 - **Merchant-SKU placement clarified** (§3 identity): if ever sent, the merchant SKU goes in `tags.merchant_sku` — never in `external_id` (which carries the platform variant id and drives collision detection). Not consumed by the engine today.
 - Plugin side: subscribe the platform product-delete webhook and forward the parent product id to §3b — no local SKU map needed. An older engine returns 404 on this path; treat its absence as "not yet available."
+
+**v1.4.0** (2026-07-10) — **Order amount semantics (gross/tax-inclusive) + `plugin_magento` source constant + browse profiling opt-out documented**. MINOR bump per the [Versioning](#versioning) rule (wire shapes unchanged; normative tightening of amount semantics + additive source constant + documenting existing opt-out behavior). PRO-1202:
+- **§5 "Amount semantics (tax basis)" block added** — all money fields on the orders endpoint are normatively **gross (tax-inclusive)**, in the order's `currency`: what the customer actually paid. `total_amount` = grand total as charged (products + shipping + tax − discounts); `line_total` / `unit_price` / `discount_amount` on the same gross basis. Per-platform sender rules documented (Shopify `taxes_included` handling, Woo `get_total() + get_total_tax()`, Magento `row_total_incl_tax`). Sender invariant `Σ items[].line_total + shipping ≈ total_amount` (± rounding; engine may monitor drift, does not reject). The engine stores amounts as sent and never recomputes tax; wrong-basis rows are corrected by re-syncing the affected orders (re-ingest fully replaces line items). `total_amount` / `unit_price` / `line_total` field notes updated accordingly.
+- ⚠️ **Woo sender remediation + one-time MiuMjau order re-sync required for the gross basis (tracked in Woo Connect PRO-1241)** — bare `get_total()` is net, i.e. the wrong basis.
+- **§6 `source` constants gain `plugin_magento`** (after `plugin_shopify`); documented that the engine stores `source` as an opaque label (not enum-validated) — senders must use their listed constant so per-source analytics stay clean.
+- **§6 profiling opt-out (Art 21) enforcement documented** (existing engine behavior, now normative): an opted-out (§10) customer is never bound at browse ingest on any resolution path (visitor token, email, external_id) — the event is stored anonymous and excluded from retroactive binding. Enforcement is engine-side because the visitor token is engine-issued. Sender-side anonymous mode (omit identity hints when profiling consent is absent) documented as a recommended, complementary data-minimization layer.
+- **Document sync list gains the Magento Connect repo** (`magento-connect/docs/RECENGINE_API_CONTRACT.md`) as the 4th byte-identical consumer.
 
 ---
 
