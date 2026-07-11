@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1240 DONE — automatic `smly_rec_*` snapshot/restore
+_Last updated: 2026-07-11 (**PRO-1241 DONE — all order money fields GROSS (tax-inclusive)
+per contract v1.4.0 §5; landed on main, UNRELEASED.** MiuMjau prod verification (PRO-1202)
+showed line items serialized ex-tax (bare `get_total()`) under a gross `total_amount` —
+per-SKU revenue understated ~24% (median `unit_price/catalog.price` ≈ 1/1.24, Estonian
+VAT). Contract synced byte-identical to **v1.4.0** (engine `2dec424`, md5 `b285ded8…`,
+commit `434ffee`): §5 "Amount semantics" (all order money gross), §6 `plugin_magento`
+source constant (no code change for us) + profiling opt-out enforcement documented (our
+F3-49 sender-side omission already conforms). Code (`150e04e`): `OrderPayloadBuilder` —
+the single money chokepoint (live hook, flusher retries, order backfill all build through
+it at send time) — now wires `line_total = get_total() + get_total_tax()`, `unit_price =
+gross line ÷ qty` (post-discount basis per §5, no longer `subtotal/qty`), line
+`discount_amount` = the gross subtotal-vs-total delta, order `discount_amount =
+get_total_discount(false)`; `total_amount` unchanged (already gross incl. shipping). No
+wire-SHAPE change, values change basis. §5 sender invariant `Σ line_total + shipping ≈
+total_amount` pinned in unit tests (taxed multi-line + discounted, zero-tax, rounding
+edge, gross-discount arg pin) and integration (REAL WC tax engine: 24% rate + fixed-cart
+coupon + taxed shipping; zero-tax case). Mock deliberately does NOT reject on tax basis
+(live doesn't either — §5 invariant is monitoring, not a 4xx; documented at the route).
+Docs: DECISIONS PRO-1241 (supersedes F3-22's amount serialization, banner added),
+CLAUDE.md gross-money note. Gates: **ci:strict exit=0**; **integration OK (146 tests,
+721 assertions, +2)** via the PRO-1240 auto-snapshot path (restore verified
+`tenant_name='Smaily Connect test'`). **Live-walk `bin/walk-pro1241-gross-orders.cjs`
+LIVE OK 9/9** against the sandbox: gross line_total/unit_price/discount on the wire,
+invariant exact (55.80 + 6.20 = 62.00), engine accepted (processed=1, zero errors[]),
+F3-44 stored exchange confirms; residue = ONE sandbox order row (external_order_id 2852)
++ auto-created customer `pro1241-gross@example.com`; store-side fully cleaned (order via
+`wc_get_order()->delete(true)`, tax rate/options restored). **Deployment dependency:**
+the one-time historical MiuMjau order re-sync (net→gross correction) rides the
+engine-side PRO-1233 purge + re-backfill window (~2026-07-14), engine-coordinated —
+release this (human-gated, separate step) before the MiuMjau flip so live+backfill
+orders go gross. Prior: **PRO-1240 DONE — automatic `smly_rec_*` snapshot/restore
 around integration runs.** `bin/run-integration-tests.sh` (= `composer run
 test:integration`) now snapshots the DEV site's `smly_rec_*` options to
 `~/.local/state/smaily-connect/smly_rec_snapshot.json` (mode 600, outside the repo,
