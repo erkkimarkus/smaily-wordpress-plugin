@@ -81,13 +81,28 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 'EUR', ( new OrderPayloadBuilder() )->build( $order, 'u' )['currency'] );
 	}
 
-	public function test_items_carry_unit_price_and_per_line_discount(): void {
-		// subtotal 50.00 over qty 2 → unit_price 25.00; total 44.51 after a
-		// 5.49 line discount.
+	public function test_items_carry_gross_unit_price_line_total_and_per_line_discount(): void {
+		// GROSS basis (v1.4.0 §5, PRO-1241): 24% VAT. Net subtotal 50.00
+		// (+12.00 tax) discounted to net total 45.00 (+10.80 tax) →
+		// line_total = 45.00 + 10.80 = 55.80 (get_total + get_total_tax, NOT
+		// bare get_total); unit_price = 55.80 / 2 = 27.90 (gross ÷ qty);
+		// discount = (50.00 + 12.00) − 55.80 = 6.20 (incl. the discounted tax).
 		$order = $this->mock_order(
 			array(
 				'status' => 'completed',
-				'items'  => array( $this->mock_item( 'POC-DENT', 2, '50.00', '44.51', array( 'product_id' => 500 ) ) ),
+				'items'  => array(
+					$this->mock_item(
+						'POC-DENT',
+						2,
+						'50.00',
+						'45.00',
+						array(
+							'product_id'   => 500,
+							'subtotal_tax' => '12.00',
+							'total_tax'    => '10.80',
+						)
+					),
+				),
 			)
 		);
 
@@ -95,9 +110,75 @@ final class OrderPayloadBuilderTest extends TestCase {
 
 		self::assertSame( 'woo-500', $item['sku'] );
 		self::assertSame( 2, $item['qty'] );
-		self::assertSame( 25.0, $item['unit_price'] );
-		self::assertSame( 44.51, $item['line_total'] );
-		self::assertSame( 5.49, $item['discount_amount'] );
+		self::assertSame( 27.9, $item['unit_price'] );
+		self::assertSame( 55.8, $item['line_total'] );
+		self::assertSame( 6.2, $item['discount_amount'] );
+	}
+
+	public function test_zero_tax_line_amounts_equal_the_net_amounts(): void {
+		// Tax-exempt / taxes-off store: gross == net, so the payload is
+		// unchanged from the pre-1.4.0 basis. unit_price is now the
+		// POST-discount gross ÷ qty (10.00 → 8.00 over qty 2 → 4.00).
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'NOTAX', 2, '10.00', '8.00', array( 'product_id' => 501 ) ) ),
+			)
+		);
+
+		$item = ( new OrderPayloadBuilder() )->build( $order, 'u' )['items'][0];
+
+		self::assertSame( 4.0, $item['unit_price'] );
+		self::assertSame( 8.0, $item['line_total'] );
+		self::assertSame( 2.0, $item['discount_amount'] );
+	}
+
+	public function test_gross_sender_invariant_sum_of_lines_plus_shipping_is_total_amount(): void {
+		// Contract §5 sender invariant: Σ items[].line_total + shipping ≈
+		// total_amount. Taxed (24%) multi-line order, one line discounted,
+		// gross shipping 5.00: line1 gross 12.40, line2 gross 18.60
+		// (net 20.00→15.00 + tax 4.80→3.60), total 12.40+18.60+5.00 = 36.00.
+		$order = $this->mock_order(
+			array(
+				'status'               => 'completed',
+				'total'                => '36.00',
+				'total_discount_gross' => '6.20',
+				'items'                => array(
+					$this->mock_item( 'L1', 1, '10.00', '10.00', array( 'product_id' => 1, 'subtotal_tax' => '2.40', 'total_tax' => '2.40' ) ),
+					$this->mock_item( 'L2', 2, '20.00', '15.00', array( 'product_id' => 2, 'subtotal_tax' => '4.80', 'total_tax' => '3.60' ) ),
+				),
+			)
+		);
+
+		$payload  = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+		$shipping = 5.00; // gross shipping — inside total_amount, not a wire field.
+
+		$line_sum = array_sum( array_column( $payload['items'], 'line_total' ) );
+		self::assertEqualsWithDelta( 31.0, $line_sum, 0.0001 );
+		self::assertEqualsWithDelta(
+			$payload['total_amount'],
+			$line_sum + $shipping,
+			0.005,
+			'Sender invariant (§5): Σ line_total + shipping ≈ total_amount.'
+		);
+		self::assertSame( 6.2, $payload['discount_amount'], 'Order discount is gross (incl. its tax share).' );
+	}
+
+	public function test_gross_rounding_uneven_unit_price_rounds_to_4_decimals(): void {
+		// Gross 12.40 over qty 3 → 4.133333… → 4.1333; line_total stays the
+		// exact charged gross (per-line rounding must not corrupt the line sum).
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'R1', 3, '10.00', '10.00', array( 'product_id' => 7, 'subtotal_tax' => '2.40', 'total_tax' => '2.40' ) ) ),
+			)
+		);
+
+		$item = ( new OrderPayloadBuilder() )->build( $order, 'u' )['items'][0];
+
+		self::assertSame( 4.1333, $item['unit_price'] );
+		self::assertSame( 12.4, $item['line_total'] );
+		self::assertArrayNotHasKey( 'discount_amount', $item );
 	}
 
 	public function test_line_discount_omitted_when_zero(): void {
@@ -113,13 +194,23 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertArrayNotHasKey( 'discount_amount', $item );
 	}
 
-	public function test_order_discount_present_only_when_nonzero(): void {
-		$with    = $this->mock_order( array( 'status' => 'completed', 'total_discount' => '5.00' ) );
+	public function test_order_discount_present_only_when_nonzero_and_is_gross(): void {
+		// The mock returns the NET discount for get_total_discount() /
+		// get_total_discount(true) and the GROSS one only for the explicit
+		// `false` arg — so this pins that the builder asks for the
+		// tax-inclusive discount (v1.4.0 §5), not the ex-tax default.
+		$with    = $this->mock_order(
+			array(
+				'status'               => 'completed',
+				'total_discount'       => '5.00',
+				'total_discount_gross' => '6.20',
+			)
+		);
 		$without = $this->mock_order( array( 'status' => 'completed', 'total_discount' => '0' ) );
 
 		$builder = new OrderPayloadBuilder();
 
-		self::assertSame( 5.0, $builder->build( $with, 'u' )['discount_amount'] );
+		self::assertSame( 6.2, $builder->build( $with, 'u' )['discount_amount'], 'Gross (incl. tax), not the ex-tax default.' );
 		self::assertArrayNotHasKey( 'discount_amount', $builder->build( $without, 'u' ) );
 	}
 
@@ -246,7 +337,15 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$order->method( 'get_status' )->willReturn( (string) ( $p['status'] ?? 'completed' ) );
 		$order->method( 'get_currency' )->willReturn( (string) ( $p['currency'] ?? 'EUR' ) );
 		$order->method( 'get_total' )->willReturn( (string) ( $p['total'] ?? '0' ) );
-		$order->method( 'get_total_discount' )->willReturn( (string) ( $p['total_discount'] ?? '0' ) );
+		// Arg-sensitive: the ex-tax default vs the gross (`false`) discount —
+		// lets tests pin that the builder requests the GROSS one (v1.4.0 §5).
+		$net_discount   = (string) ( $p['total_discount'] ?? '0' );
+		$gross_discount = (string) ( $p['total_discount_gross'] ?? $net_discount );
+		$order->method( 'get_total_discount' )->willReturnCallback(
+			static function ( $ex_taxes = true ) use ( $net_discount, $gross_discount ) {
+				return $ex_taxes ? $net_discount : $gross_discount;
+			}
+		);
 		$order->method( 'get_items' )->willReturn( $p['items'] ?? array() );
 
 		if ( isset( $p['date'] ) ) {
@@ -296,6 +395,9 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$item->method( 'get_quantity' )->willReturn( $qty );
 		$item->method( 'get_subtotal' )->willReturn( $subtotal );
 		$item->method( 'get_total' )->willReturn( $total );
+		// Tax shares (v1.4.0 §5 gross basis) — default 0 = a tax-exempt line.
+		$item->method( 'get_subtotal_tax' )->willReturn( (string) ( $opts['subtotal_tax'] ?? '0' ) );
+		$item->method( 'get_total_tax' )->willReturn( (string) ( $opts['total_tax'] ?? '0' ) );
 
 		return $item;
 	}
@@ -316,6 +418,8 @@ if ( ! class_exists( \WC_Order_Item_Product::class ) ) {
 			public function get_quantity( $context = 'view' ) { return 0; }
 			public function get_subtotal( $context = 'view' ) { return '0'; }
 			public function get_total( $context = 'view' ) { return '0'; }
+			public function get_subtotal_tax( $context = 'view' ) { return '0'; }
+			public function get_total_tax( $context = 'view' ) { return '0'; }
 		}
 PHP
 	);

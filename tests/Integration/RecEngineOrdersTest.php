@@ -175,6 +175,115 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertStringStartsWith( 'woo-oi-', (string) $payloads[0]['items'][0]['sku'], 'A zeroed-id deleted line keys on the order-item id.' );
 	}
 
+	public function test_taxed_discounted_order_wires_gross_amounts_and_the_sender_invariant_holds(): void {
+		// PRO-1241 / contract v1.4.0 §5 "Amount semantics": ALL money fields
+		// are GROSS (tax-inclusive). Real WC tax engine (24% VAT, prices
+		// entered ex-tax), two product lines, a fixed-cart coupon and taxed
+		// shipping — the wire must carry line_total = get_total() +
+		// get_total_tax() (bare get_total() is the pre-1.4.0 net bug, the
+		// pilot's ~24% per-SKU revenue understatement) and satisfy
+		// Σ items[].line_total + shipping ≈ total_amount.
+		$this->enable_24_percent_vat();
+
+		$product_a = $this->make_product( 'GROSS-A', '10.00' );
+		$product_b = $this->make_product( 'GROSS-B', '20.00' );
+
+		$coupon = new \WC_Coupon();
+		$coupon->set_code( 'gross-5-off' );
+		$coupon->set_discount_type( 'fixed_cart' );
+		$coupon->set_amount( '5.00' );
+		$coupon_id = (int) $coupon->save();
+
+		try {
+			$order = wc_create_order();
+			$order->set_billing_email( 'gross-invariant@example.test' );
+			$order->add_product( $product_a, 1 );
+			$order->add_product( $product_b, 2 );
+
+			$shipping = new \WC_Order_Item_Shipping();
+			$shipping->set_method_title( 'Flat rate' );
+			$shipping->set_total( '5.00' );
+			$order->add_item( $shipping );
+
+			$order->apply_coupon( 'gross-5-off' );
+			$order->calculate_totals( true );
+			$order->set_status( 'completed' );
+			$order_id               = (int) $order->save();
+			$this->created_orders[] = $order_id;
+
+			$order = wc_get_order( $order_id );
+			self::assertGreaterThan( 0.0, (float) $order->get_total_tax(), 'Precondition: the WC tax engine really taxed this order.' );
+
+			$stats = $this->flusher()->flush();
+			self::assertSame( 1, $stats['sent'], 'stats: ' . wp_json_encode( $stats ) );
+			self::assertSame( 0, $stats['failed'] );
+
+			$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+			self::assertIsArray( $payloads );
+			$payload = $payloads[0];
+
+			// Each wire line is the GROSS charged amount from the real order.
+			$wc_items = array_values( $order->get_items() );
+			self::assertCount( count( $wc_items ), $payload['items'] );
+			foreach ( $wc_items as $i => $wc_item ) {
+				$expected_gross = (float) $wc_item->get_total() + (float) $wc_item->get_total_tax();
+				self::assertGreaterThan(
+					(float) $wc_item->get_total(),
+					(float) $payload['items'][ $i ]['line_total'],
+					'line_total must exceed the NET get_total() — i.e. it includes tax.'
+				);
+				self::assertEqualsWithDelta( $expected_gross, (float) $payload['items'][ $i ]['line_total'], 0.0001 );
+				$qty = (int) $wc_item->get_quantity();
+				self::assertEqualsWithDelta( $expected_gross / $qty, (float) $payload['items'][ $i ]['unit_price'], 0.0001, 'unit_price = gross ÷ qty.' );
+				self::assertGreaterThan( 0.0, (float) $payload['items'][ $i ]['discount_amount'], 'The cart coupon discounts every line — gross delta present.' );
+			}
+
+			// §5 sender invariant against the REAL order totals.
+			$line_sum       = array_sum( array_column( $payload['items'], 'line_total' ) );
+			$gross_shipping = (float) $order->get_shipping_total() + (float) $order->get_shipping_tax();
+			self::assertEqualsWithDelta(
+				(float) $payload['total_amount'],
+				$line_sum + $gross_shipping,
+				0.01,
+				'Σ items[].line_total + shipping ≈ total_amount (± rounding).'
+			);
+
+			// The order-level discount is gross too (discount + its tax share).
+			self::assertEqualsWithDelta(
+				(float) $order->get_total_discount( false ),
+				(float) $payload['discount_amount'],
+				0.0001
+			);
+			self::assertGreaterThan(
+				(float) $order->get_total_discount( true ),
+				(float) $payload['discount_amount'],
+				'Gross discount must exceed the ex-tax discount on a taxed order.'
+			);
+		} finally {
+			wp_delete_post( $coupon_id, true );
+			$this->disable_taxes();
+		}
+	}
+
+	public function test_zero_tax_order_wires_amounts_equal_to_net_and_invariant_holds(): void {
+		// Taxes off (a tax-exempt store): gross == net; the §5 invariant must
+		// hold on the same code path with a zero tax share.
+		$product = $this->make_product( 'GROSS-ZERO', '12.50' );
+		$this->make_order( 'gross-zero-tax@example.test', 'completed', $product );
+
+		$stats = $this->flusher()->flush();
+		self::assertSame( 1, $stats['sent'] );
+
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		$payload = $payloads[0];
+
+		self::assertEqualsWithDelta( 12.5, (float) $payload['items'][0]['line_total'], 0.0001 );
+		self::assertEqualsWithDelta( 12.5, (float) $payload['items'][0]['unit_price'], 0.0001 );
+		$line_sum = array_sum( array_column( $payload['items'], 'line_total' ) );
+		self::assertEqualsWithDelta( (float) $payload['total_amount'], $line_sum, 0.01, 'No shipping, no tax: Σ line_total == total_amount.' );
+	}
+
 	public function test_order_with_no_product_lines_is_terminal_skipped(): void {
 		// Only non-product lines (a fee) → items[] builds empty → the engine
 		// would D6-reject on items min 1 forever. The flusher terminal-skips
@@ -212,6 +321,41 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 0, $stats['sent'] );
 		self::assertSame( 1, $stats['failed'], 'A revoked key is terminal — mark failed, no retry.' );
 		self::assertSame( 0, $stats['retried'] );
+	}
+
+	/** @var int Tax rate id created by enable_24_percent_vat(), 0 = none. */
+	private int $tax_rate_id = 0;
+
+	/**
+	 * Turn the REAL WC tax engine on: 24% standard VAT (matches the pilot
+	 * market), prices entered ex-tax, taxed shipping, tax by shop base.
+	 * Callers pair with disable_taxes() in a finally block.
+	 */
+	private function enable_24_percent_vat(): void {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		update_option( 'woocommerce_prices_include_tax', 'no' );
+		update_option( 'woocommerce_tax_based_on', 'base' );
+		$this->tax_rate_id = (int) \WC_Tax::_insert_tax_rate(
+			array(
+				'tax_rate_country'  => '', // every country — location-independent.
+				'tax_rate_state'    => '',
+				'tax_rate'          => '24.0000',
+				'tax_rate_name'     => 'VAT',
+				'tax_rate_priority' => 1,
+				'tax_rate_compound' => 0,
+				'tax_rate_shipping' => 1,
+				'tax_rate_order'    => 0,
+				'tax_rate_class'    => '',
+			)
+		);
+	}
+
+	private function disable_taxes(): void {
+		if ( $this->tax_rate_id > 0 ) {
+			\WC_Tax::_delete_tax_rate( $this->tax_rate_id );
+			$this->tax_rate_id = 0;
+		}
+		update_option( 'woocommerce_calc_taxes', 'no' );
 	}
 
 	private function flusher(): OrderFlusher {

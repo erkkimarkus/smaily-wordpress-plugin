@@ -178,6 +178,22 @@ earlier decisions — don't re-revert them:
   items terminal skip now only fires for a genuinely product-less order
   (shipping/fee only). Reverses F3-36's drop-the-line for the deleted case.
 
+### Order money is GROSS (tax-inclusive) — never a bare `get_total()` on a line (PRO-1241)
+Contract v1.4.0 §5: every money field on the orders wire is **gross — what the
+customer paid**. In WooCommerce, `WC_Order_Item::get_total()` is **NET (ex-tax)**
+— serializing it raw under the gross `total_amount` understated per-SKU revenue
+~24% on the pilot (median `unit_price/catalog.price` ≈ 1/1.24, Estonian VAT).
+`OrderPayloadBuilder` is the single chokepoint (live hook, flusher retries and
+the order backfill all build through it at send time): `line_total =
+get_total() + get_total_tax()`, `unit_price = gross line ÷ qty` (post-discount,
+NOT `subtotal/qty`), line discount = the gross subtotal-vs-total delta, order
+`discount_amount = get_total_discount( false )` (the parameterless default is
+ex-tax — an easy re-regression). Sender invariant: `Σ items[].line_total +
+shipping ≈ total_amount` (engine monitors, doesn't reject — so the mock doesn't
+reject either; the pinning lives in unit + integration payload asserts). If you
+add a new order money field, put it on the gross basis and extend the invariant
+tests.
+
 ### Event Log "Details" shows the real request + engine response (F3-44)
 Order/catalog/Smaily queue rows enqueue an EMPTY `payload` (the flusher builds the
 wire object fresh at send), so Details used to show `Payload: []`. The flushers now

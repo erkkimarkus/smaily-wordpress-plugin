@@ -41,6 +41,17 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
  * Datetime fields go through IsoDate (F3-21) — the engine's strict Zod
  * `.datetime()` requires the `Z` form, not `+00:00`.
  *
+ * ALL money fields are GROSS — tax-inclusive, what the customer paid
+ * (contract v1.4.0 §5 "Amount semantics", PRO-1241): `total_amount` is the
+ * grand total as charged (WC get_total() — products + shipping + tax −
+ * discounts, already gross); `items[].line_total` is
+ * `get_total() + get_total_tax()` (bare get_total() is NET — the pre-1.4.0
+ * bug that understated per-SKU revenue ~24% on the pilot); `unit_price` is
+ * the same gross basis ÷ qty; both `discount_amount` fields include the
+ * discounted tax. Sender invariant: Σ items[].line_total + shipping ≈
+ * total_amount (± rounding). Do NOT reintroduce a bare get_total()/
+ * get_total_discount() money read here.
+ *
  * Attribution is async engine-side (N-10): this builder only forwards the
  * stored attribution signals (smaily_rec_id / smaily_visitor_token /
  * smaily_rec_ctx / session_id), stamped onto order meta at checkout by the
@@ -127,9 +138,11 @@ class OrderPayloadBuilder {
 			'items'             => $this->items( $order ),
 		);
 
-		$discount = (float) $order->get_total_discount();
+		// GROSS discount (v1.4.0 §5): get_total_discount() defaults to
+		// ex-tax; `false` includes the tax share of the discount.
+		$discount = (float) $order->get_total_discount( false );
 		if ( $discount > 0.0 ) {
-			$payload['discount_amount'] = $discount;
+			$payload['discount_amount'] = round( $discount, 4 );
 		}
 
 		// Attribution signals stamped onto order meta at checkout — omitted
@@ -213,9 +226,15 @@ class OrderPayloadBuilder {
 	 * is never silently lost for one unkeyable line. An order
 	 * with NO product lines at all (only shipping/fee) still wires an empty
 	 * items[] and OrderFlusher terminal-skips it (engine requires min 1) — that
-	 * is the only remaining empty-items case. unit_price is the pre-discount
-	 * per-unit price (subtotal / qty); line_total is the post-discount total;
-	 * the per-line discount is subtotal − total (omitted when zero).
+	 * is the only remaining empty-items case.
+	 *
+	 * Amounts are GROSS (v1.4.0 §5, PRO-1241): line_total is the charged
+	 * amount incl. its tax share, after line discounts —
+	 * get_total() + get_total_tax(); unit_price is the same gross basis ÷ qty;
+	 * the per-line discount is the gross subtotal-vs-total delta
+	 * ((subtotal + subtotal_tax) − (total + total_tax)), omitted when zero.
+	 * Rounded to 4 decimals (float-add noise; the contract example itself
+	 * carries a 3-decimal unit_price).
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -234,18 +253,18 @@ class OrderPayloadBuilder {
 				? SkuResolver::resolve( $product )
 				: SkuResolver::resolve_order_item( $item );
 
-			$qty      = (int) $item->get_quantity();
-			$subtotal = (float) $item->get_subtotal();
-			$total    = (float) $item->get_total();
+			$qty            = (int) $item->get_quantity();
+			$subtotal_gross = (float) $item->get_subtotal() + (float) $item->get_subtotal_tax();
+			$total_gross    = (float) $item->get_total() + (float) $item->get_total_tax();
 
 			$line = array(
 				'sku'        => $sku,
 				'qty'        => $qty,
-				'unit_price' => $qty > 0 ? round( $subtotal / $qty, 4 ) : 0.0,
-				'line_total' => $total,
+				'unit_price' => $qty > 0 ? round( $total_gross / $qty, 4 ) : 0.0,
+				'line_total' => round( $total_gross, 4 ),
 			);
 
-			$discount = $subtotal - $total;
+			$discount = $subtotal_gross - $total_gross;
 			if ( $discount > 0.0 ) {
 				$line['discount_amount'] = round( $discount, 4 );
 			}

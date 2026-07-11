@@ -656,6 +656,12 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/customers' ) {
 // on ANY order forces a per-item status error so the partial-success split is
 // testable (external_order_id is the WC post id, not controllable in a test;
 // the billing email is). Attribution is async — no attribution counts here.
+// Orders ingest — §5. Amount semantics (v1.4.0, PRO-1241): all money fields
+// are GROSS (tax-inclusive). Deliberately NOT validated here because the LIVE
+// engine does not reject on the tax basis either (the §5 sender invariant is
+// a monitoring signal, not a 4xx) — a mock-side reject would be stricter than
+// live (F3-9 inversion). Gross semantics are pinned by the integration tests
+// asserting on `last_orders_payload` below and by the PRO-1241 live-walk.
 if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {

@@ -1229,6 +1229,13 @@ fixed.
 
 ### F3-22: Orders-end milestone — sub-PR 3.3 orders complete (W5)
 
+> **Partially superseded:** the on-hold→processing mapping was reversed by
+> F3-42 (on-hold is NOT a sale), and the amount serialization (net
+> `get_total()` lines, `subtotal/qty` unit_price, ex-tax discounts) was
+> superseded by PRO-1241 — all order money fields are GROSS per contract
+> v1.4.0 §5. The pattern, batch wrapper, and the rest of the status mapping
+> stand.
+
 **Context:** the third ingest domain (orders), built on the F3-16 canonical
 6-step pattern and the D6 per-item contract (F3-18), against the W5 orders
 contract (batch `{orders:[...]}`, `customer_email` identity, required `status`
@@ -3068,6 +3075,61 @@ product_group_id), PRO-1229/PRO-1228 (contract v1.3.0 sync `a5c3ea6`), F3-40 (tr
 soft path unchanged; its "hard-delete gap accepted" limit is now closed), F3-44
 (store_exchange per row), F3-18/N-7 (the D6 base this deliberately deviates from,
 via the apply_response seam).
+
+### PRO-1241 — All order money fields are GROSS (tax-inclusive), per contract v1.4.0 §5
+
+**Context:** engine-side read-only verification on MiuMjau (PRO-1202) found the
+Woo plugin internally inconsistent within a single order: `total_amount` was the
+gross grand total (`WC_Order::get_total()`) while `items[].line_total` used
+`$item->get_total()` — which in WooCommerce is **NET (ex-tax)**. Median
+`total_amount / Σ line_total` = 1.310; median `unit_price / catalog.price` =
+0.806 ≈ 1/1.24 (Estonian VAT) — per-SKU revenue in Insights understated ~24% vs
+the order-total revenue on the same page. Contract v1.4.0 (§5 "Amount
+semantics", engine `2dec424`, synced `434ffee`) standardizes ALL money fields on
+the orders endpoint as **gross/tax-inclusive** — what the customer paid; Shopify
+and Magento already conform.
+
+**Decision:** `OrderPayloadBuilder` (the single money chokepoint — live hook,
+retry flusher and order backfill all build through it at send time) serializes:
+- `items[].line_total` = `get_total() + get_total_tax()` (charged amount incl.
+  the line's tax share, after line discounts), rounded to 4 decimals;
+- `items[].unit_price` = the same gross line basis ÷ qty (NO LONGER the
+  pre-discount `subtotal / qty` — §5 defines unit_price on the post-discount
+  gross basis);
+- `items[].discount_amount` = `(subtotal + subtotal_tax) − (total + total_tax)`
+  (the gross delta), omitted when zero;
+- order `discount_amount` = `get_total_discount( false )` (tax-inclusive; the
+  parameterless default is ex-tax);
+- `total_amount` stays `get_total()` — it was already gross (incl. shipping).
+No wire-SHAPE change (same keys); values change basis. Sender invariant
+`Σ items[].line_total + shipping ≈ total_amount` is pinned by unit tests
+(taxed multi-line + discounted + zero-tax + rounding edge) and an integration
+test driving the REAL WC tax engine (24% VAT, coupon, taxed shipping). The mock
+deliberately does NOT reject on the tax basis — the live engine doesn't either
+(the invariant is an engine-side monitoring signal, not a 4xx); pinning lives in
+the payload assertions + the live-walk.
+
+**Rationale:** "gross = what the customer paid" is the only basis consistent
+with `total_amount`'s de-facto meaning across all three platforms, and the only
+one that makes per-SKU revenue sum to order revenue on the same report.
+
+**Alternatives:** (a) keep net lines and have the engine gross them up —
+rejected: the engine stores amounts as sent and never recomputes tax (§5);
+(b) send both net and gross — rejected: no consumer for net, wire bloat.
+
+**Migration:** already-ingested MiuMjau orders keep the net basis until the
+one-time historical re-sync — engine-coordinated, riding the PRO-1233 window
+(~2026-07-14); re-ingest fully replaces line items (§5 idempotency), so the
+backfill self-corrects rows. NOT part of the plugin change.
+
+**Supersedes** the amount serialization shipped with F3-22/W5 (net
+`get_total()` lines, pre-discount `subtotal/qty` unit_price, ex-tax
+discounts). Status mapping and everything else in F3-22 stand.
+
+**Relationships:** F3-22 (orders milestone — amounts part superseded), F3-43
+(deleted-line snapshot totals now also gross via the same accessors), CC-8
+(contract sync `434ffee`), LESSONS §2.3 (a formatted-field basis is exactly the
+mock-vs-live class the live-walk must cover).
 
 ## How to keep this document going
 
