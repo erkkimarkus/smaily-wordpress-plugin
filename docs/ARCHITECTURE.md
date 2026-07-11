@@ -45,7 +45,7 @@ The repo carries two coexisting PHP codebases:
 |---|---|---|
 | Namespace | `Smaily_Connect\*` | `Smaily\Connect\*` |
 | Files | `includes/*.class.php`, `integrations/` (woocommerce, cf7, elementor), `admin/settings.php` partials | `includes/{Bootstrap,Constants,…}.php` + subdirectories (`REST/`, `Smaily/`, `Settings/`, …) |
-| Role | The upstream wordpress.org plugin, loaded verbatim (forms, widget, CF7/Elementor integrations, legacy abandoned-cart cron) | Wizard, settings UI, contact-sync engine, rec-engine ingest, storefront beacon |
+| Role | The upstream wordpress.org plugin, loaded verbatim (forms, widget, CF7/Elementor integrations) | Wizard, settings UI, contact-sync engine, abandoned-cart pipeline (PRO-1195), rec-engine ingest, storefront beacon |
 
 Two independent feature gates decide which code is live:
 
@@ -179,7 +179,8 @@ All recurring work runs on Action Scheduler (bundled via
 | `smly_plus_health_check` | 15 min | `NotificationManager` health sweep |
 | `smly_plus_queue_janitor` | daily | prune old sent/failed queue rows |
 | `smly_plus_contact_sync` | daily | contact-sync tick (F3-48 mode engine) |
-| `smly_plus_abandoned_cart` | 15 min | legacy abandoned-cart pass |
+| `smly_plus_abandoned_cart` | 15 min | abandonment sweep (`CartAbandonmentSweeper`, PRO-1195 — cutoff + backlog guard + enqueue) |
+| `smly_plus_flush_cart_events` | 60 s | abandoned-cart event flush (`CartFlusher`) |
 
 Backfills use chained `as_schedule_single_action` ticks
 (`BackfillEndpoint::TICK_HOOK`) rather than a recurring action.
@@ -196,6 +197,7 @@ Custom tables (created/evolved by `DB\Migrator`, plain SQL files in
 | `wp_smly_rec_event_queue` | rec-engine ingest queue (all domains, event_type-scoped) |
 | `wp_smly_plus_backfill_job` | backfill job state (cursor, counts, `synced_count`) |
 | `wp_smly_plus_automation_mapping` | wizard automation-trigger → Smaily workflow mapping |
+| `wp_smly_plus_cart_session` | abandoned-cart session tracker (PRO-1195 — one row per WC session, guest carts included, scalar-JSON cart shape) |
 | `wp_smly_rec_visitor` | anonymous-visitor merge tracker (created Phase 1; no runtime writer today — identity merge is engine-side, §4.3) |
 
 Options: `smly_plus_*` (wizard/settings/credentials — the Smaily API password

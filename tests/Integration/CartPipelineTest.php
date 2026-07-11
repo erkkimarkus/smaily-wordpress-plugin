@@ -1,0 +1,467 @@
+<?php
+/**
+ * Integration: the namespaced abandoned-cart pipeline, end to end (PRO-1195).
+ *
+ * @package Smaily\Connect\Tests\Integration
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Tests\Integration;
+
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\CartHookHandler;
+use Smaily\Connect\Smaily\CartFlusher;
+use Smaily\Connect\Smaily\CartSessionStore;
+use Smaily\Connect\Tests\Integration\Support\EnvScrub;
+use Smaily\Connect\Tests\Integration\Support\RestRequestHelper;
+
+/**
+ * What this pins, against real WP + WC + the real tables:
+ *
+ *   - LOGGED-IN E2E: a real WC()->cart change tracks a scalar-shape row →
+ *     past the merchant's cutoff the smly_plus_abandoned_cart tick enqueues
+ *     ONE automation.abandoned_cart event → the CartFlusher POSTs the mapped
+ *     workflow to the (mocked) Smaily transport with the legacy-parity
+ *     address fields → the row is sent + its F3-44 exchange stored; the
+ *     tracker row never re-reminds.
+ *   - GUEST capture: an email typed at checkout (update_order_review POST)
+ *     attaches the identity to the session row; the reminder carries it.
+ *   - Settings CARRY-OVER (upgrade continuity): with no mapping row, the
+ *     legacy option's autoresponder_id drives the send — an upgrading store
+ *     needs zero reconfiguration.
+ *   - F3-37 backlog guard: a row older than the reminder window is expired
+ *     without emailing; nothing is enqueued for it.
+ *
+ * The Smaily API is mocked at the pre_http_request seam (the established
+ * pattern for the contact/autoresponder API) — no live traffic.
+ */
+final class CartPipelineTest extends TestCase {
+
+	private const STATUS_OPTION = 'smaily_connect_abandoned_cart_status';
+	private const CUTOFF_OPTION = 'smaily_connect_abandoned_cart_cutoff';
+	private const FIELDS_OPTION = 'smaily_connect_abandoned_cart_fields';
+
+	/** @var array<int, int> */
+	private array $created_users = array();
+
+	/** @var array<int, int> */
+	private array $created_products = array();
+
+	protected function setUp(): void {
+		parent::setUp();
+		EnvScrub::reset();
+		$this->wipe_tracker();
+		CartHookHandler::reset_request_guard();
+
+		// Wizard done + feature on + a 10-minute delay (the legacy min).
+		update_option( 'smly_plus_setup_completed', true );
+		update_option(
+			self::STATUS_OPTION,
+			array(
+				'enabled'          => true,
+				'autoresponder_id' => 0,
+			)
+		);
+		update_option( self::CUTOFF_OPTION, 10 );
+		update_option(
+			self::FIELDS_OPTION,
+			array_merge(
+				\Smaily_Connect\Includes\Options::ABANDONED_CART_DEFAULT_FIELDS,
+				array(
+					'product_name'     => true,
+					'product_quantity' => true,
+				)
+			)
+		);
+
+		RestRequestHelper::login_as_admin();
+	}
+
+	protected function tearDown(): void {
+		if ( function_exists( 'WC' ) && WC()->cart instanceof \WC_Cart ) {
+			WC()->cart->empty_cart();
+		}
+		wp_set_current_user( 0 );
+
+		$this->wipe_tracker();
+		foreach ( $this->created_products as $product_id ) {
+			$product = wc_get_product( $product_id );
+			if ( $product ) {
+				$product->delete( true );
+			}
+		}
+		foreach ( $this->created_users as $user_id ) {
+			wp_delete_user( $user_id );
+		}
+		$this->created_products = array();
+		$this->created_users    = array();
+
+		// Drop any Smaily client cached from this test's seeded credentials.
+		$bootstrap = \Smaily\Connect\Bootstrap::instance();
+		$prop      = new \ReflectionProperty( $bootstrap, 'smaily_clients' );
+		$prop->setAccessible( true );
+		$prop->setValue( $bootstrap, array() );
+
+		parent::tearDown();
+	}
+
+	public function test_logged_in_cart_abandonment_end_to_end(): void {
+		$this->map_abandoned_cart_workflow( '4242' );
+		$this->seed_credentials();
+
+		$user_id = $this->make_user( 'e2e-cart' );
+		wp_set_current_user( $user_id );
+
+		$product_id = $this->make_product( 'E2E Cart Product', 19.90 );
+
+		$this->boot_wc_cart();
+		WC()->cart->add_to_cart( $product_id, 2 );
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+		$handler->on_cart_updated();
+
+		// The tracker row exists: our own scalar shape + the user's identity.
+		$row = $this->tracker_row();
+		self::assertNotNull( $row, 'A cart change must create a tracker row.' );
+		self::assertSame( (string) $user_id, (string) $row['user_id'] );
+		$email = get_userdata( $user_id )->user_email;
+		self::assertSame( $email, $row['email'] );
+		$items = json_decode( (string) $row['cart_content'], true );
+		self::assertSame( $product_id, $items[0]['product_id'] );
+		self::assertSame( 2, $items[0]['quantity'] );
+
+		// Fresh cart: the sweep must NOT consider it abandoned yet.
+		do_action( 'smly_plus_abandoned_cart' );
+		self::assertSame( 0, $this->queue_count(), 'A cart inside the cutoff window must not be enqueued.' );
+
+		// Age it past the 10-minute cutoff, inside the 24h window.
+		$this->rewind_tracker_row( (int) $row['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+
+		self::assertSame( 1, $this->queue_count(), 'Past the cutoff the sweep enqueues exactly one reminder event.' );
+
+		// Re-sweeping must not enqueue a second reminder (mail_sent parity).
+		do_action( 'smly_plus_abandoned_cart' );
+		self::assertSame( 1, $this->queue_count() );
+
+		// Flush to the mocked Smaily transport.
+		$captured = null;
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			do_action( CartFlusher::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertIsArray( $captured, 'The reminder must reach the transport.' );
+		self::assertSame( '4242', (string) $captured['autoresponder'], 'The mapped workflow drives the send.' );
+		$address = $captured['addresses'][0];
+		self::assertSame( $email, $address['email'] );
+		self::assertSame( 'true', $address['is_abandoned_cart'] );
+		self::assertSame( 'E2E Cart Product', $address['product_name_1'], 'Legacy template parity: product fields fill the _1..10 matrix.' );
+		self::assertSame( '2', $address['product_quantity_1'] );
+		self::assertSame( '', $address['product_name_2'] );
+		self::assertArrayHasKey( 'language', $address, 'Default fields include language — resolver-sourced, never \'\'.' );
+		self::assertNotSame( '', $address['language'] );
+
+		// Queue row terminal + F3-44 exchange stored (real request + reply,
+		// no Authorization header anywhere).
+		$event = $this->queue_rows()[0];
+		self::assertSame( 'sent', $event['status'] );
+		self::assertStringContainsString( '"endpoint":"autoresponder"', (string) $event['sent_payload'] );
+		self::assertStringContainsString( '"code":101', (string) $event['last_response'] );
+		self::assertStringNotContainsString( 'Authorization', (string) $event['sent_payload'] );
+	}
+
+	public function test_guest_cart_syncs_once_a_checkout_email_is_known(): void {
+		$this->map_abandoned_cart_workflow( '5151' );
+		$this->seed_credentials();
+
+		wp_set_current_user( 0 );
+		$product_id = $this->make_product( 'Guest Product', 5.00 );
+
+		$this->boot_wc_cart();
+		WC()->cart->add_to_cart( $product_id, 1 );
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+		$handler->on_cart_updated();
+
+		$row = $this->tracker_row();
+		self::assertNotNull( $row, 'Guest carts are tracked (new capability vs the legacy logged-in-only tracker).' );
+		self::assertSame( '0', (string) $row['user_id'] );
+
+		// Without an identity the row is tracked but never synced.
+		$this->rewind_tracker_row( (int) $row['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+		self::assertSame( 0, $this->queue_count(), 'No email identity → no sync (design rule).' );
+
+		// The guest types their email at checkout (classic order-review POST).
+		$handler->on_checkout_update_order_review(
+			'billing_email=guest-cart%40example.test&billing_first_name=Mari&billing_last_name=Maasikas'
+		);
+
+		do_action( 'smly_plus_abandoned_cart' );
+		self::assertSame( 1, $this->queue_count(), 'Once the checkout email is known the abandoned cart syncs.' );
+
+		$captured = null;
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			do_action( CartFlusher::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertIsArray( $captured );
+		self::assertSame( 'guest-cart@example.test', $captured['addresses'][0]['email'] );
+		self::assertSame( '5151', (string) $captured['autoresponder'] );
+	}
+
+	public function test_legacy_autoresponder_id_carries_over_as_the_fallback(): void {
+		// Upgrade continuity (F3-54 order): no mapping row — the id the
+		// upgraded store still has in the legacy option drives the send.
+		update_option(
+			self::STATUS_OPTION,
+			array(
+				'enabled'          => true,
+				'autoresponder_id' => 88,
+			)
+		);
+		$this->seed_credentials();
+
+		$user_id = $this->make_user( 'fallback-cart' );
+		( new CartSessionStore() )->upsert(
+			(string) $user_id,
+			$user_id,
+			get_userdata( $user_id )->user_email,
+			'',
+			'',
+			array(
+				array(
+					'product_id'   => 1,
+					'variation_id' => 0,
+					'quantity'     => 1,
+				),
+			),
+			gmdate( 'Y-m-d H:i:s', time() - 30 * MINUTE_IN_SECONDS )
+		);
+
+		do_action( 'smly_plus_abandoned_cart' );
+		self::assertSame( 1, $this->queue_count() );
+
+		$captured = null;
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			do_action( CartFlusher::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertIsArray( $captured, 'The legacy fallback must reach the transport.' );
+		self::assertSame( '88', (string) $captured['autoresponder'], 'With no mapping row the legacy autoresponder_id is the workflow source — zero reconfiguration on upgrade.' );
+	}
+
+	public function test_backlog_guard_expires_stale_carts_without_emailing(): void {
+		// F3-37 carried over: a re-armed scheduler must never mass-mail
+		// history. A row older than the window is deleted, not enqueued.
+		$user_id = $this->make_user( 'stale-cart' );
+		( new CartSessionStore() )->upsert(
+			(string) $user_id,
+			$user_id,
+			get_userdata( $user_id )->user_email,
+			'',
+			'',
+			array(),
+			gmdate( 'Y-m-d H:i:s', time() - 3 * DAY_IN_SECONDS )
+		);
+
+		do_action( 'smly_plus_abandoned_cart' );
+
+		self::assertSame( 0, $this->queue_count(), 'A stale cart must be expired without any send attempt.' );
+		self::assertNull( $this->tracker_row(), 'The expired row is pruned.' );
+	}
+
+	public function test_completing_an_order_clears_the_tracker_row(): void {
+		$user_id = $this->make_user( 'order-clears' );
+		wp_set_current_user( $user_id );
+
+		$product_id = $this->make_product( 'Cleared Product', 3.50 );
+		$this->boot_wc_cart();
+		WC()->cart->add_to_cart( $product_id, 1 );
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+		$handler->on_cart_updated();
+		self::assertNotNull( $this->tracker_row() );
+
+		$order = wc_create_order( array( 'customer_id' => $user_id ) );
+		$order->set_billing_email( get_userdata( $user_id )->user_email );
+		$order->save();
+
+		try {
+			$handler->on_order_processed( $order->get_id() );
+			self::assertNull( $this->tracker_row(), 'A completed order must clear the buyer\'s tracker row.' );
+		} finally {
+			$order->delete( true ); // wp_delete_post is an HPOS no-op — always delete via the order object.
+		}
+	}
+
+	public function test_cart_hooks_are_registered_by_bootstrap(): void {
+		self::assertNotFalse( has_action( 'woocommerce_cart_updated' ), 'Bootstrap must bind the cart tracker to woocommerce_cart_updated.' );
+		self::assertNotFalse( has_action( 'woocommerce_checkout_update_order_review' ), 'Guest identity capture (classic checkout) must be bound.' );
+		self::assertNotFalse( has_action( CartFlusher::FLUSH_HOOK ), 'The cart flusher AS callback must be bound.' );
+		self::assertNotFalse( has_action( 'smly_plus_abandoned_cart' ), 'The sweep tick must be bound.' );
+	}
+
+	// --- helpers -------------------------------------------------------------
+
+	/**
+	 * Initialize WC session + cart in the CLI context (real WC_Cart).
+	 */
+	private function boot_wc_cart(): void {
+		if ( ! WC()->cart instanceof \WC_Cart || WC()->session === null ) {
+			wc_load_cart();
+		}
+		WC()->cart->empty_cart();
+		CartHookHandler::reset_request_guard();
+	}
+
+	private function map_abandoned_cart_workflow( string $workflow_id ): void {
+		$response = RestRequestHelper::post(
+			'/settings',
+			array(
+				'tab'  => 'woocommerce',
+				'data' => array(
+					'abandonedCartEnabled'       => true,
+					'abandonedCartCutoffMinutes' => 10,
+					'automationMappings'         => array(
+						array(
+							'triggerType'       => 'abandoned_cart',
+							'language'          => 'default',
+							'accountKey'        => 'default',
+							'workflowId'        => $workflow_id,
+							'isDefaultFallback' => true,
+						),
+					),
+				),
+			)
+		);
+		self::assertSame( 200, $response->get_status() );
+	}
+
+	private function seed_credentials(): void {
+		update_option(
+			'smaily_connect_api_credentials',
+			array(
+				'subdomain' => 'testsub',
+				'username'  => 'tester',
+				'password'  => \Smaily_Connect\Includes\Cypher::encrypt( 'test-password' ),
+			)
+		);
+	}
+
+	/**
+	 * A pre_http_request fake: captures the POST body, replies Smaily 101.
+	 *
+	 * @param mixed $captured By-ref capture target.
+	 */
+	private function fake_transport( &$captured ): callable {
+		return static function ( $pre, $args ) use ( &$captured ) {
+			$captured = isset( $args['body'] ) ? $args['body'] : null;
+			return array(
+				'headers'  => array(),
+				'body'     => wp_json_encode(
+					array(
+						'code'    => 101,
+						'message' => 'OK',
+					)
+				),
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+	}
+
+	private function make_user( string $slug ): int {
+		$user_id = wp_insert_user(
+			array(
+				'user_login' => 'smly_cart_' . $slug . '_' . wp_generate_password( 6, false ),
+				'user_email' => $slug . '-' . wp_generate_password( 6, false ) . '@example.test',
+				'user_pass'  => wp_generate_password( 20 ),
+			)
+		);
+		self::assertIsInt( $user_id );
+		$this->created_users[] = $user_id;
+		return $user_id;
+	}
+
+	private function make_product( string $name, float $price ): int {
+		$product = new \WC_Product_Simple();
+		$product->set_name( $name );
+		$product->set_regular_price( (string) $price );
+		$product->set_status( 'publish' );
+		$product_id = $product->save();
+		self::assertGreaterThan( 0, $product_id );
+		$this->created_products[] = $product_id;
+		return $product_id;
+	}
+
+	/**
+	 * @return array<string, mixed>|null The single tracker row (tests keep at most one).
+	 */
+	private function tracker_row(): ?array {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$row = $wpdb->get_row( "SELECT * FROM {$wpdb->prefix}smly_plus_cart_session ORDER BY id DESC LIMIT 1", ARRAY_A );
+		return is_array( $row ) ? $row : null;
+	}
+
+	private function rewind_tracker_row( int $id, int $seconds ): void {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->update(
+			$wpdb->prefix . 'smly_plus_cart_session',
+			array( 'cart_updated' => gmdate( 'Y-m-d H:i:s', time() - $seconds ) ),
+			array( 'id' => $id )
+		);
+	}
+
+	private function queue_count(): int {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}smly_plus_event_queue WHERE event_type = %s",
+				CartFlusher::EVENT_TYPE
+			)
+		);
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function queue_rows(): array {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}smly_plus_event_queue WHERE event_type = %s ORDER BY id ASC",
+				CartFlusher::EVENT_TYPE
+			),
+			ARRAY_A
+		);
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	private function wipe_tracker(): void {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}smly_plus_cart_session" );
+	}
+}

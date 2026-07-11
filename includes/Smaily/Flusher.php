@@ -26,7 +26,10 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler;
  *   contact.sync              → Smaily\Client::upsert_subscribers (default account)
  *   automation.welcome        → AutomationRouter::trigger_automation('welcome', …)
  *   automation.first_order    → AutomationRouter::trigger_automation('first_order', …)
- *   automation.abandoned_cart → AutomationRouter::trigger_automation('abandoned_cart', …)
+ *
+ * `automation.abandoned_cart` rows are NOT drained here — the dedicated
+ * CartFlusher owns them on its own AS action (PRO-1195); pending() excludes
+ * the type so the two drains never consume each other's rows.
  *
  * Payload shape (what HookHandler enqueues):
  *
@@ -92,7 +95,7 @@ final class Flusher {
 			'retried'   => 0,
 		);
 
-		foreach ( $this->queue->pending( $batch_size ) as $event ) {
+		foreach ( $this->queue->pending( $batch_size, null, array( CartFlusher::EVENT_TYPE ) ) as $event ) {
 			++$stats['processed'];
 
 			$id   = (int) ( $event['id'] ?? 0 );
@@ -156,9 +159,9 @@ final class Flusher {
 				$this->dispatch_automation( 'first_order', $payload, $fields );
 				return;
 
-			case 'automation.abandoned_cart':
-				$this->dispatch_automation( 'abandoned_cart', $payload, $fields );
-				return;
+			// automation.abandoned_cart deliberately has NO case here: the
+			// CartFlusher owns it (PRO-1195) and flush() excludes the type at
+			// the pending() query, so such a row can never reach dispatch().
 
 			default:
 				throw new TerminalDispatchException( 'unknown_event_type: ' . $event_type );

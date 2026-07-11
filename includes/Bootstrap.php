@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- internal config exceptions are surfaced to admins / logged, never echoed to a browser.
 
+use Smaily\Connect\Integrations\WooCommerce\CartHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CatalogHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\CustomerHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler as WooHookHandler;
@@ -36,6 +37,10 @@ use Smaily\Connect\REST\EndpointRegistry;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\AutomationRouter;
+use Smaily\Connect\Smaily\CartAbandonmentSweeper;
+use Smaily\Connect\Smaily\CartFlusher;
+use Smaily\Connect\Smaily\CartPayloadBuilder;
+use Smaily\Connect\Smaily\CartSessionStore;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\BackfillJobInterface;
 use Smaily\Connect\Smaily\ContactReconciler;
@@ -87,11 +92,14 @@ final class Bootstrap {
 
 	private bool $booted = false;
 
-	private ?EventQueue $event_queue             = null;
-	private ?WorkflowResolverInterface $resolver = null;
-	private ?Credentials $credentials            = null;
-	private ?AutomationRouter $automation_router = null;
-	private ?Flusher $flusher                    = null;
+	private ?EventQueue $event_queue              = null;
+	private ?WorkflowResolverInterface $resolver  = null;
+	private ?Credentials $credentials             = null;
+	private ?AutomationRouter $automation_router  = null;
+	private ?Flusher $flusher                     = null;
+	private ?CartSessionStore $cart_store         = null;
+	private ?CartFlusher $cart_flusher            = null;
+	private ?CartAbandonmentSweeper $cart_sweeper = null;
 
 	private ?IngestQueue $ingest_queue                    = null;
 	private ?CatalogPayloadBuilder $catalog_builder       = null;
@@ -164,14 +172,15 @@ final class Bootstrap {
 		// Orders drain on their own hook too (3.3-orders.3).
 		add_action( OrderFlusher::FLUSH_HOOK, array( $this, 'on_flush_order_queue' ) );
 
-		// Bridges from new AS hook names → legacy WP-Cron hook names.
-		// The legacy Smaily_Connect\Integrations\WooCommerce\Cron class
-		// still has its add_action() registrations on these hook names;
-		// firing them via do_action() keeps business logic unchanged
-		// while moving scheduling to Action Scheduler. See
-		// Migration\WPCronAuditor for the corresponding WP-Cron clear.
+		// smly_plus_contact_sync is the surviving legacy-bridge tick name
+		// (the callback no longer bridges to legacy hooks — F3-48.3).
+		// smly_plus_abandoned_cart keeps its NAME (existing recurring AS rows
+		// on upgraded stores stay valid) but now drives the namespaced
+		// abandonment sweeper — the legacy status/email double pass is
+		// retired (PRO-1195). The cart flusher drains on its own hook below.
 		add_action( 'smly_plus_contact_sync', array( $this, 'on_contact_sync_tick' ) );
 		add_action( 'smly_plus_abandoned_cart', array( $this, 'on_abandoned_cart_tick' ) );
+		add_action( CartFlusher::FLUSH_HOOK, array( $this, 'on_flush_cart_queue' ) );
 
 		// REST endpoints + the AS callback that drives the backfill loop.
 		add_action( 'rest_api_init', array( $this, 'register_rest_endpoints' ) );
@@ -387,16 +396,16 @@ final class Bootstrap {
 	}
 
 	/**
-	 * AS callback for smly_plus_abandoned_cart (every 15 minutes). Fires
-	 * the two legacy hook names in order — status first (which marks
-	 * abandoned carts), then email (which sends the reminder). The same
-	 * ordering the upstream WP-Cron used; both hooks fired in the same
-	 * 15-minute interval, and the legacy Cron class's email handler
-	 * relies on the status pass having run first.
+	 * AS callback for smly_plus_abandoned_cart (every 15 minutes). PRO-1195:
+	 * runs the namespaced abandonment sweeper — cutoff detection + the F3-37
+	 * backlog guard + enqueueing `automation.abandoned_cart` events for the
+	 * CartFlusher. The legacy status/email double pass this used to bridge to
+	 * (`smaily_connect_cron_abandoned_carts_*`) is retired; its callbacks are
+	 * no longer registered (see the legacy Cron class), so a stray surviving
+	 * WP-Cron event can't fire the old pipeline either.
 	 */
 	public function on_abandoned_cart_tick(): void {
-		do_action( 'smaily_connect_cron_abandoned_carts_status' );
-		do_action( 'smaily_connect_cron_abandoned_carts_email' );
+		$this->cart_sweeper()->sweep();
 	}
 
 	/**
@@ -409,6 +418,24 @@ final class Bootstrap {
 	 */
 	public function register_woocommerce_hooks(): void {
 		WooHooks::register( new WooHookHandler( $this->event_queue() ) );
+
+		// Abandoned-cart tracker (PRO-1195). Replaces the legacy Cart class:
+		// guest carts included (session-token rows), own scalar item shape,
+		// identity captured at checkout. The handler self-gates on the
+		// merchant toggle + setup_completed; order-completion clears run
+		// ungated (hygiene).
+		$cart = new CartHookHandler( $this->cart_session_store() );
+		add_action( 'woocommerce_cart_updated', array( $cart, 'on_cart_updated' ), 10, 0 );
+		// Classic checkout posts the typed billing email on every order-review
+		// refresh — the earliest moment a GUEST identity is known.
+		add_action( 'woocommerce_checkout_update_order_review', array( $cart, 'on_checkout_update_order_review' ), 10, 1 );
+		// Block checkout's Store-API twin (cart/update-customer route).
+		add_action( 'woocommerce_store_api_cart_update_customer_from_request', array( $cart, 'on_store_api_update_customer' ), 10, 2 );
+		// A completed order clears the tracker rows (the legacy hook set:
+		// classic + Store API + thank-you).
+		add_action( 'woocommerce_checkout_order_processed', array( $cart, 'on_order_processed' ), 10, 1 );
+		add_action( 'woocommerce_store_api_checkout_order_processed', array( $cart, 'on_store_api_order_processed' ), 10, 1 );
+		add_action( 'woocommerce_thankyou', array( $cart, 'on_order_processed' ), 10, 1 );
 
 		// Rec-engine catalog ingest (Phase 3.2.3). The handler self-gates on
 		// RecEngineSettings::is_connected(), so registering unconditionally is
@@ -539,6 +566,21 @@ final class Bootstrap {
 			as_schedule_recurring_action( time(), 300, 'smly_plus_retry_failed_events', array(), EventQueue::AS_GROUP );
 		}
 
+		// Abandoned-cart event flush (PRO-1195) — its own recurring tick so
+		// cart reminders + their retries drain independently of the main
+		// Smaily flush cycle.
+		if ( ! as_has_scheduled_action( CartFlusher::FLUSH_HOOK, array(), CartFlusher::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, CartFlusher::FLUSH_HOOK, array(), CartFlusher::AS_GROUP );
+		}
+
+		// Abandonment sweep (PRO-1195) — the 15-min cadence Activation seeds;
+		// re-assert on init so a deactivate/reactivate that cancelled the
+		// recurring row restores it without a re-activation (the other
+		// recurring jobs here follow the same pattern).
+		if ( ! as_has_scheduled_action( 'smly_plus_abandoned_cart', array(), EventQueue::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 15 * MINUTE_IN_SECONDS, 'smly_plus_abandoned_cart', array(), EventQueue::AS_GROUP );
+		}
+
 		// Rec-engine ingest flush — re-ticks every 60s so a row parked with a
 		// future next_retry_at is picked up without a fresh product change.
 		if ( ! as_has_scheduled_action( IngestQueue::FLUSH_HOOK, array(), IngestQueue::AS_GROUP ) ) {
@@ -585,6 +627,14 @@ final class Bootstrap {
 	 */
 	public function on_flush_event_queue(): void {
 		$this->flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_plus_flush_cart_events — drains the
+	 * Smaily event queue's automation.abandoned_cart rows (PRO-1195).
+	 */
+	public function on_flush_cart_queue(): void {
+		$this->cart_flusher()->flush();
 	}
 
 	/**
@@ -728,6 +778,41 @@ final class Bootstrap {
 		}
 
 		return $this->flusher;
+	}
+
+	public function cart_session_store(): CartSessionStore {
+		if ( $this->cart_store === null ) {
+			$this->cart_store = new CartSessionStore();
+		}
+
+		return $this->cart_store;
+	}
+
+	public function cart_flusher(): CartFlusher {
+		if ( $this->cart_flusher === null ) {
+			$bootstrap          = $this;
+			$this->cart_flusher = new CartFlusher(
+				$this->event_queue(),
+				$this->automation_router(),
+				static function ( string $account_key ) use ( $bootstrap ): Client {
+					return $bootstrap->smaily_client( $account_key );
+				}
+			);
+		}
+
+		return $this->cart_flusher;
+	}
+
+	public function cart_sweeper(): CartAbandonmentSweeper {
+		if ( $this->cart_sweeper === null ) {
+			$this->cart_sweeper = new CartAbandonmentSweeper(
+				$this->cart_session_store(),
+				new CartPayloadBuilder(),
+				$this->event_queue()
+			);
+		}
+
+		return $this->cart_sweeper;
 	}
 
 	public function ingest_queue(): IngestQueue {
@@ -904,7 +989,15 @@ final class Bootstrap {
 	// ---------------------------------------------------------------
 
 	public function set_event_queue( EventQueue $queue ): void {
-		$this->event_queue = $queue;
+		$this->event_queue  = $queue;
+		$this->flusher      = null; // rebuild with the new queue on next call
+		$this->cart_flusher = null;
+		$this->cart_sweeper = null;
+	}
+
+	public function set_cart_session_store( CartSessionStore $store ): void {
+		$this->cart_store   = $store;
+		$this->cart_sweeper = null; // rebuild with the new store on next call
 	}
 
 	public function set_ingest_queue( IngestQueue $queue ): void {

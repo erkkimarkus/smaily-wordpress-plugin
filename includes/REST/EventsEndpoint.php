@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
 
 use Smaily\Connect\Constants;
+use Smaily\Connect\Smaily\CartFlusher;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\CatalogRemoveFlusher;
 use Smaily\Connect\Smaily\RecEngine\CustomerFlusher;
@@ -228,11 +229,30 @@ class EventsEndpoint {
 			$n = $plus->reset_failed( $ids );
 			if ( $n > 0 ) {
 				$plus->schedule_flush();
+				// A revived automation.abandoned_cart row is drained by the
+				// CartFlusher, not the main flush hook — kick it too so cart
+				// retries re-send promptly (PRO-1195).
+				$this->kick_flush( CartFlusher::FLUSH_HOOK, CartFlusher::AS_GROUP );
 			}
 			$reset += $n;
 		}
 
 		return new WP_REST_Response( array( 'reset' => $reset ), 200 );
+	}
+
+	/**
+	 * Deduplicated async kick for a single flush hook.
+	 */
+	private function kick_flush( string $hook, string $group ): void {
+		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
+			return;
+		}
+		if ( function_exists( 'as_next_scheduled_action' )
+			&& as_next_scheduled_action( $hook, array(), $group ) !== false
+		) {
+			return;
+		}
+		as_enqueue_async_action( $hook, array(), $group );
 	}
 
 	/**

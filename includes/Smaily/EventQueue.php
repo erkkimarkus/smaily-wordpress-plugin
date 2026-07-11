@@ -102,12 +102,40 @@ class EventQueue {
 	 * arbitrarily reordered relative to subsequent automation.* events
 	 * for the same user.
 	 *
+	 * Event-type scoping (PRO-1195): the queue is drained by TWO flushers —
+	 * the main Flusher (contact.sync + welcome/first_order automations) and
+	 * the CartFlusher (`automation.abandoned_cart` on its own AS action).
+	 * `$only_types` restricts a drain to its own rows; `$exclude_types` lets
+	 * the main flusher skip rows another flusher owns. Same discipline as
+	 * IngestQueue::pending()'s $event_types.
+	 *
+	 * @param array<int, string>|null $only_types    Restrict to these event types;
+	 *                                               null/empty = no restriction.
+	 * @param array<int, string>      $exclude_types Event types to skip.
+	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function pending( int $limit = 50 ): array {
+	public function pending( int $limit = 50, ?array $only_types = null, array $exclude_types = array() ): array {
 		global $wpdb;
 
 		$table = $this->table_name();
+
+		$where = 'status = %s';
+		$args  = array( self::STATUS_PENDING );
+
+		if ( is_array( $only_types ) && $only_types !== array() ) {
+			$placeholders = implode( ', ', array_fill( 0, count( $only_types ), '%s' ) );
+			$where       .= " AND event_type IN ( {$placeholders} )";
+			$args         = array_merge( $args, array_values( array_map( 'strval', $only_types ) ) );
+		}
+
+		if ( $exclude_types !== array() ) {
+			$placeholders = implode( ', ', array_fill( 0, count( $exclude_types ), '%s' ) );
+			$where       .= " AND event_type NOT IN ( {$placeholders} )";
+			$args         = array_merge( $args, array_values( array_map( 'strval', $exclude_types ) ) );
+		}
+
+		$args[] = $limit;
 
 		// Table name interpolation is unavoidable — MySQL forbids
 		// parameterising the FROM clause. $table is controlled.
@@ -115,9 +143,8 @@ class EventQueue {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, event_type, entity_id, payload, created_at, attempts FROM {$table} WHERE status = %s ORDER BY created_at ASC LIMIT %d",
-				self::STATUS_PENDING,
-				$limit
+				"SELECT id, event_type, entity_id, payload, created_at, attempts FROM {$table} WHERE {$where} ORDER BY created_at ASC LIMIT %d",
+				...$args
 			),
 			ARRAY_A
 		);

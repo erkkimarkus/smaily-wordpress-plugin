@@ -752,11 +752,13 @@ repo: a red staleness run is the signal to sync.
   removed because its re-arm (activation + any WooCommerce re-activation) ran
   AFTER WPCronAuditor's one-time clear and resurrected the daily legacy
   `smaily_sync_subscribers` mass-send — the F3-47 language clobber — on a real
-  client. Same incident: the legacy abandoned-cart pass now terminal-marks
-  poison `cart_content` rows (old-writer rows deserialize to string items; a
-  PHP 8 offset read on them is a FATAL that aborted the whole 15-min tick,
-  forever). Keep the shape guards + per-cart Throwable backstop; a reader of
-  rows another plugin version may have written treats them as wire input.
+  client. The legacy abandoned-cart pass is RETIRED (PRO-1195) with its
+  callbacks deregistered for the same reason: a stray surviving WP-Cron event
+  must find nothing to fire (it would double-remind against the new pipeline).
+  The F3-53 guards live on in the new code — a reader of rows another plugin
+  version may have written (the legacy-cart drain, tracker `cart_content`,
+  queue payloads) treats them as wire input: shape guards + per-row Throwable
+  backstop, terminal-mark, never an eternal retry loop.
 
 ---
 
@@ -773,6 +775,26 @@ repo: a red staleness run is the signal to sync.
   there's no double-sync conflict. The CustomerHookHandler (rec-engine) uses
   `is_connected()`; it enqueues all registered users (A-filter, F3-20), matching
   the email-sync handler's breadth (neither filters by role).
+- **Abandoned cart is fully on the new path (PRO-1195).** The legacy
+  `Cart`/`Cron` abandoned-cart registrations are removed (classes kept for the
+  upstream diff; the legacy table kept — it's the one-time drain source and
+  the rollback safety net). Pipeline: `CartHookHandler` (guest carts included)
+  → `smly_plus_cart_session` tracker (own scalar JSON shape, never
+  `serialize(get_cart())`) → `CartAbandonmentSweeper` on the 15-min
+  `smly_plus_abandoned_cart` AS tick (cutoff + the F3-37 backlog guard) →
+  `automation.abandoned_cart` rows in the Smaily EventQueue → `CartFlusher` on
+  `smly_plus_flush_cart_events` (router-first, legacy `autoresponder_id`
+  fallback, F3-44 exchanges). Gated by `setup_completed` + the merchant
+  toggle; reads the SAME legacy options (status/cutoff/fields — upgrade
+  continuity, zero reconfiguration). The Smaily EventQueue is now drained by
+  TWO flushers — event-type scoping (`pending()`'s only/exclude args) keeps
+  them off each other's rows; a new Smaily-side event type must pick its
+  flusher deliberately. The queue payload's field names are LEGACY TEMPLATE
+  PARITY (`is_abandoned_cart`, the prefilled `product_<field>_1..10` matrix,
+  `over_10_products`) — merchants' Smaily autoresponder templates depend on
+  them, don't "clean them up". One-time drain stamp:
+  `smly_plus_cart_legacy_drained` (autoload=false — EnvScrub flushes its
+  per-key cache explicitly).
 
 ---
 

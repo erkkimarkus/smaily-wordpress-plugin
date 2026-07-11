@@ -16,6 +16,12 @@ parameters:
             - includes/*.class.php
             - includes/index.php
 
+    scanFiles:
+        # Legacy classes the namespaced code calls into (outside the analysed
+        # new-code tree — symbol discovery only): the WC price helpers
+        # CartPayloadBuilder reuses for legacy wire parity (PRO-1195).
+        - integrations/woocommerce/helper.class.php
+
     bootstrapFiles:
         # szepeviktor/phpstan-wordpress is auto-registered via
         # phpstan/extension-installer, so its WordPress stubs load

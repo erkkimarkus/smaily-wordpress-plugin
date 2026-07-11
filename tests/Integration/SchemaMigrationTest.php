@@ -42,6 +42,7 @@ final class SchemaMigrationTest extends TestCase {
 			'smly_plus_event_queue',
 			'smly_plus_backfill_job',
 			'smly_plus_automation_mapping',
+			'smly_plus_cart_session',
 			'smly_rec_event_queue',
 			'smly_rec_visitor',
 		);

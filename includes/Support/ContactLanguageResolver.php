@@ -133,6 +133,17 @@ final class ContactLanguageResolver {
 	}
 
 	/**
+	 * Resolve the language code for a contact we know only by email (a GUEST
+	 * abandoned cart, PRO-1195): no user meta and no order exists yet, so the
+	 * chain starts at the multilingual default → site-locale short code. Kept
+	 * on the resolver so guest sends obey the same F3-47 rules as every other
+	 * contact path (context-independent, clamped, omit-on-empty by the caller).
+	 */
+	public function for_guest(): string {
+		return $this->filtered( $this->clamp_to_active( $this->default_language() ), null );
+	}
+
+	/**
 	 * Hard guarantee against an out-of-set language reaching Smaily: a resolved
 	 * code that is NOT one of the site's currently-active languages is clamped
 	 * to the configured default. Protects against dirty history — a stray
@@ -271,7 +282,7 @@ final class ContactLanguageResolver {
 	 * language even when resolution returned '' (e.g. derive from a custom
 	 * field). Returning '' from the filter keeps the omit behaviour.
 	 *
-	 * @param \WP_User|\WC_Order $context
+	 * @param \WP_User|\WC_Order|null $context Null for guest (email-only) contacts.
 	 */
 	private function filtered( string $language, $context ): string {
 		if ( ! function_exists( 'apply_filters' ) ) {

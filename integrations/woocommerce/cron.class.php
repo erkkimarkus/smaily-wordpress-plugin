@@ -58,10 +58,16 @@ class Cron {
 		// WP-Cron event surviving/re-armed on a client site fired the
 		// mass-send daily anyway. The new contact-sync path owns this; the
 		// method stays for the upstream diff but nothing may invoke it.
-		// Cron for updating abandoned cart statuses.
-		add_action( 'smaily_connect_cron_abandoned_carts_status', array( $this, 'smaily_abandoned_carts_status' ) );
-		// Cron for sending abandoned cart emails.
-		add_action( 'smaily_connect_cron_abandoned_carts_email', array( $this, 'smaily_abandoned_carts_email' ) );
+		//
+		// PRO-1195: the two abandoned-cart hooks
+		// (smaily_connect_cron_abandoned_carts_status / _email) are
+		// deliberately NOT registered either. The namespaced pipeline
+		// (CartHookHandler → CartAbandonmentSweeper → CartFlusher) owns
+		// abandoned cart; the AS smly_plus_abandoned_cart tick no longer
+		// bridges here, and — the F3-53 lesson — a stray surviving legacy
+		// WP-Cron event must not be able to fire the retired pass either
+		// (it would double-remind against the new pipeline). The methods
+		// stay for the upstream diff but nothing may invoke them.
 	}
 
 	/**

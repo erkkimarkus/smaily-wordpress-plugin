@@ -331,6 +331,20 @@ final class FlusherTest extends TestCase {
 		self::assertSame( 0, $stats['retried'] );
 	}
 
+	public function test_flush_excludes_the_cart_event_type_from_its_drain(): void {
+		// PRO-1195: automation.abandoned_cart rows belong to the CartFlusher
+		// (its own AS action); the main drain must exclude the type at the
+		// pending() query so the two flushers never consume each other's rows.
+		$queue = $this->fake_queue( array() );
+
+		( new Flusher( $queue, $this->automation_router_returning_true(), static fn () => null ) )->flush();
+
+		self::assertSame(
+			array( Flusher::DEFAULT_BATCH_SIZE, null, array( \Smaily\Connect\Smaily\CartFlusher::EVENT_TYPE ) ),
+			$queue->last_pending_args
+		);
+	}
+
 	/**
 	 * @param array<int, array<string, mixed>> $events
 	 */
@@ -347,7 +361,11 @@ final class FlusherTest extends TestCase {
 				$this->events = $events;
 			}
 
-			public function pending( int $limit = 50 ): array {
+			/** @var array<int, mixed> The (limit, only, exclude) args of the last pending() call. */
+			public array $last_pending_args = array();
+
+			public function pending( int $limit = 50, ?array $only_types = null, array $exclude_types = array() ): array {
+				$this->last_pending_args = array( $limit, $only_types, $exclude_types );
 				return $this->events;
 			}
 

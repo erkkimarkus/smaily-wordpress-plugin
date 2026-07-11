@@ -1,0 +1,323 @@
+<?php
+/**
+ * Builds the Smaily automation payload for an abandoned-cart tracker row.
+ *
+ * @package Smaily\Connect\Smaily
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Smaily;
+
+defined( 'ABSPATH' ) || exit;
+
+use Smaily\Connect\Support\ContactLanguageResolver;
+
+/**
+ * Tracker row → queue payload for `automation.abandoned_cart` (PRO-1195).
+ *
+ * WIRE PARITY IS THE CONTRACT here: the field names this produces feed the
+ * SAME merchant-built Smaily autoresponder templates the legacy pass fed
+ * (`is_abandoned_cart`, `store`, `first_name`/`last_name`, and the
+ * `product_<field>_1..10` matrix with all slots prefilled empty + the
+ * `over_10_products` flag). The selection comes from the same
+ * `smaily_connect_abandoned_cart_fields` option, so an upgrading store's
+ * templates keep rendering without reconfiguration.
+ *
+ * Differences from the legacy `Cron::prepare_*` pair, by design:
+ *   - input is the tracker row's own JSON shape (scalars), never a
+ *     deserialized WC object — product details are fetched fresh via
+ *     wc_get_product() at build time (same as legacy);
+ *   - language comes ONLY from ContactLanguageResolver (`for_user` for a
+ *     known user, `for_guest` otherwise) and is OMITTED when unresolved —
+ *     F3-47 rules (absent preserves, '' wipes);
+ *   - guests are supported: names fall back to the checkout-captured
+ *     columns when there is no WP user.
+ *
+ * Returns the payload the CartFlusher dispatches:
+ *   { email, language?, fields: { ... } }
+ * `language` is mirrored into fields when the merchant's field selection has
+ * it enabled (legacy address parity) AND at the top level (the router's
+ * workflow-language resolution reads it there).
+ *
+ * Not final: unit tests subclass to stub the two price-display seams (which
+ * need a real WC pricing stack).
+ */
+class CartPayloadBuilder {
+
+	/** Legacy parity: at most 10 product slots on the wire. */
+	private const MAX_PRODUCTS = 10;
+
+	/** Legacy parity: every product key is prefilled '' for slots 1..10. */
+	private const PRODUCT_KEYS = array(
+		'product_base_price',
+		'product_description',
+		'product_image_url',
+		'product_name',
+		'product_price',
+		'product_quantity',
+		'product_sku',
+	);
+
+	private ?ContactLanguageResolver $language_resolver;
+
+	public function __construct( ?ContactLanguageResolver $language_resolver = null ) {
+		$this->language_resolver = $language_resolver;
+	}
+
+	/**
+	 * Build the queue payload for one tracker row.
+	 *
+	 * @param array<string, mixed> $row A smly_plus_cart_session row (id,
+	 *                                  user_id, email, first_name, last_name,
+	 *                                  cart_content JSON, …).
+	 *
+	 * @return array<string, mixed>|null Null when the row can't produce a
+	 *                                   sendable payload (no email, or
+	 *                                   cart_content that isn't our JSON
+	 *                                   shape — treat as wire input, F3-53).
+	 */
+	public function build( array $row ): ?array {
+		$email = isset( $row['email'] ) ? trim( (string) $row['email'] ) : '';
+		if ( $email === '' ) {
+			return null;
+		}
+
+		$items = json_decode( isset( $row['cart_content'] ) ? (string) $row['cart_content'] : '', true );
+		if ( ! is_array( $items ) ) {
+			return null;
+		}
+
+		$sync_fields = get_option(
+			\Smaily_Connect\Includes\Options::ABANDONED_CART_FIELDS_OPTION,
+			\Smaily_Connect\Includes\Options::ABANDONED_CART_DEFAULT_FIELDS
+		);
+		if ( ! is_array( $sync_fields ) ) {
+			$sync_fields = \Smaily_Connect\Includes\Options::ABANDONED_CART_DEFAULT_FIELDS;
+		}
+
+		$user = null;
+		if ( isset( $row['user_id'] ) && (int) $row['user_id'] > 0 && function_exists( 'get_userdata' ) ) {
+			$maybe = get_userdata( (int) $row['user_id'] );
+			if ( $maybe instanceof \WP_User ) {
+				$user = $maybe;
+			}
+		}
+
+		$language = $user instanceof \WP_User
+			? $this->resolver()->for_user( $user )
+			: $this->resolver()->for_guest();
+
+		$fields = $this->contact_fields( $row, $user, $sync_fields, $language )
+			+ $this->product_fields( $items, $sync_fields );
+
+		$payload = array(
+			'email'  => $email,
+			'fields' => $fields,
+		);
+		if ( $language !== '' ) {
+			// Top level drives the router's per-language workflow lookup;
+			// omit-on-empty per F3-47 rule 2.
+			$payload['language'] = $language;
+		}
+
+		return $payload;
+	}
+
+	/**
+	 * The non-product address fields, mirroring the legacy
+	 * `Cron::prepare_user_data()` selection semantics.
+	 *
+	 * @param array<string, mixed> $row
+	 * @param array<string, mixed> $sync_fields
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function contact_fields( array $row, ?\WP_User $user, array $sync_fields, string $language ): array {
+		// Business requirement carried over verbatim: distinguishes
+		// abandoned-cart contacts from marketing contacts on shared accounts.
+		$fields = array( 'is_abandoned_cart' => 'true' );
+
+		$first = $user instanceof \WP_User && (string) $user->first_name !== ''
+			? (string) $user->first_name
+			: ( isset( $row['first_name'] ) ? (string) $row['first_name'] : '' );
+		$last  = $user instanceof \WP_User && (string) $user->last_name !== ''
+			? (string) $user->last_name
+			: ( isset( $row['last_name'] ) ? (string) $row['last_name'] : '' );
+
+		foreach ( $sync_fields as $field => $enabled ) {
+			if ( ! $enabled ) {
+				continue;
+			}
+
+			switch ( $field ) {
+				case 'store_url':
+					$fields['store'] = function_exists( 'get_site_url' ) ? (string) get_site_url() : '';
+					break;
+				case 'language':
+					// Omit when unresolved — Smaily treats absent as "leave
+					// existing intact", empty as "wipe" (F3-47).
+					if ( $language !== '' ) {
+						$fields['language'] = $language;
+					}
+					break;
+				case 'first_name':
+					$fields['first_name'] = $first;
+					break;
+				case 'last_name':
+					$fields['last_name'] = $last;
+					break;
+				default:
+					// user_email rides the payload's top-level email; the
+					// product_* selection is handled in product_fields().
+					break;
+			}
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * The `product_<field>_1..10` matrix, mirroring the legacy
+	 * `Cron::prepare_products_data()`: every slot prefilled '' (the legacy
+	 * Smaily API requires all fields updated every send), selected fields filled
+	 * per item, `over_10_products` flagged past slot 10.
+	 *
+	 * @param array<int, mixed>    $items       Own-shape cart items.
+	 * @param array<string, mixed> $sync_fields
+	 *
+	 * @return array<string, string>
+	 */
+	private function product_fields( array $items, array $sync_fields ): array {
+		$fields = array();
+		foreach ( self::PRODUCT_KEYS as $key ) {
+			for ( $i = 1; $i <= self::MAX_PRODUCTS; $i++ ) {
+				$fields[ $key . '_' . $i ] = '';
+			}
+		}
+
+		$selected = array_intersect( self::PRODUCT_KEYS, array_keys( array_filter( $sync_fields ) ) );
+		if ( $selected === array() || ! function_exists( 'wc_get_product' ) ) {
+			return $fields;
+		}
+
+		$slot = 1;
+		foreach ( $items as $item ) {
+			// Treat stored rows as wire input (F3-53): skip anything that
+			// isn't our {product_id, quantity} shape instead of fataling.
+			if ( ! is_array( $item ) || ! isset( $item['product_id'] ) || ! is_scalar( $item['product_id'] ) ) {
+				continue;
+			}
+
+			$product = wc_get_product( (int) $item['product_id'] );
+			if ( ! $product ) {
+				continue;
+			}
+
+			if ( $slot > self::MAX_PRODUCTS ) {
+				$fields['over_10_products'] = 'true';
+				break;
+			}
+
+			foreach ( $selected as $field ) {
+				$value = $this->product_field_value( $field, $product, $item );
+				if ( $value === null ) {
+					continue;
+				}
+				$fields[ $field . '_' . $slot ] = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 );
+			}
+
+			++$slot;
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * @param \WC_Product          $product
+	 * @param array<string, mixed> $item
+	 */
+	private function product_field_value( string $field, $product, array $item ): ?string {
+		switch ( $field ) {
+			case 'product_name':
+				return (string) $product->get_name();
+			case 'product_description':
+				return (string) $product->get_description();
+			case 'product_sku':
+				return (string) $product->get_sku();
+			case 'product_quantity':
+				return isset( $item['quantity'] ) && is_scalar( $item['quantity'] )
+					? (string) $item['quantity']
+					: '';
+			case 'product_price':
+				return $this->sale_price_display( $product );
+			case 'product_base_price':
+				return $this->base_price_display( $product );
+			case 'product_image_url':
+				$url = $this->product_image_url( $product );
+				return $url !== '' ? $url : null; // Legacy parity: empty image URL keeps the '' prefill.
+			default:
+				return null;
+		}
+	}
+
+	/**
+	 * Sale display price without HTML tags — same formatting chain as the
+	 * legacy pass (Helper price incl. tax → wc_price → strip). Protected
+	 * seam: needs a real WC pricing stack, so unit tests stub it.
+	 *
+	 * @param \WC_Product $product
+	 */
+	protected function sale_price_display( $product ): string {
+		$price = wc_price(
+			\Smaily_Connect\Integrations\WooCommerce\Helper::get_current_price_with_tax( $product )
+		);
+
+		return wp_strip_all_tags( html_entity_decode( $price, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 ) );
+	}
+
+	/**
+	 * Regular display price without HTML tags (see sale_price_display).
+	 *
+	 * @param \WC_Product $product
+	 */
+	protected function base_price_display( $product ): string {
+		$price = wc_price(
+			\Smaily_Connect\Integrations\WooCommerce\Helper::get_regular_price_with_tax( $product )
+		);
+
+		return wp_strip_all_tags( html_entity_decode( $price, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 ) );
+	}
+
+	/**
+	 * Featured image, else first gallery image (legacy parity).
+	 *
+	 * @param \WC_Product $product
+	 */
+	protected function product_image_url( $product ): string {
+		$image_id = (int) $product->get_image_id();
+		if ( $image_id > 0 ) {
+			$url = wp_get_attachment_url( $image_id );
+			if ( is_string( $url ) && $url !== '' ) {
+				return $url;
+			}
+		}
+
+		$gallery = $product->get_gallery_image_ids();
+		if ( is_array( $gallery ) && $gallery !== array() ) {
+			$url = wp_get_attachment_url( (int) $gallery[0] );
+			if ( is_string( $url ) && $url !== '' ) {
+				return $url;
+			}
+		}
+
+		return '';
+	}
+
+	private function resolver(): ContactLanguageResolver {
+		if ( $this->language_resolver === null ) {
+			$this->language_resolver = new ContactLanguageResolver();
+		}
+		return $this->language_resolver;
+	}
+}

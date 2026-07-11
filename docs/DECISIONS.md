@@ -1913,6 +1913,10 @@ payloads fresh at flush, so the failed rows heal in place).
 
 ### F3-37 — Abandoned-cart backlog guard + per-cart error handling (pilot mass-email incident)
 
+> **Note (PRO-1195, 2026-07-11):** the legacy email pass this hardened is
+> retired; the backlog guard (same filter name, same 24h default, same
+> "expire without emailing" semantics) now lives in `CartAbandonmentSweeper`.
+
 **Context:** minutes after the 2.x plugin was installed on the pilot store,
 customers received abandoned-cart emails in bulk. **Attribution (corrected
 mid-investigation):** the emails came from **CartBounty Pro** — a third-party
@@ -2809,6 +2813,12 @@ store's actual language structure.
 
 ### F3-53 — Abandoned-cart poison-row hardening + the legacy WP-Cron scheduler is removed for good (Prike fatal loop)
 
+> **Note (PRO-1195, 2026-07-11):** the "rewrite is a separate decision"
+> deferral is now resolved — the legacy abandoned-cart pass is retired and
+> the poison-row guards + Throwable backstop carry over into the drain
+> (`LegacyCartDrain`), the sweeper and the CartFlusher. Decisions 2–3 here
+> (no legacy scheduler, uninvocable mass-send) stand unchanged.
+
 **Context:** Prike (2026-07-08) installed the new module over the old one (no in-place
 upgrade). From minutes after their setup wizard: a PHP 8 fatal (`Cannot access offset of
 type string on string`) on every 15-minute `smly_plus_abandoned_cart` tick — old-writer
@@ -2866,6 +2876,11 @@ omit the key when it returns '' (F3-47 rule 2). This is the interim fix; the ful
 abandoned-cart rewrite onto the new namespaced pipeline is a separate future decision.
 
 ### F3-54 — Abandoned-cart status option: one normalized shape, router-first dispatch (the REAL Prike fatal)
+
+> **Note (PRO-1195, 2026-07-11):** the legacy email pass that hosted the
+> router-first dispatch is retired; the normalized option read, the
+> router-first order and the preserved `autoresponder_id` fallback all carry
+> over into the new pipeline (`CartFlusher`). Decision 1 and 3 stand as-is.
 
 **Context:** Martin's (Prike dev) correction to the F3-53 diagnosis: the PHP 8 fatal was at
 the EMPTY-OPTION GUARD (`$status['enabled']`, cron.class.php:166), not in the cart-item
@@ -3130,6 +3145,93 @@ discounts). Status mapping and everything else in F3-22 stand.
 (deleted-line snapshot totals now also gross via the same accessors), CC-8
 (contract sync `434ffee`), LESSONS §2.3 (a formatted-field basis is exactly the
 mock-vs-live class the live-walk must cover).
+
+### PRO-1195 — Abandoned cart rewritten onto the namespaced pipeline; the legacy pass is retired (design approved by Erkki 2026-07-11)
+
+**Context:** the legacy 1.x abandoned-cart path stored `serialize(get_cart())`
+(whole WC objects — the exact F3-53 poison class), tracked only logged-in
+users, and had no Event Log observability. F3-53/F3-54 hardened it during the
+Prike incident but explicitly deferred the rewrite ("a separate decision").
+This is that decision.
+
+**Decision — the pipeline (mirrors the customers-domain shape):**
+`CartHookHandler` (WC cart hooks) → `smly_plus_cart_session` tracker
+(migration 009; one row per WC SESSION — cart_token = the session customer id,
+so GUESTS are tracked; own scalar shape `[{product_id, variation_id,
+quantity}]`, never a serialized object) → `CartAbandonmentSweeper` on the
+EXISTING `smly_plus_abandoned_cart` AS 15-min tick (same option-driven cutoff
+`smaily_connect_abandoned_cart_cutoff` + the F3-37 backlog guard, same filter
+name) → ONE `automation.abandoned_cart` event in the Smaily EventQueue →
+`CartFlusher` on its own AS action (`smly_plus_flush_cart_events`, 60 s),
+event-type-scoped both ways (`EventQueue::pending()` grew only/exclude type
+args; the main Flusher excludes the cart type). Dispatch keeps the F3-54
+order: AutomationRouter first (wizard mapping, multilingual, force_opt_in),
+fallback the legacy option's `autoresponder_id` with `force_opt_in=false`;
+neither source = terminal skip with an Event Log "skipped" marker. Every row
+stores its F3-44 exchange. Language: `ContactLanguageResolver` only —
+`for_user`, or the new `for_guest()` (default-tier, clamped) for guests;
+omit-on-empty. Wire fields keep exact legacy parity (`is_abandoned_cart`,
+`store`, names, the prefilled `product_<field>_1..10` matrix +
+`over_10_products`) — merchants' existing autoresponder templates keep
+rendering unchanged.
+
+**Guest carts (new capability):** a cart syncs only once an email identity is
+known — the logged-in user, a session-persisted billing email, or a
+checkout-entered email (classic `woocommerce_checkout_update_order_review`
+POST / Store API `cart_update_customer_from_request`). No browse/visitor-token
+identity in this pass (deliberate). Email-less rows are tracked but expire
+under the backlog guard; a login that migrates the cart to a new session token
+deletes same-email guest remnants (no double reminder).
+
+**Upgrade continuity (definition of done):** zero reconfiguration — the new
+code reads the SAME options (status array via the F3-54 normalized read,
+cutoff, fields); zero lost carts — `Migration\LegacyCartDrain` runs once from
+`Activation::run` (option stamp `smly_plus_cart_legacy_drained`), copying
+every `mail_sent IS NULL` legacy row into the tracker with its ORIGINAL
+`cart_updated` (recent carts remind, stale ones expire — the F3-37 semantics
+the legacy pass would have applied). The drain is READ-ONLY on the legacy
+table, treats `cart_content` as untrusted wire input (F3-53 guards + per-row
+Throwable backstop) and schedules NOTHING (the F3-53 re-arm scar). The legacy
+table is NOT dropped (safe rollback; schema removal is a later one-way door).
+
+**Retirement:** the legacy `Cart` tracker and the Cron abandoned-cart
+add_actions are deregistered (methods stay for the upstream diff) — F3-53
+discipline: a stray surviving legacy WP-Cron event must find nothing to fire
+(it would double-remind against the new pipeline). Bootstrap's
+`on_abandoned_cart_tick` no longer bridges to the legacy hook names.
+`AbandonedCartGuardTest` (which drove the retired pass) is replaced by
+`CartPipelineTest` + `LegacyCartDrainTest` + the CartFlusher/Sweeper unit
+suites — every pinned bug class (backlog guard, poison rows, per-cart
+continue, the F3-54 writer↔reader seam) is re-pinned against the NEW code.
+
+**Gates:** `setup_completed` (contact-path rule — dispatch needs wizard
+credentials; tracking is additionally gated on it so an un-wizarded store
+collects no cart PII) AND the merchant's abandoned-cart toggle. Housekeeping
+(expiry/prune, order-completion clears) runs ungated.
+
+**Deliberate deltas from legacy behavior (recorded, not user-visible-parity
+breaks):** (1) enabled-but-unconfigured carts terminal-skip observably in the
+Event Log instead of silently retrying until the age window (consistent with
+the pipeline's no-workflow semantics; the config gap is logged once per
+flush); (2) a deterministic non-101 Smaily body code on the fallback path is
+terminal `failed` (Event Log-retryable) instead of an eternal 15-min retry;
+(3) a truly-never-wizarded store's carts no longer send (the F3-54 legacy
+fallback kept them working) — accepted per the approved design's
+setup_completed gate; all real stores are wizard-based.
+
+**Alternatives rejected:** per-cart AS single actions for abandonment
+detection (an unschedule/reschedule per cart update on a hot path; the 15-min
+sweep matches legacy granularity); keying the tracker by user/email (loses
+guest carts — the whole point); draining legacy rows into the queue directly
+(skips cutoff/backlog semantics); dropping the legacy table (one-way door,
+blocks rollback).
+
+**Relationships:** supersedes F3-53's "harden, don't rewrite" stance (the
+hardening ideas carry over as drain/sweeper/flusher guards); F3-54 (normalized
+option read + router-first order + preserved autoresponder_id all carried
+over; the legacy email pass it patched is retired); F3-37 (backlog guard —
+same filter, now in the sweeper); F3-44 (exchange capture); F3-47 (resolver
+language, `for_guest` added); Linear PRO-1195.
 
 ## How to keep this document going
 

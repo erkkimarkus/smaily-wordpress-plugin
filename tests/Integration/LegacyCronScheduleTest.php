@@ -62,6 +62,21 @@ final class LegacyCronScheduleTest extends TestCase {
 		}
 	}
 
+	public function test_legacy_abandoned_cart_pass_has_no_registered_callbacks(): void {
+		// PRO-1195: the namespaced pipeline owns abandoned cart. A stray
+		// surviving legacy WP-Cron event must find NOTHING to fire — the
+		// retired status/email pass double-reminding against the new
+		// pipeline would be the F3-53 resurrection class all over again.
+		self::assertFalse(
+			has_action( 'smaily_connect_cron_abandoned_carts_status' ),
+			'The legacy abandoned-cart status pass must not be invocable.'
+		);
+		self::assertFalse(
+			has_action( 'smaily_connect_cron_abandoned_carts_email' ),
+			'The legacy abandoned-cart email pass must not be invocable.'
+		);
+	}
+
 	public function test_legacy_lifecycle_no_longer_carries_a_wp_cron_scheduler(): void {
 		self::assertFalse(
 			method_exists( \Smaily_Connect\Includes\Lifecycle::class, 'set_scheduled_actions' ),

@@ -12,7 +12,6 @@ use Smaily_Connect\Includes\Widget;
 use Smaily_Connect\Integrations\CF7\Admin as Smaily_CF7_Admin;
 use Smaily_Connect\Integrations\CF7\Public_Base as Smaily_CF7_Public;
 use Smaily_Connect\Integrations\Elementor\Admin as Elementor_Admin;
-use Smaily_Connect\Integrations\WooCommerce\Cart;
 use Smaily_Connect\Integrations\WooCommerce\Cron;
 use Smaily_Connect\Integrations\WooCommerce\Profile_Settings;
 use Smaily_Connect\Integrations\WooCommerce\Rss;
@@ -83,15 +82,6 @@ class Smaily_Connect {
 	 * @var    Public_Base $public_base Public_Base class instance.
 	 */
 	protected $public_base;
-
-	/**
-	 * WooCommerce Cart class instance.
-	 *
-	 *
-	 * @access private
-	 * @var    Cart $wc_cart WooCommerce Cart class instance.
-	 */
-	protected $wc_cart;
 
 	/**
 	 * WooCommerce Cron class instance.
@@ -194,7 +184,6 @@ class Smaily_Connect {
 	 *
 	 * Woocommerce related dependencies
 	 *
-	 * - Integrations\WooCommerce\Cart                         Manages status of user cart in abandoned carts table.
 	 * - Integrations\WooCommerce\Cron.                        Handles data synchronization between Smaily and WooCommerce.
 	 * - Integrations\WooCommerce\Data_Handler.                Handles woocommerce related data retrieval
 	 * - Integrations\WooCommerce\Data_Prepare.                Class for preparing Woocommerce related data
@@ -322,8 +311,10 @@ class Smaily_Connect {
 		$this->public_base->register_hooks();
 
 		if ( Helper::is_woocommerce_active() ) {
-			$this->wc_cart = new Cart();
-			$this->wc_cart->register_hooks();
+			// PRO-1195: the legacy Cart tracker is no longer registered — the
+			// namespaced CartHookHandler (Bootstrap) owns cart tracking (own
+			// scalar row shape, guest carts, Event Log observability). The
+			// class + its table stay (drain source, safe rollback).
 
 			$this->wc_cron = new Cron( $this->options );
 			$this->wc_cron->register_hooks();

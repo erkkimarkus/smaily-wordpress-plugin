@@ -26,7 +26,62 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1197 — developer docs written: `docs/ARCHITECTURE.md`,
+_Last updated: 2026-07-11 (**PRO-1195 DONE — abandoned cart REWRITTEN onto the
+namespaced pipeline; legacy pass RETIRED. Landed on main, UNRELEASED** (rides a
+later cut AFTER the 2026-07-14 MiuMjau window — no version bump, readme.txt
+untouched). Erkki-approved design: `CartHookHandler` (WC cart hooks; **guest
+carts included** — session-token rows; identity = logged-in user / session
+billing email / checkout-entered email via classic
+`checkout_update_order_review` + Store API `cart_update_customer_from_request`;
+a cart syncs only once an email is known) → new `smly_plus_cart_session`
+tracker (migration 009; own scalar JSON `[{product_id, variation_id,
+quantity}]`, never `serialize(get_cart())` — the F3-53 poison class is
+structurally gone) → `CartAbandonmentSweeper` on the EXISTING 15-min
+`smly_plus_abandoned_cart` AS tick (same cutoff option; F3-37 backlog guard
+carried over, same filter name; expiry/prune housekeeping runs even while
+gated) → `automation.abandoned_cart` rows in the Smaily EventQueue
+(`pending()` grew only/exclude event-type scoping; the main Flusher excludes
+the cart type) → new `CartFlusher` on its own AS action
+`smly_plus_flush_cart_events` (60 s): F3-54 router-first → legacy
+`autoresponder_id` fallback (force_opt_in=false) → observable terminal skip;
+a non-101 fallback body code is terminal FAILED (Event-Log-retryable, never an
+eternal loop); F3-44 exchange stored per row (never the Authorization header);
+the Events retry endpoint kicks the cart flush hook too. Wire fields keep
+EXACT legacy template parity (`is_abandoned_cart`, store/names, prefilled
+`product_<field>_1..10`, `over_10_products`); language via
+ContactLanguageResolver only (`for_user` + new `for_guest()`), omit-on-empty.
+**Upgrade continuity (definition of done) proven:** the new code reads the
+SAME options (normalized status incl. the carried-over autoresponder_id,
+cutoff, fields — zero reconfiguration); one-time READ-ONLY `LegacyCartDrain`
+on `Activation::run` (stamp `smly_plus_cart_legacy_drained`) migrates
+`mail_sent IS NULL` legacy rows with their ORIGINAL `cart_updated` (recent →
+reminds via the new pipeline; stale → F3-37 expiry without emailing; poison
+rows logged+skipped with a per-row Throwable backstop; schedules NOTHING per
+F3-53); the legacy table is NOT dropped (rollback-safe; drop = a later
+one-way door). Retirement: legacy `Cart` tracker + the Cron abandoned-cart
+add_actions deregistered (methods kept for the upstream diff) so a stray
+surviving legacy WP-Cron event finds nothing to fire; Bootstrap's tick no
+longer bridges the legacy hook names. Tests: +36 unit
+(CartFlusher/CartAbandonmentSweeper/CartPayloadBuilder/CartHookHandler +
+EventQueue scoping + main-Flusher exclusion); integration reworked — new
+`CartPipelineTest` (logged-in E2E to the mocked Smaily transport incl. F3-44
+exchange asserts, guest checkout-email capture, legacy-autoresponder fallback
+carry-over, backlog guard, order-clears, Bootstrap hook registration) + new
+`LegacyCartDrainTest` (both F3-53 poison classes, read-only + one-time +
+original-timestamp semantics, drained-recent-reminds vs stale-expires);
+`AbandonedCartGuardTest` retired WITH the pass it drove (its bug classes
+re-pinned against the new code), `AbandonedCartSettingsSeamTest` re-pointed at
+the new consumers, `LegacyCronScheduleTest` extended (cart callbacks
+uninvocable). Gates: **ci:strict exit=0** (unit 539, vitest 236, PHPCS 0
+errors, PHPStan clean) + **integration FULL OK (148 tests, 756 assertions)**
+via the wrapper (sandbox connection auto-restored, tenant verified
+'Smaily Connect test'). NO live Smaily/engine traffic. Merchant docs site
+UNCHANGED — behavioral parity; every abandoned-cart statement on it stays true
+(guest coverage extends, contradicts nothing). Docs same commit: DECISIONS
+PRO-1195 (+ F3-37/F3-53/F3-54 pointer notes), CLAUDE.md coexistence map +
+scar-note rewrite, ARCHITECTURE/API dev-doc tables refreshed (new AS jobs +
+table + retired hook pair), BACKLOG row closed. Prior:
+**PRO-1197 — developer docs written: `docs/ARCHITECTURE.md`,
 `docs/DEVELOPER.md`, `docs/API.md`** (docs-only). The three long-TODO developer-facing
 docs now exist, written from the actual repo (EndpointRegistry route surface incl. the
 `/events` triple + the public `/relay` defense layers; all 11 `smaily_connect_*` filters

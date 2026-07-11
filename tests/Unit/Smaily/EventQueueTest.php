@@ -139,6 +139,22 @@ final class EventQueueTest extends TestCase {
 		self::assertSame( 25, $wpdb->prepare_calls[0]['args'][1] );
 	}
 
+	public function test_pending_event_type_scoping_builds_in_and_not_in_clauses(): void {
+		// PRO-1195: the queue is drained by two flushers — the CartFlusher
+		// scopes to its own type, the main Flusher excludes it. Pin the SQL
+		// shape + arg order for both.
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->pending( 10, array( 'automation.abandoned_cart' ) );
+		self::assertStringContainsString( 'event_type IN ( %s )', $wpdb->prepare_calls[0]['sql'] );
+		self::assertSame( array( EventQueue::STATUS_PENDING, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[0]['args'] );
+
+		( new EventQueue() )->pending( 10, null, array( 'automation.abandoned_cart' ) );
+		self::assertStringContainsString( 'event_type NOT IN ( %s )', $wpdb->prepare_calls[1]['sql'] );
+		self::assertSame( array( EventQueue::STATUS_PENDING, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[1]['args'] );
+	}
+
 	public function test_pending_returns_empty_array_when_get_results_returns_non_array(): void {
 		$wpdb            = $this->fake_wpdb_full();
 		$GLOBALS['wpdb'] = $wpdb;

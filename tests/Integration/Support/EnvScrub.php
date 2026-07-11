@@ -60,6 +60,7 @@ final class EnvScrub {
 			'smly_plus_event_queue',
 			'smly_plus_backfill_job',
 			'smly_plus_automation_mapping',
+			'smly_plus_cart_session',
 			'smly_rec_event_queue',
 			'smly_rec_visitor',
 		);
@@ -103,6 +104,11 @@ final class EnvScrub {
 			RecEngineSettings::OPTION_ENDPOINTS,
 			RecEngineSettings::OPTION_CONFIG,
 			RecEngineSettings::OPTION_ISSUED_AT,
+			// One-time-stamp options (autoload=false → per-key cache) the
+			// LIKE-sweep deletes from the DB but not from the object cache;
+			// stale cached values would make re-runnable one-time migrations
+			// (e.g. the PRO-1195 legacy cart drain) silently no-op in tests.
+			\Smaily\Connect\Migration\LegacyCartDrain::DRAINED_OPTION,
 		) );
 		foreach ( $keys_to_flush as $key ) {
 			wp_cache_delete( (string) $key, 'options' );

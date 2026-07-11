@@ -83,7 +83,7 @@ All in the `smaily_connect_*` namespace (locations in parentheses):
 | `smaily_connect_janitor_sent_retention_days` | see `QueueJanitor` | Retention of `sent` queue rows |
 | `smaily_connect_janitor_failed_retention_days` | see `QueueJanitor` | Retention of `failed` queue rows |
 | `smaily_connect_failed_notice_threshold` | see `NotificationManager` | Failed-row count that triggers the admin health notice |
-| `smaily_connect_abandoned_cart_max_age_seconds` | see legacy `cron.class.php` | Legacy abandoned-cart age window |
+| `smaily_connect_abandoned_cart_max_age_seconds` | `DAY_IN_SECONDS` | Abandoned-cart backlog window (F3-37) — `CartAbandonmentSweeper` + the legacy drain (PRO-1195) |
 | `smaily_connect_account_fields` | — | Legacy: extra fields on the account profile-settings form (`profile-settings.class.php`) |
 
 NB: there is **no** `smaily_connect_beacon_consent` filter — browse consent is
@@ -92,10 +92,11 @@ category filter above (F3-50).
 
 ## 3. Action hooks
 
-Public `do_action` surface is minimal: `Bootstrap::on_abandoned_cart_tick()`
-fires the legacy hook pair `smaily_connect_cron_abandoned_carts_status` then
-`smaily_connect_cron_abandoned_carts_email` (the legacy cart handlers listen
-on these). Everything else scheduled is an **Action Scheduler** hook
+Public `do_action` surface is minimal — the plugin defines no public action
+hooks of its own. (The legacy abandoned-cart hook pair
+`smaily_connect_cron_abandoned_carts_status`/`_email` is RETIRED, PRO-1195:
+nothing fires it and nothing listens on it anymore.) Everything scheduled is
+an **Action Scheduler** hook
 (`smly_plus_*` / `smly_rec_*`) — internal contracts, listed with cadences in
 [`ARCHITECTURE.md` §6](ARCHITECTURE.md#6-background-work--action-scheduler).
 Don't attach third-party listeners to the queue-flush hooks; use the Event Log
