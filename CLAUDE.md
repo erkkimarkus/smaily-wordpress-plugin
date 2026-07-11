@@ -682,6 +682,23 @@ the drift); (3) run that endpoint's live-walk (or one curl) before calling it
 done. Don't let a breaking change wait for an unrelated sub-PR to surface it.
 (LESSONS §2.7.)
 
+**Staleness is now CI-guarded (PRO-1250, Decision A on PRO-1247).** The
+`Contract staleness` workflow (`.github/workflows/contract-staleness.yml` —
+deliberately its OWN workflow, since "Lint and test" is pre-existing red) runs
+`bin/check-contract-staleness.sh` on push/PR/daily-schedule/dispatch and fails
+when `docs/RECENGINE_API_CONTRACT.md` is no longer byte-identical with the
+engine repo's (`erkkimarkus/smaily-recommendations`, PRIVATE) main branch.
+The daily schedule is the real guard — drift usually arrives with no push on
+our side. It needs the repo secret `ENGINE_CONTRACT_READ_TOKEN` (fine-grained
+PAT, contents:read on the engine repo); a missing/expired secret fails with a
+distinct "CANNOT CHECK" message (exit 2), never masquerading as "CONTRACT COPY
+STALE" (exit 1). The script also runs locally: no args falls back to the local
+engine checkout (`ENGINE_CHECKOUT`, default `…/smaily.app/re`), or pass a
+path/URL. This automates DETECTION only — the sync discipline above
+(byte-identical + mock + code follow-through in the same pass, live-walk a
+wire-shape change) is unchanged. Per-bump sync issues are RETIRED for this
+repo: a red staleness run is the signal to sync.
+
 ---
 
 ## Things NOT to do (each is a scar)

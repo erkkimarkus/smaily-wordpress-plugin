@@ -26,7 +26,25 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**v3.6.1 RELEASED** — patch release per Erkki's call
+_Last updated: 2026-07-11 (**PRO-1250 DONE — contract-staleness CI guard**
+(Decision A on PRO-1247): new standalone workflow
+`.github/workflows/contract-staleness.yml` (push to main / PR / daily 05:17 UTC
+schedule — the schedule is the real guard — / dispatch) runs
+`bin/check-contract-staleness.sh`, which md5-compares our vendored
+`docs/RECENGINE_API_CONTRACT.md` against the engine repo's main
+(`erkkimarkus/smaily-recommendations`, PRIVATE) and fails "CONTRACT COPY STALE —
+sync from engine@<sha>" (exit 1) with local+engine md5 + the CC-8 instruction;
+a missing/expired secret fails with a DISTINCT "CANNOT CHECK" (exit 2). Script
+verified locally in all modes: in-sync via local checkout arg, no-arg fallback,
+and the real GitHub-API CI path (all OK, md5 `b285ded8…`, engine commit
+`2dec424`); simulated-stale temp copy → exit 1 with the full message;
+no-source → exit 2. **Pending from Erkki: mint a fine-grained PAT
+(contents:read on `smaily-recommendations` only) and add it as repo secret
+`ENGINE_CONTRACT_READ_TOKEN`** — until then the scheduled run is red with
+"CANNOT CHECK" (deliberately loud, not silent). Per-bump contract-sync issues
+are RETIRED for this repo (CLAUDE.md CC-8 note updated); the sync discipline
+itself (byte-identical + mock + code follow-through) is unchanged. Prior:
+**v3.6.1 RELEASED** — patch release per Erkki's call
 (PRO-1241 is a bugfix). Full GH release on the fork, tag `v3.6.1`, target main,
 **Latest** (non-prerelease); asset `smaily-connect.zip` is the locally-built verified
 ZIP (clean build-hash `aa86c9a`, 1 076 060 B — re-verified un-clobbered after the
