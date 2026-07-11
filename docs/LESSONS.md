@@ -636,10 +636,17 @@ with no snapshot on 2026-07-10) — is no longer discipline-based.
 `bin/run-integration-tests.sh` now snapshots the dev site's `smly_rec_*`
 options (durable, mode-600, outside the repo, never clobbering a good
 snapshot with a fixture state) before every suite run and restores + verifies
-`tenant_name` after it, even when the suite fails. The manual
-snapshot/restore rule survives only for runs that bypass the wrapper. The
-ENGINE-side half (tenant-scoped walk residue) remains discipline: a walk's
-report must still name the residue it leaves.
+`tenant_name` after it, even when the suite fails. Since PRO-1256 the guard
+is a shared library (`bin/lib-smly-snapshot.sh`; Node wrapper
+`bin/lib-smly-snapshot.cjs`): a connection-writing walk calls
+`guardSmlyRec()` at its top (wired example: `bin/walk-3.1.cjs`, the only walk
+that writes `smly_rec_*` options — the rest only read the connection or
+truncate the queue table), and
+`bash bin/run-integration-tests.sh --restore-only` recovers the dev
+connection from the durable snapshot after any run that bypassed the guard.
+The manual snapshot/restore rule survives only for hand-rolled runs that use
+neither. The ENGINE-side half (tenant-scoped walk residue) remains
+discipline: a walk's report must still name the residue it leaves.
 
 ### 2.18 An "orphaned" legacy callback isn't dead while a legacy scheduler can still fire it — and one poison row must never own the whole pass (Prike, 2026-07-08)
 

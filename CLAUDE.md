@@ -74,8 +74,11 @@ If you must hand-roll a `docker exec`, use `phpunit.integration.xml.dist` —
 the default `phpunit.xml.dist` loads the UNIT bootstrap (no wp-load, no
 WooCommerce) and the test then fails with `undefined function
 update_option()` / "WooCommerce missing" even though the real suite is green.
-A hand-rolled run also bypasses the snapshot guard — snapshot/restore
-manually (see the wp-env snapshot note in the TENANT-scoped section below).
+A hand-rolled run also bypasses the snapshot guard — wrap it in the shared
+guard yourself (`bash bin/lib-smly-snapshot.sh snapshot` before, `… restore`
+after — PRO-1256), or recover afterwards with
+`bash bin/run-integration-tests.sh --restore-only` (restores the dev
+connection from the durable snapshot without running the suite).
 
 ### Live-walk needs a fresh setup-token — from the SANDBOX tenant, never MiuMjau
 **MiuMjau IS the pilot's PRODUCTION tenant** (engine-side correction,
@@ -94,9 +97,11 @@ the template for why dev work never touches a production tenant.
 Mechanics (unchanged): the setup-token is **one-time** (consumed on
 exchange) and connections get scrubbed by integration test runs. Since
 PRO-1240 the `test:integration` wrapper snapshots/restores the dev site's
-`smly_rec_*` options AUTOMATICALLY around a suite run (see the wp-env
-snapshot note below) — only a hand-rolled `docker exec` phpunit run
-bypasses that guard. When a live-walk reports `is_connected = 0`:
+`smly_rec_*` options AUTOMATICALLY around a suite run, and since PRO-1256
+the same guard is shared with walk scripts (see the wp-env snapshot note
+below) — only a hand-rolled `docker exec` phpunit run bypasses it, and
+`bash bin/run-integration-tests.sh --restore-only` recovers from the
+durable snapshot even then. When a live-walk reports `is_connected = 0`:
 - Ask the user to mint a fresh SANDBOX token (or a full setup URL
   `https://<engine>/setup/<token>`) into a `/tmp/smaily_re_setup_*` file
   (plain token/URL, secret-safe file method).
@@ -597,11 +602,23 @@ suite, and after it — even on failure — restores them secret-safely (JSON
 piped over STDIN into `docker exec -i … wp eval-file
 bin/restore-smly-rec-options.php`, never on a command line) and prints the
 restored `tenant_name`, warning loudly on `MiuMjau`/fixture. An intentionally
-DISCONNECTED dev site is left alone (no auto-reconnect). The manual rule
-survives only for runs that bypass the wrapper (hand-rolled `docker exec`
-phpunit, walks that scrub the connection): `wp option list
---search='smly_rec_*' --format=json` before; restore via the same STDIN-fed
-`wp eval-file` script after; verify `tenant_name`. (LESSONS §2.17.)
+DISCONNECTED dev site is left alone (no auto-reconnect). **Since PRO-1256 the
+guard is a shared library, not wrapper-internal:** `bin/lib-smly-snapshot.sh`
+(sourced by the wrapper; also executable — `snapshot`/`restore` subcommands,
+always exit 0 so a guard problem never fails the guarded run). Walk scripts
+opt in via `require('./lib-smly-snapshot.cjs').guardSmlyRec()` at the top —
+snapshot now + restore on process exit, crash included. **The wired example
+is `bin/walk-3.1.cjs` — the only existing walk that writes/deletes the
+`smly_rec_*` connection options** (it seeds a mock connection and scrubs the
+options); the other walks only READ the connection or TRUNCATE the
+`smly_rec_event_queue` table (queue rows, not the connection) and need no
+guard. **Any future walk that writes `smly_rec_*` options must call
+`guardSmlyRec()` before touching them.** After any run that still scrubbed
+the connection (hand-rolled phpunit, an unguarded walk):
+`bash bin/run-integration-tests.sh --restore-only` restores from the durable
+snapshot without running the suite (non-secret output only; exit 3 when no
+usable snapshot exists — then a fresh SANDBOX setup token is the fix).
+(LESSONS §2.17.)
 
 ### Integration baseline is WP 7.0; the pilot stack needs an override to reproduce
 Since 2026-06-11 `.wp-env.json` pins `core: WordPress/WordPress#7.0` (Erkki's

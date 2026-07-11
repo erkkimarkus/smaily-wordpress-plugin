@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1194 DRAFT DELIVERED — merchant privacy-policy
+_Last updated: 2026-07-11 (**PRO-1256 DONE — shared `smly_rec_*` snapshot/restore
+guard + `--restore-only`** (dev tooling, follow-up to PRO-1240). The guard logic
+moved out of `bin/run-integration-tests.sh` into `bin/lib-smly-snapshot.sh` —
+sourced by the wrapper (NO behavior change: EXIT-trap restore,
+fixture/production/empty never clobbers a good snapshot, secret-safe STDIN
+restore, tenant_name verification with loud MiuMjau/fixture warnings, guard
+problems never fail the run) and also executable (`snapshot`/`restore`
+subcommands, always exit 0; the pre/post decision now persists via a
+pending-decision file so it survives across processes). Walk scripts opt in
+via the Node wrapper `bin/lib-smly-snapshot.cjs` — `guardSmlyRec()` snapshots
+up front and restores on process exit (crash/SIGINT included); wired into
+`bin/walk-3.1.cjs`, the ONLY existing walk that writes/deletes `smly_rec_*`
+connection options (the others only read the connection or truncate the
+queue table — decision recorded in CLAUDE.md; any future connection-writing
+walk must call it). New `bash bin/run-integration-tests.sh --restore-only`
+restores the dev connection from the durable snapshot without running the
+suite (non-secret output only; exit 3 when no usable snapshot). Proof:
+integration suite via the wrapper **OK (146 tests, 721 assertions)** with
+restore verified `tenant_name='Smaily Connect test'`; `--restore-only`
+demonstrated (real restore, 9 options, tenant verified; exit-3 path with the
+snapshot absent); standalone `snapshot`→`restore` round-trip green; NO
+live-walk run (host-side tooling only). ci:strict exit=0. Docs same commit:
+CLAUDE.md (filtered-runs + live-walk + TENANT-scoped notes now point at the
+shared lib + `--restore-only`), LESSONS §2.17 addendum. Prior:
+**PRO-1194 DRAFT DELIVERED — merchant privacy-policy
 template (EN+ET) + fail-open GDPR window review, in `docs/DATA_MODEL_GDPR.md`**
 (docs-only; the issue stays OPEN for Erkki/legal sign-off — nothing published to
 any user-visible surface, merchant docs site untouched). Two new sections: (1) a

@@ -16,6 +16,14 @@
  */
 const { chromium } = require('playwright-core');
 const { execSync } = require('child_process');
+const { guardSmlyRec } = require('./lib-smly-snapshot.cjs');
+
+// PRO-1256: this walk seeds/scrubs the dev site's smly_rec_* connection
+// options (seedConnectedState / seedDisconnectedState below). Snapshot the
+// real connection now and restore it on process exit — even on a crash —
+// so the walk can't leave the dev site's engine connection scrubbed
+// (CLAUDE.md wp-env snapshot note; shared guard = bin/lib-smly-snapshot.sh).
+guardSmlyRec();
 
 const ADMIN_URL = 'http://localhost:8888/wp-admin';
 const WIZARD_URL = `${ADMIN_URL}/admin.php?page=smaily-connect-wizard`;
