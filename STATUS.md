@@ -26,8 +26,28 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1241 DONE — all order money fields GROSS (tax-inclusive)
-per contract v1.4.0 §5; landed on main, UNRELEASED.** MiuMjau prod verification (PRO-1202)
+_Last updated: 2026-07-11 (**v3.6.1 RELEASED** — patch release per Erkki's call
+(PRO-1241 is a bugfix). Full GH release on the fork, tag `v3.6.1`, target main,
+**Latest** (non-prerelease); asset `smaily-connect.zip` is the locally-built verified
+ZIP (clean build-hash `aa86c9a`, 1 076 060 B — re-verified un-clobbered after the
+expected harmless `release.yml` failure). Contents since 3.6.0: PRO-1241 gross
+(tax-inclusive) order amounts per contract v1.4.0 §5 + the PRO-1240 dev-only
+snapshot tooling (`bin/`, not shipped). Changelog + upgrade notice state that
+already-connected stores' HISTORICAL order rows are corrected by the
+engine-coordinated re-sync (rides PRO-1233, ~2026-07-14) — nothing merchant-side;
+new orders are gross immediately on update. Gates (3.6.1 release-gate row in
+`docs/audits/INDEX.md`): PCP on the built ZIP clean except the intentional
+`Update URI` (F3-35); ci:strict exit=0 (unit 503, vitest 236); integration not
+re-run (delta past the integration-green `b249887` is version/readme/`.pot`-header
+only); no security re-audit (below policy threshold — no new
+REST/auth/crypto/SQL/PII/external-HTTP surface; judgement recorded in the row).
+**Gate-time incident, recovered:** a container-side `rm -rf` on the bind-mounted
+`plugins/smaily-connect` PCP path wiped the host working tree incl. `.git`;
+recovered by a full re-clone from `origin/main` (everything was pushed; only the
+local version-bump commit needed recreating) + full rebuild — CLAUDE.md PCP
+section now carries the never-touch-the-mount rule. Prior:
+**PRO-1241 DONE — all order money fields GROSS (tax-inclusive)
+per contract v1.4.0 §5.** MiuMjau prod verification (PRO-1202)
 showed line items serialized ex-tax (bare `get_total()`) under a gross `total_amount` —
 per-SKU revenue understated ~24% (median `unit_price/catalog.price` ≈ 1/1.24, Estonian
 VAT). Contract synced byte-identical to **v1.4.0** (engine `2dec424`, md5 `b285ded8…`,

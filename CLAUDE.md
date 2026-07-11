@@ -348,6 +348,16 @@ Two gotchas that cost real time (2026-06-25, the pre-3.0 PCP-clean pass):
 - For the **real release ZIP**, `composer install --no-dev --optimize-autoloader`
   before `composer run package` (else the ZIP ships phpunit et al.); ship `composer.json`
   (PCP flags `missing_composer_json_file` when `vendor/` ships without it).
+- **NEVER `rm -rf` (or `mv` over) the container's
+  `/var/www/html/wp-content/plugins/smaily-connect` — it is the BIND MOUNT of this
+  host repo.** A container-side `rm -rf` on it deletes the entire host working tree
+  INCLUDING `.git` (the mount point itself survives with "Resource busy" — that error
+  is the tell that you just emptied the real repo). This happened for real at the
+  3.6.1 gate (2026-07-11): full re-clone from GitHub required; only unpushed local
+  commits + gitignored build artifacts were at stake (all recoverable that day —
+  push discipline is what made it survivable). Always unzip the ZIP to a DIFFERENT
+  dir (`smaily-connect-pkg`) + pin `--slug=smaily-connect`; never target the mounted
+  plugin path with destructive container commands.
 Two findings are intentional and remain until specific milestones: `plugin_updater_detected`
 (the `Update URI` clobber-guard, F3-35 — removed at the upstream merge) and, while still
 a beta, `mismatched_plugin_name` (the `(BETA)` Name suffix — dropped at the 3.0 GA bump).
