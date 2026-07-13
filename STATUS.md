@@ -26,7 +26,56 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1336 DONE — uninstall.php now removes the
+_Last updated: 2026-07-13 (**PRO-1334 DONE — preserve-and-flag (PRO-1277)
+extended to the classic Widget, Elementor widget, and Gutenberg block
+autoresponder dropdowns.** Classic Widget (`includes/smaily-widget.class.php`)
+mirrors CF7 exactly, reusing `Helper::is_autoresponder_unavailable()` unchanged:
+a saved-but-now-disabled `autoresponder_id` gets a selected, labeled
+"Workflow #N (disabled in Smaily)" option plus the same warning notice text
+(reused verbatim — no new string needed there). Gutenberg block
+(`blocks/newsletter-signup/src/edit.js`) does the equivalent purely
+client-side: `autoresponders` (already the filtered enabled list from
+`/smaily/v1/autoresponders`) plus the saved `autoresponderId` attribute are
+enough to detect unavailability in the editor, so the REST endpoint
+(`includes/smaily-api.class.php`) needed NO change — reuses the same two
+msgids via `sprintf`/`__` from `@wordpress/i18n` (already flowed into the .pot,
+confirmed: unlike the admin TS bundle, `wp i18n make-pot` parses this block's
+plain `.js` directly, no esbuild-transpile workaround needed). Elementor
+(`integrations/elementor/newsletter-widget.class.php`) got a **reduced,
+non-dynamic fix, and here's why**: Elementor's SELECT `options` are a
+per-widget-TYPE schema cached once via `Controls_Manager::get_element_stack()`
+and shared across every instance/document — confirmed via Elementor's own
+source + developer docs, including a filed core issue where reading a
+widget's own raw settings during `register_controls()` is documented to
+error ("widget doesn't exist on stage"). There is no reliable per-instance
+hook to inject a flagged option there without either a sitewide postmeta scan
+or client-side JS overrides of Elementor's own panel — disproportionate
+machinery for a dropdown cosmetic gap. Separately, the CF7/Widget *mechanical*
+silent-wipe risk doesn't actually apply to Elementor: its settings are a
+persistent client-side model, not re-derived from the rendered `<select>`'s
+value on save, so an untouched saved id survives a save regardless. Shipped
+instead: one additional sentence appended (not replacing) the control's
+existing, already-translated `description`, telling the merchant a missing
+entry means "disabled in Smaily, your selection is kept" rather than "gone."
+Tests: no new Helper logic was added (Widget/block both reuse PRO-1277's
+already-tested `filter_enabled_autoresponders()` / `is_autoresponder_unavailable()`
+unchanged), so no new unit tests; `LegacyHelperAutorespondersTest.php` still
+covers the shared logic. One new PHP string (the Elementor description
+addendum) added to `.pot`/`-et.po` (ET translated) via `bin/build-i18n.sh`;
+the two reused strings' locations were merged in, translations intact
+(spot-checked: msgstr count 523→524, empty-msgstr count unchanged at 1). No
+merchant-docs-site change (re-verified: still doesn't document per-row
+dropdown filtering, per PRO-1277's own conclusion). Gates: `ci:strict` exit=0
+(phpcs 0 errors/phpstan no errors/unit 561 tests unchanged/lint/typecheck/
+vitest 236 unchanged); `composer run build` — all blocks incl.
+newsletter-signup compile clean; integration 148 OK (`sg docker`, sandbox
+tenant `Smaily Connect test` snapshot/restored cleanly). **Human acceptance
+needed (not verifiable here):** visually confirm the flagged option +
+Estonian translation actually render in the WP Widgets screen, the Gutenberg
+block inspector, and — for the Elementor description text — the Elementor
+panel; none of the three has an Elementor instance available in this
+environment to render against. Prior:
+**PRO-1336 DONE — uninstall.php now removes the
 PRO-1194 profiling-consent state.** The durable opt-out registry option
 (`smly_profiling_optouts`, autoload=false, hashed-email keys) and its two
 per-contact transients (`smly_profiling_<hash>` daily-TTL fresh cache,

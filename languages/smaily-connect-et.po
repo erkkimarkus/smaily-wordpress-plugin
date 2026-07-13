@@ -62,16 +62,16 @@ msgid "Phone"
 msgstr "Telefon"
 
 #: integrations/elementor/newsletter-widget.class.php:414
-#: integrations/elementor/newsletter-widget.class.php:529
+#: integrations/elementor/newsletter-widget.class.php:539
 #: public/partials/smaily-public-basic.php:38
-#: blocks/newsletter-signup/src/edit.js:369
+#: blocks/newsletter-signup/src/edit.js:401
 #: admin/src/components/steps/RssFeedSection.tsx:77
 msgid "Name"
 msgstr "Nimi"
 
 #: admin/wizard.php:61
 #: admin/wizard.php:62
-#: includes/smaily.class.php:280
+#: includes/smaily.class.php:269
 #: blocks/landingpage/src/edit.js:89
 msgid "Settings"
 msgstr "Seaded"
@@ -203,7 +203,7 @@ msgstr "See ühendus on veel seadistamata. Lõpeta kõigepealt seadistamine."
 msgid "Unsupported job_type."
 msgstr "Toetamata töötüüp (job_type)."
 
-#: includes/REST/EventsEndpoint.php:98
+#: includes/REST/EventsEndpoint.php:99
 msgid "You do not have permission to view the event log."
 msgstr "Sul ei ole õigust sündmuste logi vaadata."
 
@@ -307,40 +307,40 @@ msgstr "Tarne vorm"
 msgid "Smaily Classic Subscription Widget"
 msgstr "Smaily Classic Uudiskirja Vidin"
 
-#: includes/smaily-widget.class.php:128
+#: includes/smaily-widget.class.php:136
 msgid "Title"
 msgstr "Pealkiri"
 
-#: includes/smaily-widget.class.php:133
-#: blocks/newsletter-signup/src/edit.js:182
+#: includes/smaily-widget.class.php:141
+#: blocks/newsletter-signup/src/edit.js:191
 msgid "Display name field"
 msgstr "Kuva nime väli"
 
-#: includes/smaily-widget.class.php:136
-#: integrations/elementor/newsletter-widget.class.php:497
-#: blocks/newsletter-signup/src/edit.js:267
+#: includes/smaily-widget.class.php:144
+#: integrations/elementor/newsletter-widget.class.php:507
+#: blocks/newsletter-signup/src/edit.js:276
 msgid "Success URL"
 msgstr "Õnnestumise URL"
 
-#: includes/smaily-widget.class.php:140
-#: integrations/elementor/newsletter-widget.class.php:510
-#: blocks/newsletter-signup/src/edit.js:279
+#: includes/smaily-widget.class.php:148
+#: integrations/elementor/newsletter-widget.class.php:520
+#: blocks/newsletter-signup/src/edit.js:288
 msgid "Failure URL"
 msgstr "Tõrke URL"
 
-#: includes/smaily-widget.class.php:143
-#: integrations/elementor/newsletter-widget.class.php:515
+#: includes/smaily-widget.class.php:151
+#: integrations/elementor/newsletter-widget.class.php:525
 msgid "Note: URLs are optional. If left empty, the current page URL will be used."
 msgstr "Märkus.: URL-id on valikulised. Kui see jäetakse tühjaks, kasutatakse vormi lehe URL-i."
 
-#: includes/smaily-widget.class.php:145
+#: includes/smaily-widget.class.php:153
 msgid "Autoresponder ID"
 msgstr "Automaatvastaja ID"
 
-#: includes/smaily-widget.class.php:147
+#: includes/smaily-widget.class.php:155
 #: integrations/cf7/partials/smaily-cf7-admin.php:58
 #: integrations/elementor/newsletter-widget.class.php:357
-#: blocks/newsletter-signup/src/edit.js:299
+#: blocks/newsletter-signup/src/edit.js:308
 msgid "No autoresponder"
 msgstr "Automaatvastaja puudub"
 
@@ -366,17 +366,21 @@ msgstr "Aktiveeri Smaily selle vormi jaoks"
 
 #: integrations/cf7/partials/smaily-cf7-admin.php:53
 #: integrations/elementor/newsletter-widget.class.php:485
-#: blocks/newsletter-signup/src/edit.js:291
+#: blocks/newsletter-signup/src/edit.js:300
 msgid "Autoresponder"
 msgstr "Automaatvastaja"
 
 #. translators: %d: Smaily workflow ID.
+#: includes/smaily-widget.class.php:161
 #: integrations/cf7/partials/smaily-cf7-admin.php:65
-#, php-format
+#: blocks/newsletter-signup/src/edit.js:319
+#, php-format,js-format
 msgid "Workflow #%d (disabled in Smaily)"
 msgstr "Töövoog #%d (Smailys välja lülitatud)"
 
+#: includes/smaily-widget.class.php:173
 #: integrations/cf7/partials/smaily-cf7-admin.php:83
+#: blocks/newsletter-signup/src/edit.js:334
 msgid "This workflow is disabled in Smaily (or no longer exists) — form submissions will not trigger anything until you enable it in Smaily or pick another workflow."
 msgstr "See töövoog on Smailys välja lülitatud (või seda enam ei eksisteeri) — vormi täitmised ei käivita midagi, kuni lülitate selle Smailys uuesti sisse või valite mõne teise töövoo."
 
@@ -523,228 +527,228 @@ msgstr "Sisestage veateade"
 msgid "Hidden Fields"
 msgstr "Peidetud Väljad"
 
-#: integrations/elementor/newsletter-widget.class.php:490
+#: integrations/elementor/newsletter-widget.class.php:500
 msgid "Select an autoresponder if you want to target a specific automation workflow."
 msgstr "Valige automaatvastaja, kui soovite kasutada konkreetset automaatika töövoogu."
 
-#: integrations/elementor/newsletter-widget.class.php:503
+#: integrations/elementor/newsletter-widget.class.php:513
 msgid "Enter success URL"
 msgstr "Sisestage õnnestumise URL"
 
-#: integrations/elementor/newsletter-widget.class.php:517
+#: integrations/elementor/newsletter-widget.class.php:527
 msgid "Enter failure URL"
 msgstr "Sisestage tõrke URL"
 
-#: integrations/elementor/newsletter-widget.class.php:524
+#: integrations/elementor/newsletter-widget.class.php:534
 msgid "Custom Fields"
 msgstr "Kohandatud Väljad"
 
-#: integrations/elementor/newsletter-widget.class.php:532
+#: integrations/elementor/newsletter-widget.class.php:542
 msgid "Enter field name"
 msgstr "Sisesta nimi"
 
-#: integrations/elementor/newsletter-widget.class.php:536
-#: blocks/newsletter-signup/src/edit.js:377
+#: integrations/elementor/newsletter-widget.class.php:546
+#: blocks/newsletter-signup/src/edit.js:409
 msgid "Value"
 msgstr "Väärtus"
 
-#: integrations/elementor/newsletter-widget.class.php:539
+#: integrations/elementor/newsletter-widget.class.php:549
 msgid "Enter field value"
 msgstr "Sisesta väärtus"
 
-#: integrations/elementor/newsletter-widget.class.php:544
+#: integrations/elementor/newsletter-widget.class.php:554
 msgid "Add custom hidden fields to include additional data in the subscription."
 msgstr "Lisage peidetud välju, mis lisatakse uudiskirjaga liituja andmetele."
 
-#: integrations/elementor/newsletter-widget.class.php:563
+#: integrations/elementor/newsletter-widget.class.php:573
 msgid "Container"
 msgstr "Konteiner"
 
-#: integrations/elementor/newsletter-widget.class.php:571
+#: integrations/elementor/newsletter-widget.class.php:581
 msgid "Orientation"
 msgstr "Suund"
 
-#: integrations/elementor/newsletter-widget.class.php:575
+#: integrations/elementor/newsletter-widget.class.php:585
 msgid "Vertical"
 msgstr "Vertikaalne"
 
-#: integrations/elementor/newsletter-widget.class.php:576
+#: integrations/elementor/newsletter-widget.class.php:586
 msgid "Horizontal"
 msgstr "Horisontaalne"
 
-#: integrations/elementor/newsletter-widget.class.php:587
-#: integrations/elementor/newsletter-widget.class.php:765
-#: integrations/elementor/newsletter-widget.class.php:897
-#: integrations/elementor/newsletter-widget.class.php:1015
-#: integrations/elementor/newsletter-widget.class.php:1167
-#: integrations/elementor/newsletter-widget.class.php:1314
-#: integrations/elementor/newsletter-widget.class.php:1411
+#: integrations/elementor/newsletter-widget.class.php:597
+#: integrations/elementor/newsletter-widget.class.php:775
+#: integrations/elementor/newsletter-widget.class.php:907
+#: integrations/elementor/newsletter-widget.class.php:1025
+#: integrations/elementor/newsletter-widget.class.php:1177
+#: integrations/elementor/newsletter-widget.class.php:1324
+#: integrations/elementor/newsletter-widget.class.php:1421
 msgid "Background Color"
 msgstr "Taustavärv"
 
-#: integrations/elementor/newsletter-widget.class.php:598
+#: integrations/elementor/newsletter-widget.class.php:608
 msgid "Padding"
 msgstr "Äärised"
 
-#: integrations/elementor/newsletter-widget.class.php:617
-#: integrations/elementor/newsletter-widget.class.php:807
-#: integrations/elementor/newsletter-widget.class.php:908
-#: integrations/elementor/newsletter-widget.class.php:1087
-#: integrations/elementor/newsletter-widget.class.php:1189
-#: integrations/elementor/newsletter-widget.class.php:1325
-#: integrations/elementor/newsletter-widget.class.php:1422
+#: integrations/elementor/newsletter-widget.class.php:627
+#: integrations/elementor/newsletter-widget.class.php:817
+#: integrations/elementor/newsletter-widget.class.php:918
+#: integrations/elementor/newsletter-widget.class.php:1097
+#: integrations/elementor/newsletter-widget.class.php:1199
+#: integrations/elementor/newsletter-widget.class.php:1335
+#: integrations/elementor/newsletter-widget.class.php:1432
 msgid "Border Style"
 msgstr "Piirjoone Stiil"
 
-#: integrations/elementor/newsletter-widget.class.php:621
-#: integrations/elementor/newsletter-widget.class.php:811
-#: integrations/elementor/newsletter-widget.class.php:912
-#: integrations/elementor/newsletter-widget.class.php:1091
-#: integrations/elementor/newsletter-widget.class.php:1193
-#: integrations/elementor/newsletter-widget.class.php:1329
-#: integrations/elementor/newsletter-widget.class.php:1426
+#: integrations/elementor/newsletter-widget.class.php:631
+#: integrations/elementor/newsletter-widget.class.php:821
+#: integrations/elementor/newsletter-widget.class.php:922
+#: integrations/elementor/newsletter-widget.class.php:1101
+#: integrations/elementor/newsletter-widget.class.php:1203
+#: integrations/elementor/newsletter-widget.class.php:1339
+#: integrations/elementor/newsletter-widget.class.php:1436
 msgid "None"
 msgstr "Puudub"
 
-#: integrations/elementor/newsletter-widget.class.php:622
-#: integrations/elementor/newsletter-widget.class.php:812
-#: integrations/elementor/newsletter-widget.class.php:913
-#: integrations/elementor/newsletter-widget.class.php:1092
-#: integrations/elementor/newsletter-widget.class.php:1194
-#: integrations/elementor/newsletter-widget.class.php:1330
-#: integrations/elementor/newsletter-widget.class.php:1427
+#: integrations/elementor/newsletter-widget.class.php:632
+#: integrations/elementor/newsletter-widget.class.php:822
+#: integrations/elementor/newsletter-widget.class.php:923
+#: integrations/elementor/newsletter-widget.class.php:1102
+#: integrations/elementor/newsletter-widget.class.php:1204
+#: integrations/elementor/newsletter-widget.class.php:1340
+#: integrations/elementor/newsletter-widget.class.php:1437
 msgid "Solid"
 msgstr "Täisjoon"
 
-#: integrations/elementor/newsletter-widget.class.php:623
-#: integrations/elementor/newsletter-widget.class.php:813
-#: integrations/elementor/newsletter-widget.class.php:914
-#: integrations/elementor/newsletter-widget.class.php:1093
-#: integrations/elementor/newsletter-widget.class.php:1195
-#: integrations/elementor/newsletter-widget.class.php:1331
-#: integrations/elementor/newsletter-widget.class.php:1428
+#: integrations/elementor/newsletter-widget.class.php:633
+#: integrations/elementor/newsletter-widget.class.php:823
+#: integrations/elementor/newsletter-widget.class.php:924
+#: integrations/elementor/newsletter-widget.class.php:1103
+#: integrations/elementor/newsletter-widget.class.php:1205
+#: integrations/elementor/newsletter-widget.class.php:1341
+#: integrations/elementor/newsletter-widget.class.php:1438
 msgid "Dashed"
 msgstr "Katkendlik"
 
-#: integrations/elementor/newsletter-widget.class.php:624
-#: integrations/elementor/newsletter-widget.class.php:814
-#: integrations/elementor/newsletter-widget.class.php:915
-#: integrations/elementor/newsletter-widget.class.php:1094
-#: integrations/elementor/newsletter-widget.class.php:1196
-#: integrations/elementor/newsletter-widget.class.php:1332
-#: integrations/elementor/newsletter-widget.class.php:1429
+#: integrations/elementor/newsletter-widget.class.php:634
+#: integrations/elementor/newsletter-widget.class.php:824
+#: integrations/elementor/newsletter-widget.class.php:925
+#: integrations/elementor/newsletter-widget.class.php:1104
+#: integrations/elementor/newsletter-widget.class.php:1206
+#: integrations/elementor/newsletter-widget.class.php:1342
+#: integrations/elementor/newsletter-widget.class.php:1439
 msgid "Dotted"
 msgstr "Punktiir"
 
-#: integrations/elementor/newsletter-widget.class.php:625
-#: integrations/elementor/newsletter-widget.class.php:815
-#: integrations/elementor/newsletter-widget.class.php:916
-#: integrations/elementor/newsletter-widget.class.php:1095
-#: integrations/elementor/newsletter-widget.class.php:1197
-#: integrations/elementor/newsletter-widget.class.php:1333
-#: integrations/elementor/newsletter-widget.class.php:1430
+#: integrations/elementor/newsletter-widget.class.php:635
+#: integrations/elementor/newsletter-widget.class.php:825
+#: integrations/elementor/newsletter-widget.class.php:926
+#: integrations/elementor/newsletter-widget.class.php:1105
+#: integrations/elementor/newsletter-widget.class.php:1207
+#: integrations/elementor/newsletter-widget.class.php:1343
+#: integrations/elementor/newsletter-widget.class.php:1440
 msgid "Double"
 msgstr "Kahekordne"
 
-#: integrations/elementor/newsletter-widget.class.php:626
-#: integrations/elementor/newsletter-widget.class.php:816
-#: integrations/elementor/newsletter-widget.class.php:917
-#: integrations/elementor/newsletter-widget.class.php:1096
-#: integrations/elementor/newsletter-widget.class.php:1198
-#: integrations/elementor/newsletter-widget.class.php:1334
-#: integrations/elementor/newsletter-widget.class.php:1431
+#: integrations/elementor/newsletter-widget.class.php:636
+#: integrations/elementor/newsletter-widget.class.php:826
+#: integrations/elementor/newsletter-widget.class.php:927
+#: integrations/elementor/newsletter-widget.class.php:1106
+#: integrations/elementor/newsletter-widget.class.php:1208
+#: integrations/elementor/newsletter-widget.class.php:1344
+#: integrations/elementor/newsletter-widget.class.php:1441
 msgid "Groove"
 msgstr "Süvistatud"
 
-#: integrations/elementor/newsletter-widget.class.php:637
-#: integrations/elementor/newsletter-widget.class.php:827
-#: integrations/elementor/newsletter-widget.class.php:928
-#: integrations/elementor/newsletter-widget.class.php:1107
-#: integrations/elementor/newsletter-widget.class.php:1209
-#: integrations/elementor/newsletter-widget.class.php:1345
-#: integrations/elementor/newsletter-widget.class.php:1442
+#: integrations/elementor/newsletter-widget.class.php:647
+#: integrations/elementor/newsletter-widget.class.php:837
+#: integrations/elementor/newsletter-widget.class.php:938
+#: integrations/elementor/newsletter-widget.class.php:1117
+#: integrations/elementor/newsletter-widget.class.php:1219
+#: integrations/elementor/newsletter-widget.class.php:1355
+#: integrations/elementor/newsletter-widget.class.php:1452
 msgid "Border Color"
 msgstr "Piirjoone Värv"
 
-#: integrations/elementor/newsletter-widget.class.php:651
-#: integrations/elementor/newsletter-widget.class.php:844
-#: integrations/elementor/newsletter-widget.class.php:942
-#: integrations/elementor/newsletter-widget.class.php:1121
-#: integrations/elementor/newsletter-widget.class.php:1223
-#: integrations/elementor/newsletter-widget.class.php:1360
-#: integrations/elementor/newsletter-widget.class.php:1457
+#: integrations/elementor/newsletter-widget.class.php:661
+#: integrations/elementor/newsletter-widget.class.php:854
+#: integrations/elementor/newsletter-widget.class.php:952
+#: integrations/elementor/newsletter-widget.class.php:1131
+#: integrations/elementor/newsletter-widget.class.php:1233
+#: integrations/elementor/newsletter-widget.class.php:1370
+#: integrations/elementor/newsletter-widget.class.php:1467
 msgid "Border Width"
 msgstr "Piirjoone Laius"
 
-#: integrations/elementor/newsletter-widget.class.php:666
-#: integrations/elementor/newsletter-widget.class.php:866
-#: integrations/elementor/newsletter-widget.class.php:964
-#: integrations/elementor/newsletter-widget.class.php:1136
-#: integrations/elementor/newsletter-widget.class.php:1238
-#: integrations/elementor/newsletter-widget.class.php:1382
-#: integrations/elementor/newsletter-widget.class.php:1479
+#: integrations/elementor/newsletter-widget.class.php:676
+#: integrations/elementor/newsletter-widget.class.php:876
+#: integrations/elementor/newsletter-widget.class.php:974
+#: integrations/elementor/newsletter-widget.class.php:1146
+#: integrations/elementor/newsletter-widget.class.php:1248
+#: integrations/elementor/newsletter-widget.class.php:1392
+#: integrations/elementor/newsletter-widget.class.php:1489
 msgid "Border Radius"
 msgstr "Piirjoone Raadius"
 
-#: integrations/elementor/newsletter-widget.class.php:687
+#: integrations/elementor/newsletter-widget.class.php:697
 msgid "Labels"
 msgstr "Sildid"
 
-#: integrations/elementor/newsletter-widget.class.php:695
+#: integrations/elementor/newsletter-widget.class.php:705
 msgid "Color"
 msgstr "Värv"
 
-#: integrations/elementor/newsletter-widget.class.php:717
+#: integrations/elementor/newsletter-widget.class.php:727
 msgid "Bottom Gap"
 msgstr "Alumine Vahe"
 
-#: integrations/elementor/newsletter-widget.class.php:746
+#: integrations/elementor/newsletter-widget.class.php:756
 msgid "Input Fields"
 msgstr "Sisestusväljad"
 
-#: integrations/elementor/newsletter-widget.class.php:758
-#: integrations/elementor/newsletter-widget.class.php:1008
+#: integrations/elementor/newsletter-widget.class.php:768
+#: integrations/elementor/newsletter-widget.class.php:1018
 msgid "Normal"
 msgstr "Tavaline"
 
-#: integrations/elementor/newsletter-widget.class.php:784
-#: integrations/elementor/newsletter-widget.class.php:1041
+#: integrations/elementor/newsletter-widget.class.php:794
+#: integrations/elementor/newsletter-widget.class.php:1051
 #: blocks/landingpage/src/edit.js:133
 msgid "Height"
 msgstr "Kõrgus"
 
-#: integrations/elementor/newsletter-widget.class.php:890
-#: integrations/elementor/newsletter-widget.class.php:1160
+#: integrations/elementor/newsletter-widget.class.php:900
+#: integrations/elementor/newsletter-widget.class.php:1170
 msgid "Hover"
 msgstr "Kursor Peal"
 
-#: integrations/elementor/newsletter-widget.class.php:996
+#: integrations/elementor/newsletter-widget.class.php:1006
 msgid "Button"
 msgstr "Nupp"
 
-#: integrations/elementor/newsletter-widget.class.php:1029
-#: integrations/elementor/newsletter-widget.class.php:1178
-#: integrations/elementor/newsletter-widget.class.php:1278
+#: integrations/elementor/newsletter-widget.class.php:1039
+#: integrations/elementor/newsletter-widget.class.php:1188
+#: integrations/elementor/newsletter-widget.class.php:1288
 msgid "Text Color"
 msgstr "Teksti värv"
 
-#: integrations/elementor/newsletter-widget.class.php:1064
+#: integrations/elementor/newsletter-widget.class.php:1074
 msgid "Top Gap"
 msgstr "Ülemine vahe"
 
-#: integrations/elementor/newsletter-widget.class.php:1270
+#: integrations/elementor/newsletter-widget.class.php:1280
 msgid "Feedback Messages"
 msgstr "Tagasiside Sõnumid"
 
-#: integrations/elementor/newsletter-widget.class.php:1306
+#: integrations/elementor/newsletter-widget.class.php:1316
 msgid "Success Messages"
 msgstr "Õnnestumise Teated"
 
-#: integrations/elementor/newsletter-widget.class.php:1403
+#: integrations/elementor/newsletter-widget.class.php:1413
 msgid "Error Messages"
 msgstr "Veateated"
 
-#: integrations/woocommerce/cron.class.php:87
+#: integrations/woocommerce/cron.class.php:93
 msgid "In every 15 minutes"
 msgstr "Iga 15 minuti järel"
 
@@ -908,68 +912,68 @@ msgstr "Kasuta Smaily maandumislehte tellijate kogumiseks."
 msgid "landing page"
 msgstr "maandumisleht"
 
-#: blocks/newsletter-signup/src/edit.js:113
+#: blocks/newsletter-signup/src/edit.js:122
 msgid "Go to plugin settings"
 msgstr "Ava plugina sätted"
 
-#: blocks/newsletter-signup/src/edit.js:120
+#: blocks/newsletter-signup/src/edit.js:129
 msgid "Plugin setup is not complete!"
 msgstr "Plugina seadistus pole lõpetatud!"
 
-#: blocks/newsletter-signup/src/edit.js:123
+#: blocks/newsletter-signup/src/edit.js:132
 msgid "Please connect your Smaily account before adding a form!"
 msgstr "Palun ühenda oma Smaily konto enne vormi lisamist!"
 
-#: blocks/newsletter-signup/src/edit.js:180
+#: blocks/newsletter-signup/src/edit.js:189
 msgid "Visible fields"
 msgstr "Nähtavad väljad"
 
-#: blocks/newsletter-signup/src/edit.js:193
+#: blocks/newsletter-signup/src/edit.js:202
 msgid "Name field label"
 msgstr "Nimevälja silt"
 
-#: blocks/newsletter-signup/src/edit.js:202
+#: blocks/newsletter-signup/src/edit.js:211
 msgid "Email field label"
 msgstr "E-posti välja silt"
 
-#: blocks/newsletter-signup/src/edit.js:210
+#: blocks/newsletter-signup/src/edit.js:219
 msgid "Subscribe button label"
 msgstr "Tellimisnupu silt"
 
-#: blocks/newsletter-signup/src/edit.js:221
+#: blocks/newsletter-signup/src/edit.js:230
 msgid "Full width subscribe button"
 msgstr "Täislaiuses tellimisnupp"
 
-#: blocks/newsletter-signup/src/edit.js:236
+#: blocks/newsletter-signup/src/edit.js:245
 msgid "Button border radius"
 msgstr "Nupu nurgaraadius"
 
-#: blocks/newsletter-signup/src/edit.js:246
+#: blocks/newsletter-signup/src/edit.js:255
 msgid "Success message"
 msgstr "Õnnestumise sõnum"
 
-#: blocks/newsletter-signup/src/edit.js:254
+#: blocks/newsletter-signup/src/edit.js:263
 msgid "Error message"
 msgstr "Veateade"
 
-#: blocks/newsletter-signup/src/edit.js:263
+#: blocks/newsletter-signup/src/edit.js:272
 msgid "Hidden fields"
 msgstr "Peidetud väljad"
 
-#: blocks/newsletter-signup/src/edit.js:273
-#: blocks/newsletter-signup/src/edit.js:285
+#: blocks/newsletter-signup/src/edit.js:282
+#: blocks/newsletter-signup/src/edit.js:294
 msgid "Defaults to current page URL."
 msgstr "Vaikimisi praeguse lehe URL."
 
-#: blocks/newsletter-signup/src/edit.js:355
+#: blocks/newsletter-signup/src/edit.js:387
 msgid "Custom fields"
 msgstr "Kohandatud väljad"
 
-#: blocks/newsletter-signup/src/edit.js:390
+#: blocks/newsletter-signup/src/edit.js:422
 msgid "Remove"
 msgstr "Eemalda"
 
-#: blocks/newsletter-signup/src/edit.js:397
+#: blocks/newsletter-signup/src/edit.js:429
 msgid "Add field"
 msgstr "Lisa väli"
 
@@ -2414,7 +2418,11 @@ msgid "Done — %1$d contacts synced (%2$d users checked)."
 msgstr "Valmis — %1$d kontakti sünkroonitud (%2$d kasutajat kontrollitud)."
 
 #: admin/wizard.php:134
-#: includes/smaily.class.php:284
-#: includes/smaily.class.php:300
+#: includes/smaily.class.php:273
+#: includes/smaily.class.php:289
 msgid "Documentation"
 msgstr "Dokumentatsioon"
+
+#: integrations/elementor/newsletter-widget.class.php:500
+msgid "If a previously selected workflow no longer appears here, it may have been disabled or deleted in Smaily — your existing selection is kept; check Smaily before choosing a different one."
+msgstr "Kui varem valitud töövoog siin enam ei kuva, võib see olla Smailys välja lülitatud või kustutatud — teie olemasolev valik säilib; kontrollige Smailys, enne kui valite mõne teise."

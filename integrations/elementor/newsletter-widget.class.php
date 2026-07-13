@@ -487,7 +487,17 @@ class Newsletter_Widget extends Widget_Base {
 				'default'     => '',
 				'options'     => $this->listAutoresponders(),
 				'label_block' => true,
-				'description' => __( 'Select an autoresponder if you want to target a specific automation workflow.', 'smaily-connect' ),
+				// PRO-1334: unlike CF7/the classic Widget, Elementor's SELECT
+				// options are a per-widget-TYPE schema shared across every
+				// instance/document (Controls_Manager::get_element_stack()) —
+				// there's no reliable per-instance hook to inject a flagged
+				// option for one saved-but-disabled value here. A previously
+				// selected workflow that's disappeared from this list keeps its
+				// stored value regardless (Elementor's settings model doesn't
+				// re-derive an untouched control's value from the dropdown on
+				// save); this note just prevents the merchant from assuming a
+				// missing entry means the binding was lost and re-picking one.
+				'description' => __( 'Select an autoresponder if you want to target a specific automation workflow.', 'smaily-connect' ) . ' ' . __( 'If a previously selected workflow no longer appears here, it may have been disabled or deleted in Smaily — your existing selection is kept; check Smaily before choosing a different one.', 'smaily-connect' ),
 			)
 		);
 
