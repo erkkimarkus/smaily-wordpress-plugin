@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1341 — v3.7.0 release-gate delta security +
+_Last updated: 2026-07-13 (**PRO-1194 — GDPR-doc follow-up on the PRO-1341
+re-audit's Info finding 2 DONE (docs only).** `docs/DATA_MODEL_GDPR.md`'s
+scope note previously limited the whole document to "rec-engine personal
+data only", so the PRO-1195 cart-session tracker (`smly_plus_cart_session`,
+migration 009) went undocumented even though it stores local PII (email,
+first/last name, cart contents) in the merchant's own WordPress DB. Scope
+note widened + a new "local WordPress data" subsection added under Data
+element inventory, code-derived (read `CartHookHandler`/
+`CartAbandonmentSweeper`/`CartSessionStore` directly, not assumed): fields =
+`cart_token`/`user_id`/`email`/`first_name`/`last_name`/`cart_content`
+(product_id/variation_id/quantity per line)/`cart_updated`/
+`reminder_enqueued_at`/`created_at`; purpose = abandoned-cart reminder email
+via Smaily, independent of the rec-engine connection; retention = every row
+deleted once `cart_updated` is older than ~24h (`DAY_IN_SECONDS`, filterable
+via `smaily_connect_abandoned_cart_max_age_seconds`), whether or not a
+reminder fired, on every 15-min sweep tick even while the feature is gated
+off — plus immediate deletion on cart-empty, order completion, or a
+guest→login session migration. Also recorded as fact: `GdprHandler`'s WP
+Privacy exporter/eraser (`includes/Privacy/GdprHandler.php`) does **not**
+cover this table — a subject-access/erasure request today neither surfaces
+nor removes an in-flight cart-session row (mitigated by the ~24h auto-purge,
+not eliminated). The merchant privacy-policy template (same doc, EN+ET
+siblings) didn't mention abandoned-cart local data at all — added one
+minimal "What data is used" bullet + one retention sentence to BOTH language
+blocks (no restructuring), plus a template↔code fact-map row. No code
+changed; `ci:strict` not run (docs-only). Follow-up (not done here): register
+a WP Privacy exporter/eraser for `smly_plus_cart_session`, or explicitly
+decide the ~24h auto-purge is sufficient mitigation and record that decision.
+Prior:
+**PRO-1341 — v3.7.0 release-gate delta security +
 code-quality re-audit DONE, verdict PASS.** Scope = `aa86c9a..HEAD` (the
 v3.6.1→now delta: the PRO-1195 abandoned-cart rewrite onto the namespaced
 pipeline (biggest piece, +7115/-1100 lines total across 16 commits), the

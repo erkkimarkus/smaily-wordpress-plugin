@@ -5,10 +5,14 @@ integration touches: where it lives, which system owns it, and what each GDPR
 right (export / erase / opt-out) does to it. This is the input for the 3.8 GDPR
 work and the factual basis for the privacy-policy section.
 
-**Scope note.** This document covers ONLY rec-engine personal data. WooCommerce's
-own data (orders, addresses, purchase history) is owned and exported/erased by
-**WooCommerce's own GDPR tooling**, not this plugin. The rec-engine plugin must
-not duplicate or re-export Woo data.
+**Scope note.** This document's primary focus is rec-engine personal data.
+WooCommerce's own data (orders, addresses, purchase history) is owned and
+exported/erased by **WooCommerce's own GDPR tooling**, not this plugin. The
+rec-engine plugin must not duplicate or re-export Woo data. One exception,
+added PRO-1194: the plugin also stores one local-only PII surface that has
+nothing to do with the rec-engine — the abandoned-cart session tracker
+(`smly_plus_cart_session`, PRO-1195) — documented in its own subsection below
+for completeness, since it otherwise wouldn't appear in any GDPR inventory.
 
 ---
 
@@ -78,6 +82,50 @@ rec-meta off the order; it does not re-export Woo data.
 
 Orders, line items, addresses, purchase history → WooCommerce's own GDPR
 exporters/erasers. The rec-engine plugin does not touch these.
+
+### Plugin-held — local abandoned-cart tracker (non-rec-engine, PRO-1195)
+
+Not rec-engine data at all — it never leaves the merchant's own WordPress
+database — but it is PII the plugin itself stores locally, so it belongs in
+this inventory (PRO-1194 gap-closing; audit
+[2026-07-13-SECURITY_QUALITY_RE_AUDIT_PRO1195_CART_REWRITE.md](audits/2026-07-13-SECURITY_QUALITY_RE_AUDIT_PRO1195_CART_REWRITE.md)
+finding 2).
+
+| Element | Where | What it is | Export (Art 15) | Erase (Art 17) |
+|---|---|---|---|---|
+| `smly_plus_cart_session` row | Merchant's own WordPress DB table (`{prefix}smly_plus_cart_session`, migration 009) | One row per live/abandoned cart session: `cart_token`, `user_id`, `email`, `first_name`, `last_name`, `cart_content` (JSON array of `{product_id, variation_id, quantity}`), `cart_updated`, `reminder_enqueued_at`, `created_at` | **Not registered** — no WP Privacy exporter covers this table (gap, below) | **Not registered on request** — no WP Privacy eraser covers this table; rows are removed by automatic retention instead (below), not by an Art 17 request |
+
+**Purpose.** Powers the abandoned-cart reminder e-mail sent via Smaily (one
+`automation.abandoned_cart` event), independent of the rec-engine connection
+— gated by the setup wizard (`smly_plus_setup_completed`) and the merchant's
+abandoned-cart toggle (`CartHookHandler`, `CartAbandonmentSweeper`).
+
+**Retention (code-derived — `CartAbandonmentSweeper::sweep()` /
+`CartSessionStore`, not assumed):**
+- Every row is deleted once its `cart_updated` timestamp is older than
+  ~24 hours (`DAY_IN_SECONDS`, filterable via
+  `smaily_connect_abandoned_cart_max_age_seconds`) — whether or not a
+  reminder was ever sent (`delete_expired()` covers un-reminded rows,
+  `prune_notified()` covers already-reminded ones). This housekeeping runs on
+  every 15-minute sweep tick, **even while the abandoned-cart feature is
+  toggled off**, so tracked rows never outlive the window regardless of
+  feature state.
+- A row is deleted immediately (independent of the ~24h window) when: the
+  cart is emptied, an order completes (classic or Store API checkout —
+  `clear_for_order()` deletes by session token, customer id, and billing
+  email), or a guest cart's identity migrates to a logged-in session
+  (`delete_other_rows_for_email()` drops the stale guest-session duplicate).
+
+**GDPR-tooling gap (Info, not fixed here).** `GdprHandler`
+(`includes/Privacy/GdprHandler.php`) registers the plugin's only WP Privacy
+exporter/eraser, and it covers rec-engine data + the plugin's rec-meta
+(above) only — it does **not** export or erase `smly_plus_cart_session` rows.
+A subject-access or erasure request today neither surfaces nor removes an
+in-flight cart-session row for that e-mail; the ~24h auto-purge mitigates but
+does not eliminate the gap. Tracked as a follow-up (register an exporter/
+eraser for this table, or explicitly decide the auto-purge is sufficient
+mitigation and record that decision here) — no exporter/eraser code added by
+this pass.
 
 ---
 
@@ -230,6 +278,11 @@ What data is used.
   `smaily_rec_id` and `smaily_rec_ctx`, kept for up to 30 days, and
   `smaily_rec_uid`, kept for up to 365 days, by default). These are used to
   measure which recommendations led to purchases.
+- Abandoned-cart reminders (if enabled, separate from the profiling described
+  above): if you leave items in your cart without completing checkout, we
+  may store your cart contents, e-mail address and name for a short time in
+  our own store's systems (not the Smaily Campaign Intelligence
+  recommendation engine) to send you a reminder e-mail.
 
 Legal basis. We process this data on the basis of our legitimate interest
 (Article 6(1)(f) GDPR) in offering relevant marketing to our customers,
@@ -267,7 +320,11 @@ interactions are kept for up to 1 year. If we stop using this service for
 our store, all associated data is deleted. If you ask us to erase your
 data at any time (see "Your rights" below), it is deleted immediately
 regardless of these periods; we retain only a record showing that the
-deletion was carried out.
+deletion was carried out. Abandoned-cart reminder data (cart contents,
+e-mail, name — a separate feature from the profiling above) is kept for a
+short period, by default up to 24 hours since your last cart activity, and
+then automatically deleted, or deleted immediately once you complete your
+order or empty your cart.
 ```
 
 ### ET template — "Personaalsed tootesoovitused (profileerimine)"
@@ -306,6 +363,12 @@ Milliseid andmeid kasutatakse.
   `smaily_rec_id` ja `smaily_rec_ctx`, säilivad vaikimisi kuni 30 päeva,
   ning `smaily_rec_uid`, säilib vaikimisi kuni 365 päeva). Nende abil
   mõõdame, millised soovitused viisid ostuni.
+- Hüljatud ostukorvi meeldetuletused (kui funktsioon on sisse lülitatud,
+  eraldiseisev eespool kirjeldatud profileerimisest): kui jätad ostukorvi
+  tellimust vormistamata, võime lühikeseks ajaks salvestada sinu ostukorvi
+  sisu, e-posti aadressi ja nime meie enda poe süsteemides (mitte Smaily
+  Campaign Intelligence soovitusmootoris), et saata sulle meeldetuletuse
+  e-kiri.
 
 Õiguslik alus. Töötleme neid andmeid oma õigustatud huvi alusel (GDPR
 art 6 lg 1 p f) pakkuda oma klientidele asjakohast turundust, koos sinu
@@ -343,7 +406,11 @@ kuni 1 aasta. Kui me lõpetame selle teenuse kasutamise oma poe jaoks,
 kustutatakse kõik sellega seotud andmed. Kui palud oma andmed igal ajal
 kustutada (vt allpool "Sinu õigused"), kustutatakse need kohe, sõltumata
 eespool nimetatud tähtaegadest; alles jääb üksnes kirje, mis tõendab, et
-kustutamine on tehtud.
+kustutamine on tehtud. Hüljatud ostukorvi meeldetuletuse andmeid (ostukorvi
+sisu, e-post, nimi — eraldiseisev funktsioon eespool kirjeldatud
+profileerimisest) säilitame lühikest aega, vaikimisi kuni 24 tundi alates
+viimasest ostukorvi muudatusest, ning kustutame need seejärel automaatselt,
+või kustutame kohe, kui vormistad tellimuse või tühjendad ostukorvi.
 ```
 
 ### Template ↔ code fact map (why each claim is true)
@@ -361,6 +428,7 @@ kustutamine on tehtud.
 | "We retain only a record showing that the deletion was carried out" | Engine `gdpr_audit_log` row retained (this doc, inventory) |
 | No Art 22 automated decisions | Recommendations only select email/on-site content; no legal or similarly significant effect (this doc; F3-31 model) |
 | Retention periods (browse 90 d; recommendations/rec_attribution 2 yr; email_events 1 yr; orders/customers = duration of merchant relationship, no fixed calendar period) | Engine team answer + Erkki decision, 2026-07-12 (PRO-1194): engine-enforced global horizons, daily `cleanup-expired-data` cron. Browse events (incl. `smaily_visitor_token` rows) and visitor-token↔customer bindings: 90-day TTL from creation, hard-deleted (binding also dies on GDPR erase / customer deletion). Order & customer ingest rows: no fixed period — retained for the duration of the merchant relationship, individual control is the Art 17 erase (`DELETE /api/v1/customer/{email}`); natural upper bound is merchant offboarding (tenant purge on engine side — tracked as an engine-backlog follow-up, not yet built). Recommendations 730 days from issue (a not-yet-issued/pending recommendation is not aged out early); rec_attribution 730 days; email_events 365 days; decision_log (engine-internal automated-decision log, not a customer-facing data element in the inventory above) 30 days. |
+| Abandoned-cart reminders: cart contents/e-mail/name stored locally (not the rec engine), kept ~24h by default, deleted on order completion/cart clear | `smly_plus_cart_session` (migration 009): fields per `CartSessionStore`; ~24h auto-purge per `CartAbandonmentSweeper::sweep()` (`DAY_IN_SECONDS`, filter `smaily_connect_abandoned_cart_max_age_seconds`); immediate delete on order/cart-clear per `CartHookHandler::clear_for_order()`/`on_cart_updated()` — see the "Plugin-held — local abandoned-cart tracker" subsection above (PRO-1194/PRO-1195) |
 
 Open placeholders needing confirmation before sign-off:
 1. `[CONFIRM: Smaily legal entity name]` — the exact controller-facing legal
