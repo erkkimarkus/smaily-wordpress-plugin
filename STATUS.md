@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1334 DONE — preserve-and-flag (PRO-1277)
+_Last updated: 2026-07-13 (**PRO-1338 DONE — merchant docs site
+(`docs/site/index.html`) now documents the `[smaily_connect_newsletter_form]`
+shortcode**, in both EN/ET. Added a "Shortcode" subsection under
+Settings → Integrations (alongside the existing newsletter-block/CF7/Elementor
+copy): what it renders, an attributes table (`success_url`, `failure_url`,
+`show_name`, `autoresponder_id` — names/defaults read straight from
+`Public_Base::smaily_shortcode_render()`'s `shortcode_atts()` call and the
+`smaily-public-basic.php` partial), a copy-paste example, and the
+theme-override note (`smaily/smaily-public-basic.php` via `locate_template()`).
+Plus a one-line pointer bullet in the Step 5 wizard summary. **Limitation
+documented, no code change:** unlike the CF7/Widget/Elementor/Gutenberg
+dropdowns (PRO-1277/PRO-1334), `autoresponder_id` here is hand-typed with no
+list to validate against — a workflow later disabled/deleted in Smaily leaves
+the form rendering and submitting normally with no automation firing, and
+nothing in WordPress flags it. Verified structurally (no browser available
+here): Python `html.parser` tag-balance walk over the whole file reports zero
+mismatches/unclosed tags; `data-lang="en"`/`"et"` block counts (121/119) are
+unchanged from HEAD — this change added zero new `data-lang` blocks, only
+content inside existing paired blocks. Docs-only change; `ci:strict` not run
+(nothing else touched). Prior:
+**PRO-1334 DONE — preserve-and-flag (PRO-1277)
 extended to the classic Widget, Elementor widget, and Gutenberg block
 autoresponder dropdowns.** Classic Widget (`includes/smaily-widget.class.php`)
 mirrors CF7 exactly, reusing `Helper::is_autoresponder_unavailable()` unchanged:

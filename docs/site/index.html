@@ -567,6 +567,7 @@ td code{white-space:nowrap}
       <ul>
         <li><strong>Newsletter signup block</strong> — add the Smaily newsletter block to any page or widget area; signups land in your Smaily contacts automatically.</li>
         <li><strong>Contact Form 7</strong> and <strong>Elementor</strong> — if either plugin is active, a Smaily subscription field/widget is available in its editor.</li>
+        <li><strong>Shortcode</strong> — the <code>[smaily_connect_newsletter_form]</code> shortcode gives full control over form placement in any post, page or widget. See <a href="#set-integrations">Settings → Integrations</a>.</li>
         <li><strong>Product RSS feed</strong> — a URL you paste into Smaily's template editor to load store products into campaigns. Configure it under <a href="#set-integrations">Settings → Integrations</a>.</li>
       </ul>
     </div>
@@ -575,6 +576,7 @@ td code{white-space:nowrap}
       <ul>
         <li><strong>Uudiskirja liitumisplokk</strong> — lisa Smaily uudiskirja plokk mis tahes lehele või vidina‑alale; liitujad jõuavad automaatselt su Smaily kontaktidesse.</li>
         <li><strong>Contact Form 7</strong> ja <strong>Elementor</strong> — kui üks neist pluginatest on aktiivne, on selle redaktoris saadaval Smaily tellimis‑väli/vidin.</li>
+        <li><strong>Lühikood</strong> — lühikood <code>[smaily_connect_newsletter_form]</code> annab täieliku paigutuskontrolli mis tahes postituses, lehel või vidinas. Vt <a href="#set-integrations">Settings → Integrations</a>.</li>
         <li><strong>Toodete RSS‑voog</strong> — URL, mille kleebid Smaily malliredaktorisse, et laadida poe tooted kampaaniatesse. Seadista jaotises <a href="#set-integrations">Settings → Integrations</a>.</li>
       </ul>
     </div>
@@ -731,12 +733,50 @@ td code{white-space:nowrap}
     <div data-lang="en">
       <h3>Storefront newsletter</h3>
       <p>Add the Smaily newsletter block to any page or widget area; signups land in your Smaily contacts automatically. If you run <strong>Contact Form 7</strong> or <strong>Elementor</strong>, a Smaily subscription field/widget is available in its editor.</p>
+      <h3>Shortcode</h3>
+      <p>For full control over placement, use the <code>[smaily_connect_newsletter_form]</code> shortcode in any post, page, or widget that supports shortcodes. It renders a simple subscription form (email, optional name) that posts directly to your Smaily account.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Attribute</th><th>Meaning</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td><code>success_url</code></td><td>Where the shopper is redirected after a successful signup.</td><td>Current page</td></tr>
+            <tr><td><code>failure_url</code></td><td>Where the shopper is redirected if the signup fails.</td><td>Current page</td></tr>
+            <tr><td><code>show_name</code></td><td>Adds a Name field to the form.</td><td><code>false</code></td></tr>
+            <tr><td><code>autoresponder_id</code></td><td>Enrols the new contact into a specific Smaily workflow (find its id in Smaily). Leave it out to add the contact with no workflow.</td><td><em>(none)</em></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Example: <code>[smaily_connect_newsletter_form autoresponder_id="123" show_name="1"]</code></p>
+      <p>Themes can override the markup by providing their own <code>smaily/smaily-public-basic.php</code> template.</p>
+      <div class="note warn">
+        <span class="k">No warning for a hand‑typed workflow id</span>
+        <p>Unlike the workflow dropdowns elsewhere in Settings, <code>autoresponder_id</code> here is typed in by hand — the plugin has no list to check it against. If that workflow is later disabled or deleted in Smaily, the form keeps rendering and submitting normally, but no automation fires. Nothing in WordPress flags this; check the workflow's status directly in Smaily.</p>
+      </div>
       <h3>Product RSS feed</h3>
       <p>A URL that loads store products into Smaily campaigns. The controls only shape the URL — nothing is saved. Adjust <strong>Product category</strong>, <strong>Limit</strong> (1–250) and <strong>Sort by</strong>, press <strong>Update URL</strong>, then copy the <strong>Feed URL</strong> into Smaily's template editor.</p>
     </div>
     <div data-lang="et">
       <h3>Poe uudiskiri</h3>
       <p>Lisa Smaily uudiskirja plokk mis tahes lehele või vidina‑alale; liitujad jõuavad automaatselt su Smaily kontaktidesse. Kui kasutad <strong>Contact Form 7‑t</strong> või <strong>Elementorit</strong>, on selle redaktoris saadaval Smaily tellimis‑väli/vidin.</p>
+      <h3>Lühikood (shortcode)</h3>
+      <p>Täieliku paigutuskontrolli jaoks kasuta lühikoodi <code>[smaily_connect_newsletter_form]</code> mis tahes postituses, lehel või vidinas, mis lühikoode toetab. See kuvab lihtsa liitumisvormi (e‑post, valikuline nimi), mis saadab andmed otse su Smaily kontosse.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Atribuut</th><th>Tähendus</th><th>Vaikeväärtus</th></tr></thead>
+          <tbody>
+            <tr><td><code>success_url</code></td><td>Kuhu klient suunatakse pärast õnnestunud liitumist.</td><td>Praegune leht</td></tr>
+            <tr><td><code>failure_url</code></td><td>Kuhu klient suunatakse, kui liitumine ebaõnnestub.</td><td>Praegune leht</td></tr>
+            <tr><td><code>show_name</code></td><td>Lisab vormile Nime välja.</td><td><code>false</code></td></tr>
+            <tr><td><code>autoresponder_id</code></td><td>Lisab uue kontakti kindlasse Smaily töövoogu (id leiad Smailyst). Jäta ära, et kontakt lisataks ilma töövooga.</td><td><em>(puudub)</em></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Näide: <code>[smaily_connect_newsletter_form autoresponder_id="123" show_name="1"]</code></p>
+      <p>Teemad saavad kujundust üle kirjutada, pakkudes oma <code>smaily/smaily-public-basic.php</code> malli.</p>
+      <div class="note warn">
+        <span class="k">Käsitsi sisestatud töövoo id kohta hoiatust ei kuvata</span>
+        <p>Erinevalt mujal Settings'is olevatest töövoo‑rippmenüüdest sisestatakse <code>autoresponder_id</code> siin käsitsi — pluginal pole nimekirja, mille vastu seda kontrollida. Kui see töövoog hiljem Smailys keelatakse või kustutatakse, jätkab vorm tavapärast renderdamist ja esitamist, aga ühtegi automaatikat ei käivitu. WordPress ei märgi seda kuidagi — kontrolli töövoo olekut otse Smailyst.</p>
+      </div>
       <h3>Toodete RSS‑voog</h3>
       <p>URL, mis laadib poe tooted Smaily kampaaniatesse. Juhtnupud ainult kujundavad URL‑i — midagi ei salvestata. Sea <strong>Product category</strong>, <strong>Limit</strong> (1–250) ja <strong>Sort by</strong>, vajuta <strong>Update URL</strong>, seejärel kopeeri <strong>Feed URL</strong> Smaily malliredaktorisse.</p>
     </div>
