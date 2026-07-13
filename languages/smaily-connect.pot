@@ -337,6 +337,16 @@ msgstr ""
 msgid "Autoresponder"
 msgstr ""
 
+#. translators: %d: Smaily workflow ID.
+#: integrations/cf7/partials/smaily-cf7-admin.php:65
+#, php-format
+msgid "Workflow #%d (disabled in Smaily)"
+msgstr ""
+
+#: integrations/cf7/partials/smaily-cf7-admin.php:83
+msgid "This workflow is disabled in Smaily (or no longer exists) — form submissions will not trigger anything until you enable it in Smaily or pick another workflow."
+msgstr ""
+
 #: integrations/cf7/public.class.php:119
 msgid "Something went wrong"
 msgstr ""

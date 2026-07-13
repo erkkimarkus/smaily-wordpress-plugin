@@ -26,7 +26,35 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1194 retention finalized —
+_Last updated: 2026-07-13 (**PRO-1277 DONE — legacy Autoresponder dropdown
+(CF7 / Elementor / Gutenberg newsletter block) stops offering `is_enabled=false`
+Smaily workflows.** `Helper::get_autoresponders_list()` (`workflows.php?
+trigger_type=form_submitted`, `includes/smaily-helper.class.php`) shapes rows
+through the new `Helper::filter_enabled_autoresponders()`, which drops any row
+whose `is_enabled` coerces false (`FILTER_VALIDATE_BOOLEAN`, so a bool/int/string
+"false"/"0" wire value is all read the same way — a row missing the key is kept,
+since we can't classify it). This is the single fetch point behind all four
+consumers (CF7 admin tab, the classic Widget, the Elementor widget, the Gutenberg
+block's `/smaily/v1/autoresponders` REST route) so the fix applies uniformly.
+Preserve-and-flag (same pattern as Magento's PRO-1268): in the CF7 admin tab, if
+a form's saved `autoresponder_id` is no longer in the filtered enabled list
+(`Helper::is_autoresponder_unavailable()`), the dropdown keeps it as a selectable,
+flagged option ("Workflow #N (disabled in Smaily)") plus a warning notice, instead
+of silently reverting the binding to "No autoresponder" on the next save. Only CF7
+got the flag treatment — the classic Widget has the identical native-`<select>`
+shape and risk but wasn't touched (follow-up below); Elementor/Gutenberg use their
+own control rendering and weren't in scope. Tests: `tests/Unit/
+LegacyHelperAutorespondersTest.php` (16 cases: bool/int/string `is_enabled` wire
+shapes, junk/incomplete rows, missing-key kept, the 4 preserve-and-flag states).
+`languages/smaily-connect.pot` + `-et.po` gained the two new CF7-partial strings
+(ET translated). No merchant-docs-site change — the site doesn't document
+per-row dropdown filtering or a disabled-workflow marker. Gates: `ci:strict`
+exit=0 (phpcs/phpstan/unit 555/lint/typecheck/vitest 236); integration 148 OK
+(`sg docker`, sandbox tenant `Smaily Connect test` snapshot/restored cleanly).
+Follow-up filed: extend preserve-and-flag to the classic Widget
+(`includes/smaily-widget.class.php`) — same helper, same bug shape, not done
+here. Prior:
+**PRO-1194 retention finalized —
 `docs/DATA_MODEL_GDPR.md` merchant privacy-policy template.** Engine team answered
 the retention question + Erkki decided the orders/customers wording (2026-07-12):
 browse events (incl. `smaily_visitor_token` rows) and visitor-token↔customer

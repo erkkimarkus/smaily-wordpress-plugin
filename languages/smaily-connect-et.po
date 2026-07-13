@@ -370,6 +370,16 @@ msgstr "Aktiveeri Smaily selle vormi jaoks"
 msgid "Autoresponder"
 msgstr "Automaatvastaja"
 
+#. translators: %d: Smaily workflow ID.
+#: integrations/cf7/partials/smaily-cf7-admin.php:65
+#, php-format
+msgid "Workflow #%d (disabled in Smaily)"
+msgstr "Töövoog #%d (Smailys välja lülitatud)"
+
+#: integrations/cf7/partials/smaily-cf7-admin.php:83
+msgid "This workflow is disabled in Smaily (or no longer exists) — form submissions will not trigger anything until you enable it in Smaily or pick another workflow."
+msgstr "See töövoog on Smailys välja lülitatud (või seda enam ei eksisteeri) — vormi täitmised ei käivita midagi, kuni lülitate selle Smailys uuesti sisse või valite mõne teise töövoo."
+
 #: integrations/cf7/public.class.php:119
 msgid "Something went wrong"
 msgstr "Midagi läks valesti"
