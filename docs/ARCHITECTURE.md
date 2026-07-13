@@ -204,8 +204,13 @@ Options: `smly_plus_*` (wizard/settings/credentials — the Smaily API password
 is encrypted via the legacy `Smaily_Connect\Includes\Cypher`, deliberately not
 re-implemented in the new namespace) and `smly_rec_*`
 (`Settings\RecEngineSettings`: per-connection API key, base URL, tenant,
-endpoints map, engine config). `uninstall.php` removes all of it (options,
-tables, AS actions).
+endpoints map, engine config). `uninstall.php` removes all of it — options
+(both prefixes, LIKE-swept), the two tables above, and the AS actions
+(`smly_plus_*` + the four rec-engine flush hooks) — a full irrecoverable
+local delete (PRO-1337). No engine-side revoke call is made: the api_key
+stays valid on the engine until rotated/revoked in the engine admin, and a
+re-install needs a fresh setup token (per-connection keys since engine
+migration 0036, so this can't affect any other store).
 
 `DB\QueueJanitor` prunes `sent`/`failed` rows past retention (filterable).
 

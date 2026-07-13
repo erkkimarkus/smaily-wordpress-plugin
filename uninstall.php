@@ -9,13 +9,24 @@
  *
  * Removes:
  *   1. Every `smly_plus_*` row in wp_options (Phase-2 BETA fork state), plus
- *      the ProfilingConsent per-contact cache/stale transients (PRO-1336).
+ *      the ProfilingConsent per-contact cache/stale transients (PRO-1336) and
+ *      every `smly_rec_*` row — the rec-engine connection (per-connection API
+ *      key, tenant identity, endpoints map, config, connected flag —
+ *      `Settings\RecEngineSettings` — plus `NotificationManager::
+ *      OPTION_DOWN_SINCE`) (PRO-1337). This is a full irrecoverable local
+ *      delete: no engine-side revoke call is made, so the api_key stays valid
+ *      on the engine until rotated/revoked in the engine admin; a re-install
+ *      needs a fresh setup token (per-connection keys since engine migration
+ *      0036, so no other store is affected).
  *   2. The explicit `smaily_connect_*` option keys this plugin owns
  *      (credentials, sync settings, schema-version marker), plus the
  *      `smly_profiling_optouts` durable opt-out registry (PRO-1194/PRO-1336).
- *   3. Custom tables created by the migration runner.
+ *   3. Custom tables created by the migration runner (includes the rec-engine
+ *      `smly_rec_event_queue` / `smly_rec_visitor` tables).
  *   4. User-meta freshness markers seeded by BackfillJob.
- *   5. Cron events + Action Scheduler actions the plugin scheduled.
+ *   5. Cron events + Action Scheduler actions the plugin scheduled (both
+ *      `smly_plus_*` and `smly_rec_*` hooks — the latter are the four
+ *      rec-engine flush ticks, PRO-1337).
  *
  * Without this, a deactivate + delete + reinstall cycle leaves the
  * `smly_plus_setup_completed` flag in place, which the wizard-first
@@ -49,6 +60,24 @@ $wpdb->query(
 	$wpdb->prepare(
 		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
 		$wpdb->esc_like( 'smly_plus_' ) . '%'
+	)
+);
+
+// Every `smly_rec_*` row: the rec-engine connection (Settings\
+// RecEngineSettings — per-connection API key, base URL, tenant id/name,
+// endpoints map, config, connected flag, issued_at) plus
+// NotificationManager::OPTION_DOWN_SINCE (`smly_rec_health_down_since`). A
+// LIKE-prefix delete, like the smly_plus_* sweep above, so a future
+// smly_rec_* option doesn't need a new uninstall.php line to be swept.
+// Approved design (PRO-1337): full irrecoverable local delete — no network
+// call to the engine is made here, so the api_key remains valid engine-side
+// until revoked/rotated in the engine admin; a re-install needs a fresh
+// setup token (per-connection keys since engine migration 0036, so this
+// can't affect any other store).
+$wpdb->query(
+	$wpdb->prepare(
+		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+		$wpdb->esc_like( 'smly_rec_' ) . '%'
 	)
 );
 
@@ -114,7 +143,9 @@ foreach ( $legacy_options as $opt ) {
 //
 // Names match migrations/*.sql. Drop in dependency-order (none of these
 // FK to each other, so order doesn't matter functionally — alphabetical
-// keeps the diff predictable).
+// keeps the diff predictable). The rec-engine tables (`smly_rec_event_queue`,
+// `smly_rec_visitor`) were already covered here pre-PRO-1337 — no change
+// needed for this list, only the options + AS-actions sweeps below.
 $tables = array(
 	'smly_plus_automation_mapping',
 	'smly_plus_backfill_job',
@@ -145,9 +176,12 @@ foreach ( $cron_hooks as $hook ) {
 	wp_clear_scheduled_hook( $hook );
 }
 
-// Action Scheduler jobs (Phase-2 fork). We can't load the AS library from
-// uninstall context cleanly, so we drop rows directly via $wpdb. The
-// table is created by AS itself; absent table = no-op.
+// Action Scheduler jobs (Phase-2 fork + rec-engine flushers, PRO-1337). We
+// can't load the AS library from uninstall context cleanly, so we drop rows
+// directly via $wpdb. The table is created by AS itself; absent table = no-op.
+// `smly_rec_%` catches the four rec-engine recurring flush hooks
+// (smly_rec_flush_ingest/_customers/_orders/_catalog_remove, Bootstrap.php) —
+// left unscheduled they'd keep firing on a class that no longer exists.
 $as_table = $wpdb->prefix . 'actionscheduler_actions';
 // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $table_exists = $wpdb->get_var(
@@ -156,8 +190,9 @@ $table_exists = $wpdb->get_var(
 if ( $table_exists === $as_table ) {
 	$wpdb->query(
 		$wpdb->prepare(
-			"DELETE FROM {$as_table} WHERE hook LIKE %s",
-			$wpdb->esc_like( 'smly_plus_' ) . '%'
+			"DELETE FROM {$as_table} WHERE hook LIKE %s OR hook LIKE %s",
+			$wpdb->esc_like( 'smly_plus_' ) . '%',
+			$wpdb->esc_like( 'smly_rec_' ) . '%'
 		)
 	);
 }

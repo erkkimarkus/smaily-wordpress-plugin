@@ -26,7 +26,38 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1338 DONE — merchant docs site
+_Last updated: 2026-07-13 (**PRO-1337 DONE — uninstall.php now sweeps
+`smly_rec_*` (rec-engine connection state), closing the gap PRO-1336 flagged.**
+Approved design: full irrecoverable local delete, no engine-side revoke call.
+Three additions, all mirroring `uninstall.php`'s existing `smly_plus_*`
+conventions rather than a new one: (1) a `LIKE 'smly_rec_%'` option sweep —
+catches all 9 `Settings\RecEngineSettings` options (api_key, base_url, tenant
+id/name, endpoints, config, connected, issued_at) plus
+`NotificationManager::OPTION_DOWN_SINCE` (`smly_rec_health_down_since`, a
+`smly_rec_*` option that lives outside RecEngineSettings) — prefix sweep
+chosen over an explicit key list (mirrors `smly_plus_%`) so a future
+`smly_rec_*` option needs no new uninstall.php line; (2) the Action Scheduler
+purge gained an `OR hook LIKE 'smly_rec_%'` clause — the four rec-engine
+recurring flush hooks (`smly_rec_flush_ingest/_customers/_orders/
+_catalog_remove`, `Bootstrap.php`) were previously never unscheduled, so
+they'd keep firing on a class that no longer exists after an uninstall; (3)
+the custom-tables list (`smly_rec_event_queue`, `smly_rec_visitor`) was
+**already correct pre-PRO-1337** — verified against the migrations, no
+duplicate/change made there. `docs/ARCHITECTURE.md` §7 corrected in the same
+commit (it already claimed "uninstall.php removes all of it" — now true,
+with the engine-side-revoke note added: the api_key stays valid on the engine
+until rotated/revoked in the engine admin, per-connection keys since engine
+migration 0036 so no other store is affected, and a re-install needs a fresh
+setup token). `tests/Unit/UninstallCleanupTest.php` extended with two new
+source-level pins (reflection against `RecEngineSettings`/`NotificationManager`
+option constants and the four Flusher/IngestQueue `FLUSH_HOOK` constants) —
+`uninstall.php` itself is still never executed by the suite (destructive,
+same rationale as PRO-1336). Gates: `ci:strict` exit=0 (phpcs 0 errors/phpstan
+no errors/unit 563 tests incl. +2 new/lint/typecheck/vitest 236); integration
+148 OK (`sg docker`, sandbox tenant `Smaily Connect test` snapshot/restored
+cleanly, `smly_rec_*` unaffected by the suite run itself since uninstall.php
+isn't executed). Prior:
+**PRO-1338 DONE — merchant docs site
 (`docs/site/index.html`) now documents the `[smaily_connect_newsletter_form]`
 shortcode**, in both EN/ET. Added a "Shortcode" subsection under
 Settings → Integrations (alongside the existing newsletter-block/CF7/Elementor
