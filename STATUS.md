@@ -26,7 +26,28 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**Contract re-synced byte-identical (engine `945b7ad`, md5
+_Last updated: 2026-07-13 (**PRO-1194 retention finalized —
+`docs/DATA_MODEL_GDPR.md` merchant privacy-policy template.** Engine team answered
+the retention question + Erkki decided the orders/customers wording (2026-07-12):
+browse events (incl. `smaily_visitor_token` rows) and visitor-token↔customer
+bindings — 90-day TTL from creation, engine daily `cleanup-expired-data` cron
+hard-deletes; order & customer ingest rows — **no fixed calendar period**, retained
+for the duration of the merchant relationship, individual control is the Art 17
+erase (`DELETE /api/v1/customer/{email}`), natural upper bound is merchant
+offboarding (engine-side tenant purge — tracked as an engine-backlog follow-up, not
+yet built); recommendations 730 days from issue (pending never aged out early),
+rec_attribution 730 days, email_events 365 days, decision_log 30 days
+(engine-internal, not a customer-facing element in the inventory). The
+`[CONFIRM WITH ENGINE TEAM]` retention placeholder in BOTH template languages
+(EN+ET, content-identical siblings) is replaced with concrete plain-language
+retention text; the template↔code fact map gained a row and the open-placeholders
+list marks item 3 RESOLVED. Other placeholders (Smaily legal entity name, Smaily
+privacy-policy URL, merchant-legal-review caveat, lawful-basis framing) untouched;
+the fail-open GDPR window review section untouched (it had no retention
+cross-reference); nothing published to the merchant docs site. **PRO-1194 stays
+OPEN** — legal sign-off (entity name, URL, lawful-basis framing) still pending.
+Docs-only, no code change. Prior:
+**Contract re-synced byte-identical (engine `945b7ad`, md5
 `3dbe029b…`) — PRO-1279.** Doc-only delta since our `2dec424` sync (v1.4.0 → v1.4.1,
 PATCH bump): §3 `tags` example gains `"product_id": "7620134"`, and the identity bullet
 now states cross-variant grouping by `tags.product_id` is **live** (engine PRO-1227,

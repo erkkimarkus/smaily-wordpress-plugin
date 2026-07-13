@@ -256,11 +256,18 @@ protection supervisory authority [FOR ESTONIAN STORES: Andmekaitse
 Inspektsioon]. To exercise access or erasure, contact us at
 [CONTACT E-MAIL].
 
-Retention. Recommendation data is kept while you remain our customer
-[CONFIRM WITH ENGINE TEAM: engine-side retention period for browse events,
-visitor tokens and computed recommendations]. If you ask us to erase your
-data, the recommendation data is deleted; we retain only a record showing
-that the deletion was carried out.
+Retention. Your browsing activity in our store (pages and products viewed,
+cart events, linked to the pseudonymous visitor identifier) is kept for up
+to 90 days after it occurs, and then automatically and permanently deleted.
+Your purchase history and recommendation profile are kept for as long as
+you remain our customer. The product recommendations computed for you, and
+the internal records used to measure which recommendation led to which
+purchase, are kept for up to 2 years; engagement signals from your email
+interactions are kept for up to 1 year. If we stop using this service for
+our store, all associated data is deleted. If you ask us to erase your
+data at any time (see "Your rights" below), it is deleted immediately
+regardless of these periods; we retain only a record showing that the
+deletion was carried out.
 ```
 
 ### ET template — "Personaalsed tootesoovitused (profileerimine)"
@@ -325,11 +332,18 @@ andmekaitse järelevalveasutusele [EESTI POODIDELE: Andmekaitse
 Inspektsioon]. Andmetega tutvumiseks või kustutamiseks kirjuta meile
 aadressil [KONTAKT-E-POST].
 
-Säilitamine. Soovitusandmeid säilitame seni, kuni oled meie klient
-[KINNITADA MOOTORITIIMIGA: mootoripoolne säilitustähtaeg
-sirvimissündmustele, külastajatunnustele ja arvutatud soovitustele]. Kui
-palud oma andmed kustutada, kustutatakse soovitusandmed; alles jääb üksnes
-kirje, mis tõendab, et kustutamine on tehtud.
+Säilitamine. Sinu sirvimistegevust meie poes (vaadatud lehed ja tooted,
+ostukorvisündmused), mis on seotud pseudonüümse külastajatunnusega,
+säilitame kuni 90 päeva pärast sündmuse toimumist ning seejärel kustutame
+selle automaatselt ja jäädavalt. Sinu ostuajalugu ja soovitusprofiili
+säilitame seni, kuni oled meie klient. Sulle arvutatud tootesoovitusi ning
+sisemisi kirjeid, mille abil mõõdame, milline soovitus millise ostuni viis,
+säilitame kuni 2 aastat; sinu e-kirjadega seotud kaasatussignaale säilitame
+kuni 1 aasta. Kui me lõpetame selle teenuse kasutamise oma poe jaoks,
+kustutatakse kõik sellega seotud andmed. Kui palud oma andmed igal ajal
+kustutada (vt allpool "Sinu õigused"), kustutatakse need kohe, sõltumata
+eespool nimetatud tähtaegadest; alles jääb üksnes kirje, mis tõendab, et
+kustutamine on tehtud.
 ```
 
 ### Template ↔ code fact map (why each claim is true)
@@ -346,14 +360,17 @@ kirje, mis tõendab, et kustutamine on tehtud.
 | Access / erasure | `GdprHandler` — WP Privacy API exporter (Art 15) + eraser (Art 17); erase = engine §9 CASCADE + plugin `_smaily_*` meta removal |
 | "We retain only a record showing that the deletion was carried out" | Engine `gdpr_audit_log` row retained (this doc, inventory) |
 | No Art 22 automated decisions | Recommendations only select email/on-site content; no legal or similarly significant effect (this doc; F3-31 model) |
-| Retention placeholder | Engine-side retention duration is NOT knowable from this repo → `[CONFIRM WITH ENGINE TEAM]` |
+| Retention periods (browse 90 d; recommendations/rec_attribution 2 yr; email_events 1 yr; orders/customers = duration of merchant relationship, no fixed calendar period) | Engine team answer + Erkki decision, 2026-07-12 (PRO-1194): engine-enforced global horizons, daily `cleanup-expired-data` cron. Browse events (incl. `smaily_visitor_token` rows) and visitor-token↔customer bindings: 90-day TTL from creation, hard-deleted (binding also dies on GDPR erase / customer deletion). Order & customer ingest rows: no fixed period — retained for the duration of the merchant relationship, individual control is the Art 17 erase (`DELETE /api/v1/customer/{email}`); natural upper bound is merchant offboarding (tenant purge on engine side — tracked as an engine-backlog follow-up, not yet built). Recommendations 730 days from issue (a not-yet-issued/pending recommendation is not aged out early); rec_attribution 730 days; email_events 365 days; decision_log (engine-internal automated-decision log, not a customer-facing data element in the inventory above) 30 days. |
 
 Open placeholders needing confirmation before sign-off:
 1. `[CONFIRM: Smaily legal entity name]` — the exact controller-facing legal
    entity (do not guess).
 2. `[LINK: Smaily privacy policy]` — the real URL (do not fabricate).
-3. `[CONFIRM WITH ENGINE TEAM: retention period]` — engine-side retention for
-   browse events / visitor tokens / recommendations.
+3. ~~`[CONFIRM WITH ENGINE TEAM: retention period]`~~ — **RESOLVED 2026-07-12.**
+   Engine team supplied the enforced retention horizons and Erkki decided the
+   orders/customers wording (no fixed calendar period; see the fact-map row
+   above and the retention paragraph in both templates). No longer an open
+   placeholder.
 4. Lawful basis: the template drafts **legitimate interest + Art 21 opt-out**
    (matches the F3-31 opt-out/default-on model and the AKI reading recorded
    there: transparent action + working opt-out). Erkki/legal must confirm this
