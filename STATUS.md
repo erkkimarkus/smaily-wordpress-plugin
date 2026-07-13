@@ -26,7 +26,42 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1194 fail-open GDPR window — hardened
+_Last updated: 2026-07-13 (**PRO-1336 DONE — uninstall.php now removes the
+PRO-1194 profiling-consent state.** The durable opt-out registry option
+(`smly_profiling_optouts`, autoload=false, hashed-email keys) and its two
+per-contact transients (`smly_profiling_<hash>` daily-TTL fresh cache,
+`smly_profiling_stale_<hash>` no-expiry stale cache — both from
+`ProfilingConsent`, commit 31a8c0d) were not covered by `uninstall.php`'s
+existing cleanup: its LIKE-prefix sweep only matches `smly_plus_*`, and its
+explicit legacy-options list is `smaily_connect_*`-scoped — neither shape
+matched `smly_profiling_*`. Fix follows the file's own two established
+conventions rather than inventing a third: the single known option key
+(`smly_profiling_optouts`) joins the explicit `$legacy_options` array
+(delete_option + the existing per-key cache-flush loop already iterates it);
+the two per-contact, unbounded-count transients get a new LIKE-prefix sweep
+(`_transient_smly_profiling_%` / `_transient_timeout_smly_profiling_%`),
+mirroring the existing `smly_plus_%` sweep — the stale-cache prefix nests
+inside the fresh-cache prefix so one pair of LIKEs catches both. No existing
+test executes uninstall.php (it DROPs tables + bulk-deletes options, which
+`tests/Integration/Support/EnvScrub.php`'s own docblock calls out as too
+destructive to run inside the shared test process — that's why EnvScrub
+exists as a non-destructive sibling instead of piggybacking on the real
+file); added `tests/Unit/UninstallCleanupTest.php` instead, a cheap
+source-level pin against `ProfilingConsent`'s actual constants (via
+Reflection) so a future prefix rename or a stripped cleanup line fails
+loudly without executing the destructive script. Gates: `ci:strict` exit=0
+(phpcs 0 errors/phpstan no errors/unit 561 tests, +2 new/lint/typecheck/
+vitest 236); integration 148 OK (`sg docker`, sandbox tenant `Smaily Connect
+test` snapshot/restored cleanly — unaffected, this change doesn't touch
+`smly_rec_*`). **Related finding, NOT fixed here (scope was PRO-1336 only):**
+`uninstall.php`'s LIKE sweep also does not cover `smly_rec_*` (the rec-engine
+connection: API key, tenant, endpoints map — `Settings\RecEngineSettings`),
+despite `docs/ARCHITECTURE.md` §7 claiming uninstall "removes all of it
+(options, tables, AS actions)" — that doc line is stale/inaccurate for the
+options piece. Left as a follow-up (separate scope, pre-existing, not
+introduced by this change) — worth its own Linear issue given it's a
+real data-retention gap on uninstall. Prior:
+**PRO-1194 fail-open GDPR window — hardened
 (serve-stale-on-error + durable opt-out registry).** Design approved by Erkki;
 implements options B+C from the `docs/DATA_MODEL_GDPR.md` fail-open review
 (commit 47897a0). `ProfilingConsent` (`includes/Privacy/ProfilingConsent.php`)

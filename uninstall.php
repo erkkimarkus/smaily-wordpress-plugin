@@ -8,9 +8,11 @@
  * so we can only rely on $wpdb + the standard option / cron APIs.
  *
  * Removes:
- *   1. Every `smly_plus_*` row in wp_options (Phase-2 BETA fork state).
+ *   1. Every `smly_plus_*` row in wp_options (Phase-2 BETA fork state), plus
+ *      the ProfilingConsent per-contact cache/stale transients (PRO-1336).
  *   2. The explicit `smaily_connect_*` option keys this plugin owns
- *      (credentials, sync settings, schema-version marker).
+ *      (credentials, sync settings, schema-version marker), plus the
+ *      `smly_profiling_optouts` durable opt-out registry (PRO-1194/PRO-1336).
  *   3. Custom tables created by the migration runner.
  *   4. User-meta freshness markers seeded by BackfillJob.
  *   5. Cron events + Action Scheduler actions the plugin scheduled.
@@ -50,6 +52,23 @@ $wpdb->query(
 	)
 );
 
+// ProfilingConsent (includes/Privacy/ProfilingConsent.php) caches its
+// per-contact decision as two transients keyed by a hashed email —
+// `smly_profiling_<hash>` (fresh, daily TTL) and `smly_profiling_stale_
+// <hash>` (no-expiry fallback cache, PRO-1194) — so, like the smly_plus_*
+// sweep above, a LIKE-prefix delete is the only way to catch every
+// contact's rows without enumerating them. Transients without an external
+// object cache live in wp_options as `_transient_{name}` /
+// `_transient_timeout_{name}`; the stale prefix nests inside the fresh
+// prefix, so one LIKE pair covers both (PRO-1336).
+$wpdb->query(
+	$wpdb->prepare(
+		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+		$wpdb->esc_like( '_transient_smly_profiling_' ) . '%',
+		$wpdb->esc_like( '_transient_timeout_smly_profiling_' ) . '%'
+	)
+);
+
 $legacy_options = array(
 	// Credentials + verification state for the default account.
 	'smaily_connect_api_credentials',
@@ -83,6 +102,9 @@ $legacy_options = array(
 	'smaily_connect_dismiss_notice',
 	// Schema-version marker the migration runner reads.
 	'smaily_connect_db_version',
+	// ProfilingConsent durable opt-out registry (autoload=false, hashed-email
+	// keys — PRO-1194); must not survive an uninstall (PRO-1336).
+	'smly_profiling_optouts',
 );
 foreach ( $legacy_options as $opt ) {
 	delete_option( $opt );
