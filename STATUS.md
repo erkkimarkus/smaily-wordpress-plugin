@@ -26,7 +26,40 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1277 DONE — legacy Autoresponder dropdown
+_Last updated: 2026-07-13 (**PRO-1194 fail-open GDPR window — hardened
+(serve-stale-on-error + durable opt-out registry).** Design approved by Erkki;
+implements options B+C from the `docs/DATA_MODEL_GDPR.md` fail-open review
+(commit 47897a0). `ProfilingConsent` (`includes/Privacy/ProfilingConsent.php`)
+now resolves a profiling decision through four layers instead of one: (1) the
+existing fresh per-email transient (1-day TTL, unchanged); (2) a new **durable
+opt-out registry** — a single `smly_profiling_optouts` option (autoload=false,
+keyed by hashed email, opt-outs only) that a read error can never override,
+cleared only by a later successful engine read-back showing opt-in; (3) a new
+**stale cache** — a second per-email transient with no TTL, holding the last
+successfully fetched answer, served on a read error instead of defaulting to
+allowed; (4) true fail-open, now residual — only fires for a contact the
+plugin has never resolved either way (never-seen + engine down). Every
+successful read (and every WP-side `opt_out()`/`opt_in()`) writes all three
+stores together via a new `remember()` helper. This is a privacy-POSITIVE-only
+change — it never allows more profiling than before; it only closes cases
+where the old code defaulted to "allowed" and now correctly denies. No
+user-visible change (no merchant-docs-site edit — verified the site doesn't
+describe the fail-open window). `docs/DATA_MODEL_GDPR.md`'s fail-open review
+section is updated in the same commit: status flipped from "DRAFT" to
+"IMPLEMENTED 2026-07-13", the B/C alternatives-table rows marked implemented,
+and a new "Implemented behavior" matrix documents the four layers. Tests:
+`tests/Unit/Privacy/ProfilingConsentTest.php` gained 4 new cases (stale served
+on error, durable opt-out wins over an error, a successful opt-in read clears
+the durable entry, an opt-out read persists it durably) plus stub updates to
+4 existing cases (`get_option`/`update_option` now touched by every
+success-path write). No integration test added — `ProfilingConsent` had none
+to extend. Gates: `ci:strict` exit=0 (phpcs 0 errors/phpstan no errors/unit
+559 tests incl. ProfilingConsentTest's 10 methods expanding to 16 tests via
+the `is_allowed` data provider (24 assertions)/lint/typecheck/vitest 236).
+PRO-1194 overall **stays OPEN** — legal sign-off (entity name, URL,
+lawful-basis framing) still pending; only the fail-open hardening sub-item is
+done. Prior:
+**PRO-1277 DONE — legacy Autoresponder dropdown
 (CF7 / Elementor / Gutenberg newsletter block) stops offering `is_enabled=false`
 Smaily workflows.** `Helper::get_autoresponders_list()` (`workflows.php?
 trigger_type=form_submitted`, `includes/smaily-helper.class.php`) shapes rows

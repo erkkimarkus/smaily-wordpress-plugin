@@ -27,6 +27,12 @@ use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
  * API; a day-stale cache is acceptable for profiling (not real-time-critical),
  * and a WP-side opt-out updates the cache immediately.
  *
+ * Hardening (PRO-1194, fail-open GDPR window review, options B+C): a read
+ * error no longer defaults straight to "allowed". A durably known opt-out
+ * (non-transient option row, immune to cache eviction) always wins; failing
+ * that, the last successfully fetched state is served from a no-expiry stale
+ * cache; only a genuinely never-seen contact still fails open.
+ *
  * When the decision resolves to "do not profile", two actions fire (the spec):
  *   1. engine opt-out (§10 Client::customer_opt_out) — excluded from recs;
  *   2. beacon-stop — the beacon's profiling gate ((a).1 consumes may_profile()).
@@ -36,8 +42,10 @@ use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
  */
 class ProfilingConsent {
 
-	private const CACHE_PREFIX = 'smly_profiling_';
-	private const CACHE_TTL    = DAY_IN_SECONDS;
+	private const CACHE_PREFIX       = 'smly_profiling_';
+	private const STALE_CACHE_PREFIX = 'smly_profiling_stale_';
+	private const OPTION_OPTOUTS     = 'smly_profiling_optouts';
+	private const CACHE_TTL          = DAY_IN_SECONDS;
 
 	private RecEngineSettings $settings;
 
@@ -81,9 +89,10 @@ class ProfilingConsent {
 
 	/**
 	 * May this contact be profiled? Cached (daily TTL); a miss triggers a
-	 * read-back. Fail-open (return true) on a read error — consistent with the
-	 * opt-out, default-on model: an undeterminable state defaults to profiling
-	 * (the merchant's accepted risk, DECISIONS F3-31), never a silent block.
+	 * read-back. On a read error, `refresh()` no longer defaults straight to
+	 * allowed — see `fallback_on_error()` for the serve-stale / durable-opt-out
+	 * hardening (PRO-1194); a genuinely never-seen contact still fails open,
+	 * consistent with the opt-out, default-on model (DECISIONS F3-31).
 	 */
 	public function may_profile( string $email ): bool {
 		$cached = get_transient( self::cache_key( $email ) );
@@ -94,28 +103,51 @@ class ProfilingConsent {
 	}
 
 	/**
-	 * Read the consent back from Smaily, cache the decision, and — if it resolves
-	 * to "do not profile" — fire the engine opt-out. Returns the decision.
+	 * Read the consent back from Smaily, remember the decision, and — if it
+	 * resolves to "do not profile" — fire the engine opt-out. On a read error
+	 * (or no Smaily client configured), falls through to `fallback_on_error()`
+	 * instead of defaulting to allowed. Returns the decision.
 	 */
 	public function refresh( string $email ): bool {
-		$allowed = true; // fail-open default.
-
 		$client = ( $this->smaily_client_factory )();
+
 		if ( $client instanceof SmailyClient ) {
 			try {
 				$consent = $client->get_contact_consent( $email );
 				$allowed = self::is_allowed( $consent['is_unsubscribed'], $consent['smaily_rec_profiling'] );
+				$this->remember( $email, $allowed );
+				if ( ! $allowed ) {
+					$this->engine_opt_out( $email );
+				}
+				return $allowed;
 			} catch ( \Throwable $e ) {
-				$allowed = true; // read error → fail-open.
+				// Fall through to the shared error/unconfigured fallback below.
 			}
 		}
 
+		$allowed = $this->fallback_on_error( $email );
 		$this->cache( $email, $allowed );
-		if ( ! $allowed ) {
-			$this->engine_opt_out( $email );
+		return $allowed;
+	}
+
+	/**
+	 * Best available answer when a fresh read couldn't be completed. A
+	 * durably known opt-out always wins (never re-allowed by an error);
+	 * otherwise serve the last successfully fetched state (stale cache, no
+	 * expiry); otherwise a genuinely never-seen contact fails open
+	 * (DECISIONS F3-31 — the merchant's accepted residual risk).
+	 */
+	private function fallback_on_error( string $email ): bool {
+		if ( $this->is_durably_opted_out( $email ) ) {
+			return false;
 		}
 
-		return $allowed;
+		$stale = get_transient( self::stale_cache_key( $email ) );
+		if ( $stale !== false ) {
+			return $stale === '1';
+		}
+
+		return true;
 	}
 
 	/**
@@ -126,14 +158,14 @@ class ProfilingConsent {
 	 */
 	public function opt_out( string $email ): void {
 		$this->write( $email, false );
-		$this->cache( $email, false );
+		$this->remember( $email, false );
 		$this->engine_opt_out( $email );
 	}
 
 	/** WP-side opt back in: write `1` + timestamp, cache, re-include in the engine. */
 	public function opt_in( string $email ): void {
 		$this->write( $email, true );
-		$this->cache( $email, true );
+		$this->remember( $email, true );
 		$this->engine_opt_in( $email );
 	}
 
@@ -186,11 +218,58 @@ class ProfilingConsent {
 		}
 	}
 
+	/**
+	 * Record a definitively known decision (a successful read-back, or a
+	 * WP-side opt-out/opt-in) across all three storage layers: the fresh
+	 * daily-TTL cache, the no-expiry stale cache, and the durable opt-out
+	 * registry (added/removed as appropriate).
+	 */
+	private function remember( string $email, bool $allowed ): void {
+		$this->cache( $email, $allowed );
+		set_transient( self::stale_cache_key( $email ), $allowed ? '1' : '0', 0 );
+		$this->remember_optout( $email, $allowed );
+	}
+
 	private function cache( string $email, bool $allowed ): void {
 		set_transient( self::cache_key( $email ), $allowed ? '1' : '0', self::CACHE_TTL );
 	}
 
+	/**
+	 * Durable opt-out registry (autoload=false option, keyed by hashed email —
+	 * stores only opt-outs, so it stays bounded to the merchant's actual
+	 * opt-out count, not the whole contact base). An opt-in fetch removes the
+	 * entry; only the engine's own answer can clear a durable opt-out.
+	 */
+	private function remember_optout( string $email, bool $allowed ): void {
+		$key       = self::email_hash( $email );
+		$optouts   = (array) get_option( self::OPTION_OPTOUTS, array() );
+		$has_entry = isset( $optouts[ $key ] );
+
+		if ( $allowed && $has_entry ) {
+			unset( $optouts[ $key ] );
+		} elseif ( ! $allowed && ! $has_entry ) {
+			$optouts[ $key ] = true;
+		} else {
+			return; // already in the right state — no write.
+		}
+
+		update_option( self::OPTION_OPTOUTS, $optouts, false );
+	}
+
+	private function is_durably_opted_out( string $email ): bool {
+		$optouts = (array) get_option( self::OPTION_OPTOUTS, array() );
+		return isset( $optouts[ self::email_hash( $email ) ] );
+	}
+
+	private static function email_hash( string $email ): string {
+		return md5( strtolower( trim( $email ) ) );
+	}
+
 	private static function cache_key( string $email ): string {
-		return self::CACHE_PREFIX . md5( strtolower( trim( $email ) ) );
+		return self::CACHE_PREFIX . self::email_hash( $email );
+	}
+
+	private static function stale_cache_key( string $email ): string {
+		return self::STALE_CACHE_PREFIX . self::email_hash( $email );
 	}
 }

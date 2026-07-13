@@ -1669,6 +1669,14 @@ cached for the TTL, so the window needs a *cache-expired* opt-out + a *concurren
 read failure). Narrow + transient, but real — folded into Erkki's separate GDPR
 investigation alongside the opt-out-model risk.
 
+**Fail-open window hardened (PRO-1194, 2026-07-13).** The investigation
+(`docs/DATA_MODEL_GDPR.md` "Fail-open GDPR window") concluded: keep the
+fail-open default, but harden it with serve-stale-on-error + a durable
+opt-out registry so a read error can never re-allow a contact whose opt-out
+the plugin has already seen. Implemented as-designed; the residual fail-open
+now covers only a genuinely never-seen contact whose first-ever read errors.
+See that doc's "Implemented behavior" table for the final four-layer shape.
+
 **Enforcement runtime (3.10.x-style):** cached read-back (`smly_profiling_*`
 transient, **daily TTL** — a Smaily-side opt-out propagates within a day; profiling
 isn't real-time-critical, but a week would be a GDPR problem). WP-side opt-out writes

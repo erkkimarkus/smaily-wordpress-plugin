@@ -79,6 +79,7 @@ final class ProfilingConsentTest extends TestCase {
 
 	public function test_cache_miss_reads_back_and_caches_the_decision(): void {
 		Functions\when( 'get_transient' )->justReturn( false );
+		Functions\when( 'get_option' )->justReturn( array() );
 		$cached = null;
 		Functions\when( 'set_transient' )->alias(
 			static function ( string $k, $v ) use ( &$cached ): bool {
@@ -99,6 +100,8 @@ final class ProfilingConsentTest extends TestCase {
 	public function test_readback_opt_out_caches_false_and_engine_opts_out(): void {
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array() );
+		Functions\when( 'update_option' )->justReturn( true );
 
 		$smaily = $this->createMock( SmailyClient::class );
 		$smaily->method( 'get_contact_consent' )->willReturn(
@@ -117,16 +120,87 @@ final class ProfilingConsentTest extends TestCase {
 	public function test_readback_error_fails_open(): void {
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array() );
 
 		$smaily = $this->createMock( SmailyClient::class );
 		$smaily->method( 'get_contact_consent' )->willThrowException( new \RuntimeException( 'network' ) );
 
-		// Opt-out model → an undeterminable state defaults to profiling, never a block.
+		// Never-seen contact: no stale cache, no durable opt-out → true fail-open.
 		self::assertTrue( $this->resolver( $smaily )->refresh( 'a@example.com' ) );
+	}
+
+	public function test_error_serves_the_stale_value_when_one_exists(): void {
+		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array() );
+		// Fresh cache misses; the no-expiry stale cache holds a prior '0' (opted out).
+		Functions\when( 'get_transient' )->alias(
+			static fn ( string $key ) => strpos( $key, 'stale' ) !== false ? '0' : false
+		);
+
+		$smaily = $this->createMock( SmailyClient::class );
+		$smaily->method( 'get_contact_consent' )->willThrowException( new \RuntimeException( 'network' ) );
+
+		self::assertFalse( $this->resolver( $smaily )->refresh( 'a@example.com' ) );
+	}
+
+	public function test_durable_optout_wins_over_a_read_error_with_no_stale_entry(): void {
+		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_transient' )->justReturn( false ); // no stale entry either.
+		Functions\when( 'get_option' )->justReturn( array( md5( 'a@example.com' ) => true ) );
+
+		$smaily = $this->createMock( SmailyClient::class );
+		$smaily->method( 'get_contact_consent' )->willThrowException( new \RuntimeException( 'network' ) );
+
+		// A durably known opt-out can never be re-allowed by a transient error.
+		self::assertFalse( $this->resolver( $smaily )->refresh( 'a@example.com' ) );
+	}
+
+	public function test_successful_opt_in_readback_clears_the_durable_optout(): void {
+		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array( md5( 'a@example.com' ) => true ) );
+		$stored = null;
+		Functions\when( 'update_option' )->alias(
+			static function ( string $name, $value ) use ( &$stored ): bool {
+				$stored = $value;
+				return true;
+			}
+		);
+
+		$smaily = $this->createMock( SmailyClient::class );
+		$smaily->method( 'get_contact_consent' )->willReturn(
+			array( 'found' => true, 'is_unsubscribed' => '0', 'smaily_rec_profiling' => '1' )
+		);
+
+		self::assertTrue( $this->resolver( $smaily )->refresh( 'a@example.com' ) );
+		self::assertIsArray( $stored );
+		self::assertArrayNotHasKey( md5( 'a@example.com' ), $stored );
+	}
+
+	public function test_opt_out_readback_persists_the_durable_registry_entry(): void {
+		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array() );
+		$stored = null;
+		Functions\when( 'update_option' )->alias(
+			static function ( string $name, $value ) use ( &$stored ): bool {
+				$stored = $value;
+				return true;
+			}
+		);
+
+		$smaily = $this->createMock( SmailyClient::class );
+		$smaily->method( 'get_contact_consent' )->willReturn(
+			array( 'found' => true, 'is_unsubscribed' => '0', 'smaily_rec_profiling' => '0' )
+		);
+
+		self::assertFalse( $this->resolver( $smaily )->refresh( 'a@example.com' ) );
+		self::assertIsArray( $stored );
+		self::assertArrayHasKey( md5( 'a@example.com' ), $stored );
 	}
 
 	public function test_opt_out_writes_to_smaily_and_engine(): void {
 		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'get_option' )->justReturn( array() );
+		Functions\when( 'update_option' )->justReturn( true );
 
 		$smaily = $this->createMock( SmailyClient::class );
 		$smaily->expects( self::once() )

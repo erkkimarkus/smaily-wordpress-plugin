@@ -379,13 +379,16 @@ Open placeholders needing confirmation before sign-off:
 
 ---
 
-## Fail-open GDPR window — decision review (PRO-1194 — DRAFT, no behavior change)
+## Fail-open GDPR window — decision review + hardening (PRO-1194)
 
-**Status: review only.** This section restates the shipped behavior, analyses
-the risk, lists alternatives, and records a recommendation for Erkki/legal.
-No code or behavior was changed in this pass.
+**Status: IMPLEMENTED 2026-07-13.** This section originally restated the
+shipped behavior, analysed the risk, and listed alternatives for Erkki/legal
+sign-off. The recommended hardening (options B + C below) is now built —
+see "Implemented behavior (2026-07-13)" at the end of this section for the
+final matrix. The analysis above the recommendation is left as-written
+(historical review record); only the recommendation itself is superseded.
 
-### Current behavior (code facts, `includes/Privacy/ProfilingConsent.php`)
+### Behavior before this hardening (code facts as originally shipped)
 
 - `may_profile( $email )` reads a per-email transient
   (`smly_profiling_<md5(email)>`, TTL **1 day**). Cache hit → cached answer.
@@ -456,19 +459,35 @@ the strongest argument for hardening option C below.
 | Option | What it is | Assessment |
 |---|---|---|
 | A. Fail-closed on read error | Read error → don't profile | Any Smaily outage silently stops profiling for EVERY contact — the exact "silent 0 events, indistinguishable from feature-off" failure class this project has been burned by (F3-50, LESSONS). Disproportionate to the narrow risk; contradicts the F3-31 default-on decision. Not recommended. |
-| B. Serve-stale-on-error | On read error, reuse the last known (even expired) cached value; fail open only for never-seen contacts | Removes the worst case (a KNOWN opt-out re-profiled during an outage) at trivial cost. Small, contained change to `refresh()` + cache bookkeeping. Recommended hardening. |
-| C. Persist opt-outs durably | Mirror a known opt-out into non-expiring storage (user meta / option), checked before fail-open; cleared on opt-in | Makes a known objection immune to transient eviction AND outages. Complements B (covers cache-evicted entries B alone cannot). Recommended hardening. |
+| B. Serve-stale-on-error | On read error, reuse the last known (even expired) cached value; fail open only for never-seen contacts | Removes the worst case (a KNOWN opt-out re-profiled during an outage) at trivial cost. Small, contained change to `refresh()` + cache bookkeeping. **IMPLEMENTED 2026-07-13.** |
+| C. Persist opt-outs durably | Mirror a known opt-out into non-expiring storage (user meta / option), checked before fail-open; cleared on opt-in | Makes a known objection immune to transient eviction AND outages. Complements B (covers cache-evicted entries B alone cannot). **IMPLEMENTED 2026-07-13.** |
 | D. Shorter cache TTL | e.g. 1 h instead of 24 h | Shrinks only the propagation window, at ~24× the Smaily read volume; 24 h is already within "undue delay" tolerance for marketing profiling (F3-31: "a week would be a problem", a day is not). Not recommended alone. |
 | E. Switch to explicit opt-in | Flip `is_allowed()` per the F3-31 TODO | The fallback if AKI/legal tightens. A model change, not a window fix — out of scope here; kept invertible by design. |
 
-### Recommendation (draft, for Erkki/legal sign-off)
+### Implemented behavior (2026-07-13)
 
-**Keep the fail-open default (F3-31 stands), but harden it with B + C** so
-that an opt-out the plugin has *ever seen* can never be overridden by a read
-failure or transient eviction — the residual fail-open then covers only
+**Kept the fail-open default (F3-31 stands), hardened it with B + C.** An
+opt-out the plugin has *ever seen* can now never be overridden by a read
+failure or transient cache eviction — the residual fail-open covers only
 contacts whose objection no plugin-side system has ever observed, and the
-engine-side enforcement layer covers most of that remainder. Additionally,
-the privacy-policy template above discloses the ≤ 24 h propagation ("may take
-up to 24 hours to take effect across all systems"), which keeps the designed
-propagation window transparent. B + C are follow-up code work (own sub-PR,
-normal plan/checkpoint rhythm), NOT part of this docs pass.
+engine-side enforcement layer (F3-49 pt 3) covers most of that remainder.
+`ProfilingConsent` (`includes/Privacy/ProfilingConsent.php`) now resolves a
+profiling decision through four layers, in order:
+
+| Layer | Storage | Lifetime | When it wins |
+|---|---|---|---|
+| 1. Fresh cache | Per-email transient (`smly_profiling_<hash>`) | 1 day TTL | Normal path — any cache hit answers directly, no Smaily read. Unchanged from before this hardening. |
+| 2. Durable opt-out registry | Single option (`smly_profiling_optouts`, autoload=false), keyed by hashed email, opt-outs only | No expiry, immune to transient/object-cache eviction | On a fresh-cache miss with a read error (or no Smaily client configured): checked FIRST. If the email is in the registry, profiling is denied — unconditionally, regardless of any stale value. Only a later **successful** engine read-back showing opt-in removes the entry; an error can never clear it. |
+| 3. Stale cache | Second per-email transient (`smly_profiling_stale_<hash>`), no TTL | Until overwritten by the next successful read | Consulted only if layer 2 has no entry. Serves the last successfully fetched answer (allow or deny) instead of defaulting to allowed. |
+| 4. True fail-open | — | — | Only when NEITHER a durable opt-out NOR a stale value exists for the email — i.e. a genuinely never-seen contact whose first-ever read errors. This is the sole residual fail-open window; it can never re-allow a contact the plugin has previously resolved either way. |
+
+Every successful read-back (and every WP-side `opt_out()`/`opt_in()` call)
+writes all three stores together: the fresh cache, the stale cache, and the
+durable registry (add on opt-out, remove on opt-in). The propagation window
+(exposure 2 above) is unchanged by this hardening — it is designed cache
+freshness, not a failure mode — and stays disclosed in the privacy-policy
+template ("may take up to 24 hours to take effect across all systems").
+Tests: `tests/Unit/Privacy/ProfilingConsentTest.php` covers all four layers
+(fresh hit, stale-served-on-error, durable-opt-out-wins-over-error,
+durable-cleared-by-a-successful-opt-in-read, opt-out-persists-durably,
+true fail-open for a never-seen contact + error).
