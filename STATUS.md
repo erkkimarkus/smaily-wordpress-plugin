@@ -26,7 +26,18 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-11 (**PRO-1258 DONE — `EndpointRegistry::expected_routes()`
+_Last updated: 2026-07-13 (**Contract re-synced byte-identical (engine `945b7ad`, md5
+`3dbe029b…`) — PRO-1279.** Doc-only delta since our `2dec424` sync (v1.4.0 → v1.4.1,
+PATCH bump): §3 `tags` example gains `"product_id": "7620134"`, and the identity bullet
+now states cross-variant grouping by `tags.product_id` is **live** (engine PRO-1227,
+was "future" in v1.3.0); §3 also gains an explicit Magento-only carve-out (Magento's
+catalog `sku` field IS its platform-canonical key — does not apply to Shopify/Woo).
+CC-8 conformance verified: no wire-shape change for Woo — `CatalogPayloadBuilder::tags()`
+already emits `tags.product_id` via `SkuResolver::product_group_id()` since PRO-1224/
+PRO-1230, pinned by `CatalogPayloadBuilderTest` and mirrored in the mock router. No code
+change, no live-walk needed (prose clarify + an already-shipped field's example gains
+a value). Gates: `bin/check-contract-staleness.sh` green. Prior:
+**PRO-1258 DONE — `EndpointRegistry::expected_routes()`
 now lists the `/events` triple** (GET `/events`, GET `/events/detail`, POST
 `/events/retry`) — the PRO-1197 follow-up below. The route surface is confirmed
 against every `register_rest_route()` call in `includes/REST/`: 16
