@@ -55,8 +55,9 @@ the durable entry, an opt-out read persists it durably) plus stub updates to
 success-path write). No integration test added — `ProfilingConsent` had none
 to extend. Gates: `ci:strict` exit=0 (phpcs 0 errors/phpstan no errors/unit
 559 tests incl. ProfilingConsentTest's 10 methods expanding to 16 tests via
-the `is_allowed` data provider (24 assertions)/lint/typecheck/vitest 236).
-PRO-1194 overall **stays OPEN** — legal sign-off (entity name, URL,
+the `is_allowed` data provider (24 assertions)/lint/typecheck/vitest 236);
+integration 148 OK (`sg docker`, sandbox tenant `Smaily Connect test`
+snapshot/restored cleanly). PRO-1194 overall **stays OPEN** — legal sign-off (entity name, URL,
 lawful-basis framing) still pending; only the fail-open hardening sub-item is
 done. Prior:
 **PRO-1277 DONE — legacy Autoresponder dropdown
