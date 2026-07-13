@@ -26,7 +26,41 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1337 DONE — uninstall.php now sweeps
+_Last updated: 2026-07-13 (**PRO-1341 — v3.7.0 release-gate delta security +
+code-quality re-audit DONE, verdict PASS.** Scope = `aa86c9a..HEAD` (the
+v3.6.1→now delta: the PRO-1195 abandoned-cart rewrite onto the namespaced
+pipeline (biggest piece, +7115/-1100 lines total across 16 commits), the
+disabled-workflow dropdown filter (PRO-1277/1334), the ProfilingConsent
+fail-open hardening (PRO-1194), the uninstall.php `smly_profiling_*`/
+`smly_rec_*` sweeps (PRO-1336/1337), `/events` route test-pinning (PRO-1258),
+contract sync, new dev docs). Read the full diff file-by-file (clean-context
+agent, no involvement writing the delta) against every high-risk surface the
+task named: the new `smly_plus_cart_session` tracker's SQL (all `$wpdb->
+prepare()`d, no raw interpolation of request input), the checkout-input
+capture hooks (classic `checkout_update_order_review` + Store API
+`cart_update_customer_from_request` — both sanitize+validate before storage,
+no superglobal read directly), `ProfilingConsent`'s durable opt-out registry
+(hashed-email keys, autoload=false, no email in any log line), `uninstall.php`
+(both new LIKE-sweeps prepared+esc_like'd, new table correctly wired into the
+drop list + EnvScrub + SchemaMigrationTest), and the two-flusher event-type
+queue scoping (holds both directions, unit-pinned). Confirmed NOT touched:
+REST route surface (grep for `register_rest_route(` across the whole delta
+found zero new calls — EndpointRegistry's change is test-pinning only), the
+`/relay` beacon, auth/nonce paths, crypto. **Verdict: PASS — 0 Critical/High/
+Medium/Low, 2 Info** (both pre-existing/docs-scope, not delta regressions: a
+dead `uninstall.php` `$legacy_options` entry that's actually a leftover
+table-suffix string, harmless no-op; the new cart tracker's local PII isn't
+mentioned in `DATA_MODEL_GDPR.md`, which is consistent with that doc's own
+stated "rec-engine data only" scope note). Every F3-37/F3-44/F3-53 discipline
+point named in CLAUDE.md was checked against the actual delta code, not just
+assumed, and holds. Full report:
+[`docs/audits/2026-07-13-SECURITY_QUALITY_RE_AUDIT_PRO1195_CART_REWRITE.md`](docs/audits/2026-07-13-SECURITY_QUALITY_RE_AUDIT_PRO1195_CART_REWRITE.md),
+register row added to `docs/audits/INDEX.md`. This was a read-only analysis
+pass (no code touched); `ci:strict`/PCP-against-ZIP/live-walk are separate
+steps still needed before the v3.7.0 tag — STATUS already records green
+per-commit gates for every commit in this delta individually (see the
+PRO-1337/1336/1334/1277/1194/1258/1195/1197/1256/1250 entries below). Prior:
+**PRO-1337 DONE — uninstall.php now sweeps
 `smly_rec_*` (rec-engine connection state), closing the gap PRO-1336 flagged.**
 Approved design: full irrecoverable local delete, no engine-side revoke call.
 Three additions, all mirroring `uninstall.php`'s existing `smly_plus_*`
