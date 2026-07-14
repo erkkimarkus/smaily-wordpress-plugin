@@ -26,7 +26,21 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-14 (**PRO-1343 — GdprHandler now covers the
+_Last updated: 2026-07-14 (**PRO-1405 — GdprHandler friendly name renamed
+to "Smaily Connect data" DONE.** Erkki decided (2026-07-14) to rename the WP
+Privacy exporter/eraser friendly name away from "Smaily Campaign Intelligence
+data" — since PRO-1343 it also covers the `smly_plus_cart_session`
+abandoned-cart tracker, which works independently of the rec-engine
+connection, so the old name overclaimed scope. Both `register_exporter()`
+and `register_eraser()` in `includes/Privacy/GdprHandler.php` now register
+`__( 'Smaily Connect data', 'smaily-connect' )`. `languages/
+smaily-connect.pot` + `-et.po` msgid/msgstr updated to match (Estonian:
+"Smaily Connect andmed"); `.mo`/JSON artifacts NOT rebuilt here (gitignored,
+rebuilt at release time per `bin/build-i18n.sh`). No test asserted the old
+string literal, so none needed changing. `docs/site/index.html` and
+`docs/DATA_MODEL_GDPR.md` don't name this exact label — re-grepped, no
+changes needed. `ci:strict` green.
+Prior: 2026-07-14 (**PRO-1343 — GdprHandler now covers the
 `smly_plus_cart_session` abandoned-cart tracker DONE.** Erkki decided
 (2026-07-14) to register real WP Privacy exporter/eraser coverage for this
 table rather than rely on the ~24h auto-purge (the PRO-1194 follow-up below).

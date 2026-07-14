@@ -108,7 +108,7 @@ class GdprHandler {
 	 */
 	public function register_exporter( array $exporters ): array {
 		$exporters[ self::EXPORTER_ID ] = array(
-			'exporter_friendly_name' => __( 'Smaily Campaign Intelligence data', 'smaily-connect' ),
+			'exporter_friendly_name' => __( 'Smaily Connect data', 'smaily-connect' ),
 			'callback'               => array( $this, 'export' ),
 		);
 		return $exporters;
@@ -121,7 +121,7 @@ class GdprHandler {
 	 */
 	public function register_eraser( array $erasers ): array {
 		$erasers[ self::ERASER_ID ] = array(
-			'eraser_friendly_name' => __( 'Smaily Campaign Intelligence data', 'smaily-connect' ),
+			'eraser_friendly_name' => __( 'Smaily Connect data', 'smaily-connect' ),
 			'callback'             => array( $this, 'erase' ),
 		);
 		return $erasers;

@@ -167,8 +167,8 @@ msgstr "Peida"
 
 #: includes/Privacy/GdprHandler.php:104
 #: includes/Privacy/GdprHandler.php:117
-msgid "Smaily Campaign Intelligence data"
-msgstr "Smaily Campaign Intelligence andmed"
+msgid "Smaily Connect data"
+msgstr "Smaily Connect andmed"
 
 #: includes/Privacy/ProfilingConsentAccount.php:78
 msgid "Your recommendation preferences have been saved."

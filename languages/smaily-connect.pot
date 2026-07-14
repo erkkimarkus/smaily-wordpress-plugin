@@ -126,7 +126,7 @@ msgstr ""
 
 #: includes/Privacy/GdprHandler.php:104
 #: includes/Privacy/GdprHandler.php:117
-msgid "Smaily Campaign Intelligence data"
+msgid "Smaily Connect data"
 msgstr ""
 
 #: includes/Privacy/ProfilingConsentAccount.php:78
