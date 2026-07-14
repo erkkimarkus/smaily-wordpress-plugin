@@ -3241,6 +3241,36 @@ over; the legacy email pass it patched is retired); F3-37 (backlog guard —
 same filter, now in the sweeper); F3-44 (exchange capture); F3-47 (resolver
 language, `for_guest` added); Linear PRO-1195.
 
+### PRO-1194 (sign-off) — Privacy-policy template: legal entity, URL, lawful-basis framing confirmed
+
+**Context:** the merchant privacy-policy template in `docs/DATA_MODEL_GDPR.md`
+(added PRO-1194, drafted from verified plugin behavior) shipped with three
+open items blocking sign-off: the Smaily legal-entity name, the Smaily
+privacy-policy URL, and confirmation of the drafted lawful-basis framing.
+
+**Decision (Erkki, 2026-07-14):** entity = **Sendsmaily OÜ**; URL =
+**https://connect.smaily.com/privacy** (a separate cross-team issue, PRO-1406,
+is making this URL platform-agnostic — it currently reads Shopify-specific —
+but the URL itself is stable, so the template does not wait on that rework);
+lawful-basis framing = **confirmed as drafted**, legitimate interest
+(Art 6(1)(f) GDPR) for profiling/personalisation with the Art 21 right to
+object implemented as the opt-out (My Account toggle + engine-side
+enforcement). The merchant-legal-review caveat is **not** removed by this
+sign-off — every merchant must still have their own counsel review the
+adapted text for their store, including documenting a legitimate-interest
+balancing test.
+
+**Rationale:** these were the only items an engineering decision couldn't
+resolve alone (a real legal-entity name, a real URL, and a lawful-basis
+choice all require the business owner, not an inference). With them
+resolved, the template is no longer a draft and can be ported to the
+merchant-facing docs site.
+
+**Relationships:** finalizes the PRO-1194 draft (see `docs/DATA_MODEL_GDPR.md`
+"Merchant privacy-policy template"); the retention-period item of the same
+placeholder list was already resolved 2026-07-12 (engine team answer). Ported
+to `docs/site/index.html` (EN+ET) in the same commit as this entry.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

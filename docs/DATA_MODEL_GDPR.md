@@ -226,14 +226,19 @@ Full deletion, asymmetric to export (export is conservative, erase is complete):
 
 ## Merchant privacy-policy template (PRO-1194)
 
-> **DRAFT — pending Erkki/legal review (PRO-1194).** Nothing below is final
-> legal text. It is a TEMPLATE for merchants to adapt into their own store
-> privacy policy, and it is NOT legal advice — every merchant must have their
-> own legal counsel review the adapted text (including the lawful-basis choice
-> and, for a legitimate-interest basis, a documented balancing test / LIA).
-> The `[BRACKETED]` items are placeholders the merchant (or we) must fill.
-> Do not publish this to the merchant docs site or any user-visible surface
-> until Erkki/legal signs it off.
+> **SIGNED OFF by Erkki, 2026-07-14 (PRO-1194).** The three items that were
+> blocking sign-off — the Smaily legal entity name, the Smaily privacy-policy
+> URL, and the lawful-basis framing — are resolved below (see "Template ↔ code
+> fact map" → "Open placeholders"). It is still a TEMPLATE for merchants to
+> adapt into their own store privacy policy, and it is NOT legal advice —
+> every merchant must have their own legal counsel review the adapted text
+> (including the lawful-basis choice and, for a legitimate-interest basis, a
+> documented balancing test / LIA) — that requirement is not removed by this
+> sign-off. The remaining `[BRACKETED]` items are deliberate merchant-side
+> fill-ins (store name, contact address, supervisory authority) or the
+> merchant-legal-review caveat itself — not open items pending our
+> confirmation. Ported to the merchant docs site (`docs/site/index.html`,
+> EN+ET) in the same commit as this sign-off.
 
 **Roles, for the merchant's orientation (not part of the pasted text):** the
 store is the **data controller**; Smaily (the Smaily marketing platform + the
@@ -251,10 +256,10 @@ Personalised product recommendations (profiling)
 
 Who processes the data. [STORE NAME] ("we") is the data controller. To
 personalise our email marketing we use the Smaily Campaign Intelligence
-service provided by [CONFIRM: Smaily legal entity name] ("Smaily"), which
-processes this data on our behalf as our data processor, under a data
-processing agreement. Smaily's own privacy information is available at
-[LINK: Smaily privacy policy].
+service provided by Sendsmaily OÜ ("Smaily"), which processes this data on
+our behalf as our data processor, under a data processing agreement.
+Smaily's own privacy information is available at
+https://connect.smaily.com/privacy.
 
 What we do. We use your purchase history and — if you have accepted
 marketing cookies — your browsing activity in our online store to
@@ -335,10 +340,10 @@ Personaalsed tootesoovitused (profileerimine)
 
 Kes andmeid töötleb. [POE NIMI] ("meie") on vastutav töötleja. E-posti
 turunduse personaliseerimiseks kasutame Smaily Campaign Intelligence'i
-teenust, mida osutab [KINNITADA: Smaily juriidilise isiku nimi] ("Smaily")
-ja mis töötleb neid andmeid meie nimel volitatud töötlejana,
-andmetöötluslepingu alusel. Smaily enda privaatsusteave on kättesaadav
-aadressil [LINK: Smaily privaatsuspoliitika].
+teenust, mida osutab Sendsmaily OÜ ("Smaily") ja mis töötleb neid andmeid
+meie nimel volitatud töötlejana, andmetöötluslepingu alusel. Smaily enda
+privaatsusteave on kättesaadav aadressil
+https://connect.smaily.com/privacy.
 
 Mida me teeme. Kasutame sinu ostuajalugu ja — kui oled andnud nõusoleku
 turundusküpsisteks — sinu sirvimistegevust meie e-poes, et personaliseerida
@@ -431,10 +436,15 @@ või kustutame kohe, kui vormistad tellimuse või tühjendad ostukorvi.
 | Retention periods (browse 90 d; recommendations/rec_attribution 2 yr; email_events 1 yr; orders/customers = duration of merchant relationship, no fixed calendar period) | Engine team answer + Erkki decision, 2026-07-12 (PRO-1194): engine-enforced global horizons, daily `cleanup-expired-data` cron. Browse events (incl. `smaily_visitor_token` rows) and visitor-token↔customer bindings: 90-day TTL from creation, hard-deleted (binding also dies on GDPR erase / customer deletion). Order & customer ingest rows: no fixed period — retained for the duration of the merchant relationship, individual control is the Art 17 erase (`DELETE /api/v1/customer/{email}`); natural upper bound is merchant offboarding (tenant purge on engine side — tracked as an engine-backlog follow-up, not yet built). Recommendations 730 days from issue (a not-yet-issued/pending recommendation is not aged out early); rec_attribution 730 days; email_events 365 days; decision_log (engine-internal automated-decision log, not a customer-facing data element in the inventory above) 30 days. |
 | Abandoned-cart reminders: cart contents/e-mail/name stored locally (not the rec engine), kept ~24h by default, deleted on order completion/cart clear | `smly_plus_cart_session` (migration 009): fields per `CartSessionStore`; ~24h auto-purge per `CartAbandonmentSweeper::sweep()` (`DAY_IN_SECONDS`, filter `smaily_connect_abandoned_cart_max_age_seconds`); immediate delete on order/cart-clear per `CartHookHandler::clear_for_order()`/`on_cart_updated()` — see the "Plugin-held — local abandoned-cart tracker" subsection above (PRO-1194/PRO-1195) |
 
-Open placeholders needing confirmation before sign-off:
-1. `[CONFIRM: Smaily legal entity name]` — the exact controller-facing legal
-   entity (do not guess).
-2. `[LINK: Smaily privacy policy]` — the real URL (do not fabricate).
+Placeholders resolved at sign-off (Erkki, 2026-07-14, PRO-1194):
+1. ~~`[CONFIRM: Smaily legal entity name]`~~ — **RESOLVED 2026-07-14.** The
+   controller-facing legal entity is **Sendsmaily OÜ**; both templates now
+   name it directly.
+2. ~~`[LINK: Smaily privacy policy]`~~ — **RESOLVED 2026-07-14.**
+   `https://connect.smaily.com/privacy`. A separate cross-team issue
+   (PRO-1406) is making this URL platform-agnostic (it currently reads
+   Shopify-specific on the destination page) — the URL itself is stable, so
+   this template does not wait on that rework.
 3. ~~`[CONFIRM WITH ENGINE TEAM: retention period]`~~ — **RESOLVED 2026-07-12.**
    Engine team supplied the enforced retention horizons and Erkki decided the
    orders/customers wording (no fixed calendar period; see the fact-map row
@@ -442,9 +452,21 @@ Open placeholders needing confirmation before sign-off:
    placeholder.
 4. Lawful basis: the template drafts **legitimate interest + Art 21 opt-out**
    (matches the F3-31 opt-out/default-on model and the AKI reading recorded
-   there: transparent action + working opt-out). Erkki/legal must confirm this
-   framing — if AKI tightens to explicit opt-in, `ProfilingConsent::is_allowed()`
-   is built invertible (F3-31 TODO) and this template must be rewritten.
+   there: transparent action + working opt-out). **RESOLVED 2026-07-14** —
+   Erkki confirmed this framing as-drafted. The `[MERCHANT LEGAL REVIEW]` /
+   `[POE ÕIGUSNÕUSTAJA]` caveat in both templates is unchanged by this
+   sign-off: each merchant must still have their own counsel confirm the
+   basis for their store and document a balancing test/LIA. If AKI tightens
+   to explicit opt-in, `ProfilingConsent::is_allowed()` is built invertible
+   (F3-31 TODO) and this template would need rewriting.
+
+Remaining bracketed items in both templates — `[STORE NAME]`/`[POE NIMI]`,
+`[CONTACT E-MAIL]`/`[KONTAKT-E-POST]`, the `[MERCHANT LEGAL REVIEW]`/
+`[POE ÕIGUSNÕUSTAJA]` caveat, and `[FOR ESTONIAN STORES]`/`[EESTI POODIDELE]`
+(supervisory authority) — are deliberate merchant-side fill-ins, not open
+sign-off items: each merchant fills in their own store name and contact
+address, confirms their own supervisory authority, and has their own counsel
+complete the legal-review caveat.
 
 ---
 

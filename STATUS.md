@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-14 (**PRO-1405 — GdprHandler friendly name renamed
+_Last updated: 2026-07-14 (**PRO-1194 — RESOLVED (docs-only): privacy-policy
+template signed off + ported to the merchant docs site.** Erkki decided
+(2026-07-14) the three items blocking sign-off: Smaily legal entity =
+**Sendsmaily OÜ**; Smaily privacy-policy URL =
+**https://connect.smaily.com/privacy** (cross-team issue PRO-1406 makes this
+URL platform-agnostic separately — it's stable, so this doesn't wait on that);
+lawful-basis framing (legitimate interest, Art 6(1)(f) GDPR, + Art 21
+opt-out) **confirmed as drafted** — the merchant-legal-review caveat stays,
+each merchant still needs their own counsel. `docs/DATA_MODEL_GDPR.md`: the
+DRAFT banner flipped to SIGNED OFF, both template language blocks (EN+ET)
+have the two placeholders replaced with the real values, and the "Open
+placeholders" list is marked resolved (item 4 keeps the merchant-legal-review
+caveat text unchanged, per Erkki). The signed-off template is now also
+PORTED into `docs/site/index.html` (merchant-facing docs) as a new
+"Privacy‑policy text for your store" subsection under Data & privacy — EN+ET
+sibling blocks, same commit, nav updated to match; existing page structure
+otherwise untouched. `docs/DECISIONS.md` gained a short PRO-1194 (sign-off)
+entry recording the decision. Docs-only; `ci:strict` not required (no
+PHP/JS/tests touched). Only the cross-team URL-platform-agnostic rework
+(PRO-1406) rides separately — not blocking, PRO-1194 itself is closed. Prior:
+2026-07-14 (**PRO-1405 — GdprHandler friendly name renamed
 to "Smaily Connect data" DONE.** Erkki decided (2026-07-14) to rename the WP
 Privacy exporter/eraser friendly name away from "Smaily Campaign Intelligence
 data" — since PRO-1343 it also covers the `smly_plus_cart_session`
@@ -296,9 +316,9 @@ to extend. Gates: `ci:strict` exit=0 (phpcs 0 errors/phpstan no errors/unit
 559 tests incl. ProfilingConsentTest's 10 methods expanding to 16 tests via
 the `is_allowed` data provider (24 assertions)/lint/typecheck/vitest 236);
 integration 148 OK (`sg docker`, sandbox tenant `Smaily Connect test`
-snapshot/restored cleanly). PRO-1194 overall **stays OPEN** — legal sign-off (entity name, URL,
+snapshot/restored cleanly). ~~PRO-1194 overall **stays OPEN** — legal sign-off (entity name, URL,
 lawful-basis framing) still pending; only the fail-open hardening sub-item is
-done. Prior:
+done.~~ **RESOLVED 2026-07-14 — see top of file.** Prior:
 **PRO-1277 DONE — legacy Autoresponder dropdown
 (CF7 / Elementor / Gutenberg newsletter block) stops offering `is_enabled=false`
 Smaily workflows.** `Helper::get_autoresponders_list()` (`workflows.php?
