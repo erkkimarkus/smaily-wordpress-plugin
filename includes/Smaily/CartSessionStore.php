@@ -280,6 +280,67 @@ class CartSessionStore {
 		);
 	}
 
+	/**
+	 * Rows relevant to a WP Privacy subject-access request (PRO-1343): matched
+	 * by the email column, plus (belt-and-suspenders) any row keyed to the WP
+	 * user id whose account email is this address. Current write paths
+	 * (`CartHookHandler::current_identity()`, `LegacyCartDrain`) always
+	 * populate `email` whenever `user_id` is set, so the user_id branch is
+	 * defensive, not the primary match.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function rows_for_privacy_request( string $email, int $user_id = 0 ): array {
+		global $wpdb;
+
+		$where = $this->privacy_request_where( $email, $user_id );
+		if ( $where === null ) {
+			return array();
+		}
+
+		$sql  = "SELECT id, cart_token, user_id, email, first_name, last_name, cart_content, cart_updated, reminder_enqueued_at, created_at FROM {$this->table_name()} WHERE {$where[0]}";
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$where[1] ), ARRAY_A );
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Delete the same row set as {@see rows_for_privacy_request()} (Art 17
+	 * erasure). Returns the number of rows removed so the caller can report
+	 * `items_removed` truthfully.
+	 */
+	public function delete_rows_for_privacy_request( string $email, int $user_id = 0 ): int {
+		global $wpdb;
+
+		$where = $this->privacy_request_where( $email, $user_id );
+		if ( $where === null ) {
+			return 0;
+		}
+
+		$sql = "DELETE FROM {$this->table_name()} WHERE {$where[0]}";
+		return (int) $wpdb->query( $wpdb->prepare( $sql, ...$where[1] ) );
+	}
+
+	/**
+	 * The shared match condition for both privacy-request methods above, so
+	 * the lookup and the delete can never drift apart on what counts as "this
+	 * subject's rows".
+	 *
+	 * @return array{0: string, 1: array<int, string|int>}|null
+	 */
+	private function privacy_request_where( string $email, int $user_id ): ?array {
+		if ( $email !== '' && $user_id > 0 ) {
+			return array( 'email = %s OR user_id = %d', array( $email, $user_id ) );
+		}
+		if ( $email !== '' ) {
+			return array( 'email = %s', array( $email ) );
+		}
+		if ( $user_id > 0 ) {
+			return array( 'user_id = %d', array( $user_id ) );
+		}
+		return null;
+	}
+
 	private function table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . self::TABLE_SUFFIX;

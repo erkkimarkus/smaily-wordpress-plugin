@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Privacy\GdprHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\CartSessionStore;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Tests\Integration\Fixtures\RecEngineMockServer;
 use Smaily\Connect\Tests\Integration\Support\EnvScrub;
@@ -145,6 +146,51 @@ final class RecEngineGdprTest extends TestCase {
 		self::assertTrue( $second['done'] );
 	}
 
+	public function test_export_surfaces_cart_session_row(): void {
+		$email = 'gdpr-cart-export@example.test';
+		$store = new CartSessionStore();
+		$store->upsert(
+			'tok-' . wp_generate_uuid4(),
+			0,
+			$email,
+			'Jane',
+			'Doe',
+			array( array( 'product_id' => 123, 'variation_id' => 0, 'quantity' => 2 ) )
+		);
+
+		$names = $this->export_field_names( $this->handler()->export( $email ) );
+
+		self::assertContains( 'cart_content', $names, 'cart-session row surfaced (PRO-1343).' );
+		self::assertContains( 'cart_token', $names );
+	}
+
+	public function test_erase_deletes_cart_session_row(): void {
+		$email = 'gdpr-cart-erase@example.test';
+		$store = new CartSessionStore();
+		$store->upsert( 'tok-' . wp_generate_uuid4(), 0, $email, 'Jane', 'Doe', array() );
+
+		$result = $this->handler()->erase( $email );
+
+		self::assertTrue( $result['items_removed'] );
+		self::assertSame( array(), $store->rows_for_privacy_request( $email ) );
+	}
+
+	public function test_erase_matches_cart_session_by_user_id_when_email_column_drifted(): void {
+		$email = 'gdpr-cart-drift@example.test';
+		$user  = $this->make_user( $email );
+		$store = new CartSessionStore();
+		// Defensive case the acceptance criteria names: a row keyed to the WP
+		// user but whose email column wasn't populated. Current write paths
+		// never produce this (email is always set alongside user_id), but the
+		// erase must still find the row via the user's account email.
+		$store->upsert( 'tok-' . wp_generate_uuid4(), $user->ID, '', '', '', array() );
+
+		$result = $this->handler()->erase( $email );
+
+		self::assertTrue( $result['items_removed'], 'Row matched via user_id despite an empty email column.' );
+		self::assertSame( array(), $store->rows_for_privacy_request( '', $user->ID ) );
+	}
+
 	// --- helpers --------------------------------------------------------
 
 	private function handler(): GdprHandler {
@@ -153,7 +199,8 @@ final class RecEngineGdprTest extends TestCase {
 			$settings,
 			static function () use ( $settings ): Client {
 				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
-			}
+			},
+			new CartSessionStore()
 		);
 	}
 

@@ -93,7 +93,7 @@ finding 2).
 
 | Element | Where | What it is | Export (Art 15) | Erase (Art 17) |
 |---|---|---|---|---|
-| `smly_plus_cart_session` row | Merchant's own WordPress DB table (`{prefix}smly_plus_cart_session`, migration 009) | One row per live/abandoned cart session: `cart_token`, `user_id`, `email`, `first_name`, `last_name`, `cart_content` (JSON array of `{product_id, variation_id, quantity}`), `cart_updated`, `reminder_enqueued_at`, `created_at` | **Not registered** — no WP Privacy exporter covers this table (gap, below) | **Not registered on request** — no WP Privacy eraser covers this table; rows are removed by automatic retention instead (below), not by an Art 17 request |
+| `smly_plus_cart_session` row | Merchant's own WordPress DB table (`{prefix}smly_plus_cart_session`, migration 009) | One row per live/abandoned cart session: `cart_token`, `user_id`, `email`, `first_name`, `last_name`, `cart_content` (JSON array of `{product_id, variation_id, quantity}`), `cart_updated`, `reminder_enqueued_at`, `created_at` | **Yes** — `GdprHandler`'s exporter surfaces any in-flight row matched by e-mail (PRO-1343) | **Yes** — `GdprHandler`'s eraser deletes any matching row on request, in addition to the automatic retention below |
 
 **Purpose.** Powers the abandoned-cart reminder e-mail sent via Smaily (one
 `automation.abandoned_cart` event), independent of the rec-engine connection
@@ -116,16 +116,17 @@ abandoned-cart toggle (`CartHookHandler`, `CartAbandonmentSweeper`).
   email), or a guest cart's identity migrates to a logged-in session
   (`delete_other_rows_for_email()` drops the stale guest-session duplicate).
 
-**GDPR-tooling gap (Info, not fixed here).** `GdprHandler`
+**GDPR-tooling coverage (PRO-1343).** `GdprHandler`
 (`includes/Privacy/GdprHandler.php`) registers the plugin's only WP Privacy
-exporter/eraser, and it covers rec-engine data + the plugin's rec-meta
-(above) only — it does **not** export or erase `smly_plus_cart_session` rows.
-A subject-access or erasure request today neither surfaces nor removes an
-in-flight cart-session row for that e-mail; the ~24h auto-purge mitigates but
-does not eliminate the gap. Tracked as a follow-up (register an exporter/
-eraser for this table, or explicitly decide the auto-purge is sufficient
-mitigation and record that decision here) — no exporter/eraser code added by
-this pass.
+exporter/eraser, and it now covers `smly_plus_cart_session` rows in addition
+to rec-engine data + the plugin's rec-meta (above): a subject-access request
+surfaces any in-flight row matched by the requester's e-mail (plus, as a
+defensive belt-and-suspenders match, a row keyed to their WP user id even if
+its `email` column were ever empty), and an erasure request deletes those
+same rows — independent of the rec-engine connection, since this tracker has
+nothing to do with the engine. The ~24h auto-purge (below) remains the
+retention backstop; the exporter/eraser now additionally cover the window
+before that purge runs.
 
 ---
 

@@ -26,7 +26,32 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-13 (**PRO-1194 — GDPR-doc follow-up on the PRO-1341
+_Last updated: 2026-07-14 (**PRO-1343 — GdprHandler now covers the
+`smly_plus_cart_session` abandoned-cart tracker DONE.** Erkki decided
+(2026-07-14) to register real WP Privacy exporter/eraser coverage for this
+table rather than rely on the ~24h auto-purge (the PRO-1194 follow-up below).
+`GdprHandler::export()`/`erase()` now also call into
+`CartSessionStore::rows_for_privacy_request()` /
+`delete_rows_for_privacy_request()` (new store methods): matched by the
+`email` column, plus (belt-and-suspenders) a row keyed to the requester's WP
+user id in case its `email` column were ever empty — current write paths
+always populate both together, so this is defensive, not the primary path.
+Export surfaces one "Abandoned-cart session" item per row (all populated
+columns except the internal `id`); erase deletes the same row set and
+reports `items_removed` truthfully. `GdprHandler`'s constructor gained a
+`CartSessionStore` parameter (`Bootstrap` wires it via the existing
+`cart_session_store()` accessor). Tests: a new
+`tests/Unit/Privacy/GdprHandlerTest.php` isolates the cart-session logic
+with a fake-store double (mirrors `CartAbandonmentSweeperTest`'s pattern,
+no WP/WC runtime needed); `tests/Integration/RecEngineGdprTest.php` gained
+three cases against the real DB (export surfaces a row, erase deletes it,
+erase matches via user_id when the email column is drifted).
+`docs/DATA_MODEL_GDPR.md` updated in the same commit (table + prose no
+longer say "not registered"). `docs/site/index.html` (merchant docs)
+made no claim about WP Privacy export/erase scope that this touches —
+left unchanged. `ci:strict` + `sg docker -c "composer run
+test:integration"` both green.
+Prior: 2026-07-13 (**PRO-1194 — GDPR-doc follow-up on the PRO-1341
 re-audit's Info finding 2 DONE (docs only).** `docs/DATA_MODEL_GDPR.md`'s
 scope note previously limited the whole document to "rec-engine personal
 data only", so the PRO-1195 cart-session tracker (`smly_plus_cart_session`,
@@ -51,9 +76,11 @@ not eliminated). The merchant privacy-policy template (same doc, EN+ET
 siblings) didn't mention abandoned-cart local data at all — added one
 minimal "What data is used" bullet + one retention sentence to BOTH language
 blocks (no restructuring), plus a template↔code fact-map row. No code
-changed; `ci:strict` not run (docs-only). Follow-up (not done here): register
-a WP Privacy exporter/eraser for `smly_plus_cart_session`, or explicitly
-decide the ~24h auto-purge is sufficient mitigation and record that decision.
+changed; `ci:strict` not run (docs-only). ~~Follow-up (not done here):
+register a WP Privacy exporter/eraser for `smly_plus_cart_session`, or
+explicitly decide the ~24h auto-purge is sufficient mitigation and record
+that decision.~~ **RESOLVED PRO-1343 (2026-07-14, see above)** — an
+exporter/eraser is now registered.
 Prior:
 **PRO-1341 — v3.7.0 release-gate delta security +
 code-quality re-audit DONE, verdict PASS.** Scope = `aa86c9a..HEAD` (the

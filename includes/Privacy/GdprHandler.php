@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\CartSessionStore;
 use Smaily\Connect\Smaily\RecEngine\ApiException;
 use Smaily\Connect\Smaily\RecEngine\Client;
 
@@ -32,6 +33,10 @@ use Smaily\Connect\Smaily\RecEngine\Client;
  *   - ERASE (complete, asymmetric to export): engine §9 DELETE (CASCADE incl.
  *     rec_attribution + visitor_tokens; 404 = already gone = success) PLUS the
  *     plugin's rec-meta markers.
+ *   - Also covers the local abandoned-cart session tracker
+ *     (`smly_plus_cart_session`, PRO-1195) — not rec-engine data, but the
+ *     plugin's only other local PII store (PRO-1343), so it rides the same
+ *     exporter/eraser. Independent of the rec-engine connection.
  *
  * The engine call is injected via a closure so tests stand up a mock engine.
  */
@@ -77,6 +82,7 @@ class GdprHandler {
 	);
 
 	private RecEngineSettings $settings;
+	private CartSessionStore $cart_store;
 
 	/** @var callable(): Client */
 	private $client_factory;
@@ -84,9 +90,10 @@ class GdprHandler {
 	/**
 	 * @param callable(): Client $client_factory
 	 */
-	public function __construct( RecEngineSettings $settings, callable $client_factory ) {
+	public function __construct( RecEngineSettings $settings, callable $client_factory, CartSessionStore $cart_store ) {
 		$this->settings       = $settings;
 		$this->client_factory = $client_factory;
+		$this->cart_store     = $cart_store;
 	}
 
 	public function register(): void {
@@ -130,6 +137,9 @@ class GdprHandler {
 		foreach ( $this->plugin_meta_export_items( $email ) as $item ) {
 			$items[] = $item;
 		}
+		foreach ( $this->cart_session_export_items( $email ) as $item ) {
+			$items[] = $item;
+		}
 
 		return array(
 			'data' => $items,
@@ -145,6 +155,9 @@ class GdprHandler {
 	public function erase( string $email, int $page = 1 ): array {
 		$removed = $this->erase_engine( $email );
 		if ( $this->erase_plugin_meta( $email ) ) {
+			$removed = true;
+		}
+		if ( $this->erase_cart_sessions( $email ) ) {
 			$removed = true;
 		}
 
@@ -246,6 +259,25 @@ class GdprHandler {
 		return $items;
 	}
 
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function cart_session_export_items( string $email ): array {
+		$items = array();
+
+		foreach ( $this->cart_store->rows_for_privacy_request( $email, $this->user_id_for( $email ) ) as $row ) {
+			$pairs = array();
+			foreach ( $row as $column => $value ) {
+				if ( $column !== 'id' && $value !== null && $value !== '' ) {
+					$pairs[ $column ] = $value;
+				}
+			}
+			$items[] = $this->group_item( 'Abandoned-cart session', 'cart-session-' . $row['id'], $pairs );
+		}
+
+		return $items;
+	}
+
 	// --- erase internals ---------------------------------------------------
 
 	private function erase_engine( string $email ): bool {
@@ -296,7 +328,20 @@ class GdprHandler {
 		return $removed;
 	}
 
+	private function erase_cart_sessions( string $email ): bool {
+		return $this->cart_store->delete_rows_for_privacy_request( $email, $this->user_id_for( $email ) ) > 0;
+	}
+
 	// --- helpers -----------------------------------------------------------
+
+	/**
+	 * The WP user id for an email, or 0 — used to widen the cart-session match
+	 * to a row keyed by user_id (see rows_for_privacy_request()).
+	 */
+	private function user_id_for( string $email ): int {
+		$user = get_user_by( 'email', $email );
+		return $user instanceof \WP_User ? (int) $user->ID : 0;
+	}
 
 	/**
 	 * The customer's orders as WC_Order objects (storage-agnostic — works under
