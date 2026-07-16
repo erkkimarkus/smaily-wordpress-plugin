@@ -26,7 +26,44 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 version bump PREPARED**
+_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 RELEASED.** Full local
+build/verify/release sequence run end-to-end after the version bump (below):
+`npm run build:admin && npm run build:client` (confirms the client entry name
+is `dist/public/js/sc-runtime.js`, not `beacon.js`); blocks built
+(`composer run install-block-modules && composer run build`); i18n rebuilt via
+`bash bin/build-i18n.sh` inside the wp-env CLI container (PRO-1430 signup-guide
+strings — only `#:` reference-line refresh landed in `.pot`/`-et.po`, no
+msgid/msgstr change, committed separately as `39c606a` so `package:hash`
+stamped clean); `composer install --no-dev --optimize-autoloader` →
+`composer run package` → `composer install` (dev restored). **ci:strict
+exit=0** (PHPCS 0 errors, PHPStan clean, PHPUnit unit 570, vitest 244,
+tsc/eslint clean) run once after the version-bump commit to confirm the pins.
+ZIP verified: clean build-hash `39c606a`, v3.7.0 in all three version strings,
+required present (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
+`blocks/*/build/*`, `vendor/autoload.php`, `languages/smaily-connect-et.mo` +
+the admin-bundle et JSON), dev artifacts/tests/docs/node_modules/admin-src
+absent (grep-confirmed zero matches), 1 110 616 B (in line with recent
+releases, no `blocks/node_modules` leak). **PCP against the built ZIP**
+(unzipped to `smaily-connect-pkg` in the wp-env `…-cli-1` container, never the
+bind-mounted `smaily-connect` dir): the single intentional
+`plugin_updater_detected` ERROR (F3-35, stays until upstream merge) + 4 NEW
+WARNINGs from the PRO-1195 cart code, both reviewed and confirmed false
+positives, no fix applied — `CartAbandonmentSweeper.php:78`
+`DynamicHooknameFound` on `self::FILTER_MAX_AGE` (PCP can't resolve a
+class-constant reference to its literal value; the constant itself is
+correctly `smaily_connect_`-prefixed — same false-positive class as the
+3.2.0-gate `self::FILTER_*` findings, which WERE suppressed with
+`phpcs:ignore` there; not done here — **follow-up**, see below) and
+`CartSessionStore.php:83,302,321` `UnescapedDBParameter` ×3 on
+`{$this->table_name()}` interpolation (the table name is a hardcoded internal
+constant, not user input; every actual value goes through `$wpdb->prepare()`
+with `%s`/`%d` — the same SQL already reviewed clean in the 2026-07-13
+cart-rewrite security audit). Full detail + the release-gate row:
+`docs/audits/INDEX.md` "3.7.0 release gate". **Released via `gh release
+create v3.7.0 smaily-connect.zip --repo erkkimarkus/smaily-wordpress-plugin
+--target main --title "v3.7.0"`** — non-prerelease, confirmed **Latest**;
+asset byte-verified (1 110 616 B, matches the local build exactly). Prior:
+2026-07-17 (**PRO-1341 — v3.7.0 version bump PREPARED**
 (`smaily-connect.php`, `package.json`, `readme.txt` Stable tag/Changelog/
 Upgrade Notice, the three test version-pins). Content since v3.6.1: PRO-1195
 abandoned-cart rewrite onto the v3 pipeline (retires the legacy pass), PRO-1277/
