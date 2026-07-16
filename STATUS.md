@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1430 — DONE: "How to add a Smaily signup
+_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 gate delta re-audit
+(post-PRO-1195) DONE: PASS, 0 Critical/High/Medium/Low, 1 Info.** Per the
+re-audit policy (`docs/audits/INDEX.md`), a delta pass was required since the
+2026-07-13 audit's baseline (`af9b52f`) because the intervening commits touch
+the GDPR surface. Scope: `af9b52f..HEAD` (`bc5d6bc`, 8 commits) —
+`GdprHandler`/`CartSessionStore` WP Privacy coverage for the abandoned-cart
+tracker (PRO-1343) + the exporter/eraser friendly-name rename (PRO-1405) +
+the privacy-policy template sign-off/port (PRO-1194, docs-only), plus the
+unrelated PRO-1430 "How to add a Smaily signup form" guide (new `docsUrl`
+boot-payload field + admin React UI + docs-site HTML). Verdict: the new
+`rows_for_privacy_request()`/`delete_rows_for_privacy_request()` share one
+prepared-SQL WHERE builder so export/erase can never target different row
+sets; export drops the internal `id` + empty/null columns; the new `docsUrl`
+field renders only as an auto-escaped JSX `href` sourced from the existing
+filterable `Constants::docs_url()`; the new clipboard-copy button copies a
+hardcoded constant only (no injection surface); docs-site additions are
+static HTML with EN/ET parity, no external deps added. Confirms this delta
+CLOSES both Info findings from the 2026-07-13 audit (cart tracker now has
+real WP Privacy coverage and is documented in `DATA_MODEL_GDPR.md` + the
+now-signed-off privacy-policy template). 1 new Info, accepted (no fix
+needed at the current trust level): the `docsUrl` anchor has no scheme
+allowlist unlike the T2-audit `isHttpUrl()` guard on an engine-origin URL —
+but the source here is a developer-only PHP filter over a hardcoded https
+default, not third-party network input; revisit if `docs_url()` ever
+becomes admin-settings-writable. No `ci:strict`/PCP/live-walk run in this
+pass — STATUS.md already records green gates per code-touching commit in
+the delta (below); those remain separate v3.7.0 release-gate steps not yet
+run. Report:
+[`docs/audits/2026-07-16-SECURITY_QUALITY_DELTA_AUDIT_V370_GATE.md`](docs/audits/2026-07-16-SECURITY_QUALITY_DELTA_AUDIT_V370_GATE.md).
+Prior: 2026-07-17 (**PRO-1430 — DONE: "How to add a Smaily signup
 form" guide on the Integrations page (wizard Step 5 + Settings tab, both
 render the same component).** Erkki (product owner) found no in-product
 guidance for where a merchant actually places a Smaily signup form on each
