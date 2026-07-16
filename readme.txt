@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.6.1
+Stable tag: 3.7.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,14 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.7.0 =
+* Changed: abandoned-cart reminders now run on the same unified pipeline as the rest of Smaily Connect (catalog, customers, orders), replacing the older, separate abandoned-cart code path. Your existing settings (on/off, cutoff, which fields to include) carry over automatically — no reconfiguration needed.
+* Fixed: a disabled Smaily workflow could still appear as a selectable option in the Contact Form 7, classic Widget, Gutenberg block, and Elementor autoresponder dropdowns, so a form enrolled into it silently sent nothing. Disabled workflows are now filtered out of the dropdown; a form or widget already pointed at a workflow that has since been disabled keeps showing it (clearly flagged with a warning) instead of silently reverting to "No autoresponder".
+* Improved: when Smaily can't be reached, the profiling opt-out check now falls back to a durable local opt-out record and the last known-good answer before ever defaulting to "allowed" — a known opt-out can no longer be re-allowed during a Smaily outage.
+* Improved: the WordPress Privacy exporter/eraser (Tools > Export/Erase Personal Data) now also covers the abandoned-cart session tracker, and is listed under the friendlier name "Smaily Connect data".
+* Improved: uninstalling the plugin now also removes the Smaily Campaign Intelligence connection settings and the profiling opt-out registry, leaving no leftover data behind.
+* New: the Integrations page (setup wizard and Settings) now includes a "How to add a Smaily signup form" guide showing exactly where to place a Smaily sign-up form on your site — shortcode, Gutenberg block, Elementor widget, classic Widget, and Contact Form 7 — with a link to the full documentation.
 
 = 3.6.1 =
 * Fixed: order amounts sent to Smaily Campaign Intelligence are now gross (tax-inclusive), as the engine contract specifies. Previously line-item totals, unit prices and discount amounts were sent excluding tax while the order total included tax, which understated per-product revenue in Insights on stores that charge VAT/sales tax. **For stores already connected to Campaign Intelligence:** historical order rows already sent with tax-exclusive amounts are corrected by a one-time re-sync coordinated by the Smaily team on the engine side — nothing needs to be done on the store.
@@ -292,6 +300,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.7.0 =
+Abandoned-cart reminders now run on the unified pipeline (settings carry over automatically); disabled Smaily workflows can no longer be silently selected in form/widget dropdowns; GDPR/privacy handling hardened. Safe update.
 
 = 3.6.1 =
 Order amounts sent to Smaily Campaign Intelligence are now gross (tax-inclusive), fixing understated per-product revenue on taxed stores. Historical rows on already-connected stores are corrected by a Smaily-coordinated engine-side re-sync — no action needed on the store. Safe update.

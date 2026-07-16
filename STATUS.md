@@ -26,7 +26,22 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 gate delta re-audit
+_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 version bump PREPARED**
+(`smaily-connect.php`, `package.json`, `readme.txt` Stable tag/Changelog/
+Upgrade Notice, the three test version-pins). Content since v3.6.1: PRO-1195
+abandoned-cart rewrite onto the v3 pipeline (retires the legacy pass), PRO-1277/
+PRO-1334 disabled-workflow dropdown filtering + preserve-and-flag across all 4
+autoresponder surfaces (CF7, classic Widget, Gutenberg, Elementor), PRO-1194
+fail-open GDPR window hardening (durable profiling opt-out registry + stale-
+cache fallback before ever failing open), PRO-1336/PRO-1337 uninstall sweeps
+(rec-engine connection state + the opt-out registry), PRO-1343/PRO-1405 WP
+Privacy exporter/eraser now covers `smly_plus_cart_session` + friendly-name
+rename to "Smaily Connect data", PRO-1430 the Integrations page "How to add a
+Smaily signup form" guide (+ wording pass 742f3b8). Release-gate delta audit
+already PASS at `c2d79a7` (0 Crit/High/Med/Low, 1 Info accepted — see the entry
+below, unchanged). Build/package/PCP/ci:strict/GH-release steps follow;
+this note is updated again once the release is actually cut and verified.
+Prior: 2026-07-17 (**PRO-1341 — v3.7.0 gate delta re-audit
 (post-PRO-1195) DONE: PASS, 0 Critical/High/Medium/Low, 1 Info.** Per the
 re-audit policy (`docs/audits/INDEX.md`), a delta pass was required since the
 2026-07-13 audit's baseline (`af9b52f`) because the intervening commits touch
