@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1446 — FIXED the v3.7.1 gate's release-blocking
+_Last updated: 2026-07-17 (**PRO-1341 — v3.7.1 version bump PREPARED**
+(`smaily-connect.php`, `package.json`, `readme.txt` Stable tag/Changelog/
+Upgrade Notice, the three test version-pins). Content since the v3.7.0 release
+(effective baseline `a2326df`, the last commit of the 3.7.0 release — the
+published `v3.7.0` git tag itself points one commit earlier at `742f3b8`, a
+pre-existing tag-placement anomaly from that cut; not touched here, see
+FOLLOW-UPS): PRO-1390 browse `cart_add`/`cart_remove` now key on the canonical
+`woo-<id>` instead of the raw merchant SKU (`674c04c`) + its live-walk
+verification (`d091e72`); PRO-1342 removed a bogus uninstall.php legacy-option
+entry that was actually the cart table-name suffix, a harmless no-op
+(`bd72c58`); a docs-wording correction on an earlier audit's overstated
+closure claim (`a0a86ac`); the v3.7.1 gate delta security audit — 1 HIGH,
+release-blocking (`490792e`) — and its fix, `PRO-1446`: `/relay`'s
+`resolve_cart_product_skus()` now runs after a pure size-cap check
+(`size_guard()`) so an oversized batch is rejected before any
+`wc_get_product()` lookup, closing the DoS path (`5ee1366`), independently
+re-verified adversarially (`76e9736`, `0ea25d9`). i18n: no admin/src or
+languages changes in this delta (`git diff a2326df..HEAD -- admin/src
+languages` empty) and the `.mo`/`-et-…json` artifacts on disk are still the
+ones built for the 3.7.0 cut this morning — `bin/build-i18n.sh` SKIPPED per
+the CLAUDE.md rule (nothing to regenerate). Build/package/PCP/ci:strict/
+GH-release steps follow; this note is updated again once the release is
+actually cut and verified.
+
+Prior: 2026-07-17 (**PRO-1446 — FIXED the v3.7.1 gate's release-blocking
 HIGH finding: `/relay` cart-sku resolution ran unbounded before the batch-size
 cap.** `BeaconEndpoint::handle()` (`5ee1366`) now runs a cheap, pure size check
 (`size_guard()`, extracted out of `validate_batch()`, which now delegates to

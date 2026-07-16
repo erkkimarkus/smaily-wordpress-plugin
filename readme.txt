@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.7.0
+Stable tag: 3.7.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.7.1 =
+* Fixed: browse tracking events for "add to cart" and "remove from cart" now identify products the same way as the rest of the catalog (a stable platform id), instead of the raw WooCommerce SKU field. The SKU field can be blank, reused across products, or not match catalog rows, which prevented these events from being matched to the right product in Smaily Campaign Intelligence.
+* Fixed: hardened the browse-tracking endpoint so an oversized request is always rejected before any per-product lookup work is done, closing a potential resource-exhaustion path on that public endpoint.
+* Fixed: removed a harmless no-op from the uninstall cleanup (it referenced a database table name as if it were a plugin setting).
 
 = 3.7.0 =
 * Changed: abandoned-cart reminders now run on the same unified pipeline as the rest of Smaily Connect (catalog, customers, orders), replacing the older, separate abandoned-cart code path. Your existing settings (on/off, cutoff, which fields to include) carry over automatically — no reconfiguration needed.
@@ -300,6 +305,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.7.1 =
+Browse "add to cart"/"remove from cart" tracking events now key products correctly (previously could use an unreliable SKU field); hardened the browse-tracking endpoint against oversized requests. Safe update.
 
 = 3.7.0 =
 Abandoned-cart reminders now run on the unified pipeline (settings carry over automatically); disabled Smaily workflows can no longer be silently selected in form/widget dropdowns; GDPR/privacy handling hardened. Safe update.
