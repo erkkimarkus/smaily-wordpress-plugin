@@ -26,7 +26,32 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1390 — browse cart_add/cart_remove now key on
+_Last updated: 2026-07-17 (**PRO-1390 live-walk verification — CONFIRMED against
+the real sandbox engine.** The dev wp-env held a live connection to the
+"Smaily Connect test" sandbox tenant (restored earlier by the integration-test
+snapshot guard) — checked non-secret options (`base_url=intelligence.smaily.com`,
+`tenant_name=Smaily Connect test`, `is_connected=1`) before sending anything;
+tenant was NOT MiuMjau, so the hard safety gate cleared. Ran the full
+`RECENGINE_LIVE=1 node bin/walk-3.4-browse.cjs` — all 14 checks PASS (LIVE OK)
+— proving the browse pipeline still works end-to-end live; this walk predates
+PRO-1390 so it sends `sku` directly and doesn't exercise the new
+`product_id`-resolution path. Added one targeted live check (temp `wp
+eval-file`, not committed) that dispatches a `cart_add` event through the real
+`/relay` proxy carrying `product_id` (no `sku`, mirroring the real JS) for an
+EXISTING dev-site product (id 4334) whose merchant SKU
+(`GDPR-f213d142-…`) is deliberately NOT in `woo-<id>` shape, and captured the
+exact JSON POSTed to the engine's `ingest/browse` endpoint via the
+`http_api_debug` hook. Result: the engine-bound event carried
+`sku = "woo-4334"` (not the merchant SKU), and the engine accepted it
+(`200 {"processed":1,"errors":[]}`). Confirms the PRO-1390 fix
+(`BeaconEndpoint::resolve_cart_product_skus`) end-to-end against the real
+sandbox — not just the mock. Residue: the walk's + targeted check's browse
+events (+1 seeded customer `walk-browse-*@example.test`) landed in the
+sandbox tenant only — expected/fine per the walk's own convention; no WC
+entities created or left behind (used an existing product, read-only). No
+code changed by this verification pass.)
+
+Prior: 2026-07-17 (**PRO-1390 — browse cart_add/cart_remove now key on
 the canonical `woo-<id>`, not the merchant SKU.** Engine prod evidence
 (MiuMjau) showed `browse_events.sku` arriving raw for `product_view`/
 `cart_add` (e.g. `aatc-20-1`, an EAN `4022858617724`) — only 6% of
