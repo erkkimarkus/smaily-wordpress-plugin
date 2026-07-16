@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-3.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Smaily Connect 3.6.1\n"
+"Project-Id-Version: Smaily Connect 3.7.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/smaily-connect\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-13T17:08:53+00:00\n"
+"POT-Creation-Date: 2026-07-16T21:45:47+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -124,8 +124,8 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#: includes/Privacy/GdprHandler.php:104
-#: includes/Privacy/GdprHandler.php:117
+#: includes/Privacy/GdprHandler.php:111
+#: includes/Privacy/GdprHandler.php:124
 msgid "Smaily Connect data"
 msgstr ""
 
@@ -1264,7 +1264,7 @@ msgid "Campaign Intelligence"
 msgstr ""
 
 #: admin/src/components/settings/Settings.tsx:32
-#: admin/src/components/steps/Step5Integrations.tsx:44
+#: admin/src/components/steps/Step5Integrations.tsx:140
 #: admin/src/components/wizard/Wizard.tsx:31
 msgid "Integrations"
 msgstr ""
@@ -1629,12 +1629,12 @@ msgid "Feed URL"
 msgstr ""
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
-#: admin/src/components/steps/Step5Integrations.tsx:130
+#: admin/src/components/steps/Step5Integrations.tsx:81
 msgid "Copied ✓"
 msgstr ""
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
-#: admin/src/components/steps/Step5Integrations.tsx:130
+#: admin/src/components/steps/Step5Integrations.tsx:81
 msgid "Copy"
 msgstr ""
 
@@ -2052,126 +2052,126 @@ msgstr ""
 msgid "Engine unreachable"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:7
+#: admin/src/components/steps/Step5Integrations.tsx:9
 msgid "Elementor"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:8
+#: admin/src/components/steps/Step5Integrations.tsx:10
 msgid "The Smaily Opt-In Form widget is available in the Elementor editor."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:15
+#: admin/src/components/steps/Step5Integrations.tsx:17
 msgid "Open Elementor"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:16
+#: admin/src/components/steps/Step5Integrations.tsx:18
 msgid "Install Elementor"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:19
-#: admin/src/components/steps/Step5Integrations.tsx:212
+#: admin/src/components/steps/Step5Integrations.tsx:21
+#: admin/src/components/steps/Step5Integrations.tsx:126
 msgid "Contact Form 7"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:20
+#: admin/src/components/steps/Step5Integrations.tsx:22
 msgid "Configure individual forms via the \"Smaily for Contact Form 7\" tab."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:24
+#: admin/src/components/steps/Step5Integrations.tsx:29
 msgid "Open CF7"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:25
+#: admin/src/components/steps/Step5Integrations.tsx:30
 msgid "Install Contact Form 7"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:28
+#: admin/src/components/steps/Step5Integrations.tsx:33
 msgid "Smaily Landing Pages"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:29
+#: admin/src/components/steps/Step5Integrations.tsx:34
 msgid "Embed Smaily landing pages anywhere via the Gutenberg block."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:33
-#: admin/src/components/steps/Step5Integrations.tsx:34
+#: admin/src/components/steps/Step5Integrations.tsx:38
+#: admin/src/components/steps/Step5Integrations.tsx:39
 msgid "Add a new page"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:43
-msgid "Step 5 of 6"
-msgstr ""
-
-#: admin/src/components/steps/Step5Integrations.tsx:45
-msgid "Smaily plays nicely with the other tools you already have installed. Configure each one from its own admin page — no extra setup required here."
-msgstr ""
-
-#: admin/src/components/steps/Step5Integrations.tsx:56
-msgid "Installed"
-msgstr ""
-
-#: admin/src/components/steps/Step5Integrations.tsx:56
-msgid "Not installed"
-msgstr ""
-
-#: admin/src/components/steps/Step5Integrations.tsx:148
+#: admin/src/components/steps/Step5Integrations.tsx:87
 msgid "How to add a Smaily signup form"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:151
+#: admin/src/components/steps/Step5Integrations.tsx:88
 msgid "Add a newsletter signup form to your store using any of these methods."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:155
+#: admin/src/components/steps/Step5Integrations.tsx:90
 msgid "Shortcode"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:158
+#: admin/src/components/steps/Step5Integrations.tsx:91
 msgid "To add a Smaily form, place this code where you want the form to appear:"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:165
+#: admin/src/components/steps/Step5Integrations.tsx:97
 msgid "Attributes let you customize the redirect URLs, add a name field, and enrol subscribers into a workflow."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:175
+#: admin/src/components/steps/Step5Integrations.tsx:109
 msgid "See all attributes"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:181
+#: admin/src/components/steps/Step5Integrations.tsx:114
 msgid "Gutenberg block"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:184
+#: admin/src/components/steps/Step5Integrations.tsx:114
 msgid "In the WordPress page or post editor, open the block inserter and search \"Smaily\" — add the Smaily Sign-Up Form block anywhere in your content."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:190
+#: admin/src/components/steps/Step5Integrations.tsx:118
 msgid "Elementor widget"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:194
+#: admin/src/components/steps/Step5Integrations.tsx:118
 msgid "In the Elementor editor, open the widget panel and look under the Smaily category for the Smaily Opt-In Form widget."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:199
+#: admin/src/components/steps/Step5Integrations.tsx:121
 msgid "Elementor is not installed on this site."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:203
+#: admin/src/components/steps/Step5Integrations.tsx:122
 msgid "Classic Widget"
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:206
+#: admin/src/components/steps/Step5Integrations.tsx:122
 msgid "Go to Appearance → Widgets and add the \"Smaily Classic Subscription Widget\" to any widget area."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:216
+#: admin/src/components/steps/Step5Integrations.tsx:126
 msgid "Open a form under Contact → Contact Forms and switch to the \"Smaily for Contact Form 7\" tab to enable signup for that form."
 msgstr ""
 
-#: admin/src/components/steps/Step5Integrations.tsx:221
+#: admin/src/components/steps/Step5Integrations.tsx:129
 msgid "Contact Form 7 is not installed on this site."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:139
+msgid "Step 5 of 6"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:141
+msgid "Smaily plays nicely with the other tools you already have installed. Configure each one from its own admin page — no extra setup required here."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:152
+msgid "Installed"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:152
+msgid "Not installed"
 msgstr ""
 
 #: admin/src/components/steps/Step6Done.tsx:13

@@ -165,8 +165,8 @@ msgstr "Vaata sündmuste logi"
 msgid "Dismiss"
 msgstr "Peida"
 
-#: includes/Privacy/GdprHandler.php:104
-#: includes/Privacy/GdprHandler.php:117
+#: includes/Privacy/GdprHandler.php:111
+#: includes/Privacy/GdprHandler.php:124
 msgid "Smaily Connect data"
 msgstr "Smaily Connect andmed"
 
@@ -1278,7 +1278,7 @@ msgid "Campaign Intelligence"
 msgstr "Campaign Intelligence"
 
 #: admin/src/components/settings/Settings.tsx:32
-#: admin/src/components/steps/Step5Integrations.tsx:44
+#: admin/src/components/steps/Step5Integrations.tsx:140
 #: admin/src/components/wizard/Wizard.tsx:31
 msgid "Integrations"
 msgstr "Lõimingud"
@@ -1517,12 +1517,12 @@ msgid "Feed URL"
 msgstr "Voo-URL"
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
-#: admin/src/components/steps/Step5Integrations.tsx:130
+#: admin/src/components/steps/Step5Integrations.tsx:81
 msgid "Copied ✓"
 msgstr "Kopeeritud ✓"
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
-#: admin/src/components/steps/Step5Integrations.tsx:130
+#: admin/src/components/steps/Step5Integrations.tsx:81
 msgid "Copy"
 msgstr "Kopeeri"
 
@@ -1857,125 +1857,125 @@ msgstr "Seadistuslinki ei leitud"
 msgid "Engine unreachable"
 msgstr "Mootor pole kättesaadav"
 
-#: admin/src/components/steps/Step5Integrations.tsx:7
+#: admin/src/components/steps/Step5Integrations.tsx:9
 msgid "Elementor"
 msgstr "Elementor"
 
-#: admin/src/components/steps/Step5Integrations.tsx:8
+#: admin/src/components/steps/Step5Integrations.tsx:10
 msgid "The Smaily Opt-In Form widget is available in the Elementor editor."
 msgstr "Smaily Opt-In Form vidin on saadaval Elementori redaktoris."
 
-#: admin/src/components/steps/Step5Integrations.tsx:15
+#: admin/src/components/steps/Step5Integrations.tsx:17
 msgid "Open Elementor"
 msgstr "Ava Elementor"
 
-#: admin/src/components/steps/Step5Integrations.tsx:16
+#: admin/src/components/steps/Step5Integrations.tsx:18
 msgid "Install Elementor"
 msgstr "Paigalda Elementor"
 
-#: admin/src/components/steps/Step5Integrations.tsx:19
-#: admin/src/components/steps/Step5Integrations.tsx:212
+#: admin/src/components/steps/Step5Integrations.tsx:21
+#: admin/src/components/steps/Step5Integrations.tsx:126
 msgid "Contact Form 7"
 msgstr "Contact Form 7"
 
-#: admin/src/components/steps/Step5Integrations.tsx:20
+#: admin/src/components/steps/Step5Integrations.tsx:22
 msgid "Configure individual forms via the \"Smaily for Contact Form 7\" tab."
 msgstr "Seadista üksikud vormid vahekaardil \"Smaily for Contact Form 7\"."
 
-#: admin/src/components/steps/Step5Integrations.tsx:24
+#: admin/src/components/steps/Step5Integrations.tsx:29
 msgid "Open CF7"
 msgstr "Ava CF7"
 
-#: admin/src/components/steps/Step5Integrations.tsx:25
+#: admin/src/components/steps/Step5Integrations.tsx:30
 msgid "Install Contact Form 7"
 msgstr "Paigalda Contact Form 7"
 
-#: admin/src/components/steps/Step5Integrations.tsx:28
+#: admin/src/components/steps/Step5Integrations.tsx:33
 msgid "Smaily Landing Pages"
 msgstr "Smaily maandumislehed"
 
-#: admin/src/components/steps/Step5Integrations.tsx:29
+#: admin/src/components/steps/Step5Integrations.tsx:34
 msgid "Embed Smaily landing pages anywhere via the Gutenberg block."
 msgstr "Lisa Smaily maandumislehti ükskõik kuhu Gutenbergi ploki kaudu."
 
-#: admin/src/components/steps/Step5Integrations.tsx:33
-#: admin/src/components/steps/Step5Integrations.tsx:34
+#: admin/src/components/steps/Step5Integrations.tsx:38
+#: admin/src/components/steps/Step5Integrations.tsx:39
 msgid "Add a new page"
 msgstr "Lisa uus leht"
 
-#: admin/src/components/steps/Step5Integrations.tsx:43
+#: admin/src/components/steps/Step5Integrations.tsx:139
 msgid "Step 5 of 6"
 msgstr "5. samm 6-st"
 
-#: admin/src/components/steps/Step5Integrations.tsx:45
+#: admin/src/components/steps/Step5Integrations.tsx:141
 msgid "Smaily plays nicely with the other tools you already have installed. Configure each one from its own admin page — no extra setup required here."
 msgstr "Smaily sobib hästi kokku teiste juba paigaldatud tööriistadega. Seadista igaüks selle enda halduslehel — siin lisaseadistust vaja pole."
 
-#: admin/src/components/steps/Step5Integrations.tsx:56
+#: admin/src/components/steps/Step5Integrations.tsx:152
 msgid "Installed"
 msgstr "Paigaldatud"
 
-#: admin/src/components/steps/Step5Integrations.tsx:56
+#: admin/src/components/steps/Step5Integrations.tsx:152
 msgid "Not installed"
 msgstr "Pole paigaldatud"
 
-#: admin/src/components/steps/Step5Integrations.tsx:148
+#: admin/src/components/steps/Step5Integrations.tsx:87
 msgid "How to add a Smaily signup form"
 msgstr "Kuidas lisada Smaily liitumisvormi"
 
-#: admin/src/components/steps/Step5Integrations.tsx:151
+#: admin/src/components/steps/Step5Integrations.tsx:88
 msgid "Add a newsletter signup form to your store using any of these methods."
 msgstr "Lisa oma poele uudiskirja liitumisvorm mõne järgneva meetodi abil."
 
-#: admin/src/components/steps/Step5Integrations.tsx:155
+#: admin/src/components/steps/Step5Integrations.tsx:90
 msgid "Shortcode"
 msgstr "Lühikood (shortcode)"
 
-#: admin/src/components/steps/Step5Integrations.tsx:158
+#: admin/src/components/steps/Step5Integrations.tsx:91
 msgid "To add a Smaily form, place this code where you want the form to appear:"
 msgstr "Smaily vormi lisamiseks pane see kood kohta, kuhu soovid vormi kuvada:"
 
-#: admin/src/components/steps/Step5Integrations.tsx:165
+#: admin/src/components/steps/Step5Integrations.tsx:97
 msgid "Attributes let you customize the redirect URLs, add a name field, and enrol subscribers into a workflow."
 msgstr "Atribuutide abil saad kohandada suunamis-URL-e, lisada nimevälja ja liita tellijad töövoogu."
 
-#: admin/src/components/steps/Step5Integrations.tsx:175
+#: admin/src/components/steps/Step5Integrations.tsx:109
 msgid "See all attributes"
 msgstr "Vaata kõiki atribuute"
 
-#: admin/src/components/steps/Step5Integrations.tsx:181
+#: admin/src/components/steps/Step5Integrations.tsx:114
 msgid "Gutenberg block"
 msgstr "Gutenbergi plokk"
 
-#: admin/src/components/steps/Step5Integrations.tsx:184
+#: admin/src/components/steps/Step5Integrations.tsx:114
 msgid "In the WordPress page or post editor, open the block inserter and search \"Smaily\" — add the Smaily Sign-Up Form block anywhere in your content."
 msgstr "Ava WordPressi lehe või postituse redaktoris ploki lisamise aken ja otsi \"Smaily\" — lisa Smaily Sign-Up Form plokk oma sisu ükskõik millisesse kohta."
 
-#: admin/src/components/steps/Step5Integrations.tsx:190
+#: admin/src/components/steps/Step5Integrations.tsx:118
 msgid "Elementor widget"
 msgstr "Elementori vidin"
 
-#: admin/src/components/steps/Step5Integrations.tsx:194
+#: admin/src/components/steps/Step5Integrations.tsx:118
 msgid "In the Elementor editor, open the widget panel and look under the Smaily category for the Smaily Opt-In Form widget."
 msgstr "Ava Elementori redaktoris vidinate paneel ja otsi Smaily kategooriast Smaily Opt-In Form vidinat."
 
-#: admin/src/components/steps/Step5Integrations.tsx:199
+#: admin/src/components/steps/Step5Integrations.tsx:121
 msgid "Elementor is not installed on this site."
 msgstr "Elementor ei ole sellel saidil paigaldatud."
 
-#: admin/src/components/steps/Step5Integrations.tsx:203
+#: admin/src/components/steps/Step5Integrations.tsx:122
 msgid "Classic Widget"
 msgstr "Klassikaline vidin"
 
-#: admin/src/components/steps/Step5Integrations.tsx:206
+#: admin/src/components/steps/Step5Integrations.tsx:122
 msgid "Go to Appearance → Widgets and add the \"Smaily Classic Subscription Widget\" to any widget area."
 msgstr "Mine Väljanägemine → Vidinad ja lisa \"Smaily Classic Subscription Widget\" mõnda vidina-alasse."
 
-#: admin/src/components/steps/Step5Integrations.tsx:216
+#: admin/src/components/steps/Step5Integrations.tsx:126
 msgid "Open a form under Contact → Contact Forms and switch to the \"Smaily for Contact Form 7\" tab to enable signup for that form."
 msgstr "Ava vorm menüüst Contact → Contact Forms ja lülitu vahekaardile \"Smaily for Contact Form 7\", et lubada sellel vormil liitumine."
 
-#: admin/src/components/steps/Step5Integrations.tsx:221
+#: admin/src/components/steps/Step5Integrations.tsx:129
 msgid "Contact Form 7 is not installed on this site."
 msgstr "Contact Form 7 ei ole sellel saidil paigaldatud."
 
