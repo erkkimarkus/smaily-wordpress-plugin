@@ -2057,7 +2057,7 @@ msgid "Elementor"
 msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:8
-msgid "The Smaily subscription-form widget is available in the Elementor editor."
+msgid "The Smaily Opt-In Form widget is available in the Elementor editor."
 msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:15
@@ -2074,7 +2074,7 @@ msgid "Contact Form 7"
 msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:20
-msgid "Configure individual CF7 forms in Forms → Smaily tab."
+msgid "Configure individual forms via the \"Smaily for Contact Form 7\" tab."
 msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:24

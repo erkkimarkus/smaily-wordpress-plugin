@@ -44,7 +44,9 @@ describe('Step5Integrations — how-to-add-a-form guide (PRO-1430)', () => {
     const state = { ...wizardInitialState, env: { ...wizardInitialState.env, elementorPresent: true } };
     render(<Step5Integrations state={state} />);
 
-    expect(screen.getByText(/Smaily Opt-In Form widget/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/look under the Smaily category for the Smaily Opt-In Form widget/),
+    ).toBeInTheDocument();
   });
 
   it('says Elementor is not installed when absent', () => {
@@ -58,7 +60,7 @@ describe('Step5Integrations — how-to-add-a-form guide (PRO-1430)', () => {
     const state = { ...wizardInitialState, env: { ...wizardInitialState.env, cf7Present: true } };
     render(<Step5Integrations state={state} />);
 
-    expect(screen.getByText(/Smaily for Contact Form 7/)).toBeInTheDocument();
+    expect(screen.getByText(/Contact → Contact Forms/)).toBeInTheDocument();
   });
 
   it('says Contact Form 7 is not installed when absent', () => {

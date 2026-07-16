@@ -37,7 +37,7 @@ const CARDS: IntegrationCard[] = [
   {
     title: __('Elementor', 'smaily-connect'),
     description: __(
-      'The Smaily subscription-form widget is available in the Elementor editor.',
+      'The Smaily Opt-In Form widget is available in the Elementor editor.',
       'smaily-connect',
     ),
     installedKey: 'elementorPresent',
@@ -48,7 +48,10 @@ const CARDS: IntegrationCard[] = [
   },
   {
     title: __('Contact Form 7', 'smaily-connect'),
-    description: __('Configure individual CF7 forms in Forms → Smaily tab.', 'smaily-connect'),
+    description: __(
+      'Configure individual forms via the "Smaily for Contact Form 7" tab.',
+      'smaily-connect',
+    ),
     installedKey: 'cf7Present',
     hrefInstalled: 'admin.php?page=wpcf7',
     hrefMissing: 'plugin-install.php?s=contact+form+7&tab=search&type=term',
