@@ -26,7 +26,50 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-14 (**PRO-1194 — RESOLVED (docs-only): privacy-policy
+_Last updated: 2026-07-17 (**PRO-1430 — DONE: "How to add a Smaily signup
+form" guide on the Integrations page (wizard Step 5 + Settings tab, both
+render the same component).** Erkki (product owner) found no in-product
+guidance for where a merchant actually places a Smaily signup form on each
+supported surface. `Step5Integrations.tsx` gained a new
+`SignupFormGuide` block below the existing install-status cards, one
+card per surface, facts verified against the real source: **Shortcode**
+(`[smaily_connect_newsletter_form]`, code block + one-click copy button
+mirroring RssFeedSection's clipboard/fallback pattern, plus a "See all
+attributes" link to the merchant docs site); **Gutenberg block** (real
+title "Smaily Sign-Up Form", `blocks/newsletter-signup/src/block.json`);
+**Elementor widget** ("Smaily Opt-In Form" under the "Smaily" category,
+`integrations/elementor/newsletter-widget.class.php` +
+`admin.class.php`); **Classic Widget** ("Smaily Classic Subscription
+Widget", `includes/smaily-widget.class.php`); **Contact Form 7** (the
+"Smaily for Contact Form 7" tab, `integrations/cf7/admin.class.php`).
+Elementor/CF7 cards reuse the SAME `state.env.elementorPresent` /
+`cf7Present` detection the existing CARDS grid already had — when the
+host plugin is absent the card just says so in plain text (no dead
+pointer). The docs link needed a NEW boot-payload field: `EnvDetector::
+snapshot()` now emits `docsUrl` (= `Constants::docs_url()`, so the
+`smaily_connect_docs_url` filter still governs it) — threaded through
+`hydrate.ts` / `settings-reducer.ts` / `wizard-reducer.ts` /
+`WizardState.env.docsUrl` (optional, empty-string default; the React
+link renders only when non-empty, same gating style as `env.rss`).
+`docs/site/index.html` `#set-integrations` gained sibling how-to
+paragraphs (EN+ET) for the four non-shortcode surfaces — the shortcode
+itself was already documented there since PRO-1338; sidebar nav
+untouched (it doesn't itemize below `#set-integrations`). New msgids
+added to `languages/smaily-connect.pot` + Estonian translations in
+`-et.po` (`.mo`/JSON NOT rebuilt — gitignored, rebuilt at release time
+per `bin/build-i18n.sh`). Tests: new
+`admin/src/components/steps/Step5Integrations.test.tsx` (shortcode copy,
+docs-link presence/absence, Elementor/CF7 presence branching, block/
+widget names) + a new `EnvDetectorTest::
+test_snapshot_carries_docs_url_from_constants` case. `ci:strict` green
+(PHPCS 0 errors, PHPStan clean, PHPUnit unit 570 tests OK, JS 244 tests
++ typecheck OK); `sg docker -c "bash bin/run-integration-tests.sh"`
+green (151 tests, 770 assertions), dev-site `smly_rec_*` snapshot
+restored to the sandbox tenant ("Smaily Connect test", not MiuMjau)
+afterwards. Human acceptance (Erkki using the real page to locate each
+surface + the PRO-1334-style visual check) is OUTSTANDING — not
+claimed here.
+Prior: 2026-07-14 (**PRO-1194 — RESOLVED (docs-only): privacy-policy
 template signed off + ported to the merchant docs site.** Erkki decided
 (2026-07-14) the three items blocking sign-off: Smaily legal entity =
 **Sendsmaily OÜ**; Smaily privacy-policy URL =
