@@ -26,7 +26,41 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1341 — v3.7.1 version bump PREPARED**
+_Last updated: 2026-07-17 (**PRO-1341 — v3.7.1 RELEASED.** Full local
+build/verify/release sequence run after the version-bump commit `c25a4bb`
+(pushed to `main`): `npm run build:admin && npm run build:client` (client
+entry confirmed `dist/public/js/sc-runtime.js`); blocks built (`composer run
+install-block-modules && composer run build`); i18n rebuild SKIPPED (no
+`admin/src`/`languages` changes in the `a2326df..HEAD` delta, and the
+`.mo`/admin-bundle `-et-…json` on disk were still the ones built for the
+3.7.0 cut hours earlier); `composer install --no-dev --optimize-autoloader` →
+`composer run package` → `composer install` (dev restored). ZIP verified:
+v3.7.1 in all three version strings, required present (`dist/admin/admin.js`,
+`dist/public/js/sc-runtime.js`, `blocks/*/build/*`, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + the admin-bundle et JSON), dev artifacts/
+tests/docs/node_modules/admin-src absent, `composer.json` present,
+1 114 299 B (vs. v3.7.0's 1 110 616 B — a ~3.7 KB increase in line with the
+delta's new `RecEngineBrowseProxyTest` fixtures/code, no `blocks/node_modules`
+leak). **PCP against the built ZIP** (unzipped to `smaily-connect-pkg` in the
+wp-env `…-cli-1` container via `/tmp`, never the bind-mounted `smaily-connect`
+dir; `--slug=smaily-connect`): exactly the expected set — the intentional
+`plugin_updater_detected` ERROR (F3-35) + the same 4 PRO-1436 false-positive
+WARNINGs from the cart code (`CartAbandonmentSweeper.php:78`
+`DynamicHooknameFound`, `CartSessionStore.php:83,302,321`
+`UnescapedDBParameter` ×3) — nothing new. Container temp copies cleaned up
+afterward. **`ci:strict` exit=0** (PHPCS 0 errors, PHPStan no errors, PHPUnit
+unit 571/571, vitest 245/245, tsc/eslint clean) run after the bump commit to
+confirm the pins. Integration suite not re-run for this gate specifically —
+the `RecEngineBrowseProxyTest`/`BeaconEndpointTest` changes in this delta were
+already integration-proven the same day at the PRO-1446 fix commit
+(`sg docker -c "composer run test:integration"` 157/157, sandbox tenant
+correctly restored). **Released via `gh release create v3.7.1
+smaily-connect.zip --repo erkkimarkus/smaily-wordpress-plugin --target main
+--title "v3.7.1"`** — non-prerelease, confirmed **Latest**; asset
+byte-verified (1 114 299 B, matches the local build exactly).
+[Release](https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.7.1).
+
+Prior: 2026-07-17 (**PRO-1341 — v3.7.1 version bump PREPARED**
 (`smaily-connect.php`, `package.json`, `readme.txt` Stable tag/Changelog/
 Upgrade Notice, the three test version-pins). Content since the v3.7.0 release
 (effective baseline `a2326df`, the last commit of the 3.7.0 release — the
