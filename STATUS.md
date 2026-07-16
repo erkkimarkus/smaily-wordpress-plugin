@@ -26,7 +26,14 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1342 — removed the bogus `uninstall.php`
+_Last updated: 2026-07-17 (**docs correction — the 2026-07-16 delta-audit
+report (item 14) and its `docs/audits/INDEX.md` row overstated closure: only
+Info finding #2 (cart-PII docs gap) from the 2026-07-13 audit was closed by
+that delta (PRO-1343/PRO-1194/PRO-1405); finding #1 (the bogus `uninstall.php`
+legacy-options entry, see the PRO-1342 entry directly below) was fixed
+separately. Wording corrected in both docs; no code change.)
+
+Prior: 2026-07-17 (**PRO-1342 — removed the bogus `uninstall.php`
 legacy-options entry.** The 2026-07-13 delta audit's Info finding #1: `$legacy_
 options` (deleted via `delete_option()`) contained `'smaily_connect_abandoned_
 carts'`, which is actually the legacy CART **TABLE** suffix

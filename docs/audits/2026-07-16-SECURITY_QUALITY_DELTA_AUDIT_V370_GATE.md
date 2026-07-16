@@ -147,12 +147,14 @@ Eight commits, two unrelated workstreams:
     template to the merchant docs site). `STATUS.md` carries a dated entry
     for every commit with test counts and gate results recorded — spot-
     checked against `git log`, matches.
-14. **Previous audit's own follow-up items closed by this delta**: both Info
-    findings from the 2026-07-13 report (no WP Privacy coverage for the cart
+14. **Previous audit's own follow-up item closed by this delta**: Info
+    finding #2 from the 2026-07-13 report (no WP Privacy coverage for the cart
     tracker; the tracker undocumented in `DATA_MODEL_GDPR.md`/the privacy
-    template) are the explicit subject of `c022ebe`/`ab736ba`/`740f9b2` —
+    template) is the explicit subject of `c022ebe`/`ab736ba`/`740f9b2` —
     confirmed by re-reading the referenced sections, not just trusting the
-    commit messages.
+    commit messages. (Finding #1, the bogus `uninstall.php` legacy-options
+    entry, is unrelated to this delta and was fixed separately under
+    PRO-1342, 2026-07-17.)
 15. **Test coverage matches the claims**: `tests/Unit/Privacy/
     GdprHandlerTest.php` (new, 251 lines) isolates the cart-session logic
     with a fake-store double mirroring the existing `CartAbandonmentSweeper
@@ -187,8 +189,9 @@ Eight commits, two unrelated workstreams:
 No Low/Medium/High/Critical findings. Every high-risk surface named in the
 task brief (GDPR exporter/eraser correctness and scoping, the new
 boot-payload field, the new React UI's clipboard handling, docs-site HTML)
-was read directly and holds the repo's own invariants. Both Info findings
-from the 2026-07-13 audit are now resolved, not merely deferred.
+was read directly and holds the repo's own invariants. Info finding #2 from
+the 2026-07-13 audit is now resolved by this delta, not merely deferred;
+finding #1 was fixed separately under PRO-1342.
 
 ## What this audit does NOT cover
 
