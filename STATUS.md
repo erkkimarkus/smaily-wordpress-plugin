@@ -26,7 +26,30 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**v3.7.1 gate delta security audit — 1 HIGH,
+_Last updated: 2026-07-17 (**PRO-1446 — FIXED the v3.7.1 gate's release-blocking
+HIGH finding: `/relay` cart-sku resolution ran unbounded before the batch-size
+cap.** `BeaconEndpoint::handle()` (`5ee1366`) now runs a cheap, pure size check
+(`size_guard()`, extracted out of `validate_batch()`, which now delegates to
+it) on the raw `events` array **before** `resolve_cart_product_skus()`'s
+per-event `wc_get_product()` loop — so an oversized batch is rejected with the
+same `400`/`"Batch exceeds the 100-event cap."` it always got, but before any
+DB-backed lookup runs; the resolve loop can never execute over more than the
+100-event cap. Valid (≤100-event) `cart_add`/`cart_remove` batches are
+unaffected — resolution still runs before `validate_batch()`'s field whitelist
+strips the proxy-internal `product_id`, so `woo-<id>` resolution is unchanged
+(existing PRO-1390 unit/integration tests stayed green). New regression test
+`RecEngineBrowseProxyTest::test_oversized_batch_is_rejected_before_any_product_lookup`
+sends a 101-event batch and asserts, via a `woocommerce_product_class` filter
+counter, zero `wc_get_product()` calls and a 400 with the engine never
+contacted. `ci:strict` green (PHPCS 0 errors, PHPStan clean, PHPUnit unit 571,
+vitest 245) and `sg docker -c "composer run test:integration"` green (157/157,
+sandbox tenant `Smaily Connect test` correctly restored, not MiuMjau). Audit
+report disposition + `docs/audits/INDEX.md` row updated to FIXED. **v3.7.1 may
+now proceed** once the rest of the release-gate checklist (PCP against the
+built ZIP, etc.) is run. Full detail:
+[`docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md`](docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md).)
+
+Prior: 2026-07-17 (**v3.7.1 gate delta security audit — 1 HIGH,
 release-blocking.** Scope: `a2326df..HEAD` (the v3.7.0 tag to now — PRO-1390
 `/relay` cart-sku fix + 3 trivial doc/cleanup commits). Finding: in
 `BeaconEndpoint::handle()`, the new `resolve_cart_product_skus()` (added by

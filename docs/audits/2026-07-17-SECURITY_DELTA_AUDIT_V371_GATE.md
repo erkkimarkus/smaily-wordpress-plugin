@@ -17,6 +17,29 @@
   (STATUS-only live-walk record, one-line `uninstall.php` dead-entry removal,
   an audit-docs wording correction).
 
+## Disposition (PRO-1446, 2026-07-17)
+
+**Finding 1 (HIGH) — ✅ FIXED, `5ee1366`.** `BeaconEndpoint::handle()` now runs
+a cheap, pure `size_guard()` (the non-empty / `MAX_EVENTS=100` check,
+extracted out of `validate_batch()`, which now delegates to it) on the raw
+`events` array *before* `resolve_cart_product_skus()` runs — so the
+`wc_get_product()` loop can never execute over more than 100 events. A
+genuinely oversized batch gets the exact same `400 invalid_events` /
+`"Batch exceeds the 100-event cap."` response it always did; only the
+ordering (before vs. after resolution) changed. Resolution still runs before
+`validate_batch()`'s field whitelist strips the proxy-internal `product_id`,
+so the `woo-<id>` resolution behavior for `cart_add`/`cart_remove` on a
+valid (≤100-event) batch is unchanged — confirmed by the existing
+PRO-1390 unit/integration tests staying green. New regression test
+`RecEngineBrowseProxyTest::test_oversized_batch_is_rejected_before_any_product_lookup`
+sends a 101-event `cart_add` batch and asserts, via a `woocommerce_product_class`
+filter counter, that `wc_get_product()` is called zero times and the batch is
+rejected with a 400 before the engine is ever contacted. `ci:strict` and
+`sg docker -c "composer run test:integration"` both green post-fix
+(157/157 integration tests, sandbox tenant "Smaily Connect test" restored
+correctly, not MiuMjau). **v3.7.1 may now proceed** once the rest of the
+release-gate checklist is satisfied.
+
 ## Verdict
 
 **1 HIGH — release-blocking. RESULT: escalate.**
