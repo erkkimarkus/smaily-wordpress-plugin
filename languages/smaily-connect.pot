@@ -1629,10 +1629,12 @@ msgid "Feed URL"
 msgstr ""
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
+#: admin/src/components/steps/Step5Integrations.tsx:130
 msgid "Copied ✓"
 msgstr ""
 
 #: admin/src/components/steps/RssFeedSection.tsx:129
+#: admin/src/components/steps/Step5Integrations.tsx:130
 msgid "Copy"
 msgstr ""
 
@@ -2067,6 +2069,7 @@ msgid "Install Elementor"
 msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:19
+#: admin/src/components/steps/Step5Integrations.tsx:212
 msgid "Contact Form 7"
 msgstr ""
 
@@ -2109,6 +2112,66 @@ msgstr ""
 
 #: admin/src/components/steps/Step5Integrations.tsx:56
 msgid "Not installed"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:148
+msgid "How to add a Smaily signup form"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:151
+msgid "Add a newsletter signup form to your store using any of these methods."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:155
+msgid "Shortcode"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:158
+msgid "To add a Smaily form, place this code where you want the form to appear:"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:165
+msgid "Attributes let you customize the redirect URLs, add a name field, and enrol subscribers into a workflow."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:175
+msgid "See all attributes"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:181
+msgid "Gutenberg block"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:184
+msgid "In the WordPress page or post editor, open the block inserter and search \"Smaily\" — add the Smaily Sign-Up Form block anywhere in your content."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:190
+msgid "Elementor widget"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:194
+msgid "In the Elementor editor, open the widget panel and look under the Smaily category for the Smaily Opt-In Form widget."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:199
+msgid "Elementor is not installed on this site."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:203
+msgid "Classic Widget"
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:206
+msgid "Go to Appearance → Widgets and add the \"Smaily Classic Subscription Widget\" to any widget area."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:216
+msgid "Open a form under Contact → Contact Forms and switch to the \"Smaily for Contact Form 7\" tab to enable signup for that form."
+msgstr ""
+
+#: admin/src/components/steps/Step5Integrations.tsx:221
+msgid "Contact Form 7 is not installed on this site."
 msgstr ""
 
 #: admin/src/components/steps/Step6Done.tsx:13
