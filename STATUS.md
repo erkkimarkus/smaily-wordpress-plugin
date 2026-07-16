@@ -46,7 +46,11 @@ vitest 245) and `sg docker -c "composer run test:integration"` green (157/157,
 sandbox tenant `Smaily Connect test` correctly restored, not MiuMjau). Audit
 report disposition + `docs/audits/INDEX.md` row updated to FIXED. **v3.7.1 may
 now proceed** once the rest of the release-gate checklist (PCP against the
-built ZIP, etc.) is run. Full detail:
+built ZIP, etc.) is run. **Independently re-verified (adversarial pass,
+2026-07-17, Claude/Fable 5): no bypass of the cap, no remaining disproportionate
+per-event cost under it, the regression test would genuinely fail on a
+reverted ordering, and no error-shape drift from the refactor — Finding 1 holds
+fixed.** Full detail:
 [`docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md`](docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md).)
 
 Prior: 2026-07-17 (**v3.7.1 gate delta security audit — 1 HIGH,

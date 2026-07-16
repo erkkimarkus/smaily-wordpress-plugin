@@ -40,6 +40,28 @@ rejected with a 400 before the engine is ever contacted. `ci:strict` and
 correctly, not MiuMjau). **v3.7.1 may now proceed** once the rest of the
 release-gate checklist is satisfied.
 
+**Independent re-verification (adversarial, 2026-07-17, Claude/Fable 5).**
+Read `handle()`/`resolve_cart_product_skus()`/`size_guard()`/`validate_batch()`
+directly (not just the diff) and confirmed: (1) `resolve_cart_product_skus()`
+has exactly one caller (`handle()`), reached only after `size_guard()` returns
+null — no other route/preprocessing path skips the gate, and non-array/missing
+`events` degrades to `array()` which `size_guard()` itself rejects as empty,
+never entering the resolve loop; (2) the ≤100 `wc_get_product()`/`SkuResolver::
+resolve()` calls left under the cap are bounded, single-lookup-per-event, and
+of the same order the route already tolerated pre-PRO-1390 — no remaining
+disproportionate cost found; (3) mentally reverting `5ee1366`'s ordering, the
+new regression test's `assertSame( 0, $lookups, … )` would fail (the
+`woocommerce_product_class` filter fires on the very first `wc_get_product()`
+call), so the test genuinely pins the property, not just happy-path shape; (4)
+`size_guard()`'s return shape is byte-identical to the pre-existing
+`invalid()`/`invalid_response()` contract (same `field`/`message` for the
+100-cap case) — no JS-facing error-shape drift, and `validate_batch()`
+delegating to `size_guard()` (rather than duplicating the check) rules out
+drift between the two call sites. Re-ran `sg docker -c "bash
+bin/run-integration-tests.sh --filter RecEngineBrowseProxyTest"` (16/16 green,
+sandbox tenant correctly restored) and the unit subset (`BeaconEndpointTest`,
+10/10 green). No bypass or new issue found — Finding 1 holds fixed.
+
 ## Verdict
 
 **1 HIGH — release-blocking. RESULT: escalate.**
