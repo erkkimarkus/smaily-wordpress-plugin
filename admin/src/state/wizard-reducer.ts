@@ -39,6 +39,7 @@ export const wizardInitialState: WizardState = {
     elementorPresent: false,
     cf7Present: false,
     storeTotals: { customers: 0, orders: 0, products: 0 },
+    docsUrl: '',
   },
 
   smailyCredentials: { ...emptyCredentials },

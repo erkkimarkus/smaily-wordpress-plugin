@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom plugin tables: interpolated values are $wpdb->prepare()d (dynamic IN() lists build placeholder strings); object-cache is N/A for a write-through queue / cleanup / DDL path.
 
+use Smaily\Connect\Constants;
 use Smaily\Connect\Multilingual\DetectorFactory;
 use Smaily\Connect\Multilingual\PolylangAdapter;
 use Smaily\Connect\Multilingual\SiteLocaleAdapter;
@@ -52,6 +53,7 @@ use Smaily\Connect\Smaily\ContactSyncMode;
  *       products:  int,
  *     },
  *     rss: { baseUrl, categories[], defaults{} } | null,
+ *     docsUrl: string,
  *   }
  *
  * The React bundle reads everything that's not in WizardState.env
@@ -77,6 +79,7 @@ class EnvDetector {
 	 *     categories: array<int, array{slug: string, name: string}>,
 	 *     defaults: array{limit: int, category: string, sortBy: string, order: string, taxRate: float},
 	 *   }|null,
+	 *   docsUrl: string,
 	 * }
 	 */
 	public function snapshot(): array {
@@ -89,6 +92,10 @@ class EnvDetector {
 			'hposActive'         => $this->hpos_active(),
 			'storeTotals'        => $this->store_totals(),
 			'rss'                => $this->rss_snapshot(),
+			// Base merchant-docs URL (PRO-1430) — Constants::docs_url() is the
+			// single place this can move/be filtered; the React "How to add a
+			// Smaily signup form" section appends its own #anchor client-side.
+			'docsUrl'            => Constants::docs_url(),
 		);
 	}
 

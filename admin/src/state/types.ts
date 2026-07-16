@@ -253,6 +253,13 @@ export interface WizardState {
      * `| null` only, so pre-existing env fixtures stay valid.
      */
     rss?: RssFeedBootData | null;
+    /**
+     * Base merchant-docs URL (Constants::docs_url(), PRO-1430) — the single
+     * place the URL can move/be filtered server-side. Optional so
+     * pre-existing env fixtures without it stay valid; UI code should treat
+     * an absent/empty value as "no docs link".
+     */
+    docsUrl?: string;
   };
 
   /** Step 1 — Connect. */

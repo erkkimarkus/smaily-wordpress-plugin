@@ -231,6 +231,14 @@ final class EnvDetectorTest extends TestCase {
 		self::assertTrue( $snapshot['elementorPresent'] );
 	}
 
+	public function test_snapshot_carries_docs_url_from_constants(): void {
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+
+		$snapshot = ( new EnvDetector() )->snapshot();
+
+		self::assertSame( \Smaily\Connect\Constants::DOCS_URL, $snapshot['docsUrl'] );
+	}
+
 	public function test_saved_settings_omits_password_field(): void {
 		\Smaily_Connect\Includes\Cypher::$decrypt_return = 'plain-pw';
 

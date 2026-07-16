@@ -56,6 +56,8 @@ export interface BootPayload {
      * vice versa must not crash hydrate).
      */
     rss?: RssFeedBootData | null;
+    /** Base merchant-docs URL from EnvDetector::snapshot() (PRO-1430). */
+    docsUrl?: string;
   };
   savedSettings: {
     smailyCredentials: { subdomain: string; username: string; password: string };
@@ -150,6 +152,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
         cf7Present: false,
         storeTotals: { customers: 0, orders: 0, products: 0 },
         rss: null,
+        docsUrl: '',
       },
       smailyCredentials: { ...emptyCredentials },
       smailyConnection: idleAsync,
@@ -209,6 +212,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       cf7Present: env.cf7Present,
       storeTotals: env.storeTotals,
       rss: env.rss ?? null,
+      docsUrl: env.docsUrl ?? '',
     },
     smailyCredentials: { ...s.smailyCredentials },
     smailyConnection:
