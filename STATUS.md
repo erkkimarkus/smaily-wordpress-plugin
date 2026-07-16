@@ -26,7 +26,29 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1341 — v3.7.1 RELEASED.** Full local
+_Last updated: 2026-07-17 (**PRO-1388 — AUDITED, no code change needed:
+the `smaily_vt` capture-timing race is already closed.** The engine team
+(PRO-1382) reported that `beacon-core.ts`'s client-side, consent-gated
+`captureUrlParams()` loses the `?smaily_vt=...` param when a visitor decides
+the cookie-consent banner on a later page than the landing (MiuMjau: 373
+email clicks → 7 identified customers). Erkki's decision was to capture
+`smaily_vt` server-side, consent-independent, in `LandingCapture`. Code
+audit found this was **already implemented** by F3-46 (`211395a`,
+2026-06-26, shipped v3.1.0+) — `LandingCapture::resolve()`/`capture()`
+already writes `smaily_vt` into the `smaily_rec_uid` cookie on
+`template_redirect`, gated only on `is_connected()` +
+`smaily_connect_capture_attribution`, never on consent; the JS
+`RecEngineClient.enrich()` reads that cookie at `track()`-time regardless of
+when consent was granted. Existing tests already cover exactly this
+scenario (`LandingCaptureTest::test_captures_full_link_into_config_named_cookies`,
+`rec-engine-client.test.ts`'s `'carries smaily_visitor_token from the
+visitor cookie when present'`). No plugin diff — see `docs/DECISIONS.md`
+PRO-1388 for the full audit + the open question (why MiuMjau's measured
+conversion is still low despite the fix having been live since v3.1.0 —
+handed back to the engine team/Erkki, not resolvable from this repo).
+`ci:strict` / integration not re-run (no code touched).
+
+Prior: 2026-07-17 (**PRO-1341 — v3.7.1 RELEASED.** Full local
 build/verify/release sequence run after the version-bump commit `c25a4bb`
 (pushed to `main`): `npm run build:admin && npm run build:client` (client
 entry confirmed `dist/public/js/sc-runtime.js`); blocks built (`composer run

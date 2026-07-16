@@ -3271,6 +3271,64 @@ merchant-facing docs site.
 placeholder list was already resolved 2026-07-12 (engine team answer). Ported
 to `docs/site/index.html` (EN+ET) in the same commit as this entry.
 
+### PRO-1388 — `smaily_vt` capture-timing race: already closed by the existing server-side landing capture (F3-46)
+
+**Context:** the engine team flagged (PRO-1382, prod-verified against
+MiuMjau) that `beacon-core.ts`'s `init()`/`captureUrlParams()` is
+client-side and runs exactly once, gated on marketing consent: a visitor who
+decides the cookie-consent banner on a page AFTER the `?smaily_vt=...`
+landing loses the URL param, so the visitor-token cookie never gets written
+and the browse events eventually sent (once consent is granted) never carry
+`smaily_visitor_token`. Reported symptom: MiuMjau, 373 email clicks → 7
+identified customers.
+
+**Decision (Erkki, 2026-07-17):** capture `smaily_vt` server-side, in the
+existing consent-independent attribution path
+(`Integrations\WooCommerce\LandingCapture`), not client-side. Rejected the
+engine team's proposed sessionStorage-stash alternative — still client-side,
+so it still loses a visitor who navigates before consenting; a client-side
+mechanism cannot close a client-side race.
+
+**Finding (code audit before implementing, PRO-1388):** `LandingCapture`
+already captures `smaily_vt` → the `smaily_rec_uid` cookie (name/TTL from
+the same engine-config keys, `tracking_cookie_name`/`cookie_ttl_days`,
+`StorefrontBeacon::beacon_config()` uses for the JS `cookieNames.visitor`/
+`cookieTtlDays.visitor`) as of F3-46 (`211395a`, 2026-06-26, shipped in
+v3.1.0+) — on `template_redirect`, gated only on `is_connected()` +
+`smaily_connect_capture_attribution`, never on consent.
+`RecEngineClient.enrich()` reads whatever value sits in that cookie at
+`track()`-time, independent of whether/when `captureUrlParams()` ran — so
+once `LandingCapture` has written it on the landing request, a consent grant
+on any later page still produces browse events carrying
+`smaily_visitor_token`. This exact scenario (cookie present via a
+server-side write, not via `captureUrlParams()`) is already asserted by
+`LandingCaptureTest::test_resolve_captures_a_valid_visitor_token` /
+`test_captures_full_link_into_config_named_cookies` (unit + integration) and
+`rec-engine-client.test.ts`'s `'carries smaily_visitor_token from the
+visitor cookie when present'`. **No plugin code change was required** —
+Erkki's decision was already implemented as part of F3-46's broader
+attribution capture, before this specific race had a name.
+
+**Open, not resolved by this audit:** why MiuMjau's measured 373→7
+conversion is still that low given the fix has been live since v3.1.0.
+Two possibilities, neither confirmable from this repo: (a) the PRO-1382
+metric is cumulative over the whole pilot and dominated by traffic from
+before MiuMjau ran a ≥v3.1.0 build; (b) something else is wrong — e.g. the
+engine's own link-builder not actually appending `smaily_vt`, or a
+MiuMjau-side cache serving the landing page without executing
+`template_redirect`. Handed back to the engine team / Erkki rather than
+guessed at (see the PRO-1388 Linear comment).
+
+**JS side left unchanged:** `captureUrlParams()` in `beacon-core.ts` /
+`rec-engine-client.ts` stays — a harmless duplicate best-effort capture when
+consent happens to already be granted at landing. It writes the exact same
+cookie name/value/TTL `LandingCapture` would, so there is redundancy, not a
+conflict.
+
+**Relationships:** extends F3-46 (server-side landing capture) and F3-49
+(browse events carry `smaily_visitor_token` for cold-start, not
+attribution) — supersedes neither.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
