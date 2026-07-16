@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1390 live-walk verification — CONFIRMED against
+_Last updated: 2026-07-17 (**PRO-1342 — removed the bogus `uninstall.php`
+legacy-options entry.** The 2026-07-13 delta audit's Info finding #1: `$legacy_
+options` (deleted via `delete_option()`) contained `'smaily_connect_abandoned_
+carts'`, which is actually the legacy CART **TABLE** suffix
+(`integrations/woocommerce/cart.class.php::ABANDONED_CART_TABLE_NAME` /
+`Migration\LegacyCartDrain::LEGACY_TABLE_SUFFIX`), not an option name —
+`delete_option()` on it was a harmless no-op (grep-confirmed: no code ever
+writes an option by that name). Fix: removed the entry from `uninstall.php`'s
+`$legacy_options`; no replacement was needed since no such option exists — the
+real abandoned-cart options (`smaily_connect_abandoned_cart_cutoff`/`_status`)
+were already listed separately. **Table-drop behavior is unchanged by design**
+(DECISIONS.md PRO-1195: the legacy cart table is deliberately kept, not
+dropped, at uninstall — "safe rollback; schema removal is a later one-way
+door") — this fix touches only the dead option-list entry. No test previously
+pinned the full `$legacy_options` array content (`UninstallCleanupTest` only
+source-pins specific option/prefix constants), so none was added — matches
+existing test-coverage pattern. `ci:strict` exit=0 (PHPUnit unit 571, vitest
+245); integration suite not re-run (delta is `uninstall.php` + docs only, no
+runtime path affected). Updated the 2026-07-13 audit report's finding-1
+disposition to FIXED and the `docs/audits/INDEX.md` register row's inline
+outcome text to match. Files: `uninstall.php`,
+`docs/audits/2026-07-13-SECURITY_QUALITY_RE_AUDIT_PRO1195_CART_REWRITE.md`,
+`docs/audits/INDEX.md`.)
+
+Prior: 2026-07-17 (**PRO-1390 live-walk verification — CONFIRMED against
 the real sandbox engine.** The dev wp-env held a live connection to the
 "Smaily Connect test" sandbox tenant (restored earlier by the integration-test
 snapshot guard) — checked non-secret options (`base_url=intelligence.smaily.com`,

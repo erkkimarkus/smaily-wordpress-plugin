@@ -113,7 +113,6 @@ $legacy_options = array(
 	// Abandoned-cart configuration.
 	'smaily_connect_abandoned_cart_cutoff',
 	'smaily_connect_abandoned_cart_status',
-	'smaily_connect_abandoned_carts',
 	// RSS widget defaults.
 	'smaily_connect_rss',
 	'smaily_connect_rss_category',
