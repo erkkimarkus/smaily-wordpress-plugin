@@ -227,6 +227,48 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		self::assertNull( $received[0]['sku'], 'An unresolvable product_id must never forward a guessed sku.' );
 	}
 
+	public function test_oversized_batch_is_rejected_before_any_product_lookup(): void {
+		// PRO-1446: resolve_cart_product_skus() (the wc_get_product() loop) must
+		// never run on an attacker-controlled, unbounded raw array — the
+		// 100-event cap has to reject the batch first. `woocommerce_product_class`
+		// fires once per wc_get_product() call that reaches product-type
+		// resolution, so counting it is a direct seam onto the per-event lookup
+		// this fix must prevent from running at all here.
+		$this->enable_beacon();
+		$product = $this->make_product( 'aatc-oversize-1' );
+
+		$lookups = 0;
+		$counter = static function ( $classname ) use ( &$lookups ) {
+			++$lookups;
+			return $classname;
+		};
+		add_filter( 'woocommerce_product_class', $counter );
+
+		$events = array();
+		for ( $i = 0; $i < 101; $i++ ) {
+			$events[] = array(
+				'event_id'   => 'ov-' . $i,
+				'event_type' => 'cart_add',
+				'session_id' => 's1',
+				'event_ts'   => '2026-07-17T10:00:00Z',
+				'product_id' => (string) $product->get_id(),
+			);
+		}
+
+		$response = RestRequestHelper::post( '/relay', array( 'events' => $events ) );
+
+		remove_filter( 'woocommerce_product_class', $counter );
+
+		self::assertSame( 400, $response->get_status(), 'A 101-event batch is rejected as over the cap.' );
+		self::assertSame( 'events', $response->get_data()['field'] );
+		self::assertSame(
+			0,
+			$lookups,
+			'The size cap must reject the batch BEFORE resolve_cart_product_skus() calls wc_get_product() for any event.'
+		);
+		self::assertNull( self::$engine->state()['last_browse_received'] ?? null, 'The engine must not have been called either.' );
+	}
+
 	public function test_product_view_still_takes_an_explicit_sku_unaffected_by_cart_resolution(): void {
 		$this->enable_beacon();
 

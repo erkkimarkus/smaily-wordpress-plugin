@@ -202,19 +202,23 @@ class BeaconEndpoint {
 		if ( ! is_array( $raw ) ) {
 			$raw = array();
 		}
+
+		// PRO-1446: the size cap must gate BEFORE resolve_cart_product_skus()
+		// — that step is WP/DB-backed (wc_get_product() per cart event) and
+		// must never run over an attacker-controlled, unbounded raw array.
+		// size_guard() is the same cheap, pure check validate_batch() opens
+		// with, so a genuinely oversized batch gets the identical 400 it
+		// always got — only the ordering (before vs. after resolution) changed.
+		$size_error = self::size_guard( $raw );
+		if ( $size_error !== null ) {
+			return self::invalid_response( $size_error );
+		}
+
 		$raw = $this->resolve_cart_product_skus( $raw );
 
 		$validation = self::validate_batch( $raw );
 		if ( ! $validation['valid'] ) {
-			return new WP_REST_Response(
-				array(
-					'ok'      => false,
-					'error'   => 'invalid_events',
-					'field'   => $validation['field'],
-					'message' => $validation['message'],
-				),
-				400
-			);
+			return self::invalid_response( $validation );
 		}
 
 		// SECOND GATE (a).1 — drop browse events carrying an OPTED-OUT contact's
@@ -390,11 +394,9 @@ class BeaconEndpoint {
 	 * @return array{valid: bool, field: string, message: string, events: array<int, array<string, mixed>>}
 	 */
 	public static function validate_batch( array $events ): array {
-		if ( $events === array() ) {
-			return self::invalid( 'events', 'No events in the batch.' );
-		}
-		if ( count( $events ) > self::MAX_EVENTS ) {
-			return self::invalid( 'events', 'Batch exceeds the 100-event cap.' );
+		$size_error = self::size_guard( $events );
+		if ( $size_error !== null ) {
+			return $size_error;
 		}
 
 		$clean = array();
@@ -439,6 +441,42 @@ class BeaconEndpoint {
 			'field'   => $field,
 			'message' => $message,
 			'events'  => array(),
+		);
+	}
+
+	/**
+	 * The cheap, pure non-empty / MAX_EVENTS check — the part of validate_batch()
+	 * that must run BEFORE any per-event work (PRO-1446: specifically before
+	 * resolve_cart_product_skus()'s wc_get_product() loop). Pulled out so
+	 * handle() can gate on it ahead of resolution while validate_batch() still
+	 * opens with the same check for a raw (non-proxy) caller.
+	 *
+	 * @param array<int|string, mixed> $events
+	 *
+	 * @return array{valid: bool, field: string, message: string, events: array<int, array<string, mixed>>}|null Null when the size is within bounds.
+	 */
+	private static function size_guard( array $events ): ?array {
+		if ( $events === array() ) {
+			return self::invalid( 'events', 'No events in the batch.' );
+		}
+		if ( count( $events ) > self::MAX_EVENTS ) {
+			return self::invalid( 'events', 'Batch exceeds the 100-event cap.' );
+		}
+		return null;
+	}
+
+	/**
+	 * @param array{valid: bool, field: string, message: string, events: array<int, array<string, mixed>>} $validation
+	 */
+	private static function invalid_response( array $validation ): WP_REST_Response {
+		return new WP_REST_Response(
+			array(
+				'ok'      => false,
+				'error'   => 'invalid_events',
+				'field'   => $validation['field'],
+				'message' => $validation['message'],
+			),
+			400
 		);
 	}
 
