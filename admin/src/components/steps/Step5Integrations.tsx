@@ -1,7 +1,12 @@
+import { useRef, useState } from 'react';
+
 import { type WizardState } from '../../state/types';
-import { Card, Pill } from '../primitives';
+import { Button, Card, Pill } from '../primitives';
 import { RssFeedSection } from './RssFeedSection';
 import { __ } from '@admin/lib/i18n';
+
+/** The shortcode a merchant pastes into any post/page/widget. */
+const SIGNUP_SHORTCODE = '[smaily_connect_newsletter_form]';
 
 export interface Step5IntegrationsProps {
   state: WizardState;
@@ -62,6 +67,166 @@ const CARDS: IntegrationCard[] = [
 ];
 
 /**
+ * One "how to add a form" block on the guide grid below. Body-only Card
+ * (no headerAccessory / Pill) — these are instructions, not install-status
+ * cards like CARDS above.
+ */
+function SignupFormGuideCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Card title={title}>
+      <div className="space-y-2 text-sm text-text-secondary">{children}</div>
+    </Card>
+  );
+}
+
+/**
+ * Shortcode code block + one-click copy. Mirrors RssFeedSection's
+ * handleCopy: navigator.clipboard when available (needs a secure
+ * context — a plain-http wp-admin doesn't have one), else fall back to
+ * selecting the code text so a manual Ctrl+C still works.
+ */
+function ShortcodeCopyButton(): React.JSX.Element {
+  const [copied, setCopied] = useState(false);
+  const codeRef = useRef<HTMLElement>(null);
+
+  const selectCodeText = (): void => {
+    const node = codeRef.current;
+    if (node === null || typeof window === 'undefined' || window.getSelection === undefined) {
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  };
+
+  const handleCopy = (): void => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) {
+      navigator.clipboard.writeText(SIGNUP_SHORTCODE).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }, selectCodeText);
+    } else {
+      selectCodeText();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <code
+        ref={codeRef}
+        className="flex-1 overflow-x-auto rounded bg-surface-muted px-3 py-2 font-mono text-sm text-text-primary"
+      >
+        {SIGNUP_SHORTCODE}
+      </code>
+      <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
+        {copied ? __('Copied ✓', 'smaily-connect') : __('Copy', 'smaily-connect')}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * "How to add a Smaily signup form" — one card per surface a merchant can
+ * place the form on (PRO-1430). Elementor/CF7 presence reuses the same
+ * state.env detection CARDS above already reads; when the host plugin is
+ * absent the card just says so, no dead pointer.
+ */
+function SignupFormGuide({ state }: { state: WizardState }): React.JSX.Element {
+  const docsUrl = state.env.docsUrl ?? '';
+
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-text-primary">
+        {__('How to add a Smaily signup form', 'smaily-connect')}
+      </h3>
+      <p className="mt-1 text-sm text-text-secondary">
+        {__('Add a newsletter signup form to your store using any of these methods.', 'smaily-connect')}
+      </p>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <SignupFormGuideCard title={__('Shortcode', 'smaily-connect')}>
+          <p>
+            {__(
+              'To add a Smaily form, place this code where you want the form to appear:',
+              'smaily-connect',
+            )}
+          </p>
+          <ShortcodeCopyButton />
+          <p>
+            {__(
+              'Attributes let you customize the redirect URLs, add a name field, and enrol subscribers into a workflow.',
+              'smaily-connect',
+            )}{' '}
+            {docsUrl !== '' && (
+              <a
+                href={`${docsUrl}#set-integrations`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {__('See all attributes', 'smaily-connect')}
+              </a>
+            )}
+          </p>
+        </SignupFormGuideCard>
+
+        <SignupFormGuideCard title={__('Gutenberg block', 'smaily-connect')}>
+          <p>
+            {__(
+              'In the WordPress page or post editor, open the block inserter and search "Smaily" — add the Smaily Sign-Up Form block anywhere in your content.',
+              'smaily-connect',
+            )}
+          </p>
+        </SignupFormGuideCard>
+
+        <SignupFormGuideCard title={__('Elementor widget', 'smaily-connect')}>
+          {state.env.elementorPresent ? (
+            <p>
+              {__(
+                'In the Elementor editor, open the widget panel and look under the Smaily category for the Smaily Opt-In Form widget.',
+                'smaily-connect',
+              )}
+            </p>
+          ) : (
+            <p>{__('Elementor is not installed on this site.', 'smaily-connect')}</p>
+          )}
+        </SignupFormGuideCard>
+
+        <SignupFormGuideCard title={__('Classic Widget', 'smaily-connect')}>
+          <p>
+            {__(
+              'Go to Appearance → Widgets and add the "Smaily Classic Subscription Widget" to any widget area.',
+              'smaily-connect',
+            )}
+          </p>
+        </SignupFormGuideCard>
+
+        <SignupFormGuideCard title={__('Contact Form 7', 'smaily-connect')}>
+          {state.env.cf7Present ? (
+            <p>
+              {__(
+                'Open a form under Contact → Contact Forms and switch to the "Smaily for Contact Form 7" tab to enable signup for that form.',
+                'smaily-connect',
+              )}
+            </p>
+          ) : (
+            <p>{__('Contact Form 7 is not installed on this site.', 'smaily-connect')}</p>
+          )}
+        </SignupFormGuideCard>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Step 5 — Integrations.
  *
  * Informative-only step: three cards link out to the WP admin pages for
@@ -69,14 +234,19 @@ const CARDS: IntegrationCard[] = [
  * installed (detected via state.env on PHP-mount) so admins know where
  * to start.
  *
- * Below the cards, WooCommerce stores additionally get the product
- * RSS-feed URL builder (RssFeedSection) — client-side only, so the
- * step stays save-free. Gated on env.rss, which the server emits only
- * when WC is active.
+ * Below the cards, a "How to add a Smaily signup form" guide (PRO-1430)
+ * covers every surface a merchant can place the form on: Shortcode,
+ * Gutenberg block, Elementor widget, Classic Widget, Contact Form 7.
+ *
+ * WooCommerce stores additionally get the product RSS-feed URL builder
+ * (RssFeedSection) — client-side only, so the step stays save-free.
+ * Gated on env.rss, which the server emits only when WC is active.
  *
  * Links use admin_url() output (server-side) so the relative href stays
  * in-window — `target="_blank"` would dump users into a new tab which
- * is jarring in the wizard flow.
+ * is jarring in the wizard flow. The signup-form guide's docs link is
+ * the exception — it points off-site, so it opens in a new tab like
+ * every other external docs link in the app.
  */
 export function Step5Integrations({
   state,
@@ -130,6 +300,8 @@ export function Step5Integrations({
           );
         })}
       </div>
+
+      <SignupFormGuide state={state} />
 
       {state.env.rss != null && <RssFeedSection rss={state.env.rss} />}
     </div>
