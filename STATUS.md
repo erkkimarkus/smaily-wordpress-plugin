@@ -26,7 +26,26 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**docs correction — the 2026-07-16 delta-audit
+_Last updated: 2026-07-17 (**v3.7.1 gate delta security audit — 1 HIGH,
+release-blocking.** Scope: `a2326df..HEAD` (the v3.7.0 tag to now — PRO-1390
+`/relay` cart-sku fix + 3 trivial doc/cleanup commits). Finding: in
+`BeaconEndpoint::handle()`, the new `resolve_cart_product_skus()` (added by
+`674c04c`) calls `wc_get_product()` per event over the FULL raw `events`
+array **before** `validate_batch()`'s `MAX_EVENTS=100` cap runs — on the
+plugin's one public, unauthenticated route. A single crafted POST with a
+large `events` array (well within default body-size limits; the fixed-window
+rate limiter only throttles request count, not events-per-request, and does
+nothing on the FIRST request) forces tens of thousands of DB-backed lookups
+before the batch is rejected as oversized — a real, cheap, unauthenticated
+DoS/resource-exhaustion path that did not exist before PRO-1390. **Do not tag
+v3.7.1 until this is fixed** (reorder so the size/shape cap runs before the
+per-event resolve loop) and re-verified. Everything else in the delta
+(PRO-1342 `uninstall.php` cleanup, the live-walk record, the docs-wording
+correction) is clean/trivial. Full detail:
+[`docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md`](docs/audits/2026-07-17-SECURITY_DELTA_AUDIT_V371_GATE.md).
+No code changed by this audit — it is a finding, not a fix.)
+
+Prior: 2026-07-17 (**docs correction — the 2026-07-16 delta-audit
 report (item 14) and its `docs/audits/INDEX.md` row overstated closure: only
 Info finding #2 (cart-PII docs gap) from the 2026-07-13 audit was closed by
 that delta (PRO-1343/PRO-1194/PRO-1405); finding #1 (the bogus `uninstall.php`
