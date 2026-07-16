@@ -950,6 +950,7 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 			return array(
 				'event_id'             => isset( $event['event_id'] ) ? (string) $event['event_id'] : '',
 				'smaily_visitor_token' => isset( $event['smaily_visitor_token'] ) ? (string) $event['smaily_visitor_token'] : '',
+				'sku'                  => isset( $event['sku'] ) ? (string) $event['sku'] : null,
 			);
 		},
 		$events

@@ -194,9 +194,9 @@ describe('beacon-core: WC cart events (3.4.3b)', () => {
     document.cookie = 'smaily_anon_sid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
 
-  /** A jQuery button stub carrying (or not) a data-product_sku. */
-  function button(sku: string | undefined): { data: (key: string) => unknown } {
-    return { data: (key: string): unknown => (key === 'product_sku' ? sku : undefined) };
+  /** A jQuery button stub carrying (or not) a data-product_id. */
+  function button(productId: string | number | undefined): { data: (key: string) => unknown } {
+    return { data: (key: string): unknown => (key === 'product_id' ? productId : undefined) };
   }
 
   /** Invoke a registered WC jQuery handler (asserting it exists). */
@@ -213,25 +213,26 @@ describe('beacon-core: WC cart events (3.4.3b)', () => {
     return init();
   }
 
-  it('tracks cart_add with the button SKU on added_to_cart', async () => {
+  it('tracks cart_add with the button product_id on added_to_cart (jQuery hands back a number)', async () => {
     const client = startBeacon();
-    fire('added_to_cart', {}, {}, 'hash', button('ACA-1'));
+    fire('added_to_cart', {}, {}, 'hash', button(42));
 
     await client?.flush();
     const events = lastEvents(fetchMock);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ event_type: 'cart_add', sku: 'ACA-1' });
+    expect(events[0]).toMatchObject({ event_type: 'cart_add', product_id: '42' });
+    expect(events[0]).not.toHaveProperty('sku');
   });
 
   it('tracks cart_remove on removed_from_cart', async () => {
     const client = startBeacon();
-    fire('removed_from_cart', {}, {}, 'hash', button('ACA-9'));
+    fire('removed_from_cart', {}, {}, 'hash', button('99'));
 
     await client?.flush();
-    expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'cart_remove', sku: 'ACA-9' });
+    expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'cart_remove', product_id: '99' });
   });
 
-  it('skips a cart event with no SKU (single-product form-POST gap)', async () => {
+  it('skips a cart event with no product_id (single-product form-POST gap)', async () => {
     const client = startBeacon();
     fire('added_to_cart', {}, {}, 'hash', button(undefined));
 

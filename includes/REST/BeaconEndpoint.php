@@ -202,6 +202,7 @@ class BeaconEndpoint {
 		if ( ! is_array( $raw ) ) {
 			$raw = array();
 		}
+		$raw = $this->resolve_cart_product_skus( $raw );
 
 		$validation = self::validate_batch( $raw );
 		if ( ! $validation['valid'] ) {
@@ -309,6 +310,69 @@ class BeaconEndpoint {
 		}
 
 		return $kept;
+	}
+
+	/**
+	 * Resolve the canonical engine `sku` for `cart_add`/`cart_remove` events
+	 * (PRO-1390/PRO-1224). The JS cart listener only has the clicked button's
+	 * `data-product_id` (the WC platform id) to work with — it cannot do the
+	 * multilingual canonicalization `Support\SkuResolver` does, so it sends the
+	 * raw id under `product_id` instead of a client-guessed `sku`. This resolves
+	 * it here, server-side, through the SAME resolver catalog/orders use, so a
+	 * cart event joins the same catalog row a product_view or order line would.
+	 * `product_id` is proxy-internal: it is not in EVENT_FIELDS, so
+	 * validate_batch() drops it and it never reaches the engine.
+	 *
+	 * `product_view` needs no such step — StorefrontBeacon::page_context()
+	 * already resolves it server-side (PRO-1224) before the JS ever sees it.
+	 *
+	 * When the id doesn't resolve to a loadable product (e.g. deleted between
+	 * the click and the batch flush), `sku` is left unset rather than forwarding
+	 * a guessed value — the event still ingests without a catalog join, logged
+	 * once per batch (observable, not a silent wrong-key send).
+	 *
+	 * WP/WC-dependent (wc_get_product) — integration-tested only, unlike the
+	 * pure validate_batch() below.
+	 *
+	 * @param array<int|string, mixed> $events Raw (pre-whitelist) request events.
+	 *
+	 * @return array<int|string, mixed>
+	 */
+	private function resolve_cart_product_skus( array $events ): array {
+		$dropped = 0;
+		foreach ( $events as $index => $event ) {
+			if ( ! is_array( $event ) ) {
+				continue;
+			}
+			$event_type = isset( $event['event_type'] ) ? (string) $event['event_type'] : '';
+			if ( $event_type !== 'cart_add' && $event_type !== 'cart_remove' ) {
+				continue;
+			}
+			if ( ! isset( $event['product_id'] ) ) {
+				continue;
+			}
+
+			$product_id = (int) $event['product_id'];
+			$product    = $product_id > 0 ? wc_get_product( $product_id ) : false;
+			if ( $product instanceof \WC_Product ) {
+				$event['sku'] = \Smaily\Connect\Smaily\RecEngine\Support\SkuResolver::resolve( $product );
+			} else {
+				unset( $event['sku'] );
+				++$dropped;
+			}
+			$events[ $index ] = $event;
+		}
+
+		if ( $dropped > 0 ) {
+			\Smaily\Connect\Support\DebugLog::write(
+				sprintf(
+					'[smaily-connect beacon] dropped sku on %d cart event(s) — product_id did not resolve to a loadable product',
+					$dropped
+				)
+			);
+		}
+
+		return $events;
 	}
 
 	/**

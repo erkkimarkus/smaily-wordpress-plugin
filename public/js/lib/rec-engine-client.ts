@@ -101,6 +101,14 @@ export interface TrackingEvent {
   category_path?: string;
   search_query?: string;
   dwell_seconds?: number;
+  /**
+   * WooCommerce platform product id for a cart event (`cart_add`/`cart_remove`)
+   * whose canonical `sku` is resolved server-side by BeaconEndpoint (PRO-1390) —
+   * the wrapper only has the DOM `data-product_id` to work with and cannot do
+   * the multilingual canonicalization `Support\SkuResolver` does. Proxy-internal:
+   * stripped by the `/relay` field whitelist before an event reaches the engine.
+   */
+  product_id?: string;
 }
 
 export type MergeReason =
@@ -122,6 +130,12 @@ interface WireEvent {
   category_path?: string;
   search_query?: string;
   dwell_seconds?: number;
+  /**
+   * Cart-event platform product id, present only until BeaconEndpoint resolves
+   * it into `sku` server-side (PRO-1390) — see TrackingEvent.product_id. Never
+   * reaches the engine (the `/relay` whitelist has no `product_id` entry).
+   */
+  product_id?: string;
   /**
    * Persistent visitor token (from the campaign-click cookie), when present.
    * Identity — NOT attribution: browse attribution rides ORDER signals (F3-49,
@@ -378,6 +392,9 @@ export class RecEngineClient {
     };
     if (event.sku !== undefined) {
       wire.sku = event.sku;
+    }
+    if (event.product_id !== undefined) {
+      wire.product_id = event.product_id;
     }
     if (event.category_path !== undefined) {
       wire.category_path = event.category_path;

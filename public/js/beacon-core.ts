@@ -111,10 +111,17 @@ export function buildPageEvent(evt: EventType, context: PageContext): TrackingEv
 /**
  * Wire WooCommerce's AJAX cart jQuery events to cart_add / cart_remove. WC
  * fires `added_to_cart` / `removed_from_cart` on document.body with the clicked
- * button as the last arg; that button carries `data-product_sku`. §6 requires
- * a sku for cart events, so an event WITHOUT one is skipped (the single-product
- * form-POST add-to-cart fires no JS event at all — an accepted best-effort gap,
- * §14.2). No-op when jQuery isn't present.
+ * button as the last arg; that button carries `data-product_id` (WC's own
+ * add-to-cart.js refuses to fire the AJAX call at all without one, so it is
+ * always present here). We read the platform id, NOT the button's
+ * `data-product_sku` — that is the merchant's raw WC SKU field (optional,
+ * blank, reused, or garbage on real stores) and must never be sent as the
+ * engine's join key (PRO-1390, mirrors the product_view fix, PRO-1224). The
+ * canonical `woo-<id>` key is resolved server-side by BeaconEndpoint from this
+ * id (multilingual canonicalization needs WP, not just the DOM). §6 requires a
+ * sku for cart events, so an event WITHOUT a product_id is skipped (the
+ * single-product form-POST add-to-cart fires no JS event at all — an accepted
+ * best-effort gap, §14.2). No-op when jQuery isn't present.
  */
 export function attachCartListeners(client: RecEngineClient): void {
   const jq = window.jQuery;
@@ -127,12 +134,12 @@ export function attachCartListeners(client: RecEngineClient): void {
     if (button === undefined || typeof button.data !== 'function') {
       return;
     }
-    const raw = button.data('product_sku');
-    const sku = typeof raw === 'string' ? raw : '';
-    if (sku === '') {
-      return; // sku is required for cart events — skip rather than send a reject.
+    const raw = button.data('product_id');
+    const productId = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.trim() : '';
+    if (productId === '' || !/^\d+$/.test(productId)) {
+      return; // product_id is required to resolve a sku — skip rather than send a reject.
     }
-    client.track({ event_type: eventType, sku });
+    client.track({ event_type: eventType, product_id: productId });
   };
 
   const body = jq(document.body);

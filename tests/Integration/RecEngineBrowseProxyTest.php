@@ -39,6 +39,9 @@ final class RecEngineBrowseProxyTest extends TestCase {
 
 	private static ?RecEngineMockServer $engine = null;
 
+	/** @var array<int, int> */
+	private array $created_products = array();
+
 	public static function setUpBeforeClass(): void {
 		self::$engine = RecEngineMockServer::start();
 	}
@@ -52,6 +55,10 @@ final class RecEngineBrowseProxyTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		foreach ( $this->created_products as $product_id ) {
+			wp_delete_post( $product_id, true );
+		}
+		$this->created_products = array();
 		unset( $_COOKIE['smaily_anon_sid'] );
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, false );
 		parent::tearDown();
@@ -99,6 +106,142 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		// The api_key must never surface in the proxied response.
 		$serialised = (string) wp_json_encode( $body );
 		self::assertStringNotContainsString( 'sk_', $serialised );
+	}
+
+	public function test_cart_add_resolves_product_id_to_canonical_sku_not_the_merchant_sku(): void {
+		$this->enable_beacon();
+		$product = $this->make_product( 'aatc-20-1' );
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array(
+						'event_id'   => 'ca-1',
+						'event_type' => 'cart_add',
+						'session_id' => 's1',
+						'event_ts'   => '2026-07-17T10:00:00Z',
+						'product_id' => (string) $product->get_id(),
+					),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'] );
+
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame(
+			'woo-' . $product->get_id(),
+			$received[0]['sku'] ?? null,
+			'cart_add resolves the raw product_id (PRO-1390) to the canonical woo-<id> key, mirroring catalog/orders (PRO-1224).'
+		);
+	}
+
+	public function test_cart_remove_resolves_product_id_to_canonical_sku(): void {
+		$this->enable_beacon();
+		$product = $this->make_product( '4022858617724' );
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array(
+						'event_id'   => 'cr-1',
+						'event_type' => 'cart_remove',
+						'session_id' => 's1',
+						'event_ts'   => '2026-07-17T10:00:00Z',
+						'product_id' => (string) $product->get_id(),
+					),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame( 'woo-' . $product->get_id(), $received[0]['sku'] ?? null );
+	}
+
+	public function test_cart_add_on_a_variation_keys_the_variation_not_the_parent(): void {
+		$this->enable_beacon();
+
+		$parent = new \WC_Product_Variable();
+		$parent->set_name( 'Browse Var Parent' );
+		$parent_id                = (int) $parent->save();
+		$this->created_products[] = $parent_id;
+
+		$variation = new \WC_Product_Variation();
+		$variation->set_parent_id( $parent_id );
+		$variation->set_regular_price( '9.00' );
+		$variation_id = (int) $variation->save();
+		// WC_Product_Variation::save() cascades to the parent post; deleting the
+		// parent removes its variations too, so only track the parent.
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array(
+						'event_id'   => 'ca-var-1',
+						'event_type' => 'cart_add',
+						'session_id' => 's1',
+						'event_ts'   => '2026-07-17T10:00:00Z',
+						'product_id' => (string) $variation_id,
+					),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame(
+			'woo-' . $variation_id,
+			$received[0]['sku'] ?? null,
+			'A variable-product cart event keys on the VARIATION id (same SkuResolver rule as catalog), not the parent.'
+		);
+	}
+
+	public function test_cart_add_with_unresolvable_product_id_drops_sku_instead_of_guessing(): void {
+		$this->enable_beacon();
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array(
+						'event_id'   => 'ca-bad-1',
+						'event_type' => 'cart_add',
+						'session_id' => 's1',
+						'event_ts'   => '2026-07-17T10:00:00Z',
+						'product_id' => '999999999',
+					),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'], 'The event still ingests — a missing sku is observable, not a dropped event.' );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertArrayHasKey( 0, $received );
+		self::assertArrayHasKey( 'sku', $received[0] );
+		self::assertNull( $received[0]['sku'], 'An unresolvable product_id must never forward a guessed sku.' );
+	}
+
+	public function test_product_view_still_takes_an_explicit_sku_unaffected_by_cart_resolution(): void {
+		$this->enable_beacon();
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'pv-1', 'event_type' => 'product_view', 'sku' => 'woo-123', 'session_id' => 's1', 'event_ts' => '2026-07-17T10:00:00Z' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame( 'woo-123', $received[0]['sku'] ?? null, 'resolve_cart_product_skus() is scoped to cart_add/cart_remove only — product_view already resolves server-side in StorefrontBeacon.' );
 	}
 
 	public function test_visitor_token_survives_the_whitelist_and_reaches_engine(): void {
@@ -205,6 +348,33 @@ final class RecEngineBrowseProxyTest extends TestCase {
 	}
 
 	// --- helpers --------------------------------------------------------
+
+	/**
+	 * A simple product carrying a merchant SKU — used to prove the resolved
+	 * `sku` is the canonical `woo-<id>` platform key, never this raw value
+	 * (PRO-1390/PRO-1224).
+	 */
+	private function make_product( string $merchant_sku ): \WC_Product {
+		// Idempotent across crashed runs that skipped tearDown (mirrors
+		// RecEngineCatalogTest::make_product): drop any leftover product with
+		// this SKU before creating a fresh one (WC enforces SKU uniqueness).
+		$existing = wc_get_product_id_by_sku( $merchant_sku );
+		if ( $existing ) {
+			wp_delete_post( $existing, true );
+		}
+
+		$product = new \WC_Product_Simple();
+		$product->set_sku( $merchant_sku );
+		$product->set_name( 'Browse Proxy Test Product' );
+		$product->set_regular_price( '10.00' );
+		$id = (int) $product->save();
+
+		$this->created_products[] = $id;
+
+		$loaded = wc_get_product( $id );
+		self::assertInstanceOf( \WC_Product::class, $loaded );
+		return $loaded;
+	}
 
 	// --- (a).1 profiling gate (the beacon's second gate) -------------------
 

@@ -26,7 +26,54 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1341 — v3.7.0 RELEASED.** Full local
+_Last updated: 2026-07-17 (**PRO-1390 — browse cart_add/cart_remove now key on
+the canonical `woo-<id>`, not the merchant SKU.** Engine prod evidence
+(MiuMjau) showed `browse_events.sku` arriving raw for `product_view`/
+`cart_add` (e.g. `aatc-20-1`, an EAN `4022858617724`) — only 6% of
+`product_view` rows joined to the catalog. Investigation found `product_view`
+already resolves correctly (`StorefrontBeacon::page_context()` has called
+`Support\SkuResolver::resolve()` since PRO-1224, 8fa04f5) — the live bug was
+`cart_add`/`cart_remove` only: `beacon-core.ts`'s `attachCartListeners` read
+the WC AJAX button's `data-product_sku` (WooCommerce's own raw merchant-SKU
+attribute). Fix: the JS now reads `data-product_id` instead (WC's
+add-to-cart.js won't even fire the AJAX call without one, so it's always
+present) and sends it as a new **proxy-internal** `product_id` field — never
+forwarded to the engine (not in `BeaconEndpoint::EVENT_FIELDS`). A new
+`BeaconEndpoint::resolve_cart_product_skus()` resolves it server-side via
+`wc_get_product()` + `Support\SkuResolver::resolve()` (same resolver as
+catalog/orders, incl. multilingual canonicalization — a variation keys on its
+own id, matching catalog) into `sku`, called before `validate_batch()` in
+`handle()`. An unresolvable `product_id` (e.g. a deleted product) drops `sku`
+rather than forwarding a guessed value — logged once per batch via
+`DebugLog`, never a silent wrong-key send. Tests: +1 PHP unit
+(`product_id` dropped by the whitelist even on a hand-crafted request), +6
+PHP integration (`RecEngineBrowseProxyTest` — cart_add/cart_remove resolve to
+`woo-<id>` and NOT the merchant SKU seeded on the test product, a variation
+keys on its own id not the parent, an unresolvable id drops `sku`,
+`product_view` is unaffected/unchanged), +3 vitest (`beacon-core.test.ts`
+cart listeners now assert `product_id` not `sku`, incl. the jQuery
+number-vs-string `.data()` coercion case; `rec-engine-client.test.ts`
+`product_id` passthrough). `ci:strict` exit=0 (PHPUnit unit 571, vitest 245).
+Integration green: `sg docker -c "bash bin/run-integration-tests.sh --filter
+RecEngineBrowseProxyTest"` 15/15, then the full
+`sg docker -c "composer run test:integration"` 156/156 (snapshot guard
+restored the sandbox `Smaily Connect test` tenant afterward). **No live-walk
+run** — `bin/walk-3.4-browse.cjs` needs `RECENGINE_LIVE=1` + a fresh SANDBOX
+setup-token, which this pass didn't have; the mock-engine integration proof
+above covers the wire shape (mock now also projects `sku` in
+`last_browse_events` for this). Human acceptance / next live-walk: confirm
+against the real sandbox engine that a `cart_add` sent from a live storefront
+carries `sku = woo-<id>`. Out of scope (unchanged, pre-existing): `wishlist_*`
+events have no JS producer yet; `StorefrontBeaconTest` still doesn't assert
+the product_view `sku` branch (a pre-existing gap, not introduced here).
+Files: `includes/REST/BeaconEndpoint.php`, `public/js/beacon-core.ts`,
+`public/js/lib/rec-engine-client.ts`,
+`tests/Integration/Fixtures/mock-rec-engine/router.php` (added `sku` to the
+`last_browse_events` projection), `tests/Unit/REST/BeaconEndpointTest.php`,
+`tests/Integration/RecEngineBrowseProxyTest.php`,
+`public/js/beacon-core.test.ts`, `public/js/lib/rec-engine-client.test.ts`.)
+
+Prior: 2026-07-17 (**PRO-1341 — v3.7.0 RELEASED.** Full local
 build/verify/release sequence run end-to-end after the version bump (below):
 `npm run build:admin && npm run build:client` (confirms the client entry name
 is `dist/public/js/sc-runtime.js`, not `beacon.js`); blocks built

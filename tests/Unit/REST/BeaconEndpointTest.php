@@ -51,6 +51,25 @@ final class BeaconEndpointTest extends TestCase {
 		);
 	}
 
+	public function test_product_id_is_dropped_by_the_whitelist(): void {
+		// product_id (PRO-1390) is a proxy-internal field resolve_cart_product_skus()
+		// consumes BEFORE validate_batch runs; it must never reach the engine even
+		// if a hand-crafted request still carries it at this point.
+		$result = BeaconEndpoint::validate_batch(
+			array(
+				array(
+					'event_id'   => 'e1',
+					'event_type' => 'cart_add',
+					'sku'        => 'woo-42',
+					'product_id' => '42',
+				),
+			)
+		);
+
+		self::assertTrue( $result['valid'] );
+		self::assertArrayNotHasKey( 'product_id', $result['events'][0] );
+	}
+
 	public function test_all_nine_event_types_are_accepted(): void {
 		foreach ( BeaconEndpoint::EVENT_TYPES as $type ) {
 			$result = BeaconEndpoint::validate_batch(

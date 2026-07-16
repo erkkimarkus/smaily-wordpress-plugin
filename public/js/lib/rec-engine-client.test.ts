@@ -163,6 +163,17 @@ describe('RecEngineClient (3.4.1 transport)', () => {
     expect(event).not.toHaveProperty('smaily_visitor_token');
   });
 
+  it('carries product_id through to the wire when present (cart events — sku resolved server-side, PRO-1390)', async () => {
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'cart_add', product_id: '42' });
+
+    await client.flush();
+    const event = lastFetchBody(fetchMock).events[0];
+    expect(event).toBeDefined();
+    expect(event?.product_id).toBe('42');
+    expect(event).not.toHaveProperty('sku');
+  });
+
   it('never puts rec_id / ctx / email on a browse event (data-minimization — attribution rides orders)', async () => {
     document.cookie = 'smaily_rec_uid=vt-abc';
     document.cookie = 'smaily_rec_id=rec-1';
