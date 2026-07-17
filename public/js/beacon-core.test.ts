@@ -4,7 +4,9 @@ import type { RecEngineClientConfig } from './lib/rec-engine-client';
 
 /**
  * 3.4.3a: consent resolution, page-type → §6 event mapping, and init() wiring
- * (ensureSession + captureUrlParams + page-view track), all gated on consent.
+ * (ensureSession + page-view track, gated on consent). captureUrlParams
+ * (attribution-cookie capture) is consent-INDEPENDENT since PRO-1388 — it
+ * runs unconditionally at init.
  */
 
 const CONFIG: RecEngineClientConfig = {
@@ -143,6 +145,21 @@ describe('beacon-core: init', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
+  it('captures campaign URL params on init even without consent (PRO-1388), but sends nothing', async () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt9&keep=1');
+    window.smailyConnectBeacon = makeBoot({ consentOverride: () => false, context: { pageType: 'other' } });
+
+    const client = init();
+
+    // Attribution cookie written and URL stripped despite no consent.
+    expect(document.cookie).toContain('smaily_rec_uid=vt9');
+    expect(window.location.search).toBe('?keep=1');
+    // No session cookie, no send.
+    expect(document.cookie).not.toContain('smaily_anon_sid');
+    await client?.flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('tracks nothing without consent', async () => {
     window.smailyConnectBeacon = makeBoot({ consentOverride: () => false });
     const client = init();
@@ -168,6 +185,25 @@ describe('beacon-core: init', () => {
     await client?.flush();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(lastEvents(fetchMock)[0]).toMatchObject({ event_type: 'product_view' });
+  });
+
+  it('a token captured pre-consent from the URL rides later events once consent is granted (PRO-1388)', async () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt-preconsent');
+    let consent = false;
+    window.smailyConnectBeacon = makeBoot({ consentOverride: () => consent, context: { pageType: 'other' } });
+    const client = init();
+
+    // Captured immediately, before any consent — no send yet.
+    expect(document.cookie).toContain('smaily_rec_uid=vt-preconsent');
+    await client?.flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // Consent granted later; a cart event now carries the pre-consent token.
+    consent = true;
+    document.dispatchEvent(new Event('wp_listen_for_consent_change'));
+    client?.track({ event_type: 'cart_add', product_id: '1' });
+    await client?.flush();
+    expect(lastEvents(fetchMock)[0]).toMatchObject({ smaily_visitor_token: 'vt-preconsent' });
   });
 
 });

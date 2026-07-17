@@ -293,13 +293,28 @@ describe('RecEngineClient (3.4.2 cookies + URL-param capture)', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('does not capture or strip without consent (so a post-consent re-run still works)', () => {
+  it('captures and strips even without consent (PRO-1388: attribution is consent-independent)', () => {
     window.history.replaceState({}, '', '/landing?smaily_vt=vt1');
     client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
 
-    expect(client.captureUrlParams()).toBe(false);
-    expect(document.cookie).not.toContain('smaily_rec_uid');
-    expect(window.location.search).toBe('?smaily_vt=vt1'); // left intact for a re-run
+    expect(client.captureUrlParams()).toBe(true);
+    expect(document.cookie).toContain('smaily_rec_uid=vt1');
+    expect(window.location.search).toBe('');
+  });
+
+  it('captureUrlParams without consent writes no session cookie and sends nothing', async () => {
+    const fetchMock = makeFetchMock();
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt1');
+    client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
+
+    client.captureUrlParams();
+
+    expect(document.cookie).not.toContain('smaily_anon_sid');
+    client.track({ event_type: 'product_view', sku: 'A' });
+    await client.flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it('ensureSession generates a v4 session cookie when absent and reuses it', () => {
