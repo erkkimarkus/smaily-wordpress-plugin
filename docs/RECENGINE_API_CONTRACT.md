@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.4
+# Smaily Recommendation Engine — API Contract v1.5
 
-**Version**: 1.4.1
+**Version**: 1.5.0
 **Published**: 2026-05-19
-**Last updated**: 2026-07-12 (v1.4.1 — `tags.product_id` example + live cross-variant grouping consumption documented + explicit Magento product-identity rule; PATCH bump per the versioning rule: documentation-only, no wire/schema change — PRO-1228 / PRO-1267)
+**Last updated**: 2026-07-17 (v1.5.0 — new endpoint §14 `POST /api/v1/notifications/ingest`, the external HTTP ingest path for Notifications 2.0; MINOR bump per the versioning rule: new endpoint, backward-compatible — PRO-1438 / PRO-1444)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -30,7 +30,7 @@ Why not git submodule or a separate contracts repo right now: manual byte-sync h
 
 This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `RECENGINE_API_ROUND2.md`) into a clean REST API specification. It is platform-agnostic — the same contract serves WooCommerce, Shopify, Magento, PrestaShop, custom stores, and Make-flow integrations.
 
-**WordPress-specific notes** (Action Scheduler, HPOS, hooks, REST endpoint patterns) live in a separate document, `PLUGIN_IMPLEMENTATION_WP.md`.
+**WordPress-specific notes** (Action Scheduler, HPOS, hooks, REST endpoint patterns) live in a separate document, `docs/archive/spec/PLUGIN_IMPLEMENTATION_WP.md` (archived).
 
 ---
 
@@ -58,6 +58,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [GET /api/v1/automations/catalog](#11-get-apiv1automationscatalog)
    - [GET /api/v1/automations/config](#12-get-apiv1automationsconfig)
    - [PUT /api/v1/automations/config](#13-put-apiv1automationsconfig)
+   - [POST /api/v1/notifications/ingest](#14-post-apiv1notificationsingest)
 9. [Appendices](#appendices)
 
 ---
@@ -265,6 +266,7 @@ HTTP 400 Bad Request
 | `/api/v1/ingest/orders` | 100 requests | per 1 second |
 | `/api/v1/identity/merge` | 100 requests | per 1 second |
 | `/api/v1/automations/...` | 100 requests | per 1 second |
+| `/api/v1/notifications/ingest` | 100 requests | per 1 second |
 | `/api/v1/customer/...` (GDPR) | 10 requests | per 60 seconds |
 | `/api/setup/exchange` | 10 requests | per 60 seconds (per IP) |
 
@@ -429,7 +431,8 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
     "recommendations_preview": "https://intelligence.smaily.com/api/v1/recommendations/preview",
     "recommendations_issue":   "https://intelligence.smaily.com/api/v1/recommendations/issue",
     "automations_catalog":     "https://intelligence.smaily.com/api/v1/automations/catalog",
-    "automations_config":      "https://intelligence.smaily.com/api/v1/automations/config"
+    "automations_config":      "https://intelligence.smaily.com/api/v1/automations/config",
+    "notifications_ingest":    "https://intelligence.smaily.com/api/v1/notifications/ingest"
   },
   "config": {
     "tracking_cookie_name": "smaily_rec_uid",
@@ -1624,6 +1627,147 @@ curl -X PUT https://intelligence.smaily.com/api/v1/automations/config \
 
 ---
 
+### 14. POST /api/v1/notifications/ingest
+
+External producer entry point for Notifications 2.0 (PRO-1438). Lets an
+authenticated caller — a Connect plugin, Smaily core, or any future service —
+push notification events into the merchant's console notification drawer
+(badge, "all caught up" state, dismissible cards). This is a **generic
+event-ingest contract**: which `type` values a given caller may actually fire
+is controlled by an engine-side registry, not by this endpoint's shape (see
+below).
+
+**URL**: `POST /api/v1/notifications/ingest`
+
+**Auth**: `Authorization: Bearer sk_...`
+
+**Rate limit**: 100 req/sec (same tier as catalog/customers/orders — see [Rate limiting](#rate-limiting))
+
+**Request body**:
+```json
+{
+  "events": [
+    {
+      "type": "job.plugin_backfill_done",
+      "severity": "info",
+      "dedupe_key": "backfill-42",
+      "title": "Backfill finished",
+      "body": "4200 orders imported",
+      "payload": { "count": 4200 },
+      "occurred_at": "2026-07-17T09:00:00Z"
+    }
+  ]
+}
+```
+
+**Field reference**:
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `type` | string | YES | Registry key — must already exist in the engine's `notification_types` table with `source_kind` of `external` or `both`. Registering a new type is an engine-side ops task, not something this endpoint does at runtime. |
+| `severity` | enum | YES | `info` \| `warning` \| `error` |
+| `dedupe_key` | string | YES | The re-fire/idempotency unit for this `(tenant, type)` — see Idempotency below |
+| `title` | string | YES | Shown in the drawer card |
+| `body` | string | YES | Shown in the drawer card |
+| `payload` | object | NO | Free-form (counts, job stats, an action spec). Defaults to `{}` |
+| `occurred_at` | ISO 8601 | YES | When the producer says this happened |
+
+Wrapper is **all-or-nothing**: `events` must be an array of 1..50 items — a
+non-array / empty / >50 request → `400 validation_failed`. Individual events
+within a valid wrapper are validated **independently (D6)** — one malformed
+event does not reject the rest of the batch.
+
+**What the caller does NOT control.** `tenant_id` and `audience` are never
+read from the request body, even if present — the engine silently ignores
+them:
+- `tenant_id` is always the tenant that the bearer API key authenticates as. A
+  caller can never address another tenant.
+- `audience` is always forced to `merchant` server-side. An external caller
+  can never create an operator/system-wide notification.
+- `source` (shown nowhere on the wire, but recorded internally for
+  attribution) is derived from the authenticating connection, not sent by the
+  caller: `external:<connection label>` (the label set when the API key was
+  issued), or `external:unlabeled` if the connection has no label.
+
+**Response 200 OK**:
+```json
+{
+  "ok": true,
+  "processed": 1,
+  "errors": []
+}
+```
+
+**Per-item errors (D6, not all-or-nothing)** — each rejected event goes to
+`errors[]`; valid events in the same batch still process:
+```json
+{
+  "ok": true,
+  "processed": 0,
+  "errors": [
+    {
+      "index": 0,
+      "field": "type",
+      "message": "Type 'insight.win_back' is not externally-fireable",
+      "error_type": "type_not_externally_allowed",
+      "status": 403
+    }
+  ]
+}
+```
+
+`errors[]` items carry `error_type` + `status` (in addition to the usual
+`index`/`field`/`message`) so a caller can distinguish the failure class
+without string-matching `message`:
+
+| `error_type` | `status` | Meaning |
+|---|---|---|
+| `validation_failed` | 400 | The event didn't match the field reference above (missing/malformed field). |
+| `unknown_notification_type` | 400 | `type` is not registered in `notification_types` at all. |
+| `type_not_externally_allowed` | 403 | `type` is registered, but its `source_kind` is `internal` — reserved for the engine's own crons/evaluators. |
+| `ingest_failed` | 500 | The event passed validation and the registry gate but the write itself failed (rare — a DB-level failure). |
+
+**Unknown/disallowed `type` policy is fail-closed, by design:** a caller can
+never spontaneously create UI-affecting notification chrome just by sending
+an unrecognized `type` — accept-with-default-config was considered and
+rejected. Registering a new externally-fireable type (`source_kind:
+'external'` or `'both'`) is an engine-side ops/SQL task, done once per
+integration need.
+
+**Idempotency**: **upsert-on-open-dedupe** — a caller may safely retry or
+periodically re-send the same `(type, dedupe_key)` for its tenant (e.g.
+"backfill job N is still running" → "backfill job N finished") without
+spawning duplicate drawer entries. If a matching notification is still open
+(undismissed), its `title`/`body`/`payload`/`severity`/`occurred_at` are
+updated **in place** rather than superseded; if none is open, a fresh one is
+inserted. This is deliberately different from the natural-key-UPSERT Layer 1
+/ `event_id` Layer 2 idempotency used by the bulk ingest endpoints
+([Idempotency](#idempotency)) — a notification is a **fired instance**, not a
+stored business record, so "send it again" means "refresh the still-open
+instance," not "create a new one every time."
+
+**Curl example**:
+```bash
+curl -X POST https://intelligence.smaily.com/api/v1/notifications/ingest \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "type": "job.plugin_backfill_done",
+        "severity": "info",
+        "dedupe_key": "backfill-42",
+        "title": "Backfill finished",
+        "body": "4200 orders imported",
+        "payload": {"count": 4200},
+        "occurred_at": "2026-07-17T09:00:00Z"
+      }
+    ]
+  }'
+```
+
+---
+
 ## Appendices
 
 ### Appendix A: Pagination (future)
@@ -1814,6 +1958,14 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 **v1.4.1** (2026-07-12) — **`tags.product_id` example + live consumption, and Magento product-identity rule**. PATCH bump per the [Versioning](#versioning) rule (documentation-only; no new endpoint and no new wire field — `tags.product_id` was already introduced optional in v1.3.0, and `tags` is free-form). PRO-1228 / PRO-1267:
 - **§3 `tags` example gains `product_id`**, and the identity bullet now states cross-variant grouping is **live**: the engine groups catalog variants sharing `tags.product_id` into a product family for cross-variant cadence + `sample_to_full` (PRO-1227, engine commit `d668108`; was documented as "future" in v1.3.0). `sku` stays the variant key, `external_id` the variant id. Shopify (`9a6ca9f`) and Woo now emit `tags.product_id`; Magento follows with its canonical-key work.
 - **§3 Product identity gains an explicit Magento rule** — Magento's catalog `sku` field *is* the platform-canonical key (Magento enforces SKU mandatory + store-unique); `mag-<entity_id>` is a fallback only when the SKU field is empty. Clarified that the "never the merchant SKU field" rule is Shopify/Woo-specific. Order lines read `getSku()`; the fallback must be applied identically on catalog + order lines for an empty-SKU product (Magento Connect follow-up, PRO-1267).
+
+**v1.5.0** (2026-07-17) — **`POST /api/v1/notifications/ingest` (Notifications 2.0 external HTTP ingest)**. MINOR bump per the [Versioning](#versioning) rule (new endpoint; backward-compatible — nothing existing changed shape). PRO-1438, contract locked PRO-1444 (2026-07-17):
+- **New endpoint [§14](#14-post-apiv1notificationsingest)** — lets an authenticated caller (Connect plugin, Smaily core, any future service) push notification events into the merchant's console notification drawer. Same bearer auth as every other ingest endpoint (`tenant_api_keys`), same 100 req/sec tier, `{events: [...]}` wrapper (1..50, all-or-nothing) with D6 per-item `errors[]` inside.
+- **Registry-gated, fail-closed**: a `type` must already exist in the engine's `notification_types` table with `source_kind` `external`/`both` — unknown type → per-item `400 unknown_notification_type`; a registered-but-internal-only type → per-item `403 type_not_externally_allowed`. No accept-with-default-config path. Registering a new externally-fireable type is an engine-side ops/SQL task.
+- **`tenant_id` and `audience` are never read from the body** — always the authenticated tenant, always forced to `merchant`. An external caller can never address another tenant or create an operator/system-wide notification.
+- **Idempotency is upsert-on-open-dedupe**, not the Layer 1/Layer 2 scheme used by the bulk ingest endpoints ([Idempotency](#idempotency)): resending the same `(type, dedupe_key)` for a tenant updates the still-open notification in place instead of creating a duplicate drawer entry.
+- **Setup-exchange endpoints map gains `notifications_ingest`** (§1) — existing connections whose exchange-time map predates this key fall back to the plugin's own path constants, same "map age" behavior as every prior additive key.
+- No consumer calls this yet (no plugin/Smaily-core caller exists at lock time) — documented ahead of any integration so the contract, not a specific caller's behavior, is the source of truth from day one.
 
 ---
 

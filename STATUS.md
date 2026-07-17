@@ -26,7 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1388 — browser-side attribution capture made
+_Last updated: 2026-07-17 (**PRO-1447 — contract re-synced byte-identical to
+v1.5.0 (engine `3316261`, md5 `5c2aafa8…`).** Doc-only delta since our
+`945b7ad`/v1.4.1 sync: MINOR bump (PRO-1438 Phase 2) adds §14 `POST
+/api/v1/notifications/ingest` — the external HTTP ingest path for
+Notifications 2.0 (Connect plugin / Smaily core / future services push
+events into the merchant console notification drawer), plus the matching
+TOC entry, rate-limit table row, and a new `notifications_ingest` key on the
+setup-exchange endpoints map. CC-8 conformance verified: purely **additive**
+— no existing wrapper key, required field, enum, or field was removed or
+changed shape; confirmed via `diff` against the prior copy before syncing.
+No plugin code or mock change made or needed — §14 has no caller yet (no
+plugin/Smaily-core producer exists at lock time per the engine's own
+changelog entry); this is a "documented ahead of any integration" sync.
+Gates: `bash bin/check-contract-staleness.sh` green (`OK: … byte-identical
+with engine main … engine commit 331626188a47b841bb4321aa511d8037baa838e2`).
+Prior:
+**PRO-1388 — browser-side attribution capture made
 consent-INDEPENDENT.** Follow-up to the same-day audit below: a live probe of
 a `?smaily_vt=...` MiuMjau landing showed no `Set-Cookie` at all, because
 MiuMjau serves storefront pages from a full-page cache — PHP (and
