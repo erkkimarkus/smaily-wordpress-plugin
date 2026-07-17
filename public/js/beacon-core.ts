@@ -5,8 +5,9 @@
  * The PHP side (StorefrontBeacon) enqueues the `beacon.ts` ENTRY (which just
  * calls init() from here) and prints `window.smailyConnectBeacon =
  * { config, context, consent }` just before it. This module wires consent
- * against the WP Consent API, then on consent: ensures the anon-session
- * cookie, captures any campaign URL params, and fires the page-view event.
+ * against the WP Consent API. Campaign URL-param (attribution) capture runs
+ * unconditionally at init, regardless of consent (PRO-1388); on consent it
+ * additionally ensures the anon-session cookie and fires the page-view event.
  *
  * Kept separate from the entry so it exports only functions for vitest; the
  * entry (beacon.ts) holds the auto-boot side effect, so the built bundle has
@@ -162,6 +163,12 @@ export function init(): RecEngineClient | null {
     consentChecker: (): boolean => detectConsent(boot),
   });
 
+  // Attribution-cookie capture (visitor/rec/ctx) runs unconditionally, before
+  // consent is resolved (PRO-1388) — it writes no session cookie and sends
+  // nothing, so it is safe consent-independent; see the doc comment on
+  // RecEngineClient.captureUrlParams for why (full-page caches skip PHP).
+  client.captureUrlParams();
+
   let started = false;
   const start = (): void => {
     if (started || !detectConsent(boot)) {
@@ -169,7 +176,6 @@ export function init(): RecEngineClient | null {
     }
     started = true;
     client.ensureSession();
-    client.captureUrlParams();
     const evt = pageViewEvent(boot.context.pageType);
     if (evt !== null) {
       client.track(buildPageEvent(evt, boot.context));

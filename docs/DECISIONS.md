@@ -3271,7 +3271,7 @@ merchant-facing docs site.
 placeholder list was already resolved 2026-07-12 (engine team answer). Ported
 to `docs/site/index.html` (EN+ET) in the same commit as this entry.
 
-### PRO-1388 — `smaily_vt` capture-timing race: already closed by the existing server-side landing capture (F3-46)
+### PRO-1388 — `smaily_vt` capture-timing race: server-side capture existed (F3-46); browser-side capture made consent-independent too (2026-07-17 update)
 
 **Context:** the engine team flagged (PRO-1382, prod-verified against
 MiuMjau) that `beacon-core.ts`'s `init()`/`captureUrlParams()` is
@@ -3309,25 +3309,46 @@ visitor cookie when present'`. **No plugin code change was required** —
 Erkki's decision was already implemented as part of F3-46's broader
 attribution capture, before this specific race had a name.
 
-**Open, not resolved by this audit:** why MiuMjau's measured 373→7
-conversion is still that low given the fix has been live since v3.1.0.
-Two possibilities, neither confirmable from this repo: (a) the PRO-1382
-metric is cumulative over the whole pilot and dominated by traffic from
-before MiuMjau ran a ≥v3.1.0 build; (b) something else is wrong — e.g. the
-engine's own link-builder not actually appending `smaily_vt`, or a
-MiuMjau-side cache serving the landing page without executing
-`template_redirect`. Handed back to the engine team / Erkki rather than
-guessed at (see the PRO-1388 Linear comment).
+**Open question RESOLVED 2026-07-17:** why MiuMjau's measured 373→7
+conversion stayed low despite the fix being live since v3.1.0. Of the two
+possibilities named in the original audit, (b) is confirmed: a live probe of
+a `?smaily_vt=…` landing on MiuMjau returned no `Set-Cookie` at all — the
+store serves that page from a full-page cache, so `template_redirect` (and
+`LandingCapture`) never ran on the request. See the decision below.
 
-**JS side left unchanged:** `captureUrlParams()` in `beacon-core.ts` /
-`rec-engine-client.ts` stays — a harmless duplicate best-effort capture when
-consent happens to already be granted at landing. It writes the exact same
-cookie name/value/TTL `LandingCapture` would, so there is redundancy, not a
-conflict.
+**JS side originally left unchanged, then revised same-day:** at first
+`captureUrlParams()` in `beacon-core.ts` / `rec-engine-client.ts` was kept as
+a harmless duplicate best-effort capture, gated on consent like the rest of
+the beacon. Live-probing the open question above (why MiuMjau's 373→7 stayed
+low despite the server-side fix being live since v3.1.0) found the answer:
+**MiuMjau serves storefront pages from a full-page cache**, so on most
+landing hits PHP never runs at all — `template_redirect` doesn't fire,
+`LandingCapture` never executes, and the consent-gated JS capture was the
+only thing that could still see the URL param, but it was waiting on a
+consent decision the visitor might make on a different page (or never). A
+live probe of a `?smaily_vt=…` landing on MiuMjau confirmed no `Set-Cookie`
+at all.
 
-**Relationships:** extends F3-46 (server-side landing capture) and F3-49
-(browse events carry `smaily_visitor_token` for cold-start, not
-attribution) — supersedes neither.
+**Decision (Erkki, 2026-07-17, evolves the decision above):** make the
+browser-side URL-param → attribution-cookie promotion consent-INDEPENDENT
+too — the same class of write `LandingCapture` already does server-side.
+`RecEngineClient.captureUrlParams()` (visitor/rec_id/context cookies from
+`smaily_vt`/`smaily_rec`/`smaily_ctx`) now runs unconditionally, and
+`beacon-core.ts`'s `init()` calls it before consent is resolved rather than
+inside the consent-gated `start()`. Scope is deliberately narrow: this method
+writes ONLY the three attribution cookies and never creates the anonymous
+SESSION cookie and never sends anything — `ensureSession()`, `track()`,
+`flush()`, and cart-listener attachment stay exactly as consent-gated as
+before. Rationale: a full-page cache is not a MiuMjau-only risk (any cached
+storefront is exposed the same way), and the attribution cookies are the same
+first-party, non-PII class F3-46 already decided is consent-independent —
+extending that decision to the browser closes the last gap in the same
+reasoning rather than opening a new one. `LandingCapture` stays as-is
+(defense in depth for JS-disabled visitors on a cache-miss hit).
+
+**Relationships:** extends F3-46 (server-side landing capture, now mirrored
+browser-side) and F3-49 (browse events carry `smaily_visitor_token` for
+cold-start, not attribution) — supersedes neither.
 
 ## How to keep this document going
 

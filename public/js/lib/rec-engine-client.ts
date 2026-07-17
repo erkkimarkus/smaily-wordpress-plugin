@@ -240,14 +240,17 @@ export class RecEngineClient {
    * URL is stripped. Stripping first would lose the attribution silently if a
    * cookie write threw. The replaceState runs once, after all saves.
    *
-   * Consent-gated: with no consent nothing is captured and the URL is left
-   * intact, so a re-run after the visitor accepts consent can still capture.
+   * Consent-INDEPENDENT (PRO-1388): these are first-party attribution
+   * cookies — the same class `LandingCapture` already writes server-side
+   * unconditionally (F3-46). The browser-side capture needs the same
+   * independence because a full-page cache can serve the landing hit without
+   * ever executing PHP, so `LandingCapture` never runs on that request. This
+   * method writes ONLY the attribution cookies (visitor/rec/ctx) — it creates
+   * no session cookie and sends nothing; the anonymous session and every
+   * event send stay fully consent-gated (see ensureSession / track / flush).
    */
   public captureUrlParams(): boolean {
     if (typeof window === 'undefined' || typeof document === 'undefined' || !window.location) {
-      return false;
-    }
-    if (!this.hasConsent()) {
       return false;
     }
 

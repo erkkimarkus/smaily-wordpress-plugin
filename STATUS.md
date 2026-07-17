@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1388 — AUDITED, no code change needed:
+_Last updated: 2026-07-17 (**PRO-1388 — browser-side attribution capture made
+consent-INDEPENDENT.** Follow-up to the same-day audit below: a live probe of
+a `?smaily_vt=...` MiuMjau landing showed no `Set-Cookie` at all, because
+MiuMjau serves storefront pages from a full-page cache — PHP (and
+`LandingCapture`) never runs on most landing hits, so the server-side fix
+audited earlier today doesn't reach those requests. `RecEngineClient.
+captureUrlParams()` (`public/js/lib/rec-engine-client.ts`) no longer gates on
+consent — it now runs unconditionally, called from `beacon-core.ts`'s
+`init()` BEFORE consent is resolved. Scope stayed narrow: this method writes
+only the three attribution cookies (visitor/rec_id/context) and never creates
+the anonymous session cookie or sends anything — `ensureSession()`,
+`track()`/`flush()`, and cart-listener attachment are unchanged and remain
+fully consent-gated. `LandingCapture` (F3-46) is untouched — it stays as
+defense-in-depth for JS-disabled visitors on a cache-miss hit. New vitest
+cases: capture-without-consent still writes the cookie + strips the URL
+(`rec-engine-client.test.ts`), and end-to-end through `init()` — captured
+pre-consent with no session/send, then a later consent grant sends an event
+carrying the pre-consent `smaily_visitor_token` (`beacon-core.test.ts`). Full
+decision + rationale in `docs/DECISIONS.md` PRO-1388 (updated in the same
+commit); merchant docs site (`docs/site/index.html`, EN+ET) tweaked — the
+Campaign Intelligence attribution bullet no longer claims "server-side" as
+the sole mechanism. `ci:strict` green (JS-only diff; no PHP touched, so
+`test:integration` not re-run).
+
+Prior: 2026-07-17 (**PRO-1388 — AUDITED, no code change needed:
 the `smaily_vt` capture-timing race is already closed.** The engine team
 (PRO-1382) reported that `beacon-core.ts`'s client-side, consent-gated
 `captureUrlParams()` loses the `?smaily_vt=...` param when a visitor decides
@@ -42,10 +66,8 @@ already writes `smaily_vt` into the `smaily_rec_uid` cookie on
 when consent was granted. Existing tests already cover exactly this
 scenario (`LandingCaptureTest::test_captures_full_link_into_config_named_cookies`,
 `rec-engine-client.test.ts`'s `'carries smaily_visitor_token from the
-visitor cookie when present'`). No plugin diff — see `docs/DECISIONS.md`
-PRO-1388 for the full audit + the open question (why MiuMjau's measured
-conversion is still low despite the fix having been live since v3.1.0 —
-handed back to the engine team/Erkki, not resolvable from this repo).
+visitor cookie when present'`). No plugin diff — superseded same day by the
+entry above once the "open question" was live-probed and answered.
 `ci:strict` / integration not re-run (no code touched).
 
 Prior: 2026-07-17 (**PRO-1341 — v3.7.1 RELEASED.** Full local
