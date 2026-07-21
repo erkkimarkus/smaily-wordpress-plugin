@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1389 — ongoing-session browse identity:
+_Last updated: 2026-07-21 (**PRO-1197 — docs currency refresh: ARCHITECTURE.md
+/ API.md brought current with everything that landed since the 2026-07-13
+DEVELOPER.md touch-up** (`git log 700d870..HEAD`). No rewrite — a targeted
+pass fixing every claim the delta made stale, per Erkki's scope correction
+(the three docs already exist; FAQ/TROUBLESHOOTING stays deliberately
+deferred, untouched). Changes: ARCHITECTURE.md §4 "Storefront pieces" —
+point 1 (browse beacon) now notes `cart_add`/`cart_remove` resolve their sku
+server-side via `Support\SkuResolver` from a proxy-internal `product_id`
+(PRO-1390, closing the raw-merchant-SKU collision gap); point 2 (attribution
+capture) now describes BOTH the pre-existing server-side `LandingCapture` AND
+the browser-side `RecEngineClient.captureUrlParams()` added consent-
+independently by PRO-1388 (the MiuMjau full-page-cache case where PHP never
+runs on a landing hit); point 3 (identity merge) now covers BOTH the
+pre-existing `wp_login` `/identity/merge` call AND the PRO-1389 ongoing-
+session server-side `customer_email` injection in `BeaconEndpoint`. API.md
+§1.1's `/relay` defense-layer list reordered/expanded to match the real code
+path (PRO-1446's batch-cap-before-resolve ordering, PRO-1390's cart-sku
+resolution step, PRO-1389's identity-injection step before the profiling
+gate); §4's consent-order paragraph now notes `captureUrlParams()` runs
+before consent resolution; §6's contract pointer now names the v1.5.0 §14
+notifications-ingest addition (PRO-1447, no plugin caller yet). DEVELOPER.md
+reviewed against the same delta — no edit needed (only a version bump touched
+build/test/release-relevant files in the window). `docs/INDEX.md` rows +
+"Last reviewed" note updated to record the refresh. Verified every touched
+claim against the actual code (`BeaconEndpoint.php`, `beacon-core.ts`,
+`rec-engine-client.ts`, `StorefrontBeacon.php`), not just the commit messages.
+`ci:strict` exit=0 (docs-only change; no code touched). Files:
+`docs/ARCHITECTURE.md`, `docs/API.md`, `docs/INDEX.md`, `STATUS.md`.)
+
+Prior: 2026-07-21 (**PRO-1389 — ongoing-session browse identity:
 server-side email injection in the `/relay` proxy** (design approved by
 Erkki 2026-07-21). `IdentityHookHandler` only binds identity on `wp_login`,
 so a customer who stays logged in browsing forever never got identity

@@ -51,13 +51,28 @@ storefront visitors post browse events). Defense layers, in order:
    exist — deliberate, F3-41).
 2. **Rate limits** (transient counters, 60 s window): 30 events/session,
    120/IP — filterable (§2); over-limit → 429 `rate_limited`.
-3. **Batch cap**: max 100 events per request.
-4. **Event-type whitelist** (9 types): `product_view`, `category_view`,
+3. **Batch-size cap**: empty or >100-event batch → 400 `invalid_events`,
+   gated *before* any per-event WP/DB work (PRO-1446 — the cap must reject an
+   oversized, attacker-controlled batch before the next step's per-event
+   `wc_get_product()` lookups run).
+4. **Cart-event sku resolution**: `cart_add`/`cart_remove` carry a
+   proxy-internal `product_id` (the WC platform id); resolved server-side to
+   the canonical `woo-<id>` sku via `Support\SkuResolver` (PRO-1390) before the
+   whitelist below strips `product_id` itself. An id that doesn't resolve to a
+   loadable product drops `sku` rather than forwarding a guess (logged once
+   per batch).
+5. **Event-type whitelist** (9 types): `product_view`, `category_view`,
    `search`, `cart_add`, `cart_remove`, `wishlist_add`, `wishlist_remove`,
-   `checkout_start`, `checkout_complete`.
-5. **Per-event field whitelist** to the contract §6 shape; unknown keys dropped.
-6. **Profiling gate**: events from a known contact who opted out of profiling
-   are dropped server-side (`Privacy\ProfilingConsent`).
+   `checkout_start`, `checkout_complete`; plus a **per-event field whitelist**
+   to the contract §6 shape (unknown keys, incl. `product_id`, dropped).
+6. **Logged-in identity injection** (PRO-1389): for an ongoing logged-in
+   session — verified via the real WP `logged_in` auth cookie, not a REST
+   nonce — attach `customer_email` to every event in the batch, gated by the
+   same profiling check as the next step. The client itself never sends
+   `customer_email` (F3-49); this is the one sanctioned server-side exception.
+7. **Profiling gate**: events carrying a known contact's email who opted out
+   of profiling are dropped server-side (`Privacy\ProfilingConsent`); reuses
+   step 6's decision when the email matches instead of re-checking per event.
 
 The route is named `/relay` (and the script `sc-runtime.js`) because "beacon"
 is on ad-block filter lists — do not rename (F3-41).
@@ -127,10 +142,14 @@ window.smailyConnectBeacon = {
 
 Consent resolution order (`beacon-core.ts`): `window.wp_has_consent(category)`
 if the WP Consent API is present → `consentOverride()` if defined → **fail
-closed** (no events, no error). Cookie and URL-param names come from the
-engine config at connect time — treat the defaults (`smaily_rec_uid`,
-`smaily_anon_sid`, `smaily_rec_id`, `smaily_rec_ctx`; `smaily_vt`,
-`smaily_rec`, `smaily_ctx`) as fallbacks, not constants.
+closed** (no events, no error). This gates only event SENDING — since PRO-1388,
+`init()` calls `RecEngineClient.captureUrlParams()` (the attribution cookie
+capture, see [`ARCHITECTURE.md` §4.2](ARCHITECTURE.md#4-storefront-pieces))
+unconditionally, before consent is resolved; it writes only the three
+attribution cookies and never sends anything. Cookie and URL-param names come
+from the engine config at connect time — treat the defaults
+(`smaily_rec_uid`, `smaily_anon_sid`, `smaily_rec_id`, `smaily_rec_ctx`;
+`smaily_vt`, `smaily_rec`, `smaily_ctx`) as fallbacks, not constants.
 
 The React admin bundle additionally expects `window.wp.i18n` (enqueued with a
 `wp-i18n` dependency; see [`ARCHITECTURE.md` §9](ARCHITECTURE.md#9-i18n-architecture)).
@@ -151,6 +170,7 @@ The React admin bundle additionally expects `window.wp.i18n` (enqueued with a
 - **Rec-engine**: everything through `Smaily\RecEngine\Client`, URLs resolved
   from the stored per-connection endpoints map (with `PATH_*` constant
   fallbacks). Wire shapes, D6 error contract, §3b remove, browse §6, identity
-  §7, GDPR §8–§10, automations §11–§13: [`RECENGINE_API_CONTRACT.md`](RECENGINE_API_CONTRACT.md).
+  §7, GDPR §8–§10, automations §11–§13, notifications ingest §14 (v1.5.0,
+  PRO-1447 — no plugin caller yet): [`RECENGINE_API_CONTRACT.md`](RECENGINE_API_CONTRACT.md).
 - **Smaily contact API**: `Smaily\Client` (HTTP Basic, subdomain credentials);
   field naming per [`FIELD_MAPPING.md`](FIELD_MAPPING.md).

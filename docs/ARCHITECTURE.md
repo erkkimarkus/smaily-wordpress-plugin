@@ -127,18 +127,40 @@ Three separate mechanisms — do not conflate them (F3-46/F3-49):
    — public route, but hard-gated: 404 unless connected + browse tracking on;
    event-type + field whitelists; transient rate limits). The browser-visible
    names are deliberately neutral (`sc-runtime`, `relay`) because "beacon"
-   is on ad-block filter lists (F3-41). Events carry `session_id` and the
-   opaque `smaily_visitor_token` (cold-start personalization) — deliberately
-   NOT `smaily_rec_id`/email (data minimization, F3-49).
-2. **Attribution capture** — `Integrations\WooCommerce\LandingCapture`
-   (server-side, `template_redirect`) writes the rec-attribution URL params
-   (`smaily_rec`/`smaily_vt`/`smaily_ctx`, or guarded `utm_content`) into
-   first-party cookies (`smaily_rec_id`, `smaily_rec_uid`, `smaily_rec_ctx`);
-   checkout stamps them onto the order. **Consent-UNgated** by design (F3-46)
-   — first-party functional signal, independent of the beacon toggle.
-3. **Identity merge** — `Integrations\WooCommerce\IdentityHookHandler` on
-   `wp_login` calls the engine's `/identity/merge` (§7) to bind anonymous
-   browse sessions to the logged-in customer (F3-27).
+   is on ad-block filter lists (F3-41). The client carries `session_id` and
+   the opaque `smaily_visitor_token` (cold-start personalization) — deliberately
+   NOT `smaily_rec_id`/email (data minimization, F3-49); `cart_add`/`cart_remove`
+   send a proxy-internal `product_id` that `BeaconEndpoint` resolves server-side
+   to the canonical `woo-<id>` sku via `Support\SkuResolver` before forwarding
+   (PRO-1390 — the JS cart listener used to read WooCommerce's raw merchant-SKU
+   markup attribute, the same collision class SkuResolver exists to avoid).
+2. **Attribution capture** — two consent-independent paths write the SAME
+   first-party cookies (`smaily_rec_id`, `smaily_rec_uid`, `smaily_rec_ctx`):
+   server-side `Integrations\WooCommerce\LandingCapture` (`template_redirect`,
+   F3-46) and, since PRO-1388, browser-side
+   `RecEngineClient.captureUrlParams()` (called from `beacon-core.ts`'s
+   `init()` *before* consent is resolved). The browser path exists because a
+   full-page cache (confirmed on MiuMjau) serves most landing hits without
+   ever running PHP, so `LandingCapture` never fires there — `captureUrlParams()`
+   is the only thing left that can see the URL param; it writes only those
+   three cookies and never sends anything, so it's safe to run consent-
+   independently. Checkout stamps the cookies onto the order either way.
+   **Consent-UNgated** by design (F3-46/PRO-1388) — first-party functional
+   signal, independent of the beacon toggle/consent gate.
+3. **Identity merge** — two mechanisms bind a browse identity to a known
+   customer: `Integrations\WooCommerce\IdentityHookHandler` on `wp_login`
+   calls the engine's `/identity/merge` (§7) to bind an anonymous browse
+   session at login time (F3-27); and, since PRO-1389,
+   `REST\BeaconEndpoint::attach_logged_in_identity()` validates the real WP
+   `logged_in` auth cookie directly (not a REST nonce — the beacon sends
+   none, and a page-embedded nonce would be stale under full-page caching)
+   on every `/relay` batch and attaches `customer_email` to the outbound
+   engine events for an *ongoing* logged-in session — closing the gap where a
+   customer who never re-logs-in browsed forever with no identity attached.
+   Gated by the same profiling check as the consent model below: an
+   opted-out contact's events stay anonymous, never dropped. This is the one
+   sanctioned server-side exception to F3-49 — the client itself still never
+   sends `customer_email`.
 
 **Consent model:** browse telemetry is **fail-closed on the WP Consent API**
 (F3-50): the JS sends only when `window.wp_has_consent(category) === true`
