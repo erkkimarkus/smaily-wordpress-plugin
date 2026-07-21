@@ -26,7 +26,47 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1486 — the `/relay` browse proxy no longer
+_Last updated: 2026-07-21 (**PRO-1499 — contract synced to v1.6.0 (engine
+commit `06266a8`); `tags.category_defaulted` implemented + live-walked.**
+`docs/RECENGINE_API_CONTRACT.md` byte-identically synced from the engine's
+main (`bin/check-contract-staleness.sh` confirms in-sync). Two additions: (1)
+optional catalog tag `tags.category_defaulted` (`"true"`, omit-on-false) —
+marks a row whose `category_path` is a sender-substituted placeholder (the
+PRO-1491 store-default-category fallback, or a PRO-1498 delete-tombstone
+force-fill) rather than real taxonomy, so the engine skips category-slug-keyed
+derivation for it (engine-side skip already deployed, PRO-1500); (2) a
+wording-only §6 deprecation notice for client-originated `customer_email` on
+browse events — verified already fully covered by the same-day PRO-1486 strip
+(`BeaconEndpoint::EVENT_FIELDS`), no further code change needed. **Plugin
+follow-through (CC-8):** `CatalogPayloadBuilder::primary_category_path()`
+gained an optional by-ref `$defaulted` out-param; `build()`'s `tags()` stamps
+the flag only when a real (non-empty) placeholder value was actually
+substituted (an unresolvable-default empty `category_path` stays unflagged —
+that row fails the engine's REQUIRED-field check regardless, nothing to
+flag); `ensure_valid_removal()` stamps it exactly when it force-fills a still-
+blank `category_path`; `build_unresolvable()` always carries it (every field
+on that tombstone is definitionally a placeholder). **Mock:** no change
+needed — `tests/Integration/Fixtures/mock-rec-engine/router.php` already
+captures the whole `tags` object per-SKU with no keys allowlist (PRO-1224
+precedent). **Tests:** +unit assertions across the existing
+`CatalogPayloadBuilderTest` fallback/removal/tombstone cases (flag present on
+substituted rows, absent everywhere else — including the existing real-
+category test's unchanged exact-array assertion proving omission); +assertions
+in `RecEngineCatalogTest`'s PRO-1491 no-term-product upsert test and PRO-1498
+force-filled-removal test, both now also checking the flag reached the wire
+via `last_catalog_tags` mock introspection. **Live-walk:**
+`bin/walk-pro1499-category-defaulted.cjs` (new) proves the real sandbox engine
+("Smaily Connect test" tenant, confirmed not MiuMjau) accepts a no-
+product_cat-term product's catalog.upsert carrying
+`tags.category_defaulted:"true"` — `{"processed":1,"sent":1,"failed":0}`,
+`{"http":200,"outcome":"accepted"}`. **Gates:** `npm run ci:strict` exit=0
+(PHPUnit unit 595/595, vitest 248/248); `sg docker -c "composer run
+test:integration"` OK (163 tests, 826 assertions — 3 more assertions than the
+PRO-1486 baseline, no new test methods, only added assertions within existing
+tests), sandbox tenant "Smaily Connect test" correctly restored post-run (not
+MiuMjau).)
+
+Prior: 2026-07-21 (**PRO-1486 — the `/relay` browse proxy no longer
 accepts a client-supplied `customer_email`.** Linear decision recorded
 2026-07-21, engine-confirmed via PRO-1490: `BeaconEndpoint::EVENT_FIELDS`
 previously whitelisted `customer_email` straight through from the client POST

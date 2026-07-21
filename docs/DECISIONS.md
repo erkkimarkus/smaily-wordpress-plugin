@@ -3648,6 +3648,84 @@ PRO-1389 (the sole surviving source of `customer_email` on a forwarded event,
 unchanged by this decision); PRO-1490 (engine-side confirmation this shipped
 against).
 
+### PRO-1499 — `tags.category_defaulted` marks a substituted (placeholder) `category_path`, so the engine skips slug-derivation for it
+
+**Context:** contract v1.6.0 (engine commit `06266a8`, engine-side skip logic
+already deployed per PRO-1500) adds an optional catalog tag
+`tags.category_defaulted` (`"true"`, omit-on-false): a signal that a row's
+`category_path` is a **placeholder substituted by the sender**, not real
+product taxonomy — the store default-category fallback (F3-39/PRO-1491's
+empty-terms branch) or a `catalog.delete` tombstone that has to sync with
+*some* category (PRO-1498's `ensure_valid_removal()`/`build_unresolvable()`).
+Without the flag the engine's `mapRawAttributes()` derives
+species/`category_canonical`/replenishable from the category **slug** as if
+it were real taxonomy — on a placeholder row that derivation is noise (a
+generic "uncategorized"/store-default term slug carries no product signal).
+
+**Decision:** `CatalogPayloadBuilder` stamps `tags.category_defaulted = "true"`
+on exactly the rows where a placeholder was substituted, and omits the key
+everywhere else (never `"false"`):
+- `build()` — `primary_category_path()` gained an optional by-ref `$defaulted`
+  out-param, set `true` only on the empty-terms → store-default-fallback
+  branch (PRO-1491). `tags()` stamps the flag only when BOTH `$defaulted` is
+  true AND the resulting `category_path` is non-empty — an unresolvable store
+  default (category_path stays `""`) is not a substituted *value*, and that
+  row fails the engine's REQUIRED-field check regardless, so there is nothing
+  to flag.
+- `ensure_valid_removal()` — stamps the flag exactly when it force-fills a
+  still-blank `category_path` with `PLACEHOLDER_CATEGORY` (the PRO-1498 path).
+  A row whose `category_path` `build()` already resolved (real terms, or a
+  non-empty store-default already flagged by `tags()`) is left untouched here.
+- `build_unresolvable()` — ALWAYS carries the flag (unconditionally, in the
+  return array literal): there is no real product to derive a category from,
+  so every field including `category_path` is definitionally a placeholder.
+
+**Rationale:** the flag's value is only meaningful when it corresponds to an
+actual placeholder STRING reaching the engine — flagging an already-doomed
+empty-string row would be dishonest (nothing was actually substituted; the
+row never becomes a real catalog entry) and untestable without inventing
+behavior the contract doesn't ask for. Gating on "both defaulted AND
+non-empty" keeps the semantics exactly what the contract prose says: "the
+sender substituted the store's fallback/default category."
+
+**Mock:** no change needed. `tests/Integration/Fixtures/mock-rec-engine/
+router.php` already captures the whole `tags` object generically per-SKU
+(`last_catalog_tags`, added for PRO-1224's `tags.product_id`) with no
+allowlist on tags keys — it already accepts (and lets a test introspect) an
+arbitrary new tags key without modification.
+
+**§6 customer_email deprecation (same contract sync, verified no-op for us):**
+the contract's v1.6.0 §6 deprecation notice for client-originated
+`customer_email` on browse events matches what PRO-1486 already shipped
+(2026-07-21, same day) — `BeaconEndpoint::EVENT_FIELDS` already strips a
+client-supplied `customer_email` before it ever reaches profiling/injection
+logic, and the sole surviving source (`attach_logged_in_identity()`,
+PRO-1389, server-side) matches the contract's carved-out "server-side
+senders... may continue sending it" exception. No further code change was
+needed or made for this contract sync.
+
+**Tests:** unit (`CatalogPayloadBuilderTest`) — the store-default-fallback
+upsert row carries the flag; the unresolvable-default (empty `category_path`)
+row does NOT; `ensure_valid_removal()`'s force-fill path carries it, its
+product_url-only force-fill does NOT; both `build_unresolvable()` cases
+(placeholder literal and resolved store-default) always carry it; the
+existing real-category test proves omission via its unchanged exact-array
+assertion. Integration (`RecEngineCatalogTest`) — the PRO-1491 no-term-product
+upsert test and the PRO-1498 force-filled-removal test now also assert the
+flag reached the wire via `last_catalog_tags` mock introspection.
+
+**Live-walk:** `bin/walk-pro1499-category-defaulted.cjs` proves the real
+sandbox engine ("Smaily Connect test" tenant) accepts a no-product_cat-term
+product's catalog.upsert carrying `tags.category_defaulted:"true"`
+(`processed:1, sent:1, failed:0`, `{"http":200,"outcome":"accepted"}`) — run
+2026-07-21, `RECENGINE_LIVE=1 node bin/walk-pro1499-category-defaulted.cjs`.
+
+**Relationships:** F3-39/PRO-1491 (the store-default-category fallback this
+flags), PRO-1498 (the delete-tombstone force-fill paths this flags), PRO-1224
+(`tags.product_id` — the prior precedent for the mock's generic tags capture
+needing no schema change), PRO-1486 (the §6 customer_email deprecation this
+sync also carried, independently verified as already covered).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -266,6 +266,35 @@ an empty `product_url` the same way it already rejected `category_path`
 rows need a post-release re-drive/re-sync once this ships; the code fix alone
 doesn't retroactively repair rows already captured with the old blank shape.
 
+### A substituted `category_path` is flagged with `tags.category_defaulted` — never on an empty/unresolved one (PRO-1499)
+Contract v1.6.0 (engine commit `06266a8`) adds optional catalog tag
+`tags.category_defaulted` (`"true"`, omit-on-false): tells the engine a row's
+`category_path` is a **placeholder the sender substituted**, not real
+taxonomy, so it skips category-**slug**-keyed derivation for that row
+(species-from-category, `category_canonical`, replenishable-from-category —
+**name**-keyed derivations and any explicit tenant tag still win regardless).
+Three call sites in `CatalogPayloadBuilder`, one rule: flag it ONLY when a
+real (non-empty) placeholder value actually reached the wire.
+- `build()` — `primary_category_path()` now takes an optional by-ref
+  `$defaulted` out-param, `true` only on the PRO-1491 empty-terms →
+  store-default-fallback branch; `tags()` stamps the flag only when
+  `$defaulted` AND the resulting `category_path` is non-empty. An
+  unresolvable store default (`category_path` stays `""`) stays UNflagged —
+  that row fails the engine's REQUIRED-field check regardless, so there's no
+  placeholder value to mark.
+- `ensure_valid_removal()` (PRO-1498) — stamps the flag exactly when it
+  force-fills a still-blank `category_path` with `PLACEHOLDER_CATEGORY`; a
+  `category_path` `build()` already resolved is left untouched (and already
+  carries the flag from `build()` if that was itself a store-default
+  substitution).
+- `build_unresolvable()` (PRO-1498) — ALWAYS carries the flag: there is no
+  real product behind it, so `category_path` is definitionally a placeholder.
+No mock change was needed — `router.php` already captures the whole `tags`
+object per-SKU with no keys allowlist (the PRO-1224 `tags.product_id`
+precedent). Live-walked against the sandbox engine
+(`bin/walk-pro1499-category-defaulted.cjs`): `{"http":200,"outcome":
+"accepted"}` with the flag on the sent payload.
+
 ### Use the IsoDate helper for datetimes — never raw format
 The engine's strict Zod `.datetime()` requires Z-suffix (`Y-m-d\TH:i:s\Z`), NOT
 `+00:00`. Raw `gmdate('c')` / `$date->format('c')` produces `+00:00` and the
