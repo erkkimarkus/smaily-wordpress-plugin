@@ -236,6 +236,36 @@ single VARIATION's hard-delete keeps the per-SKU soft path — §3b would tombst
 its surviving siblings — and trash still never fires §3b. After any change here
 the pilot needs a catalog re-backfill.
 
+### A `catalog.delete` tombstone is ALWAYS force-filled and sent — never silently skipped (PRO-1498)
+F3-39/F3-40 originally SKIPPED a captured removal object whose `category_path`
+or `product_url` came back blank (the auto-draft-GC burst, 2026-06-14) — correct
+for a never-published artifact (nothing to remove), but the same skip also fired
+for a genuinely *synced* product whose removal object happened to come back
+blank (MiuMjau: 51 live rows failing engine validation with empty `product_url`,
++1 with empty `category_path`), which left it stuck `in_stock=true` in the engine
+forever (the engine has no delete-by-key, so a skipped/rejected removal can't
+self-heal). **CatalogPayloadBuilder::ensure_valid_removal()** now force-fills a
+still-blank `category_path`/`product_url` with a generic placeholder
+(`'uncategorized'` / `home_url('/?smaily_connect_removed_product={id}')`) instead
+of leaving it blank, and **CatalogPayloadBuilder::build_unresolvable()** builds a
+whole minimal tombstone from the bare id when `wc_get_product()` fails
+completely (e.g. a since-deactivated gift-card plugin's `product_type`) —
+`CatalogHookHandler::enqueue_delete_unresolvable()` /
+`CatalogBackfillJob::enqueue_unavailable_unresolvable()` call it when the
+soft-delete path's `get_product()` returns null but the post IS (or was) a
+product/variation. **Delete-only, deliberately**: the live `catalog.upsert` path
+(`CatalogPayloadBuilder::primary_category_path()`) keeps failing loud on a
+genuinely broken store — an empty required field there is still a real
+merchant-data-gap signal worth surfacing (F3-39's original intent, unchanged).
+`CatalogHookHandler::is_removable()` is retired (superseded by always-send). Out
+of scope: §3b `catalog.remove` (PRO-1230) is untouched — a different mechanism
+for a hard-deleted PARENT, not conflated with this per-SKU soft tombstone fix.
+The mock (`tests/Integration/Fixtures/mock-rec-engine/router.php`) now rejects
+an empty `product_url` the same way it already rejected `category_path`
+(mirrors the live engine — PRO-1492 folded in here). MiuMjau's existing stuck
+rows need a post-release re-drive/re-sync once this ships; the code fix alone
+doesn't retroactively repair rows already captured with the old blank shape.
+
 ### Use the IsoDate helper for datetimes — never raw format
 The engine's strict Zod `.datetime()` requires Z-suffix (`Y-m-d\TH:i:s\Z`), NOT
 `+00:00`. Raw `gmdate('c')` / `$date->format('c')` produces `+00:00` and the

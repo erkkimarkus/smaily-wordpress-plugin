@@ -3500,6 +3500,75 @@ divergence in a future pass; a change here is a contract question for the
 engine first (`CatalogPayloadBuilder` `external_id` vs `SkuResolver`
 canonical id).
 
+### PRO-1498 — `catalog.delete` tombstones are ALWAYS force-filled and sent, never silently skipped
+
+**Context:** F3-39/F3-40 skip a captured removal object whose `category_path`
+or `product_url` comes back blank, on the theory that a never-published
+artifact (auto-draft GC burst) was never synced, so there's nothing to remove.
+MiuMjau live evidence (2026-07-21) showed the same skip firing for a genuinely
+*synced* product — 51 rows failing engine validation with empty `product_url`,
++1 with empty `category_path` — which is a different case: the SKU already
+exists in the engine, so silently skipping (or the engine rejecting) the
+removal leaves it stuck `in_stock=true` forever (the engine has no
+delete-by-key; a soft removal is the ONLY way to mark a SKU unavailable,
+contract §3).
+
+**Decision:** a catalog.delete tombstone must ALWAYS reach the engine.
+`CatalogPayloadBuilder::ensure_valid_removal()` force-fills a still-blank
+`category_path`/`product_url` with a generic, honest placeholder
+(`'uncategorized'`; a synthetic `home_url('/?smaily_connect_removed_product=
+{id}')` URL) instead of leaving it blank or skipping the row.
+`CatalogPayloadBuilder::build_unresolvable()` covers the deeper case — a
+product/variation id that no longer resolves to a `WC_Product` AT ALL (e.g. its
+`product_type` came from a since-deactivated plugin) — building a whole minimal
+tombstone from the bare id. `CatalogHookHandler::is_removable()` (the old
+skip-gate) is retired; `enqueue_delete()` / `CatalogBackfillJob::
+enqueue_unavailable()` now always enqueue. `SkuResolver::resolve_id()` (new,
+mirrors `resolve_order_item()`'s F3-43 `woo-oi-{item_id}` fallback) canonicalizes
+a bare id without needing a loadable product.
+
+**Rationale:** delete-only, deliberately. The live `catalog.upsert` path keeps
+failing loud on the same gap (`primary_category_path()`'s "even the store
+default is unresolvable" residual case) — there, an empty required field is
+still a genuine merchant-data-gap signal worth surfacing (F3-39's original
+intent). A tombstone protects no such signal — its only job is "mark this SKU
+unavailable" — so correctness requires it always reach the engine, mirroring
+F3-43's order-item never-drop principle (a line that can't be keyed still
+ingests under a synthetic key rather than vanishing). A hardcoded placeholder
+string/URL is honest here because the row is never shown or clicked
+(`in_stock=false`, delisted) — its only meaning is "no longer available."
+
+**Alternatives rejected:** keep skipping (rejected — the exact stale-row bug
+this closes); reject the row and mark it permanently failed (rejected — same
+stuck-`in_stock=true` outcome, just with engine-visible noise instead of
+silence); invent a plausible-looking real product URL, e.g. the historical
+`product_base_url + sku` shape (rejected — contract explicitly calls this out
+as misleading for a *live* product, F3-17; a clearly-synthetic marker avoids
+that concern for a tombstone too).
+
+**Scope boundary:** §3b `catalog.remove` (PRO-1230, a hard-deleted PARENT's
+product-level tombstone) is a DIFFERENT mechanism and is untouched by this
+decision — its own `get_product() === null` branch in
+`on_hard_delete_product()` still no-ops, unchanged.
+
+**Mock:** `tests/Integration/Fixtures/mock-rec-engine/router.php` now rejects
+an empty `product_url` the same way it already rejected `category_path`
+(PRO-1491/e98e092) — folds in PRO-1492's mock-divergence finding.
+
+**Follow-up (not this change):** MiuMjau's existing stuck rows were captured
+under the old blank shape before this fix shipped — the code fix does not
+retroactively repair them; they need a post-release re-drive (re-touch the
+affected products, or a targeted re-backfill) so the fixed builder re-captures
+a valid object.
+
+**Relationships:** F3-39 (the original skip-gate + the store-default-category
+fallback this fix does NOT touch on the upsert side), F3-40 (trash → soft
+`in_stock=false`, the mechanism this hardens), F3-43 (the order-item
+never-drop principle this extends to catalog), PRO-1224 (`SkuResolver` —
+`resolve_id()` mirrors its `woo-` canonicalization for a bare id), PRO-1491/
+PRO-1492 (the category_path mock-strictness precedent this mirrors for
+`product_url`).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

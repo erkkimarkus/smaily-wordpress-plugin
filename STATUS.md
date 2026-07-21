@@ -26,7 +26,60 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**v3.8.0 — RELEASED** (gates green; built/gated by
+_Last updated: 2026-07-21 (**PRO-1498 — `catalog.delete` tombstones are now
+ALWAYS force-filled and sent, never silently skipped.** MiuMjau live evidence:
+51 `catalog.delete` rows failing engine validation with empty `product_url`,
++1 with empty `category_path` — a synced-then-removed product left stuck
+`in_stock=true` forever (the engine has no delete-by-key; F3-39/F3-40's
+original skip-on-blank-field guard was correct for a never-published
+auto-draft but wrong for an already-synced product). Fix:
+`CatalogPayloadBuilder::ensure_valid_removal()` force-fills a still-blank
+`category_path`/`product_url` with a generic placeholder
+(`'uncategorized'` / a synthetic `home_url('/?smaily_connect_removed_product=
+{id}')` URL) instead of leaving it blank; `CatalogPayloadBuilder::
+build_unresolvable()` builds a whole minimal tombstone from the bare id when
+`wc_get_product()` fails completely (e.g. a since-deactivated gift-card
+plugin's `product_type`) — wired into `CatalogHookHandler::
+enqueue_delete_unresolvable()` and `CatalogBackfillJob::
+enqueue_unavailable_unresolvable()`. `CatalogHookHandler::is_removable()` (the
+old skip-gate) is retired. New `SkuResolver::resolve_id()` canonicalizes a bare
+id (mirrors the F3-43 `woo-oi-{item_id}` order-item fallback). Delete-only,
+deliberately — the live `catalog.upsert` path keeps failing loud on the same
+gap (F3-39's original intent, unchanged); §3b `catalog.remove` (PRO-1230, a
+hard-deleted PARENT) is a different mechanism, untouched. **Mock strictness
+(folds in PRO-1492):** `tests/Integration/Fixtures/mock-rec-engine/router.php`
+now rejects an empty `product_url` the same way it already rejected
+`category_path` (PRO-1491/e98e092) — `docs/audits/MOCK_DIVERGENCE_AUDIT.md`
+updated. Full DECISIONS.md entry (PRO-1498). **Tests:** +9 unit (2
+`CatalogPayloadBuilderTest` on `build_unresolvable`, 3 on `ensure_valid_removal`,
+2 rewritten `CatalogHookHandlerTest` fallback assertions + 2 new
+unresolvable-product cases, 2 rewritten + 2 new `CatalogBackfillJobTest`
+cases) + 2 integration (`RecEngineCatalogTest::
+test_uncategorized_product_removal_is_force_filled_and_sent_not_dropped` —
+real trash hook → mock engine round trip, asserts `sent=1, failed=0` for a
+genuinely category-less/unresolvable-default product, mirroring the existing
+upsert-side fail-loud test's fixture; and
+`test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine` —
+proves the mock's new product_url check independent of whether the plugin's
+own fallback ever actually produces such a row). The deeper
+"`wc_get_product()` returns null entirely" case stays unit-tested only
+(mirrors the project's existing "fragile to reproduce live" judgment for the
+category-less-trashed-product edge) — reproducing it live would need
+corrupting a real product's WC classification, which isn't a reliable
+integration fixture. **Gates:** `npm run ci:strict` exit=0 (PHPCS 0 errors,
+PHPStan clean, PHPUnit unit 594/594, vitest 248/248, tsc/eslint clean);
+`sg docker -c "composer run test:integration"` OK (164 tests, 822
+assertions), sandbox tenant "Smaily Connect test" correctly restored post-run
+(not MiuMjau). **Not released as a
+version bump in this pass** — landed as plain commits on `main`, to be
+bundled into a future release like the rest of the PRO-1491 catalog work was.
+**Post-release follow-up (not done here):** MiuMjau's existing 52 stuck rows
+were captured under the OLD blank shape before this fix shipped — the code
+fix does not retroactively repair them; they need a re-drive (re-touch the
+affected products, or a targeted re-backfill) once a release carrying this
+fix reaches the pilot.
+
+Prior: 2026-07-21 (**v3.8.0 — RELEASED** (gates green; built/gated by
 the worker pass, published by the orchestrator the same session — see the
 publication note at the end of this entry). Version bumped in all four places
 (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
