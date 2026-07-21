@@ -152,14 +152,7 @@ class StorefrontBeacon {
 			$context['pageType'] = 'product';
 			$product             = wc_get_product( get_the_ID() );
 			if ( $product instanceof \WC_Product ) {
-				// SkuResolver (PRO-1224): always non-empty — the `woo-{id}`
-				// platform key (never the merchant SKU), matching what catalog
-				// ingest sent, so the engine joins product_view to the catalog row.
-				$context['sku'] = \Smaily\Connect\Smaily\RecEngine\Support\SkuResolver::resolve( $product );
-				$path = ( new CatalogPayloadBuilder() )->primary_category_path( $product );
-				if ( $path !== '' ) {
-					$context['categoryPath'] = $path;
-				}
+				$context = array_merge( $context, $this->product_context( $product ) );
 			}
 		} elseif ( is_product_category() ) {
 			$context['pageType'] = 'category';
@@ -184,6 +177,31 @@ class StorefrontBeacon {
 			$context['pageType'] = 'checkout';
 		}
 
+		return $context;
+	}
+
+	/**
+	 * Product-page context fields for an already-loaded WC_Product: the
+	 * canonical `sku` key plus the category path when set. Split out from
+	 * page_context() (PRO-1445) so the product→key resolution — the part
+	 * PRO-1390 broke (a browse surface reading the merchant SKU instead of
+	 * going through SkuResolver) — is unit-testable directly, without driving
+	 * WooCommerce's `is_product()` conditional tag (the integration harness is
+	 * plain TestCase and can't do that — see CLAUDE.md). Public for testability.
+	 *
+	 * @return array<string, string>
+	 */
+	public function product_context( \WC_Product $product ): array {
+		$context = array(
+			// SkuResolver (PRO-1224): always non-empty — the `woo-{id}`
+			// platform key (never the merchant SKU), matching what catalog
+			// ingest sent, so the engine joins product_view to the catalog row.
+			'sku' => \Smaily\Connect\Smaily\RecEngine\Support\SkuResolver::resolve( $product ),
+		);
+		$path = ( new CatalogPayloadBuilder() )->primary_category_path( $product );
+		if ( $path !== '' ) {
+			$context['categoryPath'] = $path;
+		}
 		return $context;
 	}
 
