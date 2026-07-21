@@ -26,9 +26,9 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**v3.8.1 — build/verify/gate sequence RUN, gates
-green; publication (GH release + tag) deferred to the orchestrator in this
-session, not performed by this pass.** PATCH bump (fixes + hardening, no new
+_Last updated: 2026-07-21 (**v3.8.1 — RELEASED** (gates green; built/gated by
+the worker pass, published by the orchestrator the same session — see the
+publication note at the end of this entry). PATCH bump (fixes + hardening, no new
 merchant-facing functionality). Version bumped in all four places
 (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
 `SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
@@ -77,8 +77,11 @@ ordering unchanged) plus a new-input-surface check on the PRO-1498/1499
 catalog commits (none found — internal WP post ids + already-built catalog
 objects only, no new route/external HTTP/SQL). Verdict PASS, 0 findings.
 Full report `docs/audits/2026-07-21-SECURITY_DELTA_AUDIT_V381_GATE.md` +
-register row in `docs/audits/INDEX.md`. **NOT published**: no `gh release`,
-no git tag — per this task's scope, publication is the orchestrator's step.
+register row in `docs/audits/INDEX.md`. **Published (orchestrator step, same
+session):** `gh release create v3.8.1` on `erkkimarkus/smaily-wordpress-plugin`
+— asset verified byte-identical (1 122 412 B), Latest, non-prerelease, tag on
+the bump commit `251a29f`. Post-release: MiuMjau update → final Retry of the
+52 stuck `catalog.delete` rows (PRO-1498's last checkbox).
 
 Prior: 2026-07-21 (**PRO-1499 — contract synced to v1.6.0 (engine
 commit `06266a8`); `tags.category_defaulted` implemented + live-walked.**
