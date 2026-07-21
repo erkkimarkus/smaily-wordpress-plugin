@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.7.2
+Stable tag: 3.8.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.8.0 =
+* New: browsing activity from a logged-in shopper is now linked to their account for their whole visit, not just right after they log in. This is resolved securely on the server from their WordPress login session — their email address is never sent to or exposed in the browser — and a shopper who has opted out of recommendation profiling is still respected (their activity stays anonymous, same as before).
+* Fixed: published products with no category assigned are no longer silently excluded from Smaily Campaign Intelligence. They now sync under the store's own default product category (WooCommerce's normal "Uncategorized" behaviour), instead of being rejected for missing a required field.
+* Fixed: opening the "Add new product" screen in WordPress no longer creates a doomed, empty sync entry for the not-yet-saved placeholder product. Only products you actually save are synced.
 
 = 3.7.2 =
 * Fixed: email-link attribution (which product recommendation a purchase came from) is no longer lost on storefronts that serve cached pages, or when a shopper decides the cookie-consent banner after landing. The attribution details are now captured from the link as soon as the page loads in the browser, independently of cookie consent and of whether the page was server-rendered or served from cache; browsing/tracking events themselves remain fully consent-gated as before.
@@ -308,6 +313,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.8.0 =
+Logged-in shoppers' browsing is now linked to their account for their whole session (resolved server-side; their email is never exposed to the browser; opt-outs are still respected). Products with no assigned category now sync under your store's default category instead of being skipped. Empty "Add new product" placeholders no longer create sync noise. Safe update.
 
 = 3.7.2 =
 Fixes email-link attribution being lost on cached storefronts or when consent is decided after landing. Safe update.
