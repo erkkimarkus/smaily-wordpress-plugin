@@ -30,8 +30,11 @@ use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
  *
  * Identity note: the logged-in user's email is deliberately NOT placed in the JS
  * blob (it would expose it in page source). The engine resolves identity from
- * the visitor-token / session cookies instead; server-side email injection (in
- * the proxy, from the auth cookie) is a later enhancement.
+ * the visitor-token / session cookies for anonymous browsing; for an ongoing
+ * logged-in session, `BeaconEndpoint::attach_logged_in_identity()` (PRO-1389)
+ * resolves the user server-side from the auth cookie and attaches the email to
+ * the outbound engine request only — never to this JS blob or the /relay
+ * response.
  */
 class StorefrontBeacon {
 

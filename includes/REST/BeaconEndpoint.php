@@ -139,7 +139,9 @@ class BeaconEndpoint {
 	 * @param callable(string $api_key, string $base_url): Client $client_factory
 	 * @param ?ProfilingConsent $profiling The beacon's second gate ((a).1) — drops
 	 *        browse events carrying an opted-out contact's email before forwarding.
-	 *        Null = no profiling gate (only the cookie-consent gate applies).
+	 *        Also consulted by attach_logged_in_identity() (PRO-1389) before it
+	 *        attaches a resolved logged-in email — an opted-out contact's events
+	 *        stay anonymous instead. Null = no profiling gate.
 	 */
 	public function __construct( RecEngineSettings $settings, callable $client_factory, ?ProfilingConsent $profiling = null ) {
 		$this->settings       = $settings;
@@ -221,10 +223,16 @@ class BeaconEndpoint {
 			return self::invalid_response( $validation );
 		}
 
+		// PRO-1389: attach the resolved logged-in user's email (ongoing-session
+		// identity, server-side) BEFORE the profiling gate below — attach_
+		// logged_in_identity() itself checks the same gate, so an opted-out
+		// contact never gets an email attached in the first place.
+		$identified_events = $this->attach_logged_in_identity( $validation['events'] );
+
 		// SECOND GATE (a).1 — drop browse events carrying an OPTED-OUT contact's
 		// email before they leave the building. Anon events (no email) have no
 		// contact to check and pass on the cookie-consent gate alone.
-		$events = $this->filter_by_profiling( $validation['events'] );
+		$events = $this->filter_by_profiling( $identified_events );
 		if ( $events === array() ) {
 			// Everything was for opted-out contacts — nothing to forward.
 			return new WP_REST_Response(
@@ -275,6 +283,68 @@ class BeaconEndpoint {
 			),
 			200
 		);
+	}
+
+	/**
+	 * PRO-1389: the ongoing-session identity signal `StorefrontBeacon`'s docblock
+	 * deferred. `IdentityHookHandler` only merges identity on `wp_login`, so a
+	 * customer who stays logged in browses forever without identity attaching —
+	 * this closes that gap, server-side, on every /relay batch.
+	 *
+	 * Deliberately NOT a page-embedded REST nonce: WP's cookie-auth REST
+	 * middleware only populates the current user when a valid X-WP-Nonce
+	 * accompanies the request, the beacon sends none, and a page-embedded nonce
+	 * would be stale/shared under full-page caching (the MiuMjau reality, see
+	 * PRO-1388). Validating the `logged_in` auth cookie directly works regardless
+	 * of nonce or caching. An anonymous visitor, or an invalid/expired cookie, is
+	 * treated as anonymous — never an error.
+	 *
+	 * The client NEVER sends `customer_email` (F3-49's client-side data-
+	 * minimization is unchanged) — this is the one sanctioned server-side
+	 * exception, injected purely on the outbound engine request; the JS blob and
+	 * the /relay response never see it.
+	 *
+	 * Consent: event EXISTENCE is still gated solely by the JS marketing-consent
+	 * gate (unchanged). This ADDITIONALLY checks the (a).1 profiling gate for the
+	 * resolved email before attaching it — an opted-out contact's event is
+	 * forwarded UNCHANGED (stays anonymous), never dropped: we simply never add
+	 * the identity hint, mirroring the §6 "sender-side anonymous mode".
+	 *
+	 * @param array<int, array<string, mixed>> $events
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function attach_logged_in_identity( array $events ): array {
+		$email = $this->resolve_logged_in_email();
+		if ( $email === '' ) {
+			return $events;
+		}
+		if ( $this->profiling !== null && ! $this->profiling->may_profile( $email ) ) {
+			return $events;
+		}
+
+		foreach ( $events as $index => $event ) {
+			$event['customer_email'] = $email;
+			$events[ $index ]        = $event;
+		}
+		return $events;
+	}
+
+	/**
+	 * Validate the WP `logged_in` auth cookie directly (not current-user state —
+	 * the REST dispatch never authenticates this public route). Protected so
+	 * tests can double it without standing up a real auth cookie.
+	 */
+	protected function resolve_logged_in_email(): string {
+		$user_id = wp_validate_auth_cookie( '', 'logged_in' );
+		if ( ! $user_id ) {
+			return '';
+		}
+		$user = get_userdata( (int) $user_id );
+		if ( ! $user instanceof \WP_User || $user->user_email === '' ) {
+			return '';
+		}
+		return strtolower( trim( (string) $user->user_email ) );
 	}
 
 	/**
