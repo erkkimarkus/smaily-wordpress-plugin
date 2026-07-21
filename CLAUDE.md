@@ -493,7 +493,16 @@ is NOT observable from a server-side proxy walk. Coverage is split:
   `is_product()` can't be driven to exercise the branches — writing a test that
   faked them would prove nothing. The conditional-tag branching is trivial; the
   real "does it fire on the right page" check is **manual pilot verification**
-  (or a future Chromium E2E — not built, YAGNI, low risk).
+  (or a future Chromium E2E — not built, YAGNI, low risk). What IS unit-tested
+  (PRO-1445), split out on purpose: once on the product page, the product→`sku`
+  RESOLUTION doesn't touch any conditional tag — `page_context()` delegates it
+  to `StorefrontBeacon::product_context( \WC_Product $product )`, which
+  `tests/Unit/Integrations/WooCommerce/StorefrontBeaconTest.php` calls directly
+  with a fake `WC_Product` carrying a merchant SKU that looks nothing like the
+  canonical key, asserting the result is always `woo-{id}` (SkuResolver,
+  PRO-1224) — the exact class of bug PRO-1390 shipped (a browse surface reading
+  the merchant SKU instead of the resolver). The untested part stays only "am I
+  on a product page", not "what key does that page report".
 
 Do NOT claim the live-walk validates checkout/page-view timing — it validates
 the engine contract, not the browser render moment.

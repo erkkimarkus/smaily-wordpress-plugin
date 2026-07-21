@@ -26,7 +26,35 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**v3.7.2 — build/verify/gate sequence RUN, gates
+_Last updated: 2026-07-21 (**PRO-1445 — StorefrontBeacon product-page `sku`
+resolution now unit-tested** (closes the pre-existing gap called out in the
+PRO-1390 record below). Investigation: the integration-harness limitation
+(plain `TestCase`, no `WP_UnitTestCase`/`go_to()`, can't drive `is_product()`)
+only blocks testing WHICH page type fires — the product→canonical-key
+resolution itself (`Support\SkuResolver::resolve()` + `CatalogPayloadBuilder::
+primary_category_path()`) is a pure function of a `WC_Product` object and
+doesn't touch any conditional tag, so it's a legitimate unit-test seam.
+Extracted `StorefrontBeacon::page_context()`'s product branch into a new
+public `product_context( \WC_Product $product ): array` method (behavior-
+identical — `page_context()` now calls it via `array_merge`), and added
+`tests/Unit/Integrations/WooCommerce/StorefrontBeaconTest.php` (3 tests,
+`fake_product`/`WC_Product` shim pattern mirroring
+`CatalogPayloadBuilderTest`) asserting the returned `sku` is always
+`woo-{id}` even when the fake product carries a merchant SKU shaped like the
+PRO-1390 live evidence (an EAN) — the exact bug class a regression here would
+reproduce. Updated the CLAUDE.md "Browse browser-timing is NOT live-walk-
+covered" note to record the split (conditional-tag branching still manual/
+pilot-only; the key-resolution part is now unit-covered). `ci:strict`
+exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit unit 574/574 incl. the 3 new,
+vitest 248/248, tsc/eslint clean). Integration suite re-run: `sg docker -c
+"bash bin/run-integration-tests.sh"` OK (157 tests, 791 assertions), dev
+sandbox tenant "Smaily Connect test" correctly restored post-run (not
+MiuMjau) — unaffected, since the existing `StorefrontBeaconTest` integration
+test (the `other`-default case) is unchanged. Files:
+`includes/Integrations/WooCommerce/StorefrontBeacon.php`,
+`tests/Unit/Integrations/WooCommerce/StorefrontBeaconTest.php`, `CLAUDE.md`.)
+
+Prior: 2026-07-21 (**v3.7.2 — build/verify/gate sequence RUN, gates
 green; publication (GH release + tag) deferred to the orchestrator in this
 session, not performed by this pass.** Version bumped in all four places
 (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
