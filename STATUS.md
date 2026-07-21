@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-17 (**PRO-1447 — contract re-synced byte-identical to
+_Last updated: 2026-07-21 (**PRO-1436 — suppressed the 4 false-positive PCP
+warnings from the PRO-1195 abandoned-cart code, gate-reviewed at v3.7.0/
+v3.7.1.** `CartAbandonmentSweeper.php:78` (`self::FILTER_MAX_AGE` —
+`DynamicHooknameFound`, PCP can't resolve a class-constant hook name) got the
+same `phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.
+DynamicHooknameFound` comment already used at the 3.2.0 gate
+(`ContactLanguageResolver.php`). `CartSessionStore.php:83,302,321`
+(`UnescapedDBParameter` — PCP's `PluginCheck.Security.DirectDB.
+UnescapedDBParameter` sniff) each got a narrow `phpcs:ignore` stating the
+table name is `$this->table_name()`, a hardcoded internal constant (never
+user input), and every real value is `$wpdb->prepare()`d. No behavior change,
+comment-only diff; `phpcbf` re-aligned one unrelated assignment the comment
+insertion displaced. Verified against a freshly built ZIP in the wp-env
+`…-cli-1` container (`smaily-connect-pkg`, `--slug=smaily-connect`): PCP now
+shows **only** the intentional `plugin_updater_detected` (F3-35) — the 4
+PRO-1436 warnings are gone, nothing new appeared. `ci:strict` exit=0 (PHPCS 0
+errors, PHPStan clean, PHPUnit unit 571/571, vitest 248/248, tsc/eslint
+clean). Integration suite not re-run (comment-only PHP diff, no behavior
+change).
+
+Prior: 2026-07-17 (**PRO-1447 — contract re-synced byte-identical to
 v1.5.0 (engine `3316261`, md5 `5c2aafa8…`).** Doc-only delta since our
 `945b7ad`/v1.4.1 sync: MINOR bump (PRO-1438 Phase 2) adds §14 `POST
 /api/v1/notifications/ingest` — the external HTTP ingest path for

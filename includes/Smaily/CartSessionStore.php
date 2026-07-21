@@ -80,6 +80,7 @@ class CartSessionStore {
 		$updated = $cart_updated ?? $now;
 		$table   = $this->table_name();
 
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- {$table} is $this->table_name(), a hardcoded internal constant, not user input; the only real value goes through $wpdb->prepare().
 		$existing_id = $wpdb->get_var(
 			$wpdb->prepare( "SELECT id FROM {$table} WHERE cart_token = %s", $cart_token )
 		);
@@ -298,7 +299,8 @@ class CartSessionStore {
 			return array();
 		}
 
-		$sql  = "SELECT id, cart_token, user_id, email, first_name, last_name, cart_content, cart_updated, reminder_enqueued_at, created_at FROM {$this->table_name()} WHERE {$where[0]}";
+		$sql = "SELECT id, cart_token, user_id, email, first_name, last_name, cart_content, cart_updated, reminder_enqueued_at, created_at FROM {$this->table_name()} WHERE {$where[0]}";
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- {$this->table_name()} is a hardcoded internal constant, not user input; the only real values go through $wpdb->prepare().
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$where[1] ), ARRAY_A );
 
 		return is_array( $rows ) ? $rows : array();
@@ -318,6 +320,7 @@ class CartSessionStore {
 		}
 
 		$sql = "DELETE FROM {$this->table_name()} WHERE {$where[0]}";
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- {$this->table_name()} is a hardcoded internal constant, not user input; the only real values go through $wpdb->prepare().
 		return (int) $wpdb->query( $wpdb->prepare( $sql, ...$where[1] ) );
 	}
 

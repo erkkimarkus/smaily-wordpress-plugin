@@ -74,7 +74,8 @@ class CartAbandonmentSweeper {
 			'skipped'  => 0,
 		);
 
-		$now     = time();
+		$now = time();
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- the constant value IS the plugin prefix (smaily_connect_*); PCP can't resolve self::CONST.
 		$max_age = (int) apply_filters( self::FILTER_MAX_AGE, DAY_IN_SECONDS );
 		$floor   = gmdate( 'Y-m-d H:i:s', $now - $max_age );
 
