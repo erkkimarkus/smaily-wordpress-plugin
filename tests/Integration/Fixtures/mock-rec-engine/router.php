@@ -384,6 +384,26 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 			continue;
 		}
 
+		// REQUIRED non-empty (PRO-1498 mock-divergence fix, folds in PRO-1492):
+		// the mock used to accept an empty/blank product_url too, which the real
+		// engine rejects with exactly this d6_item_error — mirrors the
+		// category_path check above (contract §3, "product_url ... Required,
+		// non-empty"). `{lang:value}` counts as blank when every language entry
+		// is empty.
+		$product_url       = $product['product_url'] ?? '';
+		$product_url_blank = is_array( $product_url )
+			? $product_url === array()
+			: (string) $product_url === '';
+		if ( $product_url_blank ) {
+			$errors[] = array(
+				'index'   => $index,
+				'sku'     => $sku,
+				'field'   => 'product_url',
+				'message' => 'String must contain at least 1 character(s)',
+			);
+			continue;
+		}
+
 		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
 			++$deduplicated;
 			continue;

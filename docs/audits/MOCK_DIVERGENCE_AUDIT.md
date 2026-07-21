@@ -62,6 +62,7 @@ per-item retry returns `{"deduplicated":1,"deduplicated_all":true}`.
 | Shape | batch array | batch array | batch | batch |
 | `event_id` location | per-item | **per-item canonical** (W1) | per-item ✅ | per-item ✅ |
 | `category_path` | accepted empty | **required, non-empty** (400 otherwise) | **enforced (PRO-1491)** — per-item `d6_item_error field=category_path` | variation→parent fix (2f14e88) |
+| `product_url` | accepted empty | **required, non-empty** (400 otherwise) | **enforced (PRO-1498, folds in PRO-1492)** — per-item `d6_item_error field=product_url` | `catalog.delete` tombstone always force-fills a valid `product_url`/`category_path` (`CatalogPayloadBuilder::ensure_valid_removal()` / `build_unresolvable()`) instead of skipping or sending blank — never silently drops a removal |
 | Bad item | (n/a) | whole-batch 400 | n/a | flush marks batch failed |
 | No `event_id` | dedup skipped | Layer-1 UPSERT (200) | works | n/a |
 
