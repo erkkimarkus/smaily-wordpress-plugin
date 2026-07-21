@@ -3,8 +3,9 @@
  * CatalogBackfillJob tests — the per-record enqueue branch: a PUBLISHED post
  * upserts (flusher loads fresh, real stock); a TRASHED post is kept as an
  * in_stock=false removal (catalog.delete with a captured object) so its
- * order-history join survives; the multilingual collapse and the
- * is_removable guard hold on both.
+ * order-history join survives; the multilingual collapse holds on both, and
+ * a removal is force-filled via CatalogPayloadBuilder::ensure_valid_removal()
+ * so it always reaches the engine regardless of the source object's shape.
  *
  * @package Smaily\Connect\Tests
  */

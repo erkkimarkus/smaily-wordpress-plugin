@@ -67,6 +67,13 @@ class CatalogPayloadBuilder {
 	/** Contract caps `description` at 500 chars. */
 	private const DESCRIPTION_MAX = 500;
 
+	/**
+	 * Generic, honest placeholder for category_path when even the store's
+	 * default_product_cat can't be resolved. The engine only requires a
+	 * non-empty string; these rows carry no merchandising meaning to fake.
+	 */
+	private const PLACEHOLDER_CATEGORY = 'uncategorized';
+
 	/** Multilingual detector; lazily the active one when not injected. */
 	private ?DetectorInterface $detector;
 
@@ -187,7 +194,7 @@ class CatalogPayloadBuilder {
 			'event_id'      => $event_uuid,
 			'sku'           => SkuResolver::resolve_id( $product_id, $this->detector() ),
 			'name'          => 'Unavailable product #' . $product_id,
-			'category_path' => $category_path !== '' ? $category_path : 'uncategorized',
+			'category_path' => $category_path !== '' ? $category_path : self::PLACEHOLDER_CATEGORY,
 			'price'         => 0.0,
 			'in_stock'      => false,
 			'product_url'   => $this->fallback_product_url( $product_id ),
@@ -216,10 +223,7 @@ class CatalogPayloadBuilder {
 	 */
 	public function ensure_valid_removal( array $object ): array {
 		if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
-			// A generic, honest placeholder — the engine only requires a
-			// non-empty string; this row is being marked unavailable, never
-			// shown, so the label carries no merchandising meaning to fake.
-			$object['category_path'] = 'uncategorized';
+			$object['category_path'] = self::PLACEHOLDER_CATEGORY;
 		}
 
 		$product_url = $object['product_url'] ?? '';

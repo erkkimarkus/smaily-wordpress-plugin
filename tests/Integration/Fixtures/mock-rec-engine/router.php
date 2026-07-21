@@ -369,7 +369,9 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 		// accept an empty/blank category_path, which the real engine rejects
 		// with exactly this d6_item_error — the MiuMjau 253-row failure burst
 		// this mock gap was hiding. `{lang:value}` counts as blank when every
-		// language entry is empty (mirrors CatalogHookHandler::is_removable()).
+		// language entry is empty (a live upsert can still 400 on this; a
+		// removal is force-filled by CatalogPayloadBuilder::ensure_valid_removal()
+		// so it's always sent, never blank).
 		$category_path = $product['category_path'] ?? '';
 		$category_path_blank = is_array( $category_path )
 			? $category_path === array()
