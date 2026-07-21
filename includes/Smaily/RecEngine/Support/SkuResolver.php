@@ -87,6 +87,20 @@ final class SkuResolver {
 	}
 
 	/**
+	 * Engine `sku` for a bare product/variation id with no loadable
+	 * WC_Product (PRO-1498): a product whose data is already gone by the
+	 * time a delete-time tombstone is built. Canonicalization only needs the
+	 * id, so this still collapses a translated product's id to the same key
+	 * `resolve()` would have produced while the product was loadable.
+	 *
+	 * @param DetectorInterface|null $detector Multilingual detector; defaults to
+	 *        the active one. Inject for tests / call-site determinism.
+	 */
+	public static function resolve_id( int $product_id, ?DetectorInterface $detector = null ): string {
+		return self::KEY_PREFIX . (string) self::canonical_id( $product_id, $detector );
+	}
+
+	/**
 	 * Engine key for an order line whose product no longer loads (deleted):
 	 * synthesised from the id WC stored on the line item at purchase time.
 	 * Prefers the variation id (catalog ingests variations as the units) and

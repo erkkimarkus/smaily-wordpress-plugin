@@ -62,6 +62,14 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
  * (re-sync real stock). Removing a TRANSLATION must NOT remove the canonical SKU
  * (P4) — see on_delete_product.
  *
+ * Always sendable (PRO-1498): a captured removal is force-filled via
+ * CatalogPayloadBuilder::ensure_valid_removal() if category_path/product_url
+ * still come back blank, and a product that no longer resolves to a
+ * WC_Product AT ALL still gets a minimal tombstone (build_unresolvable()) —
+ * a catalog.delete row is NEVER silently skipped, because the engine has no
+ * delete-by-key and a skipped removal would leave a synced product stuck
+ * `in_stock=true` forever (extends F3-43's order-item never-drop principle).
+ *
  * HARD delete (PRO-1230, contract v1.3.0 §3b): a permanently deleted PARENT
  * product additionally stops being recommendable engine-side via one
  * catalog.remove row (POST /ingest/catalog/remove) carrying the RAW canonical
@@ -182,8 +190,14 @@ class CatalogHookHandler {
 
 		$product = $this->get_product( $post_id );
 		if ( $product === null ) {
-			// Not a product (before_delete_post fires for every post type) or
-			// already gone — nothing to mark unavailable.
+			// wp_trash_post fires for EVERY post type; a non-product post
+			// (page, blog post, …) has nothing to mark unavailable. But when
+			// the post type IS (or was) a product/variation and wc_get_product()
+			// still failed — its WC data already stripped, or its product_type
+			// came from a since-deactivated plugin (PRO-1498) — the SKU may
+			// already be synced in the engine, so it still needs a tombstone;
+			// never silently drop the removal (F3-43 principle).
+			$this->enqueue_delete_unresolvable( $post_id );
 			return;
 		}
 		foreach ( $this->builder->expand( $product ) as $unit ) {
@@ -303,27 +317,37 @@ class CatalogHookHandler {
 		}
 		// Capture the full object now (still loadable); event_uuid is generated
 		// at enqueue, so the flusher stamps event_id + in_stock=false at send.
-		$object = $this->builder->build( $unit, '' );
-
-		// Skip a removal the engine is contract-guaranteed to 400: the engine has
-		// no delete-by-key — removal is an UPSERT with in_stock=false that must
-		// pass ProductSchema (category_path + product_url are REQUIRED non-empty,
-		// RECENGINE_API_CONTRACT.md §3). A never-published artifact (auto-draft,
-		// abandoned draft) has them empty and was never ingested anyway (the
-		// backfill is publish-only) — there is nothing to remove. WordPress's
-		// daily auto-draft GC fires before_delete_post for piles of these at once;
-		// without this guard each becomes a permanently-failed d6_item_error row
-		// (the catalog.delete burst Erkki saw, 2026-06-14). Skipping silently
-		// mirrors the non-product early-return in on_delete_product().
-		//
+		// ensure_valid_removal() force-fills category_path/product_url with a
+		// sane fallback if they still come back blank (PRO-1498) — a tombstone
+		// must always reach the engine, never be silently skipped: the engine
+		// has no delete-by-key, so a skipped removal leaves a synced product
+		// stuck in_stock=true forever (extends F3-43's never-drop principle).
 		// NOT applied to the upsert path: an empty category_path on a PUBLISHED
 		// product is an intended merchant-data-gap signal the engine surfaces via
 		// the Event Log — see CatalogPayloadBuilder::primary_category_path().
-		if ( ! self::is_removable( $object ) ) {
-			return;
-		}
+		$object = $this->builder->ensure_valid_removal( $this->builder->build( $unit, '' ) );
 
 		$this->queue->enqueue( self::EVENT_CATALOG_DELETE, (string) $unit->get_id(), array( 'object' => $object ) );
+	}
+
+	/**
+	 * Tombstone a product/variation id that no longer resolves to a
+	 * WC_Product at all (PRO-1498) — e.g. wc_get_product() fails because the
+	 * product's type came from a since-deactivated plugin, or its WC data is
+	 * already stripped. wp_trash_post fires for EVERY post type, so this only
+	 * fires for a post whose type is (or was) product/variation — an
+	 * unrelated trashed post (page, blog post, …) is correctly left alone.
+	 */
+	private function enqueue_delete_unresolvable( int $post_id ): void {
+		$post_type = $this->post_type( $post_id );
+		if ( 'product' !== $post_type && 'product_variation' !== $post_type ) {
+			return;
+		}
+		if ( $this->already_seen( self::EVENT_CATALOG_DELETE, $post_id ) ) {
+			return;
+		}
+		$object = $this->builder->build_unresolvable( $post_id, '' );
+		$this->queue->enqueue( self::EVENT_CATALOG_DELETE, (string) $post_id, array( 'object' => $object ) );
 	}
 
 	/**
@@ -360,29 +384,6 @@ class CatalogHookHandler {
 			CatalogRemoveFlusher::FLUSH_HOOK,
 			CatalogRemoveFlusher::AS_GROUP
 		);
-	}
-
-	/**
-	 * Whether a captured catalog object carries the engine's REQUIRED non-empty
-	 * removal fields (category_path + product_url). product_url may be the
-	 * multilingual `{lang: value}` object form, so an empty array counts as blank
-	 * just like an empty string.
-	 *
-	 * Public + static so the catalog backfill reuses the SAME guard when it
-	 * sends a trashed product as in_stock=false — a removal object the engine is
-	 * contract-guaranteed to 400 (blank category_path / product_url) must be
-	 * skipped on BOTH paths, not just the live hook.
-	 *
-	 * @param array<string, mixed> $object
-	 */
-	public static function is_removable( array $object ): bool {
-		$category_path = (string) ( $object['category_path'] ?? '' );
-		if ( $category_path === '' ) {
-			return false;
-		}
-		$product_url = $object['product_url'] ?? '';
-		$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
-		return $has_url;
 	}
 
 	private function already_seen( string $event_type, int $product_id ): bool {

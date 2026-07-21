@@ -54,22 +54,56 @@ final class CatalogBackfillJobTest extends TestCase {
 		self::assertSame( 'SKU-TRASH', $payload['object']['sku'] );
 	}
 
-	public function test_trashed_product_with_blank_category_path_is_skipped(): void {
-		// Same guard as the live delete hook: a removal object with an empty
-		// category_path is contract-guaranteed to 400, so it is not enqueued.
+	public function test_trashed_product_with_blank_category_path_is_enqueued_with_fallback(): void {
+		// PRO-1498: same fallback as the live delete hook — a removal object
+		// must always reach the engine (it has no delete-by-key), so a blank
+		// category_path is force-filled with a generic placeholder rather than
+		// skipped.
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 100, 'SKU-NOCAT', '', 'https://shop.test/p' );
 		$job     = $this->job( $queue, array( 100 => $product ), array( $product ), array( 'status' => array( 100 => 'trash' ) ) );
 
 		$job->run( 100 );
 
-		self::assertSame( array(), $queue->enqueued, 'A trashed product with no category_path cannot be sent — skipped, not a 400-bound row.' );
+		self::assertCount( 1, $queue->enqueued, 'A removal is always enqueued, never silently dropped.' );
+		self::assertSame( 'uncategorized', $queue->enqueued[0]['payload']['object']['category_path'] );
 	}
 
-	public function test_trashed_product_with_blank_product_url_is_skipped(): void {
+	public function test_trashed_product_with_blank_product_url_is_enqueued_with_fallback(): void {
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 100, 'SKU-NOURL', 'food/dry', '' );
 		$job     = $this->job( $queue, array( 100 => $product ), array( $product ), array( 'status' => array( 100 => 'trash' ) ) );
+
+		$job->run( 100 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=100', $queue->enqueued[0]['payload']['object']['product_url'] );
+	}
+
+	public function test_trashed_unresolvable_product_still_enqueues_minimal_tombstone(): void {
+		// PRO-1498: the SQL cursor confirmed this id IS a product/trash row,
+		// but wc_get_product() still failed (e.g. a since-deactivated
+		// gift-card plugin's product_type) — it may already be synced in the
+		// engine, so it still needs a tombstone built from the bare id.
+		$queue = $this->fake_queue();
+		$job   = $this->job( $queue, array(), array(), array( 'status' => array( 100 => 'trash' ) ) );
+
+		$job->run( 100 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_DELETE, $queue->enqueued[0]['type'] );
+		self::assertSame( '100', $queue->enqueued[0]['entity_id'] );
+		$object = $queue->enqueued[0]['payload']['object'];
+		self::assertSame( 'woo-100', $object['sku'] );
+		self::assertFalse( $object['in_stock'] );
+	}
+
+	public function test_published_unresolvable_product_enqueues_nothing(): void {
+		// The publish-side load failure (CC.4's known gift-card-type gap) is a
+		// separate, tracked upsert-side problem — out of scope here; only the
+		// trashed branch gets the PRO-1498 tombstone fallback.
+		$queue = $this->fake_queue();
+		$job   = $this->job( $queue, array(), array(), array( 'status' => array( 100 => 'publish' ) ) );
 
 		$job->run( 100 );
 
@@ -147,12 +181,45 @@ final class CatalogBackfillJobTest extends TestCase {
 				return $this->units;
 			}
 			public function build( \WC_Product $product, string $event_uuid ): array {
-				$object = array( 'sku' => (string) $product->get_sku(), 'event_id' => $event_uuid, 'in_stock' => true );
+				$object = array(
+					'sku'         => (string) $product->get_sku(),
+					'event_id'    => $event_uuid,
+					'in_stock'    => true,
+					'external_id' => (string) $product->get_id(),
+				);
 				// The real builder always carries category_path + product_url; the
-				// removal guard (is_removable) keys on them, so mirror them here.
+				// removal fallback (ensure_valid_removal()) keys on them, so mirror
+				// them here.
 				if ( method_exists( $product, 'smly_category_path' ) ) {
 					$object['category_path'] = $product->smly_category_path();
 					$object['product_url']   = $product->smly_product_url();
+				}
+				return $object;
+			}
+			public function build_unresolvable( int $product_id, string $event_uuid ): array {
+				return array(
+					'event_id'      => $event_uuid,
+					'sku'           => 'woo-' . $product_id,
+					'name'          => 'Unavailable product #' . $product_id,
+					'category_path' => 'uncategorized',
+					'price'         => 0.0,
+					'in_stock'      => false,
+					'product_url'   => 'https://shop.test/?smaily_connect_removed_product=' . $product_id,
+					'external_id'   => (string) $product_id,
+				);
+			}
+			// Mirrors the real ensure_valid_removal() output shape without calling
+			// the real home_url() — this raw (non-Brain\Monkey) test file has no
+			// WordPress loaded; the real method's behaviour is covered directly in
+			// CatalogPayloadBuilderTest.
+			public function ensure_valid_removal( array $object ): array {
+				if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
+					$object['category_path'] = 'uncategorized';
+				}
+				$product_url = $object['product_url'] ?? '';
+				$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
+				if ( ! $has_url ) {
+					$object['product_url'] = 'https://shop.test/?smaily_connect_removed_product=' . ( $object['external_id'] ?? '0' );
 				}
 				return $object;
 			}

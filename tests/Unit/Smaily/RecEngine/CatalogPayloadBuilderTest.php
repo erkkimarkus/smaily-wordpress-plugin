@@ -223,6 +223,91 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( '', $payload['category_path'] );
 	}
 
+	// --- always-sendable catalog.delete tombstones (PRO-1498) ---------------
+
+	public function test_ensure_valid_removal_fills_blank_category_path_with_placeholder(): void {
+		// A tombstone has no merchant-data-gap signal to protect (unlike
+		// build()'s upsert-shared fail-loud policy) — its only job is "mark
+		// this SKU unavailable", so a still-blank category_path gets a
+		// generic placeholder rather than being left empty for the engine to
+		// 400 (PRO-1498, extends F3-43's never-drop principle).
+		$builder = new CatalogPayloadBuilder();
+
+		$object = $builder->ensure_valid_removal(
+			array(
+				'category_path' => '',
+				'product_url'   => 'https://shop.test/p/1',
+				'external_id'   => '1',
+			)
+		);
+
+		self::assertSame( 'uncategorized', $object['category_path'] );
+		self::assertSame( 'https://shop.test/p/1', $object['product_url'], 'A valid product_url is left untouched.' );
+	}
+
+	public function test_ensure_valid_removal_fills_blank_product_url_with_fallback(): void {
+		Functions\when( 'home_url' )->alias( static fn ( string $path = '' ): string => 'https://shop.test' . $path );
+		$builder = new CatalogPayloadBuilder();
+
+		$object = $builder->ensure_valid_removal(
+			array(
+				'category_path' => 'food/dry',
+				'product_url'   => '',
+				'external_id'   => '42',
+			)
+		);
+
+		self::assertSame( 'food/dry', $object['category_path'], 'A valid category_path is left untouched.' );
+		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=42', $object['product_url'] );
+	}
+
+	public function test_ensure_valid_removal_treats_empty_multilingual_product_url_map_as_blank(): void {
+		Functions\when( 'home_url' )->alias( static fn ( string $path = '' ): string => 'https://shop.test' . $path );
+		$builder = new CatalogPayloadBuilder();
+
+		$object = $builder->ensure_valid_removal(
+			array(
+				'category_path' => 'food/dry',
+				'product_url'   => array(),
+				'external_id'   => '7',
+			)
+		);
+
+		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=7', $object['product_url'] );
+	}
+
+	public function test_build_unresolvable_produces_all_required_fields_non_empty(): void {
+		// PRO-1498: a product id that no longer resolves to a WC_Product at
+		// all (e.g. its product_type came from a since-deactivated plugin)
+		// still gets a minimal, contract-valid tombstone from the bare id.
+		Functions\when( 'home_url' )->alias( static fn ( string $path = '' ): string => 'https://shop.test' . $path );
+		$builder = new CatalogPayloadBuilder();
+
+		$object = $builder->build_unresolvable( 999, 'evt-unresolvable' );
+
+		self::assertSame( 'evt-unresolvable', $object['event_id'] );
+		self::assertSame( 'woo-999', $object['sku'] );
+		self::assertSame( 'Unavailable product #999', $object['name'] );
+		self::assertSame( 'uncategorized', $object['category_path'], 'No resolvable store default in this test (get_option → 0, the setUp() default).' );
+		self::assertSame( 0.0, $object['price'] );
+		self::assertFalse( $object['in_stock'] );
+		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=999', $object['product_url'] );
+		self::assertSame( '999', $object['external_id'] );
+	}
+
+	public function test_build_unresolvable_uses_store_default_category_when_resolvable(): void {
+		Functions\when( 'home_url' )->alias( static fn ( string $path = '' ): string => 'https://shop.test' . $path );
+		Functions\when( 'get_option' )->justReturn( 7 ); // default_product_cat term_id.
+		Functions\when( 'get_term' )->alias(
+			static fn ( int $id ) => 7 === $id ? (object) array( 'name' => 'Muu' ) : null
+		);
+		$builder = new CatalogPayloadBuilder();
+
+		$object = $builder->build_unresolvable( 999, 'u' );
+
+		self::assertSame( 'Muu', $object['category_path'], 'Prefers the real store default term over the last-resort literal.' );
+	}
+
 	public function test_expand_simple_product_returns_itself(): void {
 		$product = $this->fake_product( array( 'sku' => 'SIMPLE-1', 'type' => 'simple' ) );
 

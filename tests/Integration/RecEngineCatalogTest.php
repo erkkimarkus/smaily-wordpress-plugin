@@ -420,6 +420,114 @@ final class RecEngineCatalogTest extends TestCase {
 		}
 	}
 
+	public function test_uncategorized_product_removal_is_force_filled_and_sent_not_dropped(): void {
+		// PRO-1498: unlike the upsert path above (which stays fail-loud on a
+		// genuinely broken store), a catalog.delete tombstone must always
+		// reach the engine — it has no delete-by-key, so a skipped/rejected
+		// removal would leave a synced product stuck in_stock=true forever.
+		// Reproduce the SAME genuinely-broken-store shape (no product_cat
+		// term, unresolvable store default) via trash — on_delete_product's
+		// enqueue_delete()/ensure_valid_removal() is the exact same code path
+		// a hard-deleted variation's soft removal also runs, and trash is the
+		// reliable fixture (a real WC_Product::save() self-heals onto the
+		// default term, per make_uncategorized_product()'s docblock).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		CatalogHookHandler::reset_seen();
+		RecEngineMockServer::reset();
+		$bare = $this->make_uncategorized_product( 'CAT-REMOVE-NOCAT-1', '9.99' );
+		$pid  = (int) $bare->get_id();
+
+		$original_default = get_option( 'default_product_cat' );
+		update_option( 'default_product_cat', 999999999 ); // Unresolvable — a genuinely broken store.
+		try {
+			$queue = new IngestQueue();
+			$this->truncate_queue();
+
+			wp_trash_post( $pid ); // Live hook → catalog.delete, force-filled by ensure_valid_removal().
+
+			$delete_rows = $queue->pending( 10, array( CatalogHookHandler::EVENT_CATALOG_DELETE ) );
+			self::assertCount( 1, $delete_rows, 'The removal is always enqueued — never silently dropped.' );
+			$captured = json_decode( (string) $delete_rows[0]['payload'], true );
+			self::assertSame(
+				'uncategorized',
+				$captured['object']['category_path'],
+				'Force-filled with the last-resort placeholder — the store default is itself unresolvable.'
+			);
+
+			$settings = new RecEngineSettings();
+			$flusher  = new IngestFlusher(
+				$queue,
+				new CatalogPayloadBuilder(),
+				$settings,
+				static function () use ( $settings ): Client {
+					return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+				}
+			);
+			$stats = $flusher->flush();
+
+			self::assertSame( 1, $stats['sent'], 'The force-filled removal reaches the engine — sent, not rejected nor dropped.' );
+			self::assertSame( 0, $stats['failed'] );
+		} finally {
+			update_option( 'default_product_cat', $original_default );
+		}
+	}
+
+	public function test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine(): void {
+		// PRO-1498, folds in PRO-1492: the mock must reject an empty product_url
+		// with the same d6_item_error shape the real engine returns — mirrors the
+		// existing category_path check (PRO-1491/e98e092). Proven directly against
+		// a catalog.delete row's stored object (the flusher sends it verbatim, see
+		// IngestFlusher::row_to_object), independent of whether the plugin's own
+		// fallback (ensure_valid_removal(), tested above) ever actually produces
+		// such a row today.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+
+		RecEngineMockServer::reset();
+		$this->truncate_queue();
+		$queue->enqueue(
+			CatalogHookHandler::EVENT_CATALOG_DELETE,
+			'999999',
+			array(
+				'object' => array(
+					'sku'           => 'woo-999999',
+					'name'          => 'Blank URL Test',
+					'category_path' => 'food/dry',
+					'price'         => 1.0,
+					'product_url'   => '',
+				),
+			)
+		);
+
+		$flusher = new IngestFlusher(
+			$queue,
+			new CatalogPayloadBuilder(),
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		$stats = $flusher->flush();
+
+		self::assertSame( 0, $stats['sent'], 'An empty product_url never reaches "sent" — the mock rejects it like the live engine.' );
+		self::assertSame( 1, $stats['failed'], 'The row is marked failed, not silently sent.' );
+	}
+
 	public function test_trash_keeps_product_in_stock_false_and_untrash_restores(): void {
 		// Trashing is NOT a delete (before_delete_post never fires for it), so
 		// Bootstrap routes wp_trash_post → on_delete_product: the product stays in
@@ -593,7 +701,7 @@ final class RecEngineCatalogTest extends TestCase {
 		$parent_id                = (int) $parent->save();
 		$this->created_products[] = $parent_id;
 		// Category on the parent → the variation's captured removal object
-		// carries a non-empty category_path (is_removable guard).
+		// carries a non-empty category_path (a normal, real-world shape).
 		$cat     = term_exists( 'rec-trash-cat', 'product_cat' );
 		$cat     = $cat ? $cat : wp_insert_term( 'Rec Trash Cat', 'product_cat', array( 'slug' => 'rec-trash-cat' ) );
 		$term_id = (int) ( is_array( $cat ) ? $cat['term_id'] : $cat );
@@ -812,8 +920,9 @@ final class RecEngineCatalogTest extends TestCase {
 
 	/**
 	 * A product with a real product_cat term so its catalog object carries a
-	 * non-empty category_path — required for the trash/delete removal to pass
-	 * is_removable (the engine rejects a blank category_path).
+	 * non-empty category_path — a normal, real-world removal shape (a
+	 * genuinely blank category_path is now force-filled by
+	 * CatalogPayloadBuilder::ensure_valid_removal(), PRO-1498, not skipped).
 	 */
 	private function make_categorized_product( string $sku, string $price ): \WC_Product {
 		$cat = term_exists( 'rec-trash-cat', 'product_cat' );

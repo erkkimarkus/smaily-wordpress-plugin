@@ -32,11 +32,13 @@ use Smaily\Connect\Smaily\RecEngine\IngestQueue;
  * so it can't be recommended, never dropped (the engine has no delete-by-absence;
  * RECENGINE_API_CONTRACT.md §3). A published post enqueues a catalog.upsert (the
  * flusher loads it fresh, real stock); a trashed post enqueues a catalog.delete
- * carrying its captured object (the flusher stamps in_stock=false), guarded by
- * CatalogHookHandler::is_removable so a removal the engine would 400 (blank
- * category_path / product_url) is skipped. Permanently-deleted products can't be
- * recovered here — their data is gone from WC — so this closes the trash gap, not
- * the hard-delete one.
+ * carrying its captured object (the flusher stamps in_stock=false),
+ * force-filled valid via CatalogPayloadBuilder::ensure_valid_removal() when
+ * category_path / product_url come back blank (PRO-1498) — a removal is never
+ * silently skipped, since the engine has no delete-by-key and a skipped row
+ * would leave a synced product stuck in_stock=true forever (F3-43 never-drop
+ * principle). Permanently-deleted products can't be recovered here — their
+ * data is gone from WC — so this closes the trash gap, not the hard-delete one.
  *
  * Multilingual collapse (catalog-correctness P1): the WHERE clause still
  * enumerates every translation post (WPML/Polylang store each as its own
@@ -115,6 +117,14 @@ class CatalogBackfillJob extends AbstractBackfillJob {
 			return;
 		}
 
+		// A trashed product stays in the catalog as in_stock=false (kept for the
+		// order-history join / training) instead of an upsert; a published one
+		// upserts with its real stock. Decided per parent post — every expanded
+		// unit inherits it. Computed before the product load below so the
+		// unresolvable-product fallback (PRO-1498) can still tell trash from
+		// publish.
+		$is_trashed = $this->post_status( $entity_id ) === 'trash';
+
 		// Not skipped → ingest THIS post: either it IS the canonical (the common
 		// multilingual case — translations were skipped above), or its canonical
 		// isn't separately enumerable (draft / trashed default-language post) so
@@ -123,14 +133,17 @@ class CatalogBackfillJob extends AbstractBackfillJob {
 		// still keys on `wc-{canonical_id}`.
 		$product = $this->get_product( $entity_id );
 		if ( $product === null ) {
+			// The SQL cursor confirmed this id IS a product/trash post row, so a
+			// failed load here means WC couldn't classify it (e.g. a since-
+			// deactivated gift-card plugin's product_type) — a real gap, not "not
+			// ours". Only the trashed branch needs a tombstone (PRO-1498, F3-43
+			// never-drop); a publish-status load failure is a separate, tracked
+			// upsert-side gap (CC.4) out of scope here.
+			if ( $is_trashed ) {
+				$this->enqueue_unavailable_unresolvable( $entity_id );
+			}
 			return;
 		}
-
-		// A trashed product stays in the catalog as in_stock=false (kept for the
-		// order-history join / training) instead of an upsert; a published one
-		// upserts with its real stock. Decided per parent post — every expanded
-		// unit inherits it.
-		$is_trashed = $this->post_status( $entity_id ) === 'trash';
 
 		// Same fan-out as the live hook: a variable product enqueues one row per
 		// variation unit; a simple product enqueues itself.
@@ -147,16 +160,25 @@ class CatalogBackfillJob extends AbstractBackfillJob {
 	 * Enqueue a trashed unit as an in_stock=false removal: capture its object now
 	 * (a trashed post is still loadable) and route it as catalog.delete — the
 	 * flusher stamps in_stock=false, so the engine keeps the SKU (no delete-by-key)
-	 * and the order-history join survives. Skip a removal the engine is
-	 * contract-guaranteed to 400 (blank category_path / product_url), the SAME
-	 * guard the live delete hook applies (CatalogHookHandler::is_removable).
+	 * and the order-history join survives. ensure_valid_removal() force-fills
+	 * category_path/product_url with a sane fallback if they still come back
+	 * blank (PRO-1498) — the removal must always reach the engine, never be
+	 * silently skipped (extends F3-43's never-drop principle).
 	 */
 	private function enqueue_unavailable( \WC_Product $unit ): void {
-		$object = $this->builder->build( $unit, '' );
-		if ( ! CatalogHookHandler::is_removable( $object ) ) {
-			return;
-		}
+		$object = $this->builder->ensure_valid_removal( $this->builder->build( $unit, '' ) );
 		$this->queue->enqueue( CatalogHookHandler::EVENT_CATALOG_DELETE, (string) $unit->get_id(), array( 'object' => $object ) );
+	}
+
+	/**
+	 * Same as enqueue_unavailable(), for a trashed product id that no longer
+	 * resolves to a WC_Product at all — build a minimal tombstone from the
+	 * bare id (PRO-1498) so a previously-synced product still gets marked
+	 * unavailable.
+	 */
+	private function enqueue_unavailable_unresolvable( int $product_id ): void {
+		$object = $this->builder->build_unresolvable( $product_id, '' );
+		$this->queue->enqueue( CatalogHookHandler::EVENT_CATALOG_DELETE, (string) $product_id, array( 'object' => $object ) );
 	}
 
 	/**

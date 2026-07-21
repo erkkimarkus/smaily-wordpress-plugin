@@ -199,32 +199,68 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertSame( CatalogHookHandler::EVENT_CATALOG_DELETE, $queue->enqueued[0]['type'] );
 	}
 
-	// --- never-published-artifact delete skip (the auto-draft GC burst) ------
+	// --- always-sendable removal fallback (PRO-1498) --------------------------
 
-	public function test_delete_of_object_with_blank_category_path_is_not_enqueued(): void {
-		// WordPress's daily auto-draft GC deletes piles of AUTO-DRAFT products,
-		// firing before_delete_post. They have an empty category_path and were
-		// never ingested (backfill is publish-only) — enqueuing a catalog.delete
-		// the engine is guaranteed to 400 only litters the Event Log. Skip it.
+	public function test_delete_of_object_with_blank_category_path_is_enqueued_with_fallback(): void {
+		// A removal object must always reach the engine — it has no delete-by-key,
+		// so silently skipping a blank-field removal would leave a synced product
+		// stuck in_stock=true forever (extends F3-43's never-drop principle).
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 60233, 'wc-60233', '', 'https://miumjau.test/?post_type=product&p=60233' );
 		$handler = $this->handler( $queue, true, array( 60233 => $product ), array( $product ) );
 
 		$handler->on_delete_product( 60233 );
 
-		self::assertSame( array(), $queue->enqueued, 'A removal object with an empty category_path is contract-guaranteed to 400 — not enqueued.' );
+		self::assertCount( 1, $queue->enqueued, 'A removal is always enqueued, never silently dropped.' );
+		$object = $queue->enqueued[0]['payload']['object'];
+		self::assertSame( 'uncategorized', $object['category_path'], 'A blank category_path is force-filled with a generic placeholder.' );
+		self::assertSame( 'https://miumjau.test/?post_type=product&p=60233', $object['product_url'], 'A valid product_url is left untouched.' );
 	}
 
-	public function test_delete_of_object_with_blank_product_url_is_not_enqueued(): void {
-		// product_url is the other REQUIRED non-empty field; an abandoned draft
-		// whose permalink resolves empty is likewise skipped.
+	public function test_delete_of_object_with_blank_product_url_is_enqueued_with_fallback(): void {
+		// product_url is the other REQUIRED non-empty field; a still-blank one
+		// is force-filled with a synthetic placeholder rather than skipped.
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 27695, 'wc-27695', 'food/dry', '' );
 		$handler = $this->handler( $queue, true, array( 27695 => $product ), array( $product ) );
 
 		$handler->on_delete_product( 27695 );
 
-		self::assertSame( array(), $queue->enqueued, 'A removal object with an empty product_url is contract-guaranteed to 400 — not enqueued.' );
+		self::assertCount( 1, $queue->enqueued, 'A removal is always enqueued, never silently dropped.' );
+		$object = $queue->enqueued[0]['payload']['object'];
+		self::assertSame( 'food/dry', $object['category_path'], 'A valid category_path is left untouched.' );
+		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=27695', $object['product_url'] );
+	}
+
+	public function test_delete_of_unresolvable_product_still_enqueues_minimal_tombstone(): void {
+		// PRO-1498: wc_get_product() can fail even though the post IS (or was) a
+		// product/variation — e.g. its type came from a since-deactivated
+		// plugin. The SKU may already be synced in the engine, so it still
+		// needs a tombstone built from the bare id — never silently dropped.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true, array(), array(), null, array(), array( 555 => 'product' ) );
+
+		$handler->on_delete_product( 555 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( CatalogHookHandler::EVENT_CATALOG_DELETE, $queue->enqueued[0]['type'] );
+		self::assertSame( '555', $queue->enqueued[0]['entity_id'] );
+		$object = $queue->enqueued[0]['payload']['object'];
+		self::assertSame( 'woo-555', $object['sku'] );
+		self::assertFalse( $object['in_stock'] );
+		self::assertNotSame( '', $object['category_path'] );
+		self::assertNotSame( '', $object['product_url'] );
+	}
+
+	public function test_delete_of_unresolvable_non_product_post_enqueues_nothing(): void {
+		// wp_trash_post fires for EVERY post type — a trashed page/blog post
+		// that WooCommerce never had data for must not spawn a bogus catalog row.
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true, array(), array(), null, array(), array( 777 => 'post' ) );
+
+		$handler->on_delete_product( 777 );
+
+		self::assertSame( array(), $queue->enqueued );
 	}
 
 	// --- hard delete → §3b catalog.remove (PRO-1230) --------------------------
@@ -427,14 +463,46 @@ final class CatalogHookHandlerTest extends TestCase {
 				return $this->units;
 			}
 			public function build( \WC_Product $product, string $event_uuid ): array {
-				$object = array( 'sku' => (string) $product->get_sku(), 'event_id' => $event_uuid, 'in_stock' => true );
+				$object = array(
+					'sku'         => (string) $product->get_sku(),
+					'event_id'    => $event_uuid,
+					'in_stock'    => true,
+					'external_id' => (string) $product->get_id(),
+				);
 				// The real builder always carries category_path + product_url; the
-				// delete guard (removable()) keys on them, so mirror them here. A
-				// fake_product exposes them via smly_* accessors (defaults non-empty,
-				// blank for the never-published-artifact skip cases).
+				// removal fallback (ensure_valid_removal()) keys on them, so mirror
+				// them here. A fake_product exposes them via smly_* accessors
+				// (defaults non-empty, blank for the always-sendable-fallback cases).
 				if ( method_exists( $product, 'smly_category_path' ) ) {
 					$object['category_path'] = $product->smly_category_path();
 					$object['product_url']   = $product->smly_product_url();
+				}
+				return $object;
+			}
+			public function build_unresolvable( int $product_id, string $event_uuid ): array {
+				return array(
+					'event_id'      => $event_uuid,
+					'sku'           => 'woo-' . $product_id,
+					'name'          => 'Unavailable product #' . $product_id,
+					'category_path' => 'uncategorized',
+					'price'         => 0.0,
+					'in_stock'      => false,
+					'product_url'   => 'https://shop.test/?smaily_connect_removed_product=' . $product_id,
+					'external_id'   => (string) $product_id,
+				);
+			}
+			// Mirrors the real ensure_valid_removal() output shape without calling
+			// the real home_url() — this raw (non-Brain\Monkey) test file has no
+			// WordPress loaded; the real method's behaviour is covered directly in
+			// CatalogPayloadBuilderTest.
+			public function ensure_valid_removal( array $object ): array {
+				if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
+					$object['category_path'] = 'uncategorized';
+				}
+				$product_url = $object['product_url'] ?? '';
+				$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
+				if ( ! $has_url ) {
+					$object['product_url'] = 'https://shop.test/?smaily_connect_removed_product=' . ( $object['external_id'] ?? '0' );
 				}
 				return $object;
 			}

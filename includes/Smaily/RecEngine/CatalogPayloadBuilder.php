@@ -168,6 +168,87 @@ class CatalogPayloadBuilder {
 	}
 
 	/**
+	 * Build a minimal, always-valid catalog.delete tombstone for a product id
+	 * that no longer resolves to a WC_Product at all (PRO-1498) — e.g. its
+	 * product_type came from a since-deactivated plugin (a gift-card add-on),
+	 * or its WC data is already stripped by the time the delete hook runs.
+	 * There is no product to read, so every field is derived from the bare
+	 * id, but the result still satisfies contract §3's REQUIRED, non-empty
+	 * fields — the tombstone must always reach the engine so a
+	 * synced-then-vanished product never lingers `in_stock=true` (extends
+	 * F3-43's order-item never-drop principle to catalog tombstones).
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function build_unresolvable( int $product_id, string $event_uuid ): array {
+		$category_path = $this->default_category_path();
+
+		return array(
+			'event_id'      => $event_uuid,
+			'sku'           => SkuResolver::resolve_id( $product_id, $this->detector() ),
+			'name'          => 'Unavailable product #' . $product_id,
+			'category_path' => $category_path !== '' ? $category_path : 'uncategorized',
+			'price'         => 0.0,
+			'in_stock'      => false,
+			'product_url'   => $this->fallback_product_url( $product_id ),
+			'external_id'   => (string) $product_id,
+		);
+	}
+
+	/**
+	 * Force a captured catalog.delete object into an always-sendable shape.
+	 * build() already derives category_path/product_url with real fallbacks
+	 * (the store's own default_product_cat term, the real permalink) for any
+	 * product WooCommerce can still load — this only overrides the residual
+	 * case where even that comes back blank (a broken store, or a product
+	 * whose permalink can't be resolved at delete time).
+	 *
+	 * Delete-only, deliberately: the live catalog.upsert path keeps failing
+	 * loud on the same gap (F3-39/PRO-1491) because there an empty required
+	 * field is a genuine merchant-data-gap signal worth surfacing. A
+	 * tombstone has no such signal to protect — its only job is "mark this
+	 * SKU unavailable" (contract §3's soft-removal semantics) — so it must
+	 * always reach the engine rather than being silently skipped (PRO-1498,
+	 * extends F3-43's order-item never-drop principle).
+	 *
+	 * @param array<string, mixed> $object
+	 * @return array<string, mixed>
+	 */
+	public function ensure_valid_removal( array $object ): array {
+		if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
+			// A generic, honest placeholder — the engine only requires a
+			// non-empty string; this row is being marked unavailable, never
+			// shown, so the label carries no merchandising meaning to fake.
+			$object['category_path'] = 'uncategorized';
+		}
+
+		$product_url = $object['product_url'] ?? '';
+		$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
+		if ( ! $has_url ) {
+			$object['product_url'] = $this->fallback_product_url( (int) ( $object['external_id'] ?? 0 ) );
+		}
+
+		return $object;
+	}
+
+	/**
+	 * A syntactically valid placeholder URL for a product whose real
+	 * permalink can't be derived (already gone / never routable). Honest for
+	 * a tombstone — the row's only meaning is "no longer available"
+	 * (in_stock=false), so it is never shown or clicked; it exists solely to
+	 * satisfy the engine's REQUIRED non-empty product_url (contract §3).
+	 * Deliberately NOT the historical `product_base_url + sku` shape the
+	 * contract calls out as rejected for a LIVE product (F3-17) — this is a
+	 * clearly-synthetic marker, never a plausible real product page.
+	 */
+	private function fallback_product_url( int $product_id ): string {
+		if ( ! function_exists( 'home_url' ) ) {
+			return '';
+		}
+		return home_url( '/?smaily_connect_removed_product=' . $product_id );
+	}
+
+	/**
 	 * compare_price = the pre-discount price, sent only when the product
 	 * is genuinely marked down (regular > current). Returned null (→
 	 * omitted) otherwise so a non-sale product doesn't carry a redundant

@@ -258,11 +258,16 @@ final class RecEngineCatalogBackfillTest extends TestCase {
 		self::assertSame( (string) $id, $tags[ 'woo-' . $id ]['product_id'] ?? null, 'tags.product_id is the RAW canonical parent id (no woo- prefix).' );
 	}
 
-	// The is_removable guard (a category-less trashed product is skipped, not sent
-	// as a 400-bound row) is covered robustly by the unit test
-	// CatalogBackfillJobTest::test_trashed_product_with_blank_category_path_is_skipped
-	// — not repeated here, where WooCommerce's auto-assigned "Uncategorized" makes
-	// a genuinely category-less fixture fragile.
+	// The always-sendable removal fallback (PRO-1498: a category-less trashed
+	// product is force-filled with a placeholder and still sent, never
+	// skipped) is covered robustly by the unit tests
+	// CatalogBackfillJobTest::test_trashed_product_with_blank_category_path_is_enqueued_with_fallback
+	// and test_trashed_unresolvable_product_still_enqueues_minimal_tombstone —
+	// not repeated here, where WooCommerce's auto-assigned "Uncategorized" makes
+	// a genuinely category-less fixture fragile. RecEngineCatalogTest::
+	// test_uncategorized_product_removal_is_force_filled_and_sent_not_dropped
+	// covers the end-to-end force-fill-and-send round trip against the mock
+	// engine via the live delete hook.
 
 	/**
 	 * Drive a backfill job to completion, returning the cumulative
