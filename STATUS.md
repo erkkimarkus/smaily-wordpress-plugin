@@ -26,7 +26,61 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1499 — contract synced to v1.6.0 (engine
+_Last updated: 2026-07-21 (**v3.8.1 — build/verify/gate sequence RUN, gates
+green; publication (GH release + tag) deferred to the orchestrator in this
+session, not performed by this pass.** PATCH bump (fixes + hardening, no new
+merchant-facing functionality). Version bumped in all four places
+(`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
+`SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
+tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
+`tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
+(`251a29f`, pushed to `main`). Content since the v3.8.0 release record
+(`9cd41be`): PRO-1498 catalog tombstone force-fill
+(`5fe4811`/`296377c`/`33a2f35`/`c816d89` — a catalog.delete row for a
+deleted/unresolvable product is now always sent instead of being silently
+skipped when its captured category_path/product_url come back blank, or the
+product no longer resolves to a `WC_Product` at all), PRO-1486 (`3a47eb3` —
+the `/relay` browse proxy no longer accepts a client-supplied
+`customer_email`, closing the spoofable whitelist entry the v3.8.0 delta
+audit flagged as Info), PRO-1499 (`1303abc`/`0910b06`/`45cf1f3`/`8c5e5b6` —
+contract synced to v1.6.0, `tags.category_defaulted` implemented +
+live-walked). Three user-facing changelog items: removal of a deleted
+product from recommendations is now reliable even when its underlying
+WooCommerce data is gone; products rescued under the store's default
+category (3.8.0) are now marked so recommendations categorize them
+correctly; the browse-tracking endpoint hardened so identity comes only
+from the shopper's real login, never a browser-supplied value.
+`npm run build:admin && npm run build:client`; blocks rebuilt (`composer run
+install-block-modules && composer run build`); i18n rebuild SKIPPED
+(confirmed via `git log aea32bb..HEAD -- admin/src languages/` — zero hits).
+`composer install --no-dev --optimize-autoloader` → `composer run package` →
+`composer install` (dev restored). ZIP verified: v3.8.1 in all three version
+strings, required present (`dist/admin/admin.js`, `dist/public/js/
+sc-runtime.js`, `blocks/*/build/*`, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + admin-bundle et JSON, `composer.json`),
+dev artifacts/tests/docs/node_modules/admin-src absent, **1 122 412 B** (vs.
+v3.8.0's 1 119 339 B). **PCP against the built ZIP** (unzipped to
+`smaily-connect-pkg` in the wp-env `…-cli-1` container, never the
+bind-mounted `smaily-connect` dir; `--slug=smaily-connect`): exactly the
+expected `plugin_updater_detected` ERROR (F3-35), nothing else — no
+`upgrade_notice_limit` this time (267 chars, under the 300 limit).
+Container temp copies cleaned up afterward. **`ci:strict` exit=0** (PHPCS 0
+errors, PHPStan clean, PHPUnit unit 595/595, vitest 248/248, tsc/eslint
+clean). **Integration suite RE-RUN in full**: `sg docker -c "composer run
+test:integration"` OK (163 tests, 826 assertions), dev sandbox tenant
+"Smaily Connect test" correctly restored post-run (not MiuMjau). **Delta
+security audit**: full re-audit at the release boundary (delta
+`9cd41be..251a29f`) — adversarial pass on the PRO-1486 `/relay` strip (the
+pure-narrowing verification the same-day register note deferred to this
+pass: confirmed no bypass via case/nesting/type confusion, injection
+ordering unchanged) plus a new-input-surface check on the PRO-1498/1499
+catalog commits (none found — internal WP post ids + already-built catalog
+objects only, no new route/external HTTP/SQL). Verdict PASS, 0 findings.
+Full report `docs/audits/2026-07-21-SECURITY_DELTA_AUDIT_V381_GATE.md` +
+register row in `docs/audits/INDEX.md`. **NOT published**: no `gh release`,
+no git tag — per this task's scope, publication is the orchestrator's step.
+
+Prior: 2026-07-21 (**PRO-1499 — contract synced to v1.6.0 (engine
 commit `06266a8`); `tags.category_defaulted` implemented + live-walked.**
 `docs/RECENGINE_API_CONTRACT.md` byte-identically synced from the engine's
 main (`bin/check-contract-staleness.sh` confirms in-sync). Two additions: (1)
