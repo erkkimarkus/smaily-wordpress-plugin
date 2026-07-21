@@ -26,7 +26,51 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1436 — suppressed the 4 false-positive PCP
+_Last updated: 2026-07-21 (**v3.7.2 — build/verify/gate sequence RUN, gates
+green; publication (GH release + tag) deferred to the orchestrator in this
+session, not performed by this pass.** Version bumped in all four places
+(`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
+`SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
+tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
+`tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
+(`bc7bcc9`, pushed to `main`). Content since the v3.7.1 release record
+(`f470faf`): the PRO-1388 consent-independent browser-side attribution
+capture fix + its tests (`6d8bd6d`/`f2ffd50`), the PRO-1447 contract sync to
+v1.5.0 (`ea76f8d`, doc-only), and the PRO-1436 PCP-suppression comments
+(`5f9b031`, comment-only) — the only user-facing changelog item is the
+attribution-capture fix. `npm run build:admin && npm run build:client`
+(client entry `dist/public/js/sc-runtime.js`); blocks built (`composer run
+install-block-modules && composer run build`); i18n rebuild SKIPPED (no
+`admin/src`/`.po` changes since v3.7.1, and the on-disk `.mo`/admin-bundle
+`-et-…json` confirmed still current from the 3.7.1 build). `composer install
+--no-dev --optimize-autoloader` → `composer run package` → `composer
+install` (dev restored). ZIP verified: v3.7.2 in all three version strings,
+required present (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
+`blocks/*/build/*`, `vendor/autoload.php`, `languages/smaily-connect-et.mo`
++ the admin-bundle et JSON), dev artifacts/tests/docs/node_modules/admin-src
+absent, `composer.json` present, **1 116 466 B** (vs. v3.7.1's 1 114 299 B —
+a ~2.2 KB increase in line with the delta's new beacon-core/rec-engine-client
+code + contract doc). **PCP against the built ZIP** (unzipped to
+`smaily-connect-pkg` in the wp-env `…-cli-1` container, never the
+bind-mounted `smaily-connect` dir; `--slug=smaily-connect`): exactly the
+expected set — only the intentional `plugin_updater_detected` ERROR (F3-35),
+nothing else. The `due_rows()` method in `CartSessionStore.php` (same
+`{$this->table_name()}` interpolation pattern as the sites PRO-1436
+suppressed) was specifically checked and did NOT get flagged by PCP.
+Container temp copies cleaned up afterward. **`ci:strict` exit=0** (PHPCS 0
+errors, PHPStan clean, PHPUnit unit 571/571, vitest 248/248, tsc/eslint
+clean). **Integration suite RE-RUN in full**: `sg docker -c "composer run
+test:integration"` OK (157 tests, 791 assertions), dev sandbox tenant
+"Smaily Connect test" correctly restored post-run (not MiuMjau). **Delta
+security audit**: the two PRO-1388 beacon commits (the consent surface) were
+adversarially reviewed — `captureUrlParams()` still writes only the three
+attribution cookies, creates no session and sends nothing pre-consent, no new
+injection/XSS surface, cookie flags sane; verdict PASS, 0 findings. Full
+report `docs/audits/2026-07-21-SECURITY_DELTA_AUDIT_V372_GATE.md` + register
+row in `docs/audits/INDEX.md`. **NOT published**: no `gh release`, no git tag
+— per this task's scope, publication is the orchestrator's step.
+
+Prior: 2026-07-21 (**PRO-1436 — suppressed the 4 false-positive PCP
 warnings from the PRO-1195 abandoned-cart code, gate-reviewed at v3.7.0/
 v3.7.1.** `CartAbandonmentSweeper.php:78` (`self::FILTER_MAX_AGE` —
 `DynamicHooknameFound`, PCP can't resolve a class-constant hook name) got the
