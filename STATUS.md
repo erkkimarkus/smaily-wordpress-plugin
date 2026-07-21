@@ -26,7 +26,66 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1491 continuation — F3-39 REVISION (approved
+_Last updated: 2026-07-21 (**v3.8.0 — build/verify/gate sequence RUN, gates
+green; publication (GH release + tag) deferred to the orchestrator in this
+session, not performed by this pass.** Version bumped in all four places
+(`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
+`SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
+tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
+`tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
+(`aea32bb`, pushed to `main`). Content since the v3.7.2 release record
+(`bc7bcc9`): the PRO-1389 ongoing-session identity injection on `/relay`
+(`90e2712`/`34d8c3d`/`895c7da`) and its consent-lookup dedup follow-up, a
+PRO-1402 decision record, a docs refresh (`ef1b911`, PRO-1197), and the
+PRO-1491 catalog fixes (default-category fallback for no-term published
+products + auto-draft-skip, `e98e092`/`642eae3`/`7d3c799`/`07e4f0c`/
+`04789b8`) — a MINOR bump (new functionality, not just a fix). Three
+user-facing changelog items: logged-in shoppers' browsing is now linked to
+their account for the whole session (resolved server-side, email never
+exposed to the browser, opt-outs respected); products with no category now
+sync under the store's own default category instead of being skipped; empty
+"Add new product" auto-draft placeholders no longer enqueue doomed sync rows.
+`npm run build:admin && npm run build:client` (client entry `dist/public/js/
+sc-runtime.js`); blocks rebuilt (`composer run install-block-modules &&
+composer run build`); i18n rebuild SKIPPED (confirmed via `git log
+bc7bcc9..HEAD -- admin/src languages/` — zero hits; on-disk `.mo`/admin-bundle
+`-et-…json` unchanged from the 3.7.2-era build). `composer install --no-dev
+--optimize-autoloader` → `composer run package` → `composer install` (dev
+restored). **Gate-time PCP finding, fixed same session:** the first ZIP's
+`readme.txt` 3.8.0 Upgrade Notice was 368 chars, over PCP's 300-char limit
+(`upgrade_notice_limit` WARNING) — same class of fix as the v3.6.0 gate;
+tightened to 290 chars, content unchanged (`9cd41be`), ZIP rebuilt. Final ZIP
+verified: v3.8.0 in all three version strings, required present
+(`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`, `blocks/*/build/*`,
+`vendor/autoload.php`, `languages/smaily-connect-et.mo` + admin-bundle et
+JSON, `composer.json`), dev artifacts/tests/docs/node_modules/admin-src
+absent, **1 119 339 B** (vs. v3.7.2's 1 116 466 B — a ~2.7 KB increase in
+line with the delta's new identity-injection + catalog-fallback code).
+**PCP against the built ZIP** (unzipped to `smaily-connect-pkg` in the
+wp-env `…-cli-1` container, never the bind-mounted `smaily-connect` dir;
+`--slug=smaily-connect`): re-run after the upgrade-notice fix, exactly the
+expected set — only the intentional `plugin_updater_detected` ERROR
+(F3-35), nothing else. Container temp copies cleaned up afterward.
+**`ci:strict` exit=0** (PHPCS 0 errors, PHPStan clean, PHPUnit unit
+585/585, vitest 248/248, tsc/eslint clean). **Integration suite RE-RUN in
+full**: `sg docker -c "composer run test:integration"` OK (162 tests, 814
+assertions), dev sandbox tenant "Smaily Connect test" correctly restored
+post-run (not MiuMjau). **Delta security audit**: the three PRO-1389
+identity-injection commits (the auth/consent surface) were adversarially
+reviewed against the release brief's explicit questions — injection gates
+exclusively on WordPress core's own `wp_validate_auth_cookie()` (a forged or
+expired cookie resolves to anonymous, never an attached email), the
+opted-out path forwards events byte-for-byte unmodified (never dropped), the
+resolved email is absent from every response/error path, and the
+consent-lookup dedup narrows rather than widens the pre-existing (and
+out-of-scope for this delta) `may_profile()` timing surface; PRO-1491's
+catalog commits confirmed to carry no new user-input surface. Verdict PASS,
+0 findings. Full report
+`docs/audits/2026-07-21-SECURITY_DELTA_AUDIT_V380_GATE.md` + register row
+in `docs/audits/INDEX.md`. **NOT published**: no `gh release`, no git tag —
+per this task's scope, publication is the orchestrator's step.
+
+Prior: 2026-07-21 (**PRO-1491 continuation — F3-39 REVISION (approved
 by Erkki): published no-term products now get the store's own default
 category name; auto-draft saves no longer enqueue catalog rows.** Two fixes
 on top of the same-day root-cause investigation below (which stands
