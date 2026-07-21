@@ -315,7 +315,7 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 == Upgrade Notice ==
 
 = 3.8.0 =
-Logged-in shoppers' browsing is now linked to their account for their whole session (resolved server-side; their email is never exposed to the browser; opt-outs are still respected). Products with no assigned category now sync under your store's default category instead of being skipped. Empty "Add new product" placeholders no longer create sync noise. Safe update.
+Logged-in shoppers' browsing is now linked to their account for the session (resolved server-side, email never exposed to the browser, opt-outs respected). Products with no category now sync under your store's default category. Empty product drafts no longer create sync noise. Safe update.
 
 = 3.7.2 =
 Fixes email-link attribution being lost on cached storefronts or when consent is decided after landing. Safe update.
