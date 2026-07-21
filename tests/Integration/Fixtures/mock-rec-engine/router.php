@@ -365,6 +365,25 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/catalog' ) {
 			continue;
 		}
 
+		// REQUIRED non-empty (PRO-1491 mock-divergence fix): the mock used to
+		// accept an empty/blank category_path, which the real engine rejects
+		// with exactly this d6_item_error — the MiuMjau 253-row failure burst
+		// this mock gap was hiding. `{lang:value}` counts as blank when every
+		// language entry is empty (mirrors CatalogHookHandler::is_removable()).
+		$category_path = $product['category_path'] ?? '';
+		$category_path_blank = is_array( $category_path )
+			? $category_path === array()
+			: (string) $category_path === '';
+		if ( $category_path_blank ) {
+			$errors[] = array(
+				'index'   => $index,
+				'sku'     => $sku,
+				'field'   => 'category_path',
+				'message' => 'String must contain at least 1 character(s)',
+			);
+			continue;
+		}
+
 		if ( $event_id !== '' && in_array( $event_id, $seen, true ) ) {
 			++$deduplicated;
 			continue;

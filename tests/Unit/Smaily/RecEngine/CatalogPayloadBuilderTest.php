@@ -184,6 +184,23 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( 'food/dry', $payload['category_path'] );
 	}
 
+	public function test_category_path_is_empty_string_with_no_fallback_when_product_has_no_categories(): void {
+		// PRO-1491: get_the_terms() returning nothing (false/empty — the
+		// default setUp() stub) must yield the bare empty string, never an
+		// invented fallback like "uncategorized". category_path is a
+		// contract-REQUIRED, non-empty field (RECENGINE_API_CONTRACT.md §3)
+		// with no omit-on-empty allowance — inventing a bucket value here
+		// would be a business-model call the connector must not make
+		// (primary_category_path() docblock / DECISIONS F3-39). The engine's
+		// resulting `d6_item_error field=category_path` is the intended
+		// merchant-data-gap signal, not a bug to mask.
+		$product = $this->fake_product( array( 'sku' => 'NOCAT-1', 'price' => '1.00' ) );
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
+
+		self::assertSame( '', $payload['category_path'] );
+	}
+
 	public function test_expand_simple_product_returns_itself(): void {
 		$product = $this->fake_product( array( 'sku' => 'SIMPLE-1', 'type' => 'simple' ) );
 

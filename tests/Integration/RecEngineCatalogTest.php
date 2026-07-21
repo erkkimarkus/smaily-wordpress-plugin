@@ -318,6 +318,50 @@ final class RecEngineCatalogTest extends TestCase {
 		self::assertSame( array(), $queue->pending( 10 ), 'Both rows reached a terminal state.' );
 	}
 
+	public function test_uncategorized_product_upsert_is_rejected_by_the_engine_and_marked_failed(): void {
+		// PRO-1491 root cause + mock-divergence fix: a PUBLISHED product with
+		// literally NO product_cat term (not even "Uncategorized" — that would
+		// yield a non-empty "uncategorized" path) builds an empty
+		// category_path. CatalogPayloadBuilder deliberately never invents a
+		// fallback (F3-39 / primary_category_path() docblock) — the engine's
+		// REQUIRED, non-empty Zod field 400s per-item so the gap is a visible
+		// Event Log signal, not a silent drop. Before this fix the mock
+		// wrongly ACCEPTED the empty string, hiding the exact failure MiuMjau
+		// hit 253 times (`d6_item_error field=category_path`).
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+		$builder  = new CatalogPayloadBuilder();
+
+		CatalogHookHandler::reset_seen();
+		RecEngineMockServer::reset();
+		$bare = $this->make_uncategorized_product( 'CAT-NOCAT-1', '9.99' );
+		self::assertSame( '', $builder->primary_category_path( $bare ), 'Sanity: the fixture truly has no category.' );
+
+		$this->truncate_queue();
+		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bare->get_id(), array(), 'ok-cat-nocat' );
+
+		$flusher = new IngestFlusher(
+			$queue,
+			$builder,
+			$settings,
+			static function () use ( $settings ): Client {
+				return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+			}
+		);
+		$stats = $flusher->flush();
+
+		self::assertSame( 0, $stats['sent'], 'An empty category_path never reaches "sent" — the engine rejects it.' );
+		self::assertSame( 1, $stats['failed'], 'The row is marked failed, not silently dropped nor silently sent.' );
+	}
+
 	public function test_trash_keeps_product_in_stock_false_and_untrash_restores(): void {
 		// Trashing is NOT a delete (before_delete_post never fires for it), so
 		// Bootstrap routes wp_trash_post → on_delete_product: the product stays in
@@ -724,6 +768,52 @@ final class RecEngineCatalogTest extends TestCase {
 		wp_set_object_terms( (int) $product->get_id(), array( $term_id ), 'product_cat' );
 
 		$loaded = wc_get_product( (int) $product->get_id() );
+		self::assertInstanceOf( \WC_Product::class, $loaded );
+		return $loaded;
+	}
+
+	/**
+	 * PRO-1491: a product with NO product_cat term at all (not even
+	 * "Uncategorized") — the real-world shape that produces an empty
+	 * `category_path` and the engine's `d6_item_error field=category_path`.
+	 *
+	 * Bypasses `WC_Product::save()` on purpose: its data store
+	 * (`WC_Product_Data_Store_CPT`) forces `default_product_cat` onto an
+	 * empty category list, and `WC_Post_Data::force_default_term()` (hooked
+	 * on the `set_object_terms` action) re-asserts it on ANY subsequent
+	 * `wp_set_object_terms( …, array(), 'product_cat' )` clear attempt too —
+	 * confirmed empirically (a `save()` + explicit clear still healed back to
+	 * "uncategorized" here). The self-heal only runs INSIDE a
+	 * `set_object_terms` call, so a raw `wp_insert_post()` + meta build that
+	 * never touches the taxonomy at all reproduces the real shape: a bulk
+	 * import / a WPML stand-in translation row whose `product_cat`
+	 * relationship was simply never established.
+	 */
+	private function make_uncategorized_product( string $sku, string $price ): \WC_Product {
+		$existing = wc_get_product_id_by_sku( $sku );
+		if ( $existing ) {
+			wp_delete_post( $existing, true );
+		}
+
+		$id = (int) wp_insert_post(
+			array(
+				'post_type'   => 'product',
+				'post_status' => 'publish',
+				'post_title'  => 'Catalog Test ' . $sku,
+			)
+		);
+		self::assertGreaterThan( 0, $id );
+		$this->created_products[] = $id;
+
+		update_post_meta( $id, '_sku', $sku );
+		update_post_meta( $id, '_regular_price', $price );
+		update_post_meta( $id, '_price', $price );
+		update_post_meta( $id, '_stock_status', 'instock' );
+		update_post_meta( $id, '_manage_stock', 'no' );
+		update_post_meta( $id, '_virtual', 'no' );
+		update_post_meta( $id, '_downloadable', 'no' );
+
+		$loaded = wc_get_product( $id );
 		self::assertInstanceOf( \WC_Product::class, $loaded );
 		return $loaded;
 	}
