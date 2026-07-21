@@ -2101,6 +2101,36 @@ FRESH from `wc_get_product()` on every send, including a retry (F3-44 holds
 here) — so assigning each affected product a real category in wp-admin, then
 using the Event Log's "Retry", is sufficient; no re-backfill needed.
 
+**REVISION (PRO-1491, 2026-07-21, approved by Erkki) — the "no invented
+fallback" call above is narrowed for the empirically-confirmed case; two
+fixes shipped.** The ADDENDUM's live evidence (253 real, PUBLISHED MiuMjau
+products silently excluded from the engine catalog) changed the cost-benefit:
+these are not abandoned artifacts, they are products a real merchant expects
+recommended. **Fix A** — `CatalogPayloadBuilder::primary_category_path()` now
+falls back, when a published product has zero `product_cat` terms, to the
+**store's own `default_product_cat` option**, resolving that term and using
+its actual NAME at build time (never a hardcoded English literal — a
+localized/renamed store gets its own term name). This is WooCommerce's own
+"uncategorized" semantics, not an invented bucket — the connector still makes
+no business-model call, it forwards a value the store itself already
+designates. If even the default term is unresolvable (a genuinely broken
+store: the option or the term itself is gone), the method still returns `""`
+and the engine's REQUIRED-field rejection still fires — the original
+fail-loud behavior is preserved for that edge, not removed. **Fix B**
+(orthogonal root-cause overlap found during the same investigation) —
+`CatalogHookHandler::on_save_product()` now skips `auto-draft` status posts
+(mirroring its existing `trash` early-return): opening the WordPress "Add
+product" screen creates an auto-draft placeholder (no name, no category, no
+price) that fires `save_post` before the merchant has entered anything: this
+was a second, independent source of empty-`category_path` catalog rows, one
+that Fix A cannot fully help either (the recovery is the row never having been
+enqueued, not a fallback name). Plain `draft` status was left unchanged
+(out of scope — a merchant explicitly saving a draft is a real action, and
+Fix A now covers a draft's possibly-still-empty category too). The mock's
+strict empty-`category_path` rejection (the ADDENDUM's mock-divergence fix)
+is UNCHANGED and still correct — it now guards the narrower fail-loud edge
+Fix A's fallback doesn't reach.
+
 ### F3-40 — Trashed products stay in the catalog as `in_stock=false` (pilot orphan-join fix)
 
 **Context:** an engine-team data audit (2026-06-17) found ~4% of pilot order lines

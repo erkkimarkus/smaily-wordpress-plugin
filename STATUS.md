@@ -26,7 +26,63 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1491 — MiuMjau's 253 failed `catalog.upsert`
+_Last updated: 2026-07-21 (**PRO-1491 continuation — F3-39 REVISION (approved
+by Erkki): published no-term products now get the store's own default
+category name; auto-draft saves no longer enqueue catalog rows.** Two fixes
+on top of the same-day root-cause investigation below (which stands
+unchanged as the evidence trail). **Fix A** —
+`CatalogPayloadBuilder::primary_category_path()` now falls back, when a
+PUBLISHED product has zero `product_cat` terms, to the store's OWN
+`default_product_cat` option: resolves that term and uses its actual NAME at
+build time (never a hardcoded English literal — a localized/renamed store
+gets its own term name). This is WooCommerce's own "uncategorized"
+semantics, not an invented bucket, so it doesn't reverse the "connector
+never makes a business-model call" principle — it forwards a value the store
+itself already designates. If even the default term is unresolvable (a
+genuinely broken store), the fail-loud `''` → engine-rejects behavior is
+UNCHANGED — this only narrows the empirically-confirmed real case (the
+MiuMjau 253 rows), it doesn't remove the guard. **Fix B** — a second,
+independent root cause found during the same investigation:
+`CatalogHookHandler::on_save_product()` now skips `auto-draft` status posts
+(mirroring the existing `trash` early-return) — opening the WordPress "Add
+product" screen creates an auto-draft placeholder (empty name/category/
+price) that fires `save_post` before the merchant enters anything, which was
+enqueuing a doomed catalog row every time. Plain `draft` is unchanged
+(out of scope; see FOLLOW-UPS). The mock's strict empty-`category_path`
+rejection (same-day earlier fix, unchanged) now guards the narrower
+unresolvable-default edge instead of every no-term product.
+**Tests**: unit — `CatalogPayloadBuilderTest` gained
+`test_category_path_falls_back_to_store_default_category_when_product_has_
+no_categories` (asserts the resolved term NAME, not "uncategorized") and
+renamed the old no-fallback test to
+`test_category_path_is_empty_string_when_default_category_is_unresolvable`
+(same assertion, narrower scope); `CatalogHookHandlerTest` gained
+`test_save_of_auto_draft_is_skipped`. Integration —
+`RecEngineCatalogTest::test_uncategorized_product_upsert_is_rejected_by_the_
+engine_and_marked_failed` renamed to
+`test_uncategorized_product_upsert_uses_store_default_category_and_is_sent`
+(now asserts `sent=1/failed=0` with `category_path==='Uncategorized'`, the
+wp-env test site's real default term name) plus a new
+`test_uncategorized_product_upsert_is_rejected_when_store_default_category_
+is_unresolvable` (temporarily corrupts `default_product_cat` via
+`update_option`/restores in a `finally`, proving the fail-loud edge still
+works end-to-end against the mock). Gates: `npm run ci:strict` exit=0
+(PHPCS 0 errors, PHPStan clean, PHPUnit unit `585/585` — was 583, +2; vitest
+`248/248` unchanged). Integration:
+`sg docker -c "composer run test:integration"` `OK (162 tests, 814
+assertions)` — was 161/809, +1 test; dev sandbox tenant "Smaily Connect
+test" correctly restored post-run (not MiuMjau).
+Files: `includes/Smaily/RecEngine/CatalogPayloadBuilder.php`,
+`includes/Integrations/WooCommerce/CatalogHookHandler.php`,
+`tests/Unit/Smaily/RecEngine/CatalogPayloadBuilderTest.php`,
+`tests/Unit/Integrations/WooCommerce/CatalogHookHandlerTest.php`,
+`tests/Integration/RecEngineCatalogTest.php`, `docs/DECISIONS.md`,
+`STATUS.md`. **Remaining**: the MiuMjau repair (retry of the 253 real
+failed rows once this ships) is a human/orchestrator step, not part of this
+change — see the ADDENDUM below for the mechanics (Event Log "Retry",
+F3-44).)
+
+Prior: 2026-07-21 (**PRO-1491 — MiuMjau's 253 failed `catalog.upsert`
 rows (`d6_item_error field=category_path`) root-caused; mock divergence
 closed, no CatalogPayloadBuilder change.** Live evidence: every failed row
 had an empty `category_path`. Root cause, confirmed empirically (not just
