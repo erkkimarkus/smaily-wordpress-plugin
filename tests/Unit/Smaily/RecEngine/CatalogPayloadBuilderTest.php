@@ -34,6 +34,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		Functions\when( 'wp_get_attachment_url' )->justReturn( false );
 		Functions\when( 'get_the_terms' )->justReturn( false );
 		Functions\when( 'get_ancestors' )->justReturn( array() );
+		// No resolvable store default_product_cat by default (PRO-1491 fix A) —
+		// individual tests override this to exercise the fallback itself.
+		Functions\when( 'get_option' )->justReturn( 0 );
 		// SiteLocaleAdapter::get_translations() reads these — stub so they don't
 		// trip Brain\Monkey; their scalar return keeps build() on the
 		// single-language (product-field) path.
@@ -184,16 +187,35 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertSame( 'food/dry', $payload['category_path'] );
 	}
 
-	public function test_category_path_is_empty_string_with_no_fallback_when_product_has_no_categories(): void {
-		// PRO-1491: get_the_terms() returning nothing (false/empty — the
-		// default setUp() stub) must yield the bare empty string, never an
-		// invented fallback like "uncategorized". category_path is a
-		// contract-REQUIRED, non-empty field (RECENGINE_API_CONTRACT.md §3)
-		// with no omit-on-empty allowance — inventing a bucket value here
-		// would be a business-model call the connector must not make
-		// (primary_category_path() docblock / DECISIONS F3-39). The engine's
-		// resulting `d6_item_error field=category_path` is the intended
-		// merchant-data-gap signal, not a bug to mask.
+	public function test_category_path_falls_back_to_store_default_category_when_product_has_no_categories(): void {
+		// F3-39 REVISION (PRO-1491, 2026-07-21): get_the_terms() returning
+		// nothing (false/empty — the default setUp() stub) now falls back to
+		// the store's OWN default_product_cat term name — WooCommerce's own
+		// "uncategorized" semantics, resolved at build time (never a
+		// hardcoded English literal). MiuMjau's 253 real published products
+		// were being silently excluded from the engine's catalog by the
+		// REQUIRED-field rejection this fixes.
+		Functions\when( 'get_option' )->justReturn( 7 ); // default_product_cat term_id.
+		Functions\when( 'get_term' )->alias(
+			static fn ( int $id ) => 7 === $id ? (object) array( 'name' => 'Muu' ) : null
+		);
+		$product = $this->fake_product( array( 'sku' => 'NOCAT-1', 'price' => '1.00' ) );
+
+		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
+
+		self::assertSame( 'Muu', $payload['category_path'], 'The store default term NAME is used — its localized value, not "uncategorized".' );
+		self::assertSame( 'Muu', $payload['tags']['category_path'], 'tags.category_path echoes the same resolved value.' );
+	}
+
+	public function test_category_path_is_empty_string_when_default_category_is_unresolvable(): void {
+		// F3-39's original fail-loud behavior is preserved for a genuinely
+		// broken store: get_the_terms() empty AND the store's own
+		// default_product_cat option unresolvable (the default setUp() stub,
+		// get_option → 0) yields the bare empty string, never an invented
+		// value. category_path is a contract-REQUIRED, non-empty field
+		// (RECENGINE_API_CONTRACT.md §3) — the engine's resulting
+		// `d6_item_error field=category_path` is the intended data-gap
+		// signal, not a bug to mask.
 		$product = $this->fake_product( array( 'sku' => 'NOCAT-1', 'price' => '1.00' ) );
 
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );

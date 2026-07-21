@@ -318,16 +318,18 @@ final class RecEngineCatalogTest extends TestCase {
 		self::assertSame( array(), $queue->pending( 10 ), 'Both rows reached a terminal state.' );
 	}
 
-	public function test_uncategorized_product_upsert_is_rejected_by_the_engine_and_marked_failed(): void {
-		// PRO-1491 root cause + mock-divergence fix: a PUBLISHED product with
-		// literally NO product_cat term (not even "Uncategorized" — that would
-		// yield a non-empty "uncategorized" path) builds an empty
-		// category_path. CatalogPayloadBuilder deliberately never invents a
-		// fallback (F3-39 / primary_category_path() docblock) — the engine's
-		// REQUIRED, non-empty Zod field 400s per-item so the gap is a visible
-		// Event Log signal, not a silent drop. Before this fix the mock
-		// wrongly ACCEPTED the empty string, hiding the exact failure MiuMjau
-		// hit 253 times (`d6_item_error field=category_path`).
+	public function test_uncategorized_product_upsert_uses_store_default_category_and_is_sent(): void {
+		// F3-39 REVISION (PRO-1491, 2026-07-21): a PUBLISHED product with
+		// literally NO product_cat term (not even "Uncategorized" — that
+		// would yield a non-empty "uncategorized" path) used to build an
+		// empty category_path that the engine's REQUIRED, non-empty Zod
+		// field rejected per-item — exactly the gap MiuMjau hit 253 times
+		// (`d6_item_error field=category_path`), silently excluding real
+		// published products from the catalog. CatalogPayloadBuilder now
+		// falls back to the store's OWN default_product_cat term name
+		// (WooCommerce's real "uncategorized" semantics, resolved at build
+		// time — the wp-env test site's default is "Uncategorized"), so the
+		// row is a genuine catalog entry, not a rejection.
 		$base = (string) self::$engine->base_url();
 		EnvSeed::connect(
 			array(
@@ -343,7 +345,11 @@ final class RecEngineCatalogTest extends TestCase {
 		CatalogHookHandler::reset_seen();
 		RecEngineMockServer::reset();
 		$bare = $this->make_uncategorized_product( 'CAT-NOCAT-1', '9.99' );
-		self::assertSame( '', $builder->primary_category_path( $bare ), 'Sanity: the fixture truly has no category.' );
+		self::assertSame(
+			'Uncategorized',
+			$builder->primary_category_path( $bare ),
+			'Sanity: the fixture truly has no category term, but the store default term name resolves.'
+		);
 
 		$this->truncate_queue();
 		$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bare->get_id(), array(), 'ok-cat-nocat' );
@@ -358,8 +364,60 @@ final class RecEngineCatalogTest extends TestCase {
 		);
 		$stats = $flusher->flush();
 
-		self::assertSame( 0, $stats['sent'], 'An empty category_path never reaches "sent" — the engine rejects it.' );
-		self::assertSame( 1, $stats['failed'], 'The row is marked failed, not silently dropped nor silently sent.' );
+		self::assertSame( 1, $stats['sent'], 'The default-category fallback makes the row a valid catalog entry — sent, not rejected.' );
+		self::assertSame( 0, $stats['failed'] );
+	}
+
+	public function test_uncategorized_product_upsert_is_rejected_when_store_default_category_is_unresolvable(): void {
+		// The fail-loud path F3-39 originally established is NOT removed —
+		// it moves one level down: if a store's OWN default_product_cat
+		// option is itself broken (points at a deleted/never-existing term),
+		// there is no WooCommerce semantics left to borrow, and the
+		// connector still does not invent a value. The engine's
+		// REQUIRED-field rejection surfaces that genuinely broken state.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+		$queue    = new IngestQueue();
+		$builder  = new CatalogPayloadBuilder();
+
+		CatalogHookHandler::reset_seen();
+		RecEngineMockServer::reset();
+		$bare = $this->make_uncategorized_product( 'CAT-NOCAT-BROKEN-1', '9.99' );
+
+		$original_default = get_option( 'default_product_cat' );
+		update_option( 'default_product_cat', 999999999 ); // a term_id that cannot exist.
+		try {
+			self::assertSame(
+				'',
+				$builder->primary_category_path( $bare ),
+				'An unresolvable store default falls back to the bare empty string, never an invented value.'
+			);
+
+			$this->truncate_queue();
+			$queue->enqueue( CatalogHookHandler::EVENT_CATALOG_UPSERT, (string) $bare->get_id(), array(), 'd6err-cat-broken-default' );
+
+			$flusher = new IngestFlusher(
+				$queue,
+				$builder,
+				$settings,
+				static function () use ( $settings ): Client {
+					return new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+				}
+			);
+			$stats = $flusher->flush();
+
+			self::assertSame( 0, $stats['sent'], 'An empty category_path never reaches "sent" — the engine rejects it.' );
+			self::assertSame( 1, $stats['failed'], 'The row is marked failed, not silently dropped nor silently sent.' );
+		} finally {
+			update_option( 'default_product_cat', $original_default );
+		}
 	}
 
 	public function test_trash_keeps_product_in_stock_false_and_untrash_restores(): void {

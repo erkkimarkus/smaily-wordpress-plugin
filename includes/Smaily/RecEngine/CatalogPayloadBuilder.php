@@ -414,10 +414,14 @@ class CatalogPayloadBuilder {
 	 * should map to food/dry, not the broad food — and join its ancestor
 	 * slugs root-first.
 	 *
-	 * Returns "" when the product has no category; that's a REQUIRED field
-	 * the engine may reject, but surfacing the merchant's missing-category
-	 * data via the engine's error response (handled in the flush job) is
-	 * better than the builder inventing a value.
+	 * F3-39 revision (PRO-1491, 2026-07-21): a PUBLISHED product whose
+	 * product_cat relationship was never established at all (bulk import /
+	 * WPML stand-in row bypassing WC_Product::save(), DECISIONS F3-39
+	 * addendum) falls back to the store's OWN `default_product_cat` term
+	 * name — WooCommerce's own semantics for an uncategorized product,
+	 * not an invented value. Only when even that default is unresolvable
+	 * (a broken store) does this return "" so the engine's REQUIRED-field
+	 * rejection still surfaces the data gap (fail-loud preserved).
 	 *
 	 * Public so the storefront browse beacon (3.4.3) emits the SAME
 	 * category_path for a product_view as catalog ingest does for the product
@@ -439,7 +443,7 @@ class CatalogPayloadBuilder {
 
 		$terms = get_the_terms( $category_source_id, 'product_cat' );
 		if ( ! is_array( $terms ) || $terms === array() ) {
-			return '';
+			return $this->default_category_path();
 		}
 
 		// $terms is a non-empty array<WP_Term> here (is_array + non-empty
@@ -465,6 +469,32 @@ class CatalogPayloadBuilder {
 		$slugs[] = (string) $primary->slug;
 
 		return implode( '/', array_filter( $slugs, static fn( string $s ): bool => $s !== '' ) );
+	}
+
+	/**
+	 * WooCommerce's own "uncategorized" resolution: the store's
+	 * `default_product_cat` option is the term_id every zero-category
+	 * product is supposed to carry (`WC_Post_Data::force_default_term()`
+	 * self-heals any active category-clear back to this term — it only
+	 * ever leaves a product with zero terms when product_cat was never
+	 * touched at all, F3-39 addendum). Resolved AT BUILD TIME so it reads
+	 * the store's actual (possibly renamed/localized) term name, never a
+	 * hardcoded English literal. Returns "" when the option or the term
+	 * itself can't be resolved (a broken store) so primary_category_path()
+	 * still falls through to the engine's fail-loud REQUIRED-field rejection.
+	 */
+	private function default_category_path(): string {
+		if ( ! function_exists( 'get_option' ) || ! function_exists( 'get_term' ) ) {
+			return '';
+		}
+		$default_term_id = (int) get_option( 'default_product_cat', 0 );
+		if ( $default_term_id <= 0 ) {
+			return '';
+		}
+		$term = get_term( $default_term_id, 'product_cat' );
+		return ( is_object( $term ) && isset( $term->name ) && (string) $term->name !== '' )
+			? (string) $term->name
+			: '';
 	}
 
 	/**
