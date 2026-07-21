@@ -26,7 +26,56 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1498 — `catalog.delete` tombstones are now
+_Last updated: 2026-07-21 (**PRO-1486 — the `/relay` browse proxy no longer
+accepts a client-supplied `customer_email`.** Linear decision recorded
+2026-07-21, engine-confirmed via PRO-1490: `BeaconEndpoint::EVENT_FIELDS`
+previously whitelisted `customer_email` straight through from the client POST
+body with no origin check — spoofable (attach an arbitrary email to anonymous
+browsing; probe another contact's profiling opt-out state by guessing
+emails). No legitimate producer sends it client-side (F3-49; the JS
+`enrich()` never has), and the contract explicitly supports senders omitting
+identity hints, so nothing engine-side breaks. **Fix:** `customer_email`
+removed from `EVENT_FIELDS` — a client-supplied value is now silently
+whitelist-dropped before `attach_logged_in_identity()` (PRO-1389, the ONLY
+remaining source, unchanged) or `filter_by_profiling()` ever run, so
+server-side injection semantics are identical to before. **Scope caveat**
+(engine team, honored in code + docs): the strip is specific to the
+browse-event POST shape `/relay` handles today; a future storefront-
+recommendations GET proxy that legitimately takes a `customer_email` query
+param must not inherit `EVENT_FIELDS`/`validate_batch()` unmodified — flagged
+in the `EVENT_FIELDS` docblock + class docblock + `docs/DECISIONS.md`
+(PRO-1486 entry). **Dead-code cleanup:** `filter_by_profiling()`'s per-event
+re-check for a client-supplied email DIFFERING from the server-resolved one
+is removed (unreachable once the client-supplied value is stripped
+upstream); the loop/counter/log structure is kept as defense-in-depth against
+a hypothetical future `customer_email` producer, though it can't actually
+trigger a drop in the current single-producer graph.
+`attach_logged_in_identity()`'s now-unused `verified_email` return key is also
+dropped. **Follow-up, not fixed here (recorded in DECISIONS + FOLLOW-UPS):**
+`smaily_rec_id`/`smaily_ctx` remain in `EVENT_FIELDS` and are
+client-suppliable via the same whitelist-pass-through mechanism, contrary to
+F3-49's client-side-omission intent — the JS client never sends them today,
+but the whitelist doesn't enforce that; a follow-up issue should evaluate
+closing it the same way. **Tests:** +1 unit
+(`BeaconEndpointTest::test_client_supplied_customer_email_is_stripped`), 1
+unit test rewritten
+(`BeaconEndpointIdentityTest::test_client_supplied_customer_email_is_stripped_and_never_checked`,
+replacing the now-impossible "differing client-supplied email" scenario), 1
+integration test rewritten
+(`RecEngineBrowseProxyTest::test_client_supplied_customer_email_is_stripped_and_not_used_for_profiling`,
+replacing the two old client-supplied-email profiling-opt-out tests — the
+real opt-out path stays covered by the existing PRO-1389 logged-in-cookie
+tests). **Security audit:** a register note was added to
+`docs/audits/INDEX.md` for the narrowed `/relay` surface — a full re-audit
+was judged not required for a narrowing (input-rejecting) change. **Gates:**
+`npm run ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit unit
+595/595, vitest 248/248, tsc/eslint clean); `sg docker -c "composer run
+test:integration"` OK (163 tests, 823 assertions — one net fewer test than
+the v3.8.0 baseline: two old client-supplied-email profiling tests replaced
+by one new strip-proof test), sandbox tenant "Smaily Connect test" correctly
+restored post-run (not MiuMjau).)
+
+Prior: 2026-07-21 (**PRO-1498 — `catalog.delete` tombstones are now
 ALWAYS force-filled and sent, never silently skipped.** MiuMjau live evidence:
 51 `catalog.delete` rows failing engine validation with empty `product_url`,
 +1 with empty `category_path` — a synced-then-removed product left stuck

@@ -51,6 +51,26 @@ final class BeaconEndpointTest extends TestCase {
 		);
 	}
 
+	public function test_client_supplied_customer_email_is_stripped(): void {
+		// PRO-1486: a client-supplied customer_email is spoofable (arbitrary
+		// attribution on anonymous browsing, or probing another contact's
+		// profiling opt-out state by guessing emails) — it must never survive
+		// the whitelist. The only sanctioned source is the server-side
+		// attach_logged_in_identity() injection, which runs AFTER this filter.
+		$result = BeaconEndpoint::validate_batch(
+			array(
+				array(
+					'event_id'       => 'e1',
+					'event_type'     => 'product_view',
+					'customer_email' => 'spoofed@example.com',
+				),
+			)
+		);
+
+		self::assertTrue( $result['valid'] );
+		self::assertArrayNotHasKey( 'customer_email', $result['events'][0] );
+	}
+
 	public function test_product_id_is_dropped_by_the_whitelist(): void {
 		// product_id (PRO-1390) is a proxy-internal field resolve_cart_product_skus()
 		// consumes BEFORE validate_batch runs; it must never reach the engine even

@@ -3569,6 +3569,85 @@ never-drop principle this extends to catalog), PRO-1224 (`SkuResolver` —
 PRO-1492 (the category_path mock-strictness precedent this mirrors for
 `product_url`).
 
+### PRO-1486 — `customer_email` stripped from client-supplied `/relay` browse events (engine-confirmed via PRO-1490)
+
+**Context:** `BeaconEndpoint::EVENT_FIELDS` — the per-event whitelist
+`validate_batch()` applies to a client-supplied browse-event POST — included
+`customer_email` with no check on its origin. Since it is client-controlled
+input, any caller of the public `/relay` route could attach an arbitrary email
+to otherwise-anonymous browsing (spoofed attribution/personalization signal)
+or use the endpoint as an oracle to probe whether a guessed email has opted
+out of profiling (the `filter_by_profiling()` (a).1 gate's drop-vs-keep
+behavior leaked that bit per guess, with no rate-limit-independent cost to an
+attacker beyond the existing per-IP/session throttle). No legitimate producer
+ever sent it client-side: the JS client (`rec-engine-client.ts` `enrich()`)
+never emits `customer_email` (F3-49), and the one sanctioned source is
+`BeaconEndpoint::attach_logged_in_identity()` (PRO-1389), which resolves it
+server-side from the real `logged_in` auth cookie and attaches it AFTER
+`validate_batch()` runs — entirely independent of the whitelist.
+
+**Decision:** `customer_email` is removed from `EVENT_FIELDS`. A
+client-supplied `customer_email` on the `/relay` POST body is now silently
+dropped by the whitelist, identically to any other unrecognized field —
+before `attach_logged_in_identity()` or `filter_by_profiling()` ever run, so
+injection semantics (server-resolved email only, opted-out ⇒ forwarded
+anonymous not dropped) are completely unchanged. Confirmed with the engine
+team (PRO-1490) before shipping: no legitimate producer sends it client-side,
+the contract already supports senders omitting identity hints entirely, and
+nothing engine-side depends on receiving a client-originated `customer_email`.
+
+**Scope caveat (engine team, honored in code):** the strip applies to the
+BROWSE-EVENT POST path only (`BeaconEndpoint::EVENT_FIELDS` /
+`validate_batch()`), not to `/relay` as a route in the abstract. `/relay`
+today handles only this one POST shape. If a future storefront-
+recommendations GET proxy is added to this route (or a sibling route) that
+legitimately takes a `customer_email` query param (e.g. "recommendations for
+this known customer"), that handler must NOT reuse `EVENT_FIELDS`/
+`validate_batch()` unmodified — it needs its own explicit field handling. A
+code comment on `EVENT_FIELDS` and the class docblock's abuse-model section
+both point here.
+
+**Dead-code cleanup:** `filter_by_profiling()`'s per-event branch that
+re-checked a client-supplied email DIFFERING from the server-resolved one
+(`may_profile()` called again per non-matching email) is now unreachable — a
+differing client-supplied email can no longer exist once `validate_batch()`
+strips it before either method runs. That branch is removed (was: a ternary
+falling back to a fresh `may_profile()` call; now: a direct use of the
+already-computed `$verified_allowed`). The surrounding loop/drop-counter/
+logging structure is KEPT as defense-in-depth — cheap, and it protects
+against a hypothetical future `customer_email` producer that attaches the
+field without its own consent check — even though, in the current
+single-producer graph (`attach_logged_in_identity()` is the only source, and
+it already gates on `may_profile()` before attaching), that drop path cannot
+actually trigger today. `attach_logged_in_identity()`'s return shape also
+dropped the now-unused `verified_email` key (only `verified_allowed` is
+consumed after the simplification).
+
+**Not done in this pass (follow-up, flagged not fixed):** `smaily_rec_id` and
+`smaily_ctx` remain in `EVENT_FIELDS` and are client-suppliable on a browse
+event, contrary to F3-49's client-side-omission intent, via the same
+whitelist-pass-through mechanism this decision just closed for
+`customer_email`. The JS client never sends them today, so there is no known
+live exploitation, but the whitelist itself does not enforce that. Recorded
+here rather than fixed, per the recorded decision's scope (customer_email
+only, this pass) — a follow-up Linear issue should evaluate whether the same
+spoofing logic applies and, if so, close it the same way.
+
+**Tests:** unit (`BeaconEndpointTest::test_client_supplied_customer_email_is_stripped`,
+`BeaconEndpointIdentityTest::test_client_supplied_customer_email_is_stripped_and_never_checked`)
+prove the whitelist strip and that no profiling lookup occurs for a stripped
+value; integration
+(`RecEngineBrowseProxyTest::test_client_supplied_customer_email_is_stripped_and_not_used_for_profiling`)
+proves a spoofed email — including one matching a real opted-out contact —
+never reaches the mock engine and never causes a drop, over the real `/relay`
+POST path.
+
+**Relationships:** F3-49 (client-side data-minimization — this decision adds
+the matching SERVER-side enforcement for `customer_email` specifically);
+PRO-1389 (the sole surviving source of `customer_email` on a forwarded event,
+unchanged by this decision); PRO-1490 (engine-side confirmation this shipped
+against).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -52,7 +52,14 @@ use WP_REST_Response;
  *      the 9 §6 types, every event must carry an event_id, the batch is capped
  *      at 100, and each event is field-whitelisted to the §6 shape. Our own
  *      JS client never produces an invalid type or an id-less event, so a
- *      violation signals tampering ⇒ hard 400, nothing forwarded.
+ *      violation signals tampering ⇒ hard 400, nothing forwarded. The
+ *      whitelist (EVENT_FIELDS) deliberately excludes `customer_email`
+ *      (PRO-1486) — a client-supplied value is spoofable (arbitrary
+ *      attribution, or probing another contact's opt-out state by guessing
+ *      emails); the only sanctioned source is the server-side
+ *      attach_logged_in_identity() below. This strip is scoped to THIS
+ *      browse-event POST handler — see EVENT_FIELDS's docblock for the
+ *      caveat a future recommendations-GET proxy must not inherit it blindly.
  *
  * Browse does NOT use the IngestQueue/Flusher pattern (catalog/customers/orders
  * do): it is client-buffered, best-effort telemetry forwarded synchronously
@@ -106,8 +113,23 @@ class BeaconEndpoint {
 	);
 
 	/**
-	 * The §6 per-event field whitelist. Anything outside this set is dropped
-	 * before forwarding (caps payload bloat + blocks key injection).
+	 * The §6 per-event field whitelist for a CLIENT-SUPPLIED browse event.
+	 * Anything outside this set is dropped before forwarding (caps payload
+	 * bloat + blocks key injection).
+	 *
+	 * PRO-1486: `customer_email` is deliberately NOT in this list — a client
+	 * could attach an arbitrary email to anonymous browsing (spoofed
+	 * attribution) or probe another contact's profiling opt-out state by
+	 * guessing emails. No legitimate producer sends it client-side (the JS
+	 * client — `rec-engine-client.ts` `enrich()` — never has, F3-49); the
+	 * ONLY sanctioned source is the server-side `attach_logged_in_identity()`
+	 * (PRO-1389), which assigns it directly onto the already-whitelisted
+	 * event array AFTER validate_batch() runs, bypassing this whitelist
+	 * entirely. Scope caveat: this whitelist (and the strip it enacts) is for
+	 * the `/relay` BROWSE-EVENT POST path only — a future storefront-
+	 * recommendations GET proxy that legitimately takes a `customer_email`
+	 * query param is a different call shape and must not inherit this
+	 * whitelist unmodified; see the DECISIONS.md PRO-1486 entry.
 	 *
 	 * @var array<int, string>
 	 */
@@ -121,7 +143,6 @@ class BeaconEndpoint {
 		'dwell_seconds',
 		'event_ts',
 		'source',
-		'customer_email',
 		'smaily_visitor_token',
 		'smaily_rec_id',
 		'smaily_ctx',
@@ -234,7 +255,7 @@ class BeaconEndpoint {
 		// contact to check and pass on the cookie-consent gate alone. The
 		// verified email/decision from the attach step above lets this skip a
 		// redundant may_profile() re-check per event (PRO-1389 follow-up).
-		$events = $this->filter_by_profiling( $identity['events'], $identity['verified_email'], $identity['verified_allowed'] );
+		$events = $this->filter_by_profiling( $identity['events'], $identity['verified_allowed'] );
 		if ( $events === array() ) {
 			// Everything was for opted-out contacts — nothing to forward.
 			return new WP_REST_Response(
@@ -301,10 +322,12 @@ class BeaconEndpoint {
 	 * of nonce or caching. An anonymous visitor, or an invalid/expired cookie, is
 	 * treated as anonymous — never an error.
 	 *
-	 * The client NEVER sends `customer_email` (F3-49's client-side data-
-	 * minimization is unchanged) — this is the one sanctioned server-side
-	 * exception, injected purely on the outbound engine request; the JS blob and
-	 * the /relay response never see it.
+	 * The client NEVER sends `customer_email` — F3-49's client-side data-
+	 * minimization, and since PRO-1486 enforced server-side too: validate_batch()
+	 * drops any client-supplied `customer_email` before this method ever runs
+	 * (it is not in EVENT_FIELDS). This is the ONE sanctioned source of
+	 * `customer_email` on a forwarded event, injected purely on the outbound
+	 * engine request; the JS blob and the /relay response never see it.
 	 *
 	 * Consent: event EXISTENCE is still gated solely by the JS marketing-consent
 	 * gate (unchanged). This ADDITIONALLY checks the (a).1 profiling gate for the
@@ -312,21 +335,20 @@ class BeaconEndpoint {
 	 * forwarded UNCHANGED (stays anonymous), never dropped: we simply never add
 	 * the identity hint, mirroring the §6 "sender-side anonymous mode".
 	 *
-	 * Also returns the resolved email + its (a).1 decision (empty email when
-	 * no logged-in visitor was resolved) so `filter_by_profiling()` can reuse
-	 * this single `may_profile()` call instead of re-checking every event that
-	 * carries the same email.
+	 * Also returns the (a).1 decision so `filter_by_profiling()` doesn't need to
+	 * re-check the same email per event (PRO-1389 follow-up; still true after
+	 * PRO-1486 — see that method's docblock for why the decision alone is now
+	 * sufficient without carrying the email itself).
 	 *
 	 * @param array<int, array<string, mixed>> $events
 	 *
-	 * @return array{events: array<int, array<string, mixed>>, verified_email: string, verified_allowed: bool}
+	 * @return array{events: array<int, array<string, mixed>>, verified_allowed: bool}
 	 */
 	private function attach_logged_in_identity( array $events ): array {
 		$email = $this->resolve_logged_in_email();
 		if ( $email === '' ) {
 			return array(
 				'events'           => $events,
-				'verified_email'   => '',
 				'verified_allowed' => false,
 			);
 		}
@@ -335,7 +357,6 @@ class BeaconEndpoint {
 		if ( ! $allowed ) {
 			return array(
 				'events'           => $events,
-				'verified_email'   => $email,
 				'verified_allowed' => false,
 			);
 		}
@@ -346,7 +367,6 @@ class BeaconEndpoint {
 		}
 		return array(
 			'events'           => $events,
-			'verified_email'   => $email,
 			'verified_allowed' => true,
 		);
 	}
@@ -376,20 +396,24 @@ class BeaconEndpoint {
 	 * error: aggregated into a 24h counter + logged ONCE per batch (never per
 	 * event, so a heavy opted-out browser can't flood the log).
 	 *
-	 * `$verified_email`/`$verified_allowed` carry the single `may_profile()`
-	 * call `attach_logged_in_identity()` already made for the resolved
-	 * logged-in visitor (empty email = none resolved). An event whose
-	 * `customer_email` matches that email reuses the cached decision instead
-	 * of calling `may_profile()` again — up to 100 redundant lookups per
-	 * batch otherwise, since every event in the batch carries the same
-	 * attached email. A client-supplied email that differs is still checked
-	 * per event exactly as before.
+	 * PRO-1486: this is a defense-in-depth backstop, not the primary gate —
+	 * `attach_logged_in_identity()` already checks the SAME profiling decision
+	 * (`$verified_allowed`) before ever attaching `customer_email` to an event,
+	 * so in the current single-producer graph no event reaching here can carry
+	 * an opted-out email. `$verified_allowed` is passed through (rather than
+	 * re-deriving it) so a bug elsewhere that attaches an email without its own
+	 * consent check still gets caught here. The former per-event
+	 * `may_profile()` re-check for a client-supplied email DIFFERING from the
+	 * server-resolved one is gone: since validate_batch() now strips any
+	 * client-supplied `customer_email` before this point, that scenario can no
+	 * longer occur — keeping the extra lookup would have been untestable dead
+	 * code.
 	 *
 	 * @param array<int, array<string, mixed>> $events
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function filter_by_profiling( array $events, string $verified_email = '', bool $verified_allowed = false ): array {
+	private function filter_by_profiling( array $events, bool $verified_allowed ): array {
 		if ( $this->profiling === null ) {
 			return $events;
 		}
@@ -397,15 +421,8 @@ class BeaconEndpoint {
 		$kept    = array();
 		$dropped = 0;
 		foreach ( $events as $event ) {
-			$email = isset( $event['customer_email'] ) ? (string) $event['customer_email'] : '';
-			if ( $email === '' ) {
-				$kept[] = $event;
-				continue;
-			}
-			$may_profile = ( $verified_email !== '' && $email === $verified_email )
-				? $verified_allowed
-				: $this->profiling->may_profile( $email );
-			if ( ! $may_profile ) {
+			$has_email = isset( $event['customer_email'] ) && (string) $event['customer_email'] !== '';
+			if ( $has_email && ! $verified_allowed ) {
 				++$dropped;
 				continue;
 			}

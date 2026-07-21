@@ -425,9 +425,20 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		return 'smly_profiling_' . md5( strtolower( trim( $email ) ) );
 	}
 
-	public function test_profiling_opt_out_drops_only_the_known_email_event(): void {
+	/**
+	 * PRO-1486: a client-supplied customer_email is spoofable — stripped by the
+	 * EVENT_FIELDS whitelist before it can ever reach the (a).1 profiling gate,
+	 * even when the guessed email happens to match a real opted-out contact.
+	 * All three events forward (none dropped, none anonymized-by-opt-out —
+	 * they were never carrying a real identity to begin with), and none of the
+	 * spoofed emails reach the engine. The real opt-out path (a genuinely
+	 * logged-in, opted-out visitor) is proven separately below with a real auth
+	 * cookie (test_logged_in_but_opted_out_user_is_forwarded_anonymous_not_dropped).
+	 */
+	public function test_client_supplied_customer_email_is_stripped_and_not_used_for_profiling(): void {
 		$this->enable_beacon();
-		// out@ has opted out (cache hit = '0'); in@ + anon are allowed (default-on).
+		// A real opt-out record for this email — proves the spoofed value isn't
+		// even checked against it, because it never survives to the gate.
 		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
 
 		$response = RestRequestHelper::post(
@@ -442,27 +453,12 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		);
 
 		self::assertSame( 200, $response->get_status() );
-		// The opted-out event is dropped; the allowed + anon ones reach the engine.
-		self::assertSame( 2, $response->get_data()['processed'] );
+		self::assertSame( 3, $response->get_data()['processed'], 'Nothing dropped — spoofed emails never reach the profiling gate.' );
 
-		delete_transient( $this->profiling_key( 'out@example.com' ) );
-	}
-
-	public function test_all_events_opted_out_returns_zero_without_calling_engine(): void {
-		$this->enable_beacon();
-		set_transient( $this->profiling_key( 'out@example.com' ), '0', DAY_IN_SECONDS );
-
-		$response = RestRequestHelper::post(
-			'/relay',
-			array(
-				'events' => array(
-					array( 'event_id' => 'pf-only', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'customer_email' => 'out@example.com' ),
-				),
-			)
-		);
-
-		self::assertSame( 200, $response->get_status() );
-		self::assertSame( 0, $response->get_data()['processed'], 'all opted-out → nothing forwarded' );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		foreach ( $received as $event ) {
+			self::assertArrayNotHasKey( 'customer_email', $event, 'A client-supplied customer_email must never reach the engine.' );
+		}
 
 		delete_transient( $this->profiling_key( 'out@example.com' ) );
 	}

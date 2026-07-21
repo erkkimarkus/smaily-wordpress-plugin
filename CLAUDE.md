@@ -572,8 +572,14 @@ deprioritized. So `enrich()` (`rec-engine-client.ts`) puts the opaque
 mirrors `session_id`) — its value is future **cold-start personalization** (the engine
 binds the browse row to the customer via the token), NOT attribution. The CLIENT still
 NEVER adds `smaily_rec_id` / `smaily_ctx` / `customer_email` to browse events — deliberate
-data-minimization enforced CLIENT-side (the `/relay` whitelist still lists them for
-other wrappers; the omission is `enrich()`'s job) — that discipline is unchanged. Profiling
+data-minimization enforced CLIENT-side (the omission is `enrich()`'s job) — that discipline
+is unchanged. **Since PRO-1486 `customer_email` is ALSO enforced SERVER-side**: it is no
+longer in `BeaconEndpoint::EVENT_FIELDS` at all, so a client-supplied value (spoofed
+attribution, or probing another contact's opt-out state by guessing emails) is stripped
+before forwarding, regardless of whether the JS ever tries to send it — see the PRO-1486
+addendum below. `smaily_rec_id`/`smaily_ctx` are still in the whitelist (client-side-only
+discipline, same spoofing class, unresolved — flagged as a PRO-1486 follow-up, not yet
+fixed). Profiling
 opt-out on the token path is **engine-side** (server-enforced): an opted-out contact's
 browse event is never bound to a customer; the plugin's email-based `ProfilingConsent` gate
 stays the first filter but can't map `visitor_token`→email (engine-issued token). Guest-browse
@@ -599,6 +605,22 @@ which DROPS an event that already carries an opted-out email — that gate is ne
 triggered by this feature, since injection never attaches an email for an opted-out
 contact in the first place). The email never reaches the JS blob or the `/relay` response —
 injection is purely on the outbound engine request. (DECISIONS PRO-1389, addendum to F3-49.)
+
+**PRO-1486 addendum — `customer_email` is now ALSO stripped server-side.** Erkki flagged
+(2026-07-21, engine-confirmed via PRO-1490) that a client-supplied `customer_email` on the
+`/relay` POST was previously passed straight through by `EVENT_FIELDS` with no check —
+spoofable (attach an arbitrary email to anonymous browsing; probe another contact's
+profiling opt-out state by guessing emails). `customer_email` is now REMOVED from
+`EVENT_FIELDS`; the only surviving source is `attach_logged_in_identity()`, which runs
+AFTER `validate_batch()`'s whitelist and assigns the field directly (bypassing the
+whitelist). The strip is scoped to the browse-event POST handler only — see the
+`EVENT_FIELDS` docblock and the DECISIONS.md PRO-1486 entry for the caveat a future
+storefront-recommendations GET proxy (which would legitimately take a `customer_email`
+query param) must not inherit blindly. `filter_by_profiling()`'s per-event branch for a
+client-supplied email DIFFERING from the server-resolved one is gone (unreachable once the
+client-supplied value is stripped) — the method keeps its loop/counter/logging shape as
+defense-in-depth against a future customer_email producer that skips its own consent
+check, but in the current single-producer graph it can no longer actually drop anything.
 
 ### OrderBackfill — which storage path the tests actually cover (HPOS vs legacy)
 OrderBackfillJob (3.5.2) reads orders with a direct `WHERE id > cursor` query

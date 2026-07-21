@@ -169,12 +169,15 @@ final class BeaconEndpointIdentityTest extends TestCase {
 	}
 
 	/**
-	 * A differing, client-supplied customer_email (not the server-resolved
-	 * identity — here there IS no resolved identity, the visitor is anonymous)
-	 * is not covered by the cached decision and must still be checked per event,
-	 * exactly as before this optimization.
+	 * PRO-1486: a client-supplied customer_email (spoofed, differing from any
+	 * server-resolved identity — here there IS no resolved identity, the
+	 * visitor is anonymous) never reaches filter_by_profiling() at all — it is
+	 * stripped by validate_batch()'s whitelist before attach_logged_in_identity()
+	 * or filter_by_profiling() ever run. No may_profile() lookup happens for it
+	 * (there's nothing to check: the event is forwarded anonymous), and the
+	 * spoofed email never reaches the engine.
 	 */
-	public function test_differing_client_supplied_email_still_gets_checked_per_event(): void {
+	public function test_client_supplied_customer_email_is_stripped_and_never_checked(): void {
 		$client    = $this->recording_client();
 		$profiling = $this->counting_profiling_stub( array() );
 		$endpoint  = $this->endpoint( '', $client, $profiling ); // anonymous — nothing resolved server-side.
@@ -185,14 +188,14 @@ final class BeaconEndpointIdentityTest extends TestCase {
 				'event_type'     => 'product_view',
 				'session_id'     => 's1',
 				'event_ts'       => '2026-07-21T10:00:00Z',
-				'customer_email' => 'other@example.com',
+				'customer_email' => 'spoofed@example.com',
 			),
 			array(
 				'event_id'       => 'e2',
 				'event_type'     => 'category_view',
 				'session_id'     => 's1',
 				'event_ts'       => '2026-07-21T10:01:00Z',
-				'customer_email' => 'other@example.com',
+				'customer_email' => 'spoofed@example.com',
 			),
 		);
 
@@ -200,11 +203,9 @@ final class BeaconEndpointIdentityTest extends TestCase {
 
 		self::assertSame( 200, $response->get_status() );
 		self::assertSame( 2, $response->get_data()['processed'] );
-		self::assertSame(
-			array( 'other@example.com', 'other@example.com' ),
-			$profiling->calls,
-			'No server-verified email to dedupe against — each event is still checked individually.'
-		);
+		self::assertArrayNotHasKey( 'customer_email', $client->received[0] ?? array() );
+		self::assertArrayNotHasKey( 'customer_email', $client->received[1] ?? array() );
+		self::assertSame( array(), $profiling->calls, 'A stripped client-supplied email triggers no profiling lookup at all.' );
 	}
 
 	// --- doubles ----------------------------------------------------------
