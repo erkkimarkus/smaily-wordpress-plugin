@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.8.0
+Stable tag: 3.8.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.8.1 =
+* Fixed: a product removed from Smaily Campaign Intelligence's recommendations (when its underlying WooCommerce data is already gone) is now reliably removed even in edge cases where it previously could be skipped.
+* Fixed: products rescued under your store's default category (see 3.8.0) are now clearly marked internally so Smaily Campaign Intelligence categorizes their recommendations correctly rather than treating them as regular tagged products.
+* Hardened: the browse-tracking endpoint no longer accepts a browser-supplied identity value; a shopper's identity is only ever established from their real, server-verified WordPress login session, as already applied since 3.8.0.
 
 = 3.8.0 =
 * New: browsing activity from a logged-in shopper is now linked to their account for their whole visit, not just right after they log in. This is resolved securely on the server from their WordPress login session — their email address is never sent to or exposed in the browser — and a shopper who has opted out of recommendation profiling is still respected (their activity stays anonymous, same as before).
@@ -313,6 +318,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.8.1 =
+Reliability + hardening only, no new features. Deleted-product removal from Campaign Intelligence is more reliable; default-category products are now correctly categorized; the browse-tracking endpoint no longer accepts a browser-supplied identity value. Safe update.
 
 = 3.8.0 =
 Logged-in shoppers' browsing is now linked to their account for the session (resolved server-side, email never exposed to the browser, opt-outs respected). Products with no category now sync under your store's default category. Empty product drafts no longer create sync noise. Safe update.
