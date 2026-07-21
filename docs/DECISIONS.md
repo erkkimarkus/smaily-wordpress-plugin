@@ -3350,6 +3350,78 @@ reasoning rather than opening a new one. `LandingCapture` stays as-is
 browser-side) and F3-49 (browse events carry `smaily_visitor_token` for
 cold-start, not attribution) — supersedes neither.
 
+### PRO-1389 — Ongoing-session browse identity: server-side email injection in the `/relay` proxy (ADDENDUM to F3-49, design approved by Erkki 2026-07-21)
+
+**Context:** `IdentityHookHandler` only merges identity on `wp_login` (§7 —
+binds pre-login anon history to a customer at the moment of login). A
+customer who stays logged in for a long browsing session generates no
+`wp_login` event, so nothing attaches their identity to the browse events
+their session produces — `StorefrontBeacon`'s own docblock flagged this as a
+deferred enhancement: "server-side email injection (in the proxy, from the
+auth cookie) is a later enhancement."
+
+**Decision:** `BeaconEndpoint::attach_logged_in_identity()` resolves the
+current visitor server-side, in the `/relay` proxy, and attaches
+`customer_email` (contract §6, "Identity hint (if user is logged in)") to
+every event in the batch actually forwarded — after the abuse/rate-limit
+filtering, before the D6 send.
+
+1. **Resolution is a cookie validation, not a REST nonce.** WP's REST
+   cookie-auth only populates the current user when a valid `X-WP-Nonce`
+   accompanies the request; the beacon sends none, and a page-embedded nonce
+   would be stale/shared under full-page caching (the MiuMjau reality,
+   PRO-1388). `resolve_logged_in_email()` instead calls
+   `wp_validate_auth_cookie( '', 'logged_in' )` directly against the real
+   `logged_in`-scheme auth cookie, then `get_userdata()`. An
+   anonymous/invalid/expired cookie resolves to `''` — never an error.
+2. **This is the one sanctioned server-side exception to F3-49's
+   client-side data-minimization — F3-49 is NOT reversed.** The client
+   (`enrich()`) still never sends `customer_email`/`smaily_rec_id`/
+   `smaily_ctx` on browse events; that discipline is unchanged. Only the
+   PROXY, server-side, on the outbound engine request, now injects the
+   email for a resolved logged-in session. The JS blob (`StorefrontBeacon`
+   config) and the `/relay` response never carry it.
+3. **Consent does not weaken.** Event EXISTENCE is still gated solely by
+   the JS marketing-consent gate (unchanged — `StorefrontBeacon`/
+   `beacon-core.ts`). Injection ADDITIONALLY checks the (a).1
+   `ProfilingConsent` gate for the resolved email before attaching it: an
+   opted-out contact's event is forwarded **unchanged, still anonymous** —
+   never dropped. The pre-existing `filter_by_profiling()` second gate
+   (which drops an event carrying an opted-out email) stays as defense in
+   depth; since injection itself never attaches an email for an opted-out
+   contact, that drop path is never triggered by this feature.
+4. **Performance:** one `wp_validate_auth_cookie()` (in-memory HMAC check)
+   + a cached `ProfilingConsent::may_profile()` read (1-day transient +
+   durable opt-out registry, PRO-1194) per `/relay` POST from a logged-in
+   visitor — no new remote call per event.
+
+**Rationale:** the engine already resolves `customer_email` → `customer_id`
+at ingest (§6 identity-resolution flow) and retroactively binds same-session
+events — the plugin was simply never sending the hint for an ongoing
+logged-in session. Server-side cookie validation is the only mechanism that
+survives full-page caching, matching the F3-46/PRO-1388 precedent (server-
+side capture as the robust path; client-side as best-effort/defense in
+depth).
+
+**Alternatives rejected:** a page-embedded REST nonce (breaks under
+full-page caching, the exact failure class PRO-1388 diagnosed); relying on
+`wp_get_current_user()` via the REST cookie-auth pipeline (requires the
+nonce the beacon deliberately doesn't send); sending the email from the JS
+blob (would expose it in page source, violating the explicit
+`StorefrontBeacon` identity note).
+
+**GDPR docs:** `docs/DATA_MODEL_GDPR.md` and the mirrored privacy-policy
+template in `docs/site/index.html` (EN+ET) previously described browse
+activity as linked only to "a pseudonymous visitor identifier" — updated in
+the same commit to note that a logged-in, non-opted-out session is
+additionally linked directly to the account.
+
+**Relationships:** ADDENDUM to F3-49 (client-side data-minimization —
+unchanged, this is the one sanctioned server-side exception); F3-31
+(`ProfilingConsent` — the (a).1 gate this reuses, no new caching built);
+F3-27 (`IdentityHookHandler` — the `wp_login` binding this complements, not
+replaces); F3-46/PRO-1388 (server-side-survives-caching precedent).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

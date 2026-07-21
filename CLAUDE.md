@@ -540,15 +540,35 @@ classes; browse would at best give the soft `assisted_view`, which the engine
 deprioritized. So `enrich()` (`rec-engine-client.ts`) puts the opaque
 `smaily_visitor_token` on each browse event **when the cookie is present** (omit-on-empty,
 mirrors `session_id`) — its value is future **cold-start personalization** (the engine
-binds the browse row to the customer via the token), NOT attribution. Do **NOT** add
-`smaily_rec_id` / `smaily_ctx` / `customer_email` to browse events — deliberate
+binds the browse row to the customer via the token), NOT attribution. The CLIENT still
+NEVER adds `smaily_rec_id` / `smaily_ctx` / `customer_email` to browse events — deliberate
 data-minimization enforced CLIENT-side (the `/relay` whitelist still lists them for
-other wrappers; the omission is `enrich()`'s job). Profiling opt-out on the token path is
-**engine-side** (server-enforced): an opted-out contact's browse event is never bound to a
-customer; the plugin's email-based `ProfilingConsent` gate stays the first filter but can't
-map `visitor_token`→email (engine-issued token). Guest-browse binds only via
-`identity/merge` on login (F3-27) — browse-session-only is an accepted v1 limitation.
-(DECISIONS F3-49.)
+other wrappers; the omission is `enrich()`'s job) — that discipline is unchanged. Profiling
+opt-out on the token path is **engine-side** (server-enforced): an opted-out contact's
+browse event is never bound to a customer; the plugin's email-based `ProfilingConsent` gate
+stays the first filter but can't map `visitor_token`→email (engine-issued token). Guest-browse
+binds only via `identity/merge` on login (F3-27) — browse-session-only is an accepted v1
+limitation. (DECISIONS F3-49.)
+
+**PRO-1389 addendum — the one sanctioned SERVER-side exception.** `BeaconEndpoint::
+attach_logged_in_identity()` (called from `handle()`, after the abuse/rate-limit filtering,
+before the D6 send) resolves the current visitor server-side via
+`resolve_logged_in_email()` — `wp_validate_auth_cookie( '', 'logged_in' )` against the real
+`logged_in` auth cookie, **not** a page-embedded REST nonce (WP's cookie-auth REST
+middleware only populates the current user with a valid `X-WP-Nonce`, which the beacon
+never sends, and a page-embedded nonce breaks under full-page caching — the MiuMjau
+reality, PRO-1388) — and attaches `customer_email` (contract §6) to every event in the
+batch. This closes the gap `StorefrontBeacon`'s docblock used to call "a later
+enhancement": `IdentityHookHandler` only merges identity on `wp_login`, so a customer who
+stays logged in browsing forever previously got no identity attached at all. Consent does
+NOT weaken: event existence is still gated solely by the JS marketing-consent gate;
+injection additionally checks the (a).1 `ProfilingConsent` gate for the resolved email
+BEFORE attaching it — an opted-out contact's event is forwarded **unchanged, still
+anonymous**, never dropped (contrast with the pre-existing `filter_by_profiling()` gate,
+which DROPS an event that already carries an opted-out email — that gate is never
+triggered by this feature, since injection never attaches an email for an opted-out
+contact in the first place). The email never reaches the JS blob or the `/relay` response —
+injection is purely on the outbound engine request. (DECISIONS PRO-1389, addendum to F3-49.)
 
 ### OrderBackfill — which storage path the tests actually cover (HPOS vs legacy)
 OrderBackfillJob (3.5.2) reads orders with a direct `WHERE id > cursor` query

@@ -277,7 +277,8 @@ What data is used.
   order statuses.
 - Browsing activity in our store (only if you have accepted marketing
   cookies): pages and products viewed, cart events and searches, linked to
-  a pseudonymous visitor identifier.
+  a pseudonymous visitor identifier — and, while you are logged in and have
+  not opted out of personalisation, linked directly to your account.
 - Technical identifiers: a pseudonymous visitor token and session
   identifier, and first-party cookies we set when you arrive in our store
   through a recommendation link in one of our emails (cookies
@@ -362,7 +363,8 @@ Milliseid andmeid kasutatakse.
   staatused.
 - Sirvimistegevus meie poes (ainult turundusküpsiste nõusolekul): vaadatud
   lehed ja tooted, ostukorvisündmused ja otsingud, seotuna pseudonüümse
-  külastajatunnusega.
+  külastajatunnusega — ning sisselogituna ja kui sa ei ole personaliseerimisest
+  loobunud, seotakse see lisaks otse sinu kontoga.
 - Tehnilised identifikaatorid: pseudonüümne külastajatunnus (visitor
   token) ja seansitunnus ning esimese osapoole küpsised, mille paigaldame,
   kui jõuad meie poodi meie e-kirjas olnud soovituslingi kaudu (küpsised
@@ -426,7 +428,7 @@ või kustutame kohe, kui vormistad tellimuse või tühjendad ostukorvi.
 | Profiling = purchase history + (consented) browse | Engine ingest: orders/customers always when connected; browse only behind the WP Consent API `marketing` gate (`beacon-core.ts detectConsent`, F3-50) AND the profiling gate (`BeaconEndpoint` second gate, F3-31 (a).1) |
 | Contact/account fields listed | `CustomerPayloadBuilder`: email, first/last name, phone, country, language, first_seen_at |
 | Purchase-history fields listed | `OrderPayloadBuilder`: items (sku/qty/prices), amounts, status, ordered_at, currency |
-| Pseudonymous visitor token / session id; no rec_id/email on browse | F3-49 (`enrich()` sends `session_id` + `smaily_visitor_token` only) |
+| Pseudonymous visitor token / session id; the CLIENT never adds rec_id/email to browse | F3-49 (`enrich()` sends `session_id` + `smaily_visitor_token` only). PRO-1389 addendum: for a logged-in, non-opted-out session, `BeaconEndpoint::attach_logged_in_identity()` attaches `customer_email` SERVER-side (from the WP auth cookie) on the outbound engine request only — never in the JS blob or the `/relay` response; an opted-out contact's event stays anonymous, not dropped |
 | Attribution cookies `smaily_rec_id`/`smaily_rec_ctx` 30 d, `smaily_rec_uid` 365 d (defaults; engine config can override) | `LandingCapture` (`rec_id_ttl_days` 30, `context_ttl_days` 30, `cookie_ttl_days` 365); set consent-ungated per F3-46 (Erkki) — hence they MUST be disclosed in the policy |
 | Opt-out via My Account, still receives emails | `ProfilingConsentAccount` (My Account dashboard section "Smaily Campaign Intelligence", checkbox "Use my data for personalised recommendations" / et: "Kasuta minu andmeid personaalsete soovituste jaoks") |
 | "Up to 24 hours to take effect across all systems" | `ProfilingConsent` daily-TTL cache: a WP-side opt-out is immediate (cache + engine §10 fire at once); a Smaily-side opt-out propagates at the next cache refresh, ≤ 24 h (see the fail-open review below) |

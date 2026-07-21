@@ -26,7 +26,65 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1445 — StorefrontBeacon product-page `sku`
+_Last updated: 2026-07-21 (**PRO-1389 — ongoing-session browse identity:
+server-side email injection in the `/relay` proxy** (design approved by
+Erkki 2026-07-21). `IdentityHookHandler` only binds identity on `wp_login`,
+so a customer who stays logged in browsing forever never got identity
+attached to their browse events — `StorefrontBeacon`'s own docblock flagged
+this as a deferred enhancement. `BeaconEndpoint::attach_logged_in_identity()`
+now closes it: after the abuse/rate-limit filtering and before the D6 send,
+it resolves the visitor server-side via `resolve_logged_in_email()` —
+`wp_validate_auth_cookie( '', 'logged_in' )` against the real WP `logged_in`
+auth cookie, deliberately NOT a page-embedded REST nonce (the beacon sends
+none, and a page-embedded nonce breaks under full-page caching — the
+MiuMjau reality, PRO-1388) — and attaches `customer_email` (contract §6) to
+every event in the batch actually forwarded. The client (`enrich()`) still
+NEVER sends `customer_email` (F3-49's data-minimization is unchanged — this
+is the one sanctioned server-side exception); the email never reaches the
+JS blob or the `/relay` response. Consent does not weaken: event existence
+stays gated on the JS marketing-consent gate alone; injection additionally
+checks the (a).1 `ProfilingConsent` gate for the resolved email BEFORE
+attaching it — an opted-out contact's event forwards unchanged (still
+anonymous), never dropped. Wire-shape verified before coding: contract §6
+already lists `customer_email` ("Identity hint (if user is logged in)") and
+`BeaconEndpoint::EVENT_FIELDS` already whitelisted it (unused until now); the
+mock's `has_identity`/D6 sub-count logic already read it too. One mock gap
+found and fixed in the same pass (CC-8): the mock's `last_browse_events` test
+introspection projection only carried `event_id`/`smaily_visitor_token`/`sku`
+— `customer_email` was silently dropped from that projection (though it WAS
+read for the `with_customer_match` sub-count), which masked the new field in
+a first integration run; added it (omitted entirely when absent, not as an
+empty string, so `assertArrayNotHasKey` stays meaningful).
+Tests: 6 new unit tests (`tests/Unit/REST/BeaconEndpointIdentityTest.php`,
+Brain\Monkey + a protected `resolve_logged_in_email()` seam mirroring
+`LandingCaptureTest`'s `headers_already_sent()` pattern) covering
+logged-in+consenting attach, anonymous no-attach, opted-out
+forward-unchanged-not-dropped, a gate-present-but-not-opted-out control, the
+response never carrying the email, and a multi-event batch all getting the
+same email. 3 new integration tests in `RecEngineBrowseProxyTest.php` drive
+the REAL cookie-validation path end-to-end (no doubled seam): a real WP user
++ a real `logged_in`-scheme auth cookie value captured via the
+`set_logged_in_cookie` action (fired before any header write) and installed
+into `$_COOKIE`, exactly as a browser would present it. `ci:strict` exit=0
+(PHPCS 0 errors, PHPStan clean, PHPUnit unit 580/580 incl. the 6 new, vitest
+248/248, tsc/eslint clean — JS untouched). Integration: `sg docker -c "bash
+bin/run-integration-tests.sh"` OK (160 tests, 804 assertions, up from 157/791
+— the 3 new PRO-1389 cases), dev sandbox tenant "Smaily Connect test"
+correctly restored post-run. Docs updated in the same pass: DECISIONS.md
+(new PRO-1389 entry, explicit ADDENDUM to F3-49 — F3-49 not reversed),
+CLAUDE.md (F3-49 section addendum), `docs/DATA_MODEL_GDPR.md` +
+`docs/site/index.html` (EN+ET both) — the "browse carries no email" claim
+updated to note the logged-in, non-opted-out exception. Live end-to-end
+verification on a real store/engine (does a real logged-in shopper's browse
+event actually reach the live engine with `customer_email`) is a human
+acceptance item — not yet done. Files: `includes/REST/BeaconEndpoint.php`,
+`includes/Integrations/WooCommerce/StorefrontBeacon.php`,
+`tests/Unit/REST/BeaconEndpointIdentityTest.php` (new),
+`tests/Integration/RecEngineBrowseProxyTest.php`,
+`tests/Integration/Fixtures/mock-rec-engine/router.php`, `docs/DECISIONS.md`,
+`CLAUDE.md`, `docs/DATA_MODEL_GDPR.md`, `docs/site/index.html`.)
+
+Prior: 2026-07-21 (**PRO-1445 — StorefrontBeacon product-page `sku`
 resolution now unit-tested** (closes the pre-existing gap called out in the
 PRO-1390 record below). Investigation: the integration-harness limitation
 (plain `TestCase`, no `WP_UnitTestCase`/`go_to()`, can't drive `is_product()`)
@@ -2755,8 +2813,11 @@ sides ready = go-live.
   fired from our stream and the async order-attribution path-3 was inert. Engine team
   confirmed browse does NOT feed attribution — order `smaily_rec_id` + email-click drive
   the `direct`/`exact_later`/`indirect_*` mix; browse would at best give the soft
-  `assisted_view`. So browse still carries NO `smaily_rec_id`/`customer_email`
-  (data-minimization), but NOW carries the opaque `smaily_visitor_token` (omit-on-empty)
+  `assisted_view`. So the CLIENT still never adds `smaily_rec_id`/`customer_email`
+  (data-minimization unchanged — PRO-1389, 2026-07-21, adds the one sanctioned
+  SERVER-side exception: `/relay` attaches `customer_email` for a resolved,
+  non-opted-out logged-in session, on the outbound engine request only), and browse
+  NOW carries the opaque `smaily_visitor_token` (omit-on-empty)
   for the engine's future **cold-start personalization** binding (the engine binds the
   browse row via it; ingest already accepts the field). Profiling opt-out on the
   token/external_id path is engine-side (server-enforced 2026-07-03) — the plugin's

@@ -1059,7 +1059,7 @@ td code{white-space:nowrap}
       <ul>
         <li><strong>Customer name and email</strong> — to sync contacts to your Smaily account and, with Campaign Intelligence, as the per‑customer identity.</li>
         <li><strong>Order and product data</strong> — to power automations and, when enabled, recommendations.</li>
-        <li><strong>Browse events</strong> — only when you enable browse tracking <em>and</em> the shopper has granted marketing consent through the WP Consent API. Browse events carry an opaque visitor token, never an email or recommendation id.</li>
+        <li><strong>Browse events</strong> — only when you enable browse tracking <em>and</em> the shopper has granted marketing consent through the WP Consent API. The browser itself never sends an email or recommendation id — only an opaque visitor token. If the shopper is logged in and hasn't opted out of personalisation, the plugin attaches their email <em>server‑side</em> before forwarding the event, so recommendations stay linked to their account even mid‑session; the email never reaches the page or the browser.</li>
       </ul>
       <p>The optional customer fields beyond email are the ones <em>you</em> tick in <a href="#set-subscribers">Subscribers</a>.</p>
     </div>
@@ -1067,7 +1067,7 @@ td code{white-space:nowrap}
       <ul>
         <li><strong>Kliendi nimi ja e‑post</strong> — kontaktide sünkimiseks su Smaily kontosse ja Campaign Intelligence'iga kliendipõhise identiteedina.</li>
         <li><strong>Tellimuste ja toodete andmed</strong> — automaatikate ja lubatuna soovituste toitmiseks.</li>
-        <li><strong>Sirvimissündmused</strong> — ainult siis, kui lubad sirvimise jälgimise <em>ja</em> klient on WP Consent API kaudu andnud turundusnõusoleku. Sirvimissündmused kannavad läbipaistmatut külastaja‑tokenit, mitte kunagi e‑posti ega soovituse‑id'd.</li>
+        <li><strong>Sirvimissündmused</strong> — ainult siis, kui lubad sirvimise jälgimise <em>ja</em> klient on WP Consent API kaudu andnud turundusnõusoleku. Brauser ise ei saada kunagi e‑posti ega soovituse‑id'd — ainult läbipaistmatu külastaja‑tokeni. Kui klient on sisse logitud ja ei ole personaliseerimisest loobunud, lisab plugin tema e‑posti aadressi <em>serveripoolselt</em> enne sündmuse edastamist, et soovitused püsiksid seotuna tema kontoga ka poole sessiooni pealt — e‑post ei jõua kunagi lehele ega brauserisse.</li>
       </ul>
       <p>Valikulised kliendiväljad peale e‑posti on need, mille <em>sina</em> märgid jaotises <a href="#set-subscribers">Tellijad</a>.</p>
     </div>
@@ -1104,7 +1104,7 @@ td code{white-space:nowrap}
       <ul>
         <li>Contact and account details: email address, name, phone number, country and preferred language.</li>
         <li>Purchase history: products ordered, quantities, prices, order dates and order statuses.</li>
-        <li>Browsing activity in our store (only if you have accepted marketing cookies): pages and products viewed, cart events and searches, linked to a pseudonymous visitor identifier.</li>
+        <li>Browsing activity in our store (only if you have accepted marketing cookies): pages and products viewed, cart events and searches, linked to a pseudonymous visitor identifier — and, while you are logged in and have not opted out of personalisation, linked directly to your account.</li>
         <li>Technical identifiers: a pseudonymous visitor token and session identifier, and first‑party cookies we set when you arrive in our store through a recommendation link in one of our emails (cookies <code>smaily_rec_id</code> and <code>smaily_rec_ctx</code>, kept for up to 30 days, and <code>smaily_rec_uid</code>, kept for up to 365 days, by default). These are used to measure which recommendations led to purchases.</li>
         <li>Abandoned‑cart reminders (if enabled, separate from the profiling described above): if you leave items in your cart without completing checkout, we may store your cart contents, email address and name for a short time in our own store's systems (not the Smaily Campaign Intelligence recommendation engine) to send you a reminder email.</li>
       </ul>
@@ -1126,7 +1126,7 @@ td code{white-space:nowrap}
       <ul>
         <li>Kontakt- ja kontoandmed: e‑posti aadress, nimi, telefoninumber, riik ja eelistatud keel.</li>
         <li>Ostuajalugu: tellitud tooted, kogused, hinnad, tellimuste kuupäevad ja staatused.</li>
-        <li>Sirvimistegevus meie poes (ainult turundusküpsiste nõusolekul): vaadatud lehed ja tooted, ostukorvisündmused ja otsingud, seotuna pseudonüümse külastajatunnusega.</li>
+        <li>Sirvimistegevus meie poes (ainult turundusküpsiste nõusolekul): vaadatud lehed ja tooted, ostukorvisündmused ja otsingud, seotuna pseudonüümse külastajatunnusega — ning sisselogituna ja kui sa ei ole personaliseerimisest loobunud, seotakse see lisaks otse sinu kontoga.</li>
         <li>Tehnilised identifikaatorid: pseudonüümne külastajatunnus (visitor token) ja seansitunnus ning esimese osapoole küpsised, mille paigaldame, kui jõuad meie poodi meie e‑kirjas olnud soovituslingi kaudu (küpsised <code>smaily_rec_id</code> ja <code>smaily_rec_ctx</code>, säilivad vaikimisi kuni 30 päeva, ning <code>smaily_rec_uid</code>, säilib vaikimisi kuni 365 päeva). Nende abil mõõdame, millised soovitused viisid ostuni.</li>
         <li>Hüljatud ostukorvi meeldetuletused (kui funktsioon on sisse lülitatud, eraldiseisev eespool kirjeldatud profileerimisest): kui jätad ostukorvi tellimust vormistamata, võime lühikeseks ajaks salvestada sinu ostukorvi sisu, e‑posti aadressi ja nime meie enda poe süsteemides (mitte Smaily Campaign Intelligence soovitusmootoris), et saata sulle meeldetuletuse e‑kiri.</li>
       </ul>
