@@ -50,7 +50,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		parent::setUp();
 		EnvScrub::reset();
 		RecEngineMockServer::reset();
-		unset( $_COOKIE['smaily_anon_sid'] );
+		unset( $_COOKIE['smaily_anon_sid'], $_COOKIE[ LOGGED_IN_COOKIE ] );
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, false );
 	}
 
@@ -59,7 +59,7 @@ final class RecEngineBrowseProxyTest extends TestCase {
 			wp_delete_post( $product_id, true );
 		}
 		$this->created_products = array();
-		unset( $_COOKIE['smaily_anon_sid'] );
+		unset( $_COOKIE['smaily_anon_sid'], $_COOKIE[ LOGGED_IN_COOKIE ] );
 		update_option( BeaconEndpoint::OPTION_TRACK_BROWSING, false );
 		parent::tearDown();
 	}
@@ -465,6 +465,128 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		self::assertSame( 0, $response->get_data()['processed'], 'all opted-out → nothing forwarded' );
 
 		delete_transient( $this->profiling_key( 'out@example.com' ) );
+	}
+
+	// --- PRO-1389: ongoing-session identity (server-side email injection) ---
+
+	public function test_logged_in_users_email_is_attached_server_side(): void {
+		$this->enable_beacon();
+		$user_id = $this->log_in_with_real_auth_cookie( 'shopper-pro1389@example.com' );
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'id-1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:00:00Z' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'] );
+
+		// Never in the response sent back to the browser.
+		$serialised = (string) wp_json_encode( $response->get_data() );
+		self::assertStringNotContainsString( 'shopper-pro1389@example.com', $serialised );
+
+		// But it DID reach the engine, resolved server-side from the real
+		// WP `logged_in` auth cookie — not a page-embedded nonce.
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertSame( 'shopper-pro1389@example.com', $received[0]['customer_email'] ?? null );
+
+		$this->log_out( $user_id );
+	}
+
+	public function test_anonymous_visitor_has_no_customer_email_attached(): void {
+		$this->enable_beacon();
+		// No auth cookie set — anonymous.
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'anon-1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:00:00Z' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertArrayNotHasKey( 'customer_email', $received[0] ?? array() );
+	}
+
+	public function test_logged_in_but_opted_out_user_is_forwarded_anonymous_not_dropped(): void {
+		$this->enable_beacon();
+		$email = 'optout-pro1389@example.com';
+		set_transient( $this->profiling_key( $email ), '0', DAY_IN_SECONDS );
+		$user_id = $this->log_in_with_real_auth_cookie( $email );
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'oo-1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:00:00Z' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'], 'Opted-out logged-in user event still forwarded, not dropped.' );
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertArrayNotHasKey( 'customer_email', $received[0] ?? array(), 'No identity attached for an opted-out contact.' );
+
+		delete_transient( $this->profiling_key( $email ) );
+		$this->log_out( $user_id );
+	}
+
+	/**
+	 * Creates a real WP user and a REAL `logged_in`-scheme auth cookie value
+	 * (via `wp_set_auth_cookie()` + the `set_logged_in_cookie` action, which
+	 * fires with the raw cookie string before any header is sent) and installs
+	 * it into `$_COOKIE`, exactly as a browser would present it on the next
+	 * request. This drives BeaconEndpoint's real `wp_validate_auth_cookie()`
+	 * call — proving the actual cookie-validation path, not a doubled seam.
+	 */
+	private function log_in_with_real_auth_cookie( string $email ): int {
+		if ( ! function_exists( 'wp_insert_user' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
+		$existing = get_user_by( 'email', $email );
+		if ( $existing instanceof \WP_User ) {
+			wp_delete_user( $existing->ID );
+		}
+		$user_id = wp_insert_user(
+			array(
+				'user_login' => 'pro1389-' . md5( $email ),
+				'user_email' => $email,
+				'user_pass'  => wp_generate_password(),
+			)
+		);
+		self::assertIsInt( $user_id, 'Test user creation must succeed.' );
+
+		$captured = '';
+		$capture  = static function ( $cookie ) use ( &$captured ): void {
+			$captured = (string) $cookie;
+		};
+		add_action( 'set_logged_in_cookie', $capture );
+		wp_set_auth_cookie( $user_id );
+		remove_action( 'set_logged_in_cookie', $capture );
+
+		self::assertNotSame( '', $captured, 'wp_set_auth_cookie() must have fired set_logged_in_cookie.' );
+		$_COOKIE[ LOGGED_IN_COOKIE ] = $captured;
+
+		return $user_id;
+	}
+
+	private function log_out( int $user_id ): void {
+		unset( $_COOKIE[ LOGGED_IN_COOKIE ] );
+		if ( class_exists( '\WP_Session_Tokens' ) ) {
+			\WP_Session_Tokens::get_instance( $user_id )->destroy_all();
+		}
+		if ( ! function_exists( 'wp_delete_user' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
+		wp_delete_user( $user_id );
 	}
 
 	private function enable_beacon(): void {

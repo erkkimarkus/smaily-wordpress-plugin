@@ -944,14 +944,21 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 		$events
 	);
 	// Full projection so a test can assert an identity field survived the proxy
-	// whitelist and reached the engine (F3-49 browse visitor_token pass-through).
+	// whitelist and reached the engine (F3-49 browse visitor_token pass-through;
+	// PRO-1389 server-side customer_email injection for a logged-in session).
+	// customer_email is omitted from the row entirely (not even as '') when
+	// absent, so a test can assert on absence with assertArrayNotHasKey.
 	$state['last_browse_events'] = array_map(
 		static function ( $event ) {
-			return array(
+			$row = array(
 				'event_id'             => isset( $event['event_id'] ) ? (string) $event['event_id'] : '',
 				'smaily_visitor_token' => isset( $event['smaily_visitor_token'] ) ? (string) $event['smaily_visitor_token'] : '',
 				'sku'                  => isset( $event['sku'] ) ? (string) $event['sku'] : null,
 			);
+			if ( isset( $event['customer_email'] ) && (string) $event['customer_email'] !== '' ) {
+				$row['customer_email'] = (string) $event['customer_email'];
+			}
+			return $row;
 		},
 		$events
 	);
