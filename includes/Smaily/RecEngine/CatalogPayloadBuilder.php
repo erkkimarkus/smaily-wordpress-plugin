@@ -119,13 +119,16 @@ class CatalogPayloadBuilder {
 	public function build( \WC_Product $product, string $event_uuid ): array {
 		$translations = $this->detector()->get_translations( (int) $product->get_id() );
 
+		$category_defaulted = false;
+		$category_path      = $this->primary_category_path( $product, $category_defaulted );
+
 		$payload = array(
 			// queue.event_uuid → wire body.event_id. The one rename that
 			// carries the row's idempotency key to the engine, per-product.
 			'event_id'      => $event_uuid,
 			'sku'           => SkuResolver::resolve( $product, $this->detector() ),
 			'name'          => $this->localized( $translations['name'], (string) $product->get_name() ),
-			'category_path' => $this->primary_category_path( $product ),
+			'category_path' => $category_path,
 			'price'         => (float) $product->get_price(),
 			'in_stock'      => (bool) $product->is_in_stock(),
 			'product_url'   => $this->localized( $translations['product_url'], $this->product_url( $product ) ),
@@ -161,7 +164,7 @@ class CatalogPayloadBuilder {
 			$payload['image_url'] = $image_url;
 		}
 
-		$tags = $this->tags( $product, $payload['category_path'] );
+		$tags = $this->tags( $product, $payload['category_path'], $category_defaulted );
 		if ( $tags !== array() ) {
 			$payload['tags'] = $tags;
 		}
@@ -199,6 +202,11 @@ class CatalogPayloadBuilder {
 			'in_stock'      => false,
 			'product_url'   => $this->fallback_product_url( $product_id ),
 			'external_id'   => (string) $product_id,
+			// There is no real product to derive a category from — this row's
+			// category_path is always a placeholder (contract §"category-defaulted",
+			// PRO-1499). tags.product_id is omitted here (no product to resolve
+			// a group id from), unlike build()'s tags().
+			'tags'          => array( 'category_defaulted' => 'true' ),
 		);
 	}
 
@@ -224,6 +232,11 @@ class CatalogPayloadBuilder {
 	public function ensure_valid_removal( array $object ): array {
 		if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
 			$object['category_path'] = self::PLACEHOLDER_CATEGORY;
+			// Forcing a placeholder here is exactly the substitution
+			// tags.category_defaulted (PRO-1499) exists to mark.
+			$tags                       = is_array( $object['tags'] ?? null ) ? $object['tags'] : array();
+			$tags['category_defaulted'] = 'true';
+			$object['tags']             = $tags;
 		}
 
 		$product_url = $object['product_url'] ?? '';
@@ -374,7 +387,7 @@ class CatalogPayloadBuilder {
 	 *
 	 * @return array<string, string>
 	 */
-	private function tags( \WC_Product $product, string $category_path ): array {
+	private function tags( \WC_Product $product, string $category_path, bool $category_defaulted = false ): array {
 		// product_id: parent id shared by all variations of one product, RAW
 		// (no `woo-` prefix) for Shopify parity + the §3b remove-by-id shape.
 		$tags = array( 'product_id' => SkuResolver::product_group_id( $product, $this->detector() ) );
@@ -389,6 +402,14 @@ class CatalogPayloadBuilder {
 
 		if ( $category_path !== '' ) {
 			$tags['category_path'] = $category_path;
+			// Omit-on-false (contract §"category-defaulted", PRO-1499): only
+			// stamp the marker when a real (non-empty) category_path was
+			// actually substituted — a defaulted-but-still-empty category_path
+			// (unresolvable store default) fails the engine's REQUIRED-field
+			// check regardless, so there is no placeholder value to flag.
+			if ( $category_defaulted ) {
+				$tags['category_defaulted'] = 'true';
+			}
 		}
 
 		return $tags;
@@ -511,8 +532,15 @@ class CatalogPayloadBuilder {
 	 * Public so the storefront browse beacon (3.4.3) emits the SAME
 	 * category_path for a product_view as catalog ingest does for the product
 	 * — one source, so the engine can correlate browse against catalog.
+	 *
+	 * @param bool $defaulted Out-param (PRO-1499): set true when the returned
+	 *        path came from the store's default-category fallback rather than
+	 *        the product's own terms — build() uses this to decide whether to
+	 *        stamp tags.category_defaulted. Callers that don't care (the
+	 *        browse beacon) simply omit the argument.
 	 */
-	public function primary_category_path( \WC_Product $product ): string {
+	public function primary_category_path( \WC_Product $product, ?bool &$defaulted = null ): string {
+		$defaulted = false;
 		if ( ! function_exists( 'get_the_terms' ) ) {
 			return '';
 		}
@@ -528,6 +556,7 @@ class CatalogPayloadBuilder {
 
 		$terms = get_the_terms( $category_source_id, 'product_cat' );
 		if ( ! is_array( $terms ) || $terms === array() ) {
+			$defaulted = true;
 			return $this->default_category_path();
 		}
 
