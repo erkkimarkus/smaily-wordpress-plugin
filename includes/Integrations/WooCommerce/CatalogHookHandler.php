@@ -107,6 +107,17 @@ class CatalogHookHandler {
 		if ( $this->post_status( $post_id ) === 'trash' ) {
 			return;
 		}
+		// A brand-new "Add product" screen creates an AUTO-DRAFT placeholder
+		// post (empty title, no category, no price) before the merchant has
+		// entered anything; save_post fires for it like any other save.
+		// Without this guard every "Add product" click enqueued a doomed
+		// catalog row — empty category_path/product_url — that the engine
+		// would reject (PRO-1491 fix B). The auto-draft is re-saved as a real
+		// draft/publish later, which fires save_post again and is enqueued
+		// normally then.
+		if ( $this->post_status( $post_id ) === 'auto-draft' ) {
+			return;
+		}
 		// Saving any translation re-syncs the CANONICAL product, so its
 		// `wc-{canonical_id}` row stays single and current across languages (P1).
 		$product = $this->canonical_product( $post_id );

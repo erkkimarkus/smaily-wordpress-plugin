@@ -106,6 +106,20 @@ final class CatalogHookHandlerTest extends TestCase {
 		self::assertSame( array(), $queue->enqueued, 'A save fired by trashing must not upsert — the trash/delete path owns the in_stock=false removal.' );
 	}
 
+	public function test_save_of_auto_draft_is_skipped(): void {
+		// A brand-new "Add product" screen creates an AUTO-DRAFT placeholder
+		// post before the merchant enters anything; save_post fires for it
+		// like any other save. Enqueuing it would only ever produce a doomed
+		// catalog row (empty name/category/price) — skip it (PRO-1491 fix B).
+		$queue   = $this->fake_queue();
+		$product = $this->fake_product( 100, '' );
+		$handler = $this->handler( $queue, true, array( 100 => $product ), array( $product ), null, array( 100 => 'auto-draft' ) );
+
+		$handler->on_save_product( 100 );
+
+		self::assertSame( array(), $queue->enqueued, 'An auto-draft save must never enqueue a catalog row.' );
+	}
+
 	public function test_delete_enqueues_catalog_delete_with_captured_object(): void {
 		$queue   = $this->fake_queue();
 		$product = $this->fake_product( 100, 'GONE-1' );
