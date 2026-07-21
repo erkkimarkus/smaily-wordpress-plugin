@@ -26,7 +26,66 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**PRO-1197 — docs currency refresh: ARCHITECTURE.md
+_Last updated: 2026-07-21 (**PRO-1491 — MiuMjau's 253 failed `catalog.upsert`
+rows (`d6_item_error field=category_path`) root-caused; mock divergence
+closed, no CatalogPayloadBuilder change.** Live evidence: every failed row
+had an empty `category_path`. Root cause, confirmed empirically (not just
+read from code): `CatalogPayloadBuilder::primary_category_path()` returns ''
+only when `get_the_terms( $id, 'product_cat' )` is genuinely empty for the
+canonical product — and WooCommerce's OWN `WC_Post_Data::force_default_term()`
+(hooked on the `set_object_terms` action, `class-wc-post-data.php`) re-asserts
+the store's `default_product_cat` ("Uncategorized") on ANY `wp_set_object_
+terms( …, array(), 'product_cat' )` clear attempt, confirmed live in wp-env
+(a `WC_Product::save()` + explicit clear still healed back to
+"uncategorized"). So an empty category_path is NOT "a merchant removed the
+category" (that self-heals) — it only happens for a post whose `product_cat`
+relationship was **never established through any `wp_set_object_terms` call
+at all** (the self-heal hook never fires), e.g. a bulk-import / migration
+tool that writes `wp_posts` + product meta directly, or a WPML/WCML
+translation "stand-in" row created outside WC's normal product-save path.
+Contract check (§3, `category_path` | YES | non-empty) confirms this is a
+REQUIRED field with NO omit-on-empty allowance, matching the plugin's own
+pre-existing, deliberate decision (F3-39, 2026-06-14; `primary_category_
+path()`'s docblock): the builder must never invent a fallback category —
+the engine's 400 is the intended merchant-data-gap signal, not a bug. That
+decision stands unchanged; **no code change to CatalogPayloadBuilder**.
+**Mock-divergence closed** (LESSONS §2.3/§2.4 — a real one): the integration
+mock (`tests/Integration/Fixtures/mock-rec-engine/router.php`,
+`/api/v1/ingest/catalog`) used to silently ACCEPT an empty/blank
+`category_path`, hiding exactly the failure MiuMjau hit 253 times. It now
+per-item-rejects it (`errors: [{field: 'category_path', message: 'String
+must contain at least 1 character(s)'}]`), matching the live engine's D6
+response byte-for-byte (message text taken from the live evidence).
+`docs/audits/MOCK_DIVERGENCE_AUDIT.md`'s catalog row updated ("Mock now:
+enforced (PRO-1491)"). **Tests**: 1 new unit test
+(`CatalogPayloadBuilderTest::test_category_path_is_empty_string_with_no_
+fallback_when_product_has_no_categories` — pins '' stays '', never a
+fallback); 1 new integration test
+(`RecEngineCatalogTest::test_uncategorized_product_upsert_is_rejected_by_
+the_engine_and_marked_failed` — a fixture built via raw `wp_insert_post()` +
+meta, bypassing `WC_Product::save()` on purpose so the self-heal never
+fires, reproducing the real MiuMjau shape; asserts the flusher marks it
+`failed`, never silently `sent` nor silently dropped). **Recovery path for
+the 253 MiuMjau rows** (code-verified, not yet executed — a post-release
+human/orchestrator step): `IngestFlusher::row_to_object()` loads the product
+FRESH via `wc_get_product()` and rebuilds the payload at EVERY send,
+including a retry (F3-44 holds for catalog rows) — so once each affected
+product is given a real `product_cat` term in wp-admin, using the Event Log's
+existing "Retry" on the failed rows is sufficient; a full catalog re-backfill
+is NOT required (though it would also work). Identifying which 253 products
+need a category (via the stored `sent_payload`/sku on each failed row,
+F3-44) and assigning one is the merchant/human step this doesn't automate.
+Gates: `ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit unit
+583/583 incl. the 1 new, vitest 248/248 unchanged). Integration:
+`sg docker -c "composer run test:integration"` OK (161 tests, 809 assertions,
+up from 160/804 — the 1 new PRO-1491 case), dev sandbox tenant "Smaily
+Connect test" correctly restored post-run.
+Files: `tests/Integration/Fixtures/mock-rec-engine/router.php`,
+`tests/Integration/RecEngineCatalogTest.php`,
+`tests/Unit/Smaily/RecEngine/CatalogPayloadBuilderTest.php`,
+`docs/audits/MOCK_DIVERGENCE_AUDIT.md`, `docs/DECISIONS.md`, `STATUS.md`.)
+
+Prior: 2026-07-21 (**PRO-1197 — docs currency refresh: ARCHITECTURE.md
 / API.md brought current with everything that landed since the 2026-07-13
 DEVELOPER.md touch-up** (`git log 700d870..HEAD`). No rewrite — a targeted
 pass fixing every claim the delta made stale, per Erkki's scope correction

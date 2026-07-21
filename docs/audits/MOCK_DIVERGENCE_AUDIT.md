@@ -61,7 +61,7 @@ per-item retry returns `{"deduplicated":1,"deduplicated_all":true}`.
 | Wrapper key | `products` | **`items`** | `items` ✅ | `items` ✅ (fix a2ea53c) |
 | Shape | batch array | batch array | batch | batch |
 | `event_id` location | per-item | **per-item canonical** (W1) | per-item ✅ | per-item ✅ |
-| `category_path` | accepted empty | **required, non-empty** (400 otherwise) | not enforced | variation→parent fix (2f14e88) |
+| `category_path` | accepted empty | **required, non-empty** (400 otherwise) | **enforced (PRO-1491)** — per-item `d6_item_error field=category_path` | variation→parent fix (2f14e88) |
 | Bad item | (n/a) | whole-batch 400 | n/a | flush marks batch failed |
 | No `event_id` | dedup skipped | Layer-1 UPSERT (200) | works | n/a |
 

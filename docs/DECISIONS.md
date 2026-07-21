@@ -2071,6 +2071,36 @@ signal, above).
 F3-36 (LESSONS §2.11 — silent pre-enqueue drops, the contrasting case);
 `CatalogBackfillJob` (the publish-only filter the hook now mirrors in spirit).
 
+**ADDENDUM (PRO-1491, 2026-07-21) — the upsert-path non-guard reconfirmed with
+253 rows of live evidence; root cause narrowed.** MiuMjau accumulated 253
+failed `catalog.upsert` rows, all `d6_item_error field=category_path`
+(oldest 2026-06-11, i.e. this has been happening since near go-live).
+Investigated whether this was still the right call given the volume — it is;
+**no code change to `CatalogPayloadBuilder`**, the "no invented fallback"
+decision above stands. What's new: confirmed EMPIRICALLY (not just read from
+code) exactly which product shape produces the empty string. WooCommerce's
+own `WC_Post_Data::force_default_term()` (hooked on the `set_object_terms`
+action) re-asserts the store's `default_product_cat` on ANY
+`wp_set_object_terms( …, array(), 'product_cat' )` call that would otherwise
+leave a product with zero categories — so "a merchant/tool actively cleared
+the category" self-heals to "Uncategorized" (non-empty) and is NOT the
+failure mode. The failure mode is a product post whose `product_cat`
+relationship was **never established through any `wp_set_object_terms` call
+in the first place** — that hook never fires, so there is nothing to heal.
+Concretely: a bulk-import/migration tool that writes `wp_posts` + product
+meta directly (bypassing `WC_Product::save()`), or a WPML/WCML translation
+"stand-in" row created outside WC's normal product-save path. The 253 rows
+are real, structurally-missing-category products, exactly the signal F3-39
+intended the engine to surface — not a plugin bug. **Mock-divergence closed
+in the same pass**: the integration mock had never enforced `category_path`
+non-empty (accepted it silently), which is exactly the shape of bug this
+repo's mock-vs-live discipline exists to catch (LESSONS §2.3/§2.4) — fixed to
+match the live `d6_item_error`. **Recovery for the 253 rows is human, not a
+deploy**: `IngestFlusher::row_to_object()` rebuilds catalog.upsert payloads
+FRESH from `wc_get_product()` on every send, including a retry (F3-44 holds
+here) — so assigning each affected product a real category in wp-admin, then
+using the Event Log's "Retry", is sufficient; no re-backfill needed.
+
 ### F3-40 — Trashed products stay in the catalog as `in_stock=false` (pilot orphan-join fix)
 
 **Context:** an engine-team data audit (2026-06-17) found ~4% of pilot order lines
