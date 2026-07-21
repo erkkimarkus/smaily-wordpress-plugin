@@ -141,6 +141,72 @@ final class BeaconEndpointIdentityTest extends TestCase {
 		self::assertSame( 'mari@example.com', $client->received[1]['customer_email'] ?? null );
 	}
 
+	/**
+	 * PRO-1389 follow-up (efficiency): attach_logged_in_identity() already
+	 * verified the resolved email's profiling consent once — filter_by_profiling()
+	 * must reuse that decision instead of calling may_profile() again per event.
+	 */
+	public function test_logged_in_batch_triggers_exactly_one_consent_lookup_for_the_resolved_email(): void {
+		$client    = $this->recording_client();
+		$profiling = $this->counting_profiling_stub( array() ); // nobody opted out.
+		$endpoint  = $this->endpoint( 'mari@example.com', $client, $profiling );
+
+		$events = array(
+			array( 'event_id' => 'e1', 'event_type' => 'product_view', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:00:00Z' ),
+			array( 'event_id' => 'e2', 'event_type' => 'category_view', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:01:00Z' ),
+			array( 'event_id' => 'e3', 'event_type' => 'search', 'session_id' => 's1', 'event_ts' => '2026-07-21T10:02:00Z' ),
+		);
+
+		$response = $endpoint->handle( $this->request( $events ) );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 3, $response->get_data()['processed'] );
+		self::assertSame(
+			array( 'mari@example.com' ),
+			$profiling->calls,
+			'One consent lookup for the whole batch, not one per event.'
+		);
+	}
+
+	/**
+	 * A differing, client-supplied customer_email (not the server-resolved
+	 * identity — here there IS no resolved identity, the visitor is anonymous)
+	 * is not covered by the cached decision and must still be checked per event,
+	 * exactly as before this optimization.
+	 */
+	public function test_differing_client_supplied_email_still_gets_checked_per_event(): void {
+		$client    = $this->recording_client();
+		$profiling = $this->counting_profiling_stub( array() );
+		$endpoint  = $this->endpoint( '', $client, $profiling ); // anonymous — nothing resolved server-side.
+
+		$events = array(
+			array(
+				'event_id'       => 'e1',
+				'event_type'     => 'product_view',
+				'session_id'     => 's1',
+				'event_ts'       => '2026-07-21T10:00:00Z',
+				'customer_email' => 'other@example.com',
+			),
+			array(
+				'event_id'       => 'e2',
+				'event_type'     => 'category_view',
+				'session_id'     => 's1',
+				'event_ts'       => '2026-07-21T10:01:00Z',
+				'customer_email' => 'other@example.com',
+			),
+		);
+
+		$response = $endpoint->handle( $this->request( $events ) );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 2, $response->get_data()['processed'] );
+		self::assertSame(
+			array( 'other@example.com', 'other@example.com' ),
+			$profiling->calls,
+			'No server-verified email to dedupe against — each event is still checked individually.'
+		);
+	}
+
 	// --- doubles ----------------------------------------------------------
 
 	private function endpoint( string $resolved_email, Client $client, ?ProfilingConsent $profiling ): BeaconEndpoint {
@@ -215,6 +281,33 @@ final class BeaconEndpointIdentityTest extends TestCase {
 			}
 
 			public function may_profile( string $email ): bool {
+				return ! in_array( $email, $this->opted_out, true );
+			}
+		};
+	}
+
+	/**
+	 * Like profiling_stub(), but records every email may_profile() was called
+	 * with (in call order) — pins the PRO-1389 follow-up dedup property.
+	 *
+	 * @param array<int, string> $opted_out_emails
+	 */
+	private function counting_profiling_stub( array $opted_out_emails ): ProfilingConsent {
+		return new class( $opted_out_emails ) extends ProfilingConsent {
+			/** @var array<int, string> */
+			private array $opted_out;
+
+			/** @var array<int, string> */
+			public array $calls = array();
+
+			/** @param array<int, string> $opted_out */
+			// phpcs:ignore Squiz.Commenting.FunctionComment.Missing -- test double, skips the real deps.
+			public function __construct( array $opted_out ) {
+				$this->opted_out = $opted_out;
+			}
+
+			public function may_profile( string $email ): bool {
+				$this->calls[] = $email;
 				return ! in_array( $email, $this->opted_out, true );
 			}
 		};

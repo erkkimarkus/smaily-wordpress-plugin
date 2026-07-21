@@ -227,12 +227,14 @@ class BeaconEndpoint {
 		// identity, server-side) BEFORE the profiling gate below — attach_
 		// logged_in_identity() itself checks the same gate, so an opted-out
 		// contact never gets an email attached in the first place.
-		$identified_events = $this->attach_logged_in_identity( $validation['events'] );
+		$identity = $this->attach_logged_in_identity( $validation['events'] );
 
 		// SECOND GATE (a).1 — drop browse events carrying an OPTED-OUT contact's
 		// email before they leave the building. Anon events (no email) have no
-		// contact to check and pass on the cookie-consent gate alone.
-		$events = $this->filter_by_profiling( $identified_events );
+		// contact to check and pass on the cookie-consent gate alone. The
+		// verified email/decision from the attach step above lets this skip a
+		// redundant may_profile() re-check per event (PRO-1389 follow-up).
+		$events = $this->filter_by_profiling( $identity['events'], $identity['verified_email'], $identity['verified_allowed'] );
 		if ( $events === array() ) {
 			// Everything was for opted-out contacts — nothing to forward.
 			return new WP_REST_Response(
@@ -310,24 +312,43 @@ class BeaconEndpoint {
 	 * forwarded UNCHANGED (stays anonymous), never dropped: we simply never add
 	 * the identity hint, mirroring the §6 "sender-side anonymous mode".
 	 *
+	 * Also returns the resolved email + its (a).1 decision (empty email when
+	 * no logged-in visitor was resolved) so `filter_by_profiling()` can reuse
+	 * this single `may_profile()` call instead of re-checking every event that
+	 * carries the same email.
+	 *
 	 * @param array<int, array<string, mixed>> $events
 	 *
-	 * @return array<int, array<string, mixed>>
+	 * @return array{events: array<int, array<string, mixed>>, verified_email: string, verified_allowed: bool}
 	 */
 	private function attach_logged_in_identity( array $events ): array {
 		$email = $this->resolve_logged_in_email();
 		if ( $email === '' ) {
-			return $events;
+			return array(
+				'events'           => $events,
+				'verified_email'   => '',
+				'verified_allowed' => false,
+			);
 		}
-		if ( $this->profiling !== null && ! $this->profiling->may_profile( $email ) ) {
-			return $events;
+
+		$allowed = $this->profiling === null || $this->profiling->may_profile( $email );
+		if ( ! $allowed ) {
+			return array(
+				'events'           => $events,
+				'verified_email'   => $email,
+				'verified_allowed' => false,
+			);
 		}
 
 		foreach ( $events as $index => $event ) {
 			$event['customer_email'] = $email;
 			$events[ $index ]        = $event;
 		}
-		return $events;
+		return array(
+			'events'           => $events,
+			'verified_email'   => $email,
+			'verified_allowed' => true,
+		);
 	}
 
 	/**
@@ -355,11 +376,20 @@ class BeaconEndpoint {
 	 * error: aggregated into a 24h counter + logged ONCE per batch (never per
 	 * event, so a heavy opted-out browser can't flood the log).
 	 *
+	 * `$verified_email`/`$verified_allowed` carry the single `may_profile()`
+	 * call `attach_logged_in_identity()` already made for the resolved
+	 * logged-in visitor (empty email = none resolved). An event whose
+	 * `customer_email` matches that email reuses the cached decision instead
+	 * of calling `may_profile()` again — up to 100 redundant lookups per
+	 * batch otherwise, since every event in the batch carries the same
+	 * attached email. A client-supplied email that differs is still checked
+	 * per event exactly as before.
+	 *
 	 * @param array<int, array<string, mixed>> $events
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function filter_by_profiling( array $events ): array {
+	private function filter_by_profiling( array $events, string $verified_email = '', bool $verified_allowed = false ): array {
 		if ( $this->profiling === null ) {
 			return $events;
 		}
@@ -368,7 +398,14 @@ class BeaconEndpoint {
 		$dropped = 0;
 		foreach ( $events as $event ) {
 			$email = isset( $event['customer_email'] ) ? (string) $event['customer_email'] : '';
-			if ( $email !== '' && ! $this->profiling->may_profile( $email ) ) {
+			if ( $email === '' ) {
+				$kept[] = $event;
+				continue;
+			}
+			$may_profile = ( $verified_email !== '' && $email === $verified_email )
+				? $verified_allowed
+				: $this->profiling->may_profile( $email );
+			if ( ! $may_profile ) {
 				++$dropped;
 				continue;
 			}

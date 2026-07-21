@@ -83,6 +83,13 @@ acceptance item — not yet done. Files: `includes/REST/BeaconEndpoint.php`,
 `tests/Integration/RecEngineBrowseProxyTest.php`,
 `tests/Integration/Fixtures/mock-rec-engine/router.php`, `docs/DECISIONS.md`,
 `CLAUDE.md`, `docs/DATA_MODEL_GDPR.md`, `docs/site/index.html`.)
+**Follow-up (quality-review efficiency finding, same day):** `attach_logged_in_
+identity()` now returns the resolved email's already-checked `may_profile()`
+decision, and `filter_by_profiling()` reuses it for matching events instead of
+re-checking each one — up to 101 consent-transient lookups per batch collapses
+to 1 (differing client-supplied emails still get their own per-event check,
+unchanged); 2 new unit tests pin the call count, `ci:strict` + the
+`RecEngineBrowseProxyTest` integration filter stayed green, no behavior change.
 
 Prior: 2026-07-21 (**PRO-1445 — StorefrontBeacon product-page `sku`
 resolution now unit-tested** (closes the pre-existing gap called out in the
