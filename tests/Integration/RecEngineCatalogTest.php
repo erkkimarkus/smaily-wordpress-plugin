@@ -366,6 +366,15 @@ final class RecEngineCatalogTest extends TestCase {
 
 		self::assertSame( 1, $stats['sent'], 'The default-category fallback makes the row a valid catalog entry — sent, not rejected.' );
 		self::assertSame( 0, $stats['failed'] );
+
+		// PRO-1499: the substituted category_path is flagged on the wire so
+		// the engine skips category-slug-keyed derivation for this row.
+		$tags = self::$engine->state()['last_catalog_tags'] ?? array();
+		self::assertSame(
+			'true',
+			$tags[ 'woo-' . $bare->get_id() ]['category_defaulted'] ?? null,
+			'tags.category_defaulted reached the engine for the store-default-fallback row.'
+		);
 	}
 
 	public function test_uncategorized_product_upsert_is_rejected_when_store_default_category_is_unresolvable(): void {
@@ -460,6 +469,8 @@ final class RecEngineCatalogTest extends TestCase {
 				$captured['object']['category_path'],
 				'Force-filled with the last-resort placeholder — the store default is itself unresolvable.'
 			);
+			// PRO-1499: the force-fill IS the substitution the flag marks.
+			self::assertSame( 'true', $captured['object']['tags']['category_defaulted'] );
 
 			$settings = new RecEngineSettings();
 			$flusher  = new IngestFlusher(
@@ -474,6 +485,14 @@ final class RecEngineCatalogTest extends TestCase {
 
 			self::assertSame( 1, $stats['sent'], 'The force-filled removal reaches the engine — sent, not rejected nor dropped.' );
 			self::assertSame( 0, $stats['failed'] );
+
+			// PRO-1499: the flag reached the wire too, not just the captured object.
+			$tags = self::$engine->state()['last_catalog_tags'] ?? array();
+			self::assertSame(
+				'true',
+				$tags[ 'woo-' . $pid ]['category_defaulted'] ?? null,
+				'tags.category_defaulted reached the engine for the force-filled removal.'
+			);
 		} finally {
 			update_option( 'default_product_cat', $original_default );
 		}

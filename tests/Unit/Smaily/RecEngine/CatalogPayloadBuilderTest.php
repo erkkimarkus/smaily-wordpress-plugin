@@ -205,6 +205,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		self::assertSame( 'Muu', $payload['category_path'], 'The store default term NAME is used — its localized value, not "uncategorized".' );
 		self::assertSame( 'Muu', $payload['tags']['category_path'], 'tags.category_path echoes the same resolved value.' );
+		// PRO-1499: the store-default substitution is flagged so the engine
+		// skips category-slug-keyed derivation for this placeholder row.
+		self::assertSame( 'true', $payload['tags']['category_defaulted'] );
 	}
 
 	public function test_category_path_is_empty_string_when_default_category_is_unresolvable(): void {
@@ -221,6 +224,10 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
 
 		self::assertSame( '', $payload['category_path'] );
+		// PRO-1499: an unresolvable (still-empty) category_path is not a
+		// substituted VALUE, so it must not be flagged — the row fails the
+		// engine's REQUIRED-field check regardless, with no placeholder to mark.
+		self::assertArrayNotHasKey( 'category_defaulted', $payload['tags'] );
 	}
 
 	// --- always-sendable catalog.delete tombstones (PRO-1498) ---------------
@@ -243,6 +250,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		self::assertSame( 'uncategorized', $object['category_path'] );
 		self::assertSame( 'https://shop.test/p/1', $object['product_url'], 'A valid product_url is left untouched.' );
+		// PRO-1499: forcing the placeholder is exactly the substitution
+		// tags.category_defaulted marks.
+		self::assertSame( 'true', $object['tags']['category_defaulted'] );
 	}
 
 	public function test_ensure_valid_removal_fills_blank_product_url_with_fallback(): void {
@@ -259,6 +269,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 
 		self::assertSame( 'food/dry', $object['category_path'], 'A valid category_path is left untouched.' );
 		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=42', $object['product_url'] );
+		// PRO-1499: only the product_url was force-filled, not category_path —
+		// no substitution to flag.
+		self::assertArrayNotHasKey( 'tags', $object );
 	}
 
 	public function test_ensure_valid_removal_treats_empty_multilingual_product_url_map_as_blank(): void {
@@ -293,6 +306,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		self::assertFalse( $object['in_stock'] );
 		self::assertSame( 'https://shop.test/?smaily_connect_removed_product=999', $object['product_url'] );
 		self::assertSame( '999', $object['external_id'] );
+		// PRO-1499: a tombstone always syncs SOME category_path — never real
+		// taxonomy — so it always carries the flag.
+		self::assertSame( 'true', $object['tags']['category_defaulted'] );
 	}
 
 	public function test_build_unresolvable_uses_store_default_category_when_resolvable(): void {
@@ -306,6 +322,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$object = $builder->build_unresolvable( 999, 'u' );
 
 		self::assertSame( 'Muu', $object['category_path'], 'Prefers the real store default term over the last-resort literal.' );
+		// PRO-1499: still a tombstone — the flag doesn't depend on which
+		// placeholder text was used.
+		self::assertSame( 'true', $object['tags']['category_defaulted'] );
 	}
 
 	public function test_expand_simple_product_returns_itself(): void {
@@ -387,7 +406,9 @@ final class CatalogPayloadBuilderTest extends TestCase {
 		$payload = ( new CatalogPayloadBuilder() )->build( $product, 'u' );
 
 		// product_id (PRO-1224) is the RAW canonical parent id — always present —
-		// alongside brand + category_path.
+		// alongside brand + category_path. A real (non-defaulted) category_path
+		// omits category_defaulted entirely (PRO-1499) — the exact array match
+		// below proves it, no separate assertion needed.
 		self::assertSame(
 			array( 'product_id' => '555', 'brand' => 'Acana', 'category_path' => 'toys' ),
 			$payload['tags']
