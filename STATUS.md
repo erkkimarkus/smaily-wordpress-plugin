@@ -54,9 +54,9 @@ test (the `other`-default case) is unchanged. Files:
 `includes/Integrations/WooCommerce/StorefrontBeacon.php`,
 `tests/Unit/Integrations/WooCommerce/StorefrontBeaconTest.php`, `CLAUDE.md`.)
 
-Prior: 2026-07-21 (**v3.7.2 — build/verify/gate sequence RUN, gates
-green; publication (GH release + tag) deferred to the orchestrator in this
-session, not performed by this pass.** Version bumped in all four places
+Prior: 2026-07-21 (**v3.7.2 — RELEASED** (gates green; built/gated by the
+worker pass, published by the orchestrator the same session — see the
+publication note at the end of this entry). Version bumped in all four places
 (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
 `SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
 tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
@@ -95,8 +95,15 @@ adversarially reviewed — `captureUrlParams()` still writes only the three
 attribution cookies, creates no session and sends nothing pre-consent, no new
 injection/XSS surface, cookie flags sane; verdict PASS, 0 findings. Full
 report `docs/audits/2026-07-21-SECURITY_DELTA_AUDIT_V372_GATE.md` + register
-row in `docs/audits/INDEX.md`. **NOT published**: no `gh release`, no git tag
-— per this task's scope, publication is the orchestrator's step.
+row in `docs/audits/INDEX.md`. **Published (orchestrator step, same
+session):** `gh release create v3.7.2` on `erkkimarkus/smaily-wordpress-plugin`
+— asset verified (1 116 466 B), Latest, non-prerelease, tag on the bump commit
+`bc7bcc9` per the v3.7.1 convention. **PRO-1450 resolved in the same pass:**
+the `v3.7.0` tag force-repointed `742f3b8` → `367c304` (its bump commit,
+matching the convention); the v3.7.0 GH release re-verified intact afterwards
+(asset present, still public, not draft/prerelease). MiuMjau updated to
+v3.7.2 the same day (Erkki) — the PRO-1388 identified-session re-measurement
+awaits post-release traffic.
 
 Prior: 2026-07-21 (**PRO-1436 — suppressed the 4 false-positive PCP
 warnings from the PRO-1195 abandoned-cart code, gate-reviewed at v3.7.0/
