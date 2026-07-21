@@ -3422,6 +3422,24 @@ unchanged, this is the one sanctioned server-side exception); F3-31
 F3-27 (`IdentityHookHandler` — the `wp_login` binding this complements, not
 replaces); F3-46/PRO-1388 (server-side-survives-caching precedent).
 
+### PRO-1402 — Multilingual stand-in rows: `external_id` deliberately stays the translation post's own id (engine decision, Erkki-approved 2026-07-21)
+
+**Decision: no change.** On a multilingual stand-in catalog row (default-language
+canonical post trashed/draft, a published translation "stands in"), `sku` is
+canonicalized to `woo-<canonical_id>` but `external_id` remains the translation
+post's OWN id — so the two ids differ on exactly that row shape, and that is
+intended semantics, not a bug. Engine rationale (PRO-1329 thread, 2026-07-21):
+`sku` is the stable identity/join key; `external_id` is "the raw platform id
+that resolves to a live product right now", which is what the storefront
+recommendations endpoint needs for render-time resolution and add-to-cart —
+aligning it to the canonical id would point at a trashed/draft post in
+precisely the case where it matters. The storefront RFC records the same
+semantics engine-side (`external_id` = id of the unit actually serialized;
+may differ from the id inside `sku` on stand-in rows). Do NOT "fix" this
+divergence in a future pass; a change here is a contract question for the
+engine first (`CatalogPayloadBuilder` `external_id` vs `SkuResolver`
+canonical id).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
