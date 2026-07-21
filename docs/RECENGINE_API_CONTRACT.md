@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.5
+# Smaily Recommendation Engine — API Contract v1.6
 
-**Version**: 1.5.0
+**Version**: 1.6.0
 **Published**: 2026-05-19
-**Last updated**: 2026-07-17 (v1.5.0 — new endpoint §14 `POST /api/v1/notifications/ingest`, the external HTTP ingest path for Notifications 2.0; MINOR bump per the versioning rule: new endpoint, backward-compatible — PRO-1438 / PRO-1444)
+**Last updated**: 2026-07-21 (v1.6.0 — §3 new optional `tags.category_defaulted` catalog field + §6 `customer_email` browse-identity-hint deprecation notice for client-originated senders; MINOR bump per the versioning rule: new optional field, backward-compatible — PRO-1500)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -620,7 +620,7 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 | `image_url` | string (URL) \| `{lang: string}` | NO | Product image URL. **Stored as a representative scalar only** — there is no `image_url_i18n` column, so the `{lang}` form is accepted but not stored per-language. |
 | `product_url` | string (URL) \| `{lang: string}` | YES | Product page URL. **Required, non-empty** — an empty string `""` is rejected (400), mirroring `category_path`. No silent fallback to `product_base_url + sku`. |
 | `external_id` | string | NO | Plugin/platform internal ID (for debugging/traceability). |
-| `tags` | object | NO | Best-effort mapping (engine uses immediately) |
+| `tags` | object | NO | Best-effort mapping (engine uses immediately). Includes the optional `category_defaulted` marker — see [below](#category-defaulted). |
 | `raw_attributes` | object | NO | Raw platform data. **Currently stored verbatim and not processed** — the AI mapping wizard / `unmapped_attributes` flow is planned, not yet implemented. |
 | `product_type` | string | NO | Platform product type — WC `simple`/`variable`/`grouped`/`external` **plus gift-card plugins' custom types** (`pw-gift-card`, `gift-card`, `gift_card`, `wc_gc`, …). The **robust non-product signal**: the engine derives `recommendable` from this (gift-card types → excluded). Send it; do not hard-filter on it yourself. |
 | `is_virtual` | boolean | NO | WC virtual flag. **Stored as signal, not auto-excluding** — a legitimate digital/virtual-goods store sells these. Lets the engine distinguish a digital store from a config artifact. |
@@ -648,6 +648,9 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 
 <a name="engine-internal"></a>
 **Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): the engine's **exclusion decision** (a per-store/business-model call the connector must NOT make). Derived primarily from the **`product_type` signal** (gift-card types → excluded), with `sku`/`category_path`/`name` heuristics as fallback (test artifacts `LIVE-*`/`live-test`, name-matched gift cards/donations). `is_virtual`/`is_downloadable` are **stored but do NOT auto-exclude** (digital-goods stores sell those). Recomputed on every upsert, so a corrected sync self-heals; tunable engine-side without redeploying connectors. Excluded products are never recommended via any path. **Division of labour: the connector sends structural signal; the engine owns the exclusion.**
+
+<a name="category-defaulted"></a>
+**`tags.category_defaulted`** (added v1.6.0, PRO-1500): optional string tag, value `"true"` — **omit-on-false** (send it only when true; there is no `"false"` value, absence means "not defaulted"). Set this when the sender substituted the store's fallback/default category because the product genuinely has none (e.g. WooCommerce's default-category behavior), or on a delete-tombstone row the sender still has to sync with *some* `category_path`. Semantics: on such a row, `category_path` is a **placeholder, not real product taxonomy**. The engine skips every category-**slug**-keyed derivation for it — species-from-category, `category_canonical`, and replenishable-from-category (`lib/ingest/attribute-mapping.ts`) — while **name**-keyed derivations (species/life-stage-from-name, brand lexicon match) are unaffected and still run; an explicit `tags.species` / `tags.replenishable` etc. always wins regardless of this flag. A row left without `category_canonical` this way stays eligible for the nightly AI category sweep (`lib/catalog/category-sweep.ts`), which classifies from the product name when the category axis carries no signal. **Re-sync honesty**: evaluated fresh from each request's own `tags` — omit the flag on a later sync (once a real category is known) and normal slug-derivation resumes for that sync; nothing is "sticky" in the engine's derivation logic.
 
 **Response 200 OK** (all products valid):
 ```json
@@ -1003,11 +1006,13 @@ Browse events batch. The highest-volume endpoint.
 | `dwell_seconds` | integer | NO | Time on page (for `product_view`) |
 | `event_ts` | ISO 8601 | YES | Event occurrence timestamp |
 | `source` | string | NO | Defaults to `web` if omitted. Constant: `web`, `plugin_woo`, `plugin_shopify`, `plugin_magento`, `make`, `custom`. The engine stores `source` as an opaque label (not enum-validated); senders must use their listed constant so per-source analytics stay clean. |
-| `customer_email` | string | NO | Identity hint (if user is logged in) |
+| `customer_email` | string | NO | Identity hint (if user is logged in). **Deprecated for client-originated senders — see below.** |
 | `smaily_visitor_token` | string | NO | Identity hint (from cookie) |
 | `smaily_rec_id` | string | NO | Attribution (from cookie) |
 | `smaily_ctx` | string | NO | Attribution (from cookie) |
 | `external_id` | string | NO | Platform user_id |
+
+> **Deprecated for client-originated senders (2026-07-21 decision, PRO-1500): `customer_email` as a browse-event identity hint.** No legitimate client-side producer for this field exists — a storefront beacon has no verified email of its own to send, and a value handed to client-side JS is trivially spoofable. The supported identity path for a logged-in shopper is the visitor-token cookie (`smaily_visitor_token`, resolved server-side against `visitor_tokens`) plus the explicit [`POST /api/v1/identity/merge`](#7-post-apiv1identitymerge) call on login ([§7](#7-post-apiv1identitymerge)) — not a client-echoed email. **Server-side senders** (a Make-flow-style integration running on the merchant's own server, which already holds a verified email — typically `source: "make"`) **may continue sending `customer_email` on browse events during the grace period.** This release documents the deprecation only: per this contract's additive-MINOR discipline (nothing existing changes shape or behavior on a MINOR), the engine still accepts and resolves `customer_email` from every sender exactly as in the table above — no accept-and-ignore code change ships in v1.6.0. A future contract change will move client-originated `customer_email` to accept-and-ignore semantics (accepted on the wire, no longer consulted by the identity-resolution steps below); that is not yet implemented and is tracked separately.
 
 **Identity resolution flow** (engine-side):
 
@@ -1966,6 +1971,10 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **Idempotency is upsert-on-open-dedupe**, not the Layer 1/Layer 2 scheme used by the bulk ingest endpoints ([Idempotency](#idempotency)): resending the same `(type, dedupe_key)` for a tenant updates the still-open notification in place instead of creating a duplicate drawer entry.
 - **Setup-exchange endpoints map gains `notifications_ingest`** (§1) — existing connections whose exchange-time map predates this key fall back to the plugin's own path constants, same "map age" behavior as every prior additive key.
 - No consumer calls this yet (no plugin/Smaily-core caller exists at lock time) — documented ahead of any integration so the contract, not a specific caller's behavior, is the source of truth from day one.
+
+**v1.6.0** (2026-07-21) — **`tags.category_defaulted` on catalog ingest, and a deprecation notice for browse `customer_email`**. MINOR bump per the [Versioning](#versioning) rule (new optional field + a wording-only deprecation notice; nothing existing changes shape or behavior). PRO-1500, Erkki-approved 2026-07-21:
+- **§3 new optional catalog field [`tags.category_defaulted`](#category-defaulted)** — `"true"`, omit-on-false. Marks a row whose `category_path` is a **placeholder** (a store default-category fallback, or a delete-tombstone row synced with *some* category) rather than real taxonomy. Engine behavior: `lib/ingest/attribute-mapping.ts` `mapRawAttributes()` gains a `categoryDefaulted` parameter that skips every category-**slug**-keyed derivation (species-from-category, `category_canonical`, replenishable-from-category) for such a row; **name**-keyed derivations (species/life-stage-from-name, brand) are unaffected, and explicit tenant-sent tags still always win. A row left without `category_canonical` this way stays eligible for the nightly AI category sweep (verified against `lib/catalog/category-sweep.ts` / `lib/catalog/tag-meta.ts` `needsCategorySweep()` — its selection is keyed only on `category_canonical` + `_tag_meta`, so it already includes these rows without any change). Evaluated fresh per upsert from the request's own `tags` — omitting the flag on a later sync (once a real category is known) re-enables normal derivation for that sync, with no stored state to reset.
+- **§6 `customer_email` on browse events marked deprecated for client-originated senders** (documentation only in this release — no code change, no accept-and-ignore yet): no legitimate client-side producer exists, the field is spoofable from browser JS, and the supported logged-in-identity path is the visitor-token cookie + [§7 `identity/merge`](#7-post-apiv1identitymerge). Server-side senders (Make-flow style) may keep sending it during the grace period.
 
 ---
 
