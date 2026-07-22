@@ -54,6 +54,7 @@ use Smaily\Connect\Smaily\ContactSyncMode;
  *     },
  *     rss: { baseUrl, categories[], defaults{} } | null,
  *     docsUrl: string,
+ *     orderStatuses: array<{slug, name}>,
  *   }
  *
  * The React bundle reads everything that's not in WizardState.env
@@ -80,6 +81,7 @@ class EnvDetector {
 	 *     defaults: array{limit: int, category: string, sortBy: string, order: string, taxRate: float},
 	 *   }|null,
 	 *   docsUrl: string,
+	 *   orderStatuses: array<int, array{slug: string, name: string}>,
 	 * }
 	 */
 	public function snapshot(): array {
@@ -96,6 +98,9 @@ class EnvDetector {
 			// single place this can move/be filtered; the React "How to add a
 			// Smaily signup form" section appends its own #anchor client-side.
 			'docsUrl'            => Constants::docs_url(),
+			// PRO-1504 — registered WooCommerce order statuses (incl. custom
+			// ones), choices for the "counts as shipped" multi-select.
+			'orderStatuses'      => $this->order_statuses(),
 		);
 	}
 
@@ -196,6 +201,30 @@ class EnvDetector {
 			'orders'    => $this->orders_count(),
 			'products'  => $this->products_count(),
 		);
+	}
+
+	/**
+	 * Registered order statuses (incl. custom ones), for the "counts as
+	 * shipped" multi-select (PRO-1504). `wc_get_order_statuses()` keys
+	 * are 'wc-'-prefixed; the bare slug (what `$order->get_status()`
+	 * returns and what OrderPayloadBuilder::map_status() compares
+	 * against) is the one stored in the merchant's selection.
+	 *
+	 * @return array<int, array{slug: string, name: string}>
+	 */
+	private function order_statuses(): array {
+		if ( ! function_exists( 'wc_get_order_statuses' ) ) {
+			return array();
+		}
+		$statuses = array();
+		foreach ( wc_get_order_statuses() as $key => $label ) {
+			$slug       = ( strpos( (string) $key, 'wc-' ) === 0 ) ? substr( (string) $key, 3 ) : (string) $key;
+			$statuses[] = array(
+				'slug' => $slug,
+				'name' => (string) $label,
+			);
+		}
+		return $statuses;
 	}
 
 	private function customers_count(): int {
@@ -375,8 +404,9 @@ class EnvDetector {
 	 * @return array<string, mixed>
 	 */
 	public function saved_settings(): array {
-		$creds = new Credentials();
-		$set   = $creds->get();
+		$creds             = new Credentials();
+		$set               = $creds->get();
+		$transactional_set = $creds->get( 'transactional' );
 
 		return array(
 			'smailyCredentials'             => array(
@@ -428,6 +458,21 @@ class EnvDetector {
 			// cast read a disabled array ({enabled: false}) as TRUE.
 			'abandonedCartEnabled'          => \Smaily_Connect\Includes\Options::abandoned_cart_status()['enabled'],
 			'automationMappings'            => $this->automation_mappings(),
+
+			// Transactional emails (PRO-1504, stage 1 — configuration only,
+			// no send path yet). Separate Smaily account bound under
+			// account_key='transactional'; credentials mirror the default
+			// account's password-omitted shape.
+			'transactionalEmailsEnabled'    => (bool) get_option( 'smly_plus_transactional_emails_enabled', false ),
+			'transactionalCredentials'      => array(
+				'subdomain' => $transactional_set !== null ? $transactional_set->subdomain : '',
+				'username'  => $transactional_set !== null ? $transactional_set->username : '',
+				'password'  => '',
+			),
+			'transactionalConnected'        => (bool) get_option( 'smly_plus_transactional_connection_verified', false ),
+			'orderConfirmationEnabled'      => (bool) get_option( 'smly_plus_order_confirmation_enabled', false ),
+			'shippingConfirmationEnabled'   => (bool) get_option( 'smly_plus_shipping_confirmation_enabled', false ),
+			'shippedOrderStatuses'          => (array) get_option( 'smly_plus_shipped_order_statuses', array( 'completed' ) ),
 
 			// Step 4: rec-engine connection state (sub-PR 3.1). The
 			// api_key is DELIBERATELY omitted from the boot payload —

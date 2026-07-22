@@ -66,6 +66,20 @@ class SettingsEndpoint {
 	private const LEGACY_OPTION_CART_CUTOFF     = 'smaily_connect_abandoned_cart_cutoff';
 	private const LEGACY_OPTION_CART_STATUS     = 'smaily_connect_abandoned_cart_status';
 
+	/**
+	 * Automation-mapping trigger_type allowlist (PRO-1504). Rows outside
+	 * this list are silently dropped from the replace, same as a row
+	 * missing a required field — a garbage trigger_type can't otherwise
+	 * reach {prefix}smly_plus_automation_mapping.
+	 */
+	private const VALID_TRIGGER_TYPES = array(
+		'welcome',
+		'first_order',
+		'abandoned_cart',
+		'order_confirmation',
+		'shipping_confirmation',
+	);
+
 	public function register(): void {
 		register_rest_route(
 			Constants::REST_NAMESPACE,
@@ -359,11 +373,72 @@ class SettingsEndpoint {
 		);
 		update_option( self::LEGACY_OPTION_CART_CUTOFF, $cutoff );
 
+		$this->save_transactional_emails( $data );
+
 		// Replace the mapping table contents in one shot — Settings always
 		// sends the full list it wants persisted, no partial updates.
 		$this->replace_automation_mappings( $mappings );
 
 		return $this->success_response();
+	}
+
+	/**
+	 * Transactional emails (PRO-1504, stage 1 — configuration only, no send
+	 * path). A separate Smaily account bound under account_key='transactional',
+	 * mirroring how the default account's credentials are persisted in
+	 * save_connection(): empty inbound password = "leave the stored secret
+	 * as-is", non-empty = "rotate to this".
+	 *
+	 * @param array<string, mixed> $data
+	 */
+	private function save_transactional_emails( array $data ): void {
+		update_option( 'smly_plus_transactional_emails_enabled', ! empty( $data['transactionalEmailsEnabled'] ) );
+		update_option( 'smly_plus_order_confirmation_enabled', ! empty( $data['orderConfirmationEnabled'] ) );
+		update_option( 'smly_plus_shipping_confirmation_enabled', ! empty( $data['shippingConfirmationEnabled'] ) );
+
+		$statuses_raw = isset( $data['shippedOrderStatuses'] ) && is_array( $data['shippedOrderStatuses'] )
+			? $data['shippedOrderStatuses']
+			: array();
+		$statuses     = array_values(
+			array_filter(
+				array_map(
+					static fn ( $s ): string => sanitize_key( (string) $s ),
+					$statuses_raw
+				)
+			)
+		);
+		update_option( 'smly_plus_shipped_order_statuses', $statuses );
+
+		$creds     = isset( $data['transactionalCredentials'] ) && is_array( $data['transactionalCredentials'] )
+			? $data['transactionalCredentials']
+			: array();
+		$subdomain = isset( $creds['subdomain'] ) ? sanitize_text_field( (string) $creds['subdomain'] ) : '';
+		$username  = isset( $creds['username'] ) ? sanitize_text_field( (string) $creds['username'] ) : '';
+		$password  = isset( $creds['password'] ) ? (string) $creds['password'] : '';
+
+		$option_key = Credentials::PHASE2_OPTION_PREFIX . 'transactional';
+		if ( $password === '' ) {
+			$existing  = get_option( $option_key, array() );
+			$encrypted = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
+		} else {
+			$encrypted = $this->encrypt_password( $password );
+		}
+
+		update_option(
+			$option_key,
+			array(
+				'subdomain' => $subdomain,
+				'username'  => $username,
+				'password'  => $encrypted,
+			)
+		);
+
+		// Mirrors save_connection()'s default-account verified flag, but
+		// scoped to whether this save actually carries a usable credential
+		// pair — transactional credentials are optional (only relevant once
+		// the merchant turns the feature on), so an incomplete/cleared pair
+		// must not keep showing a stale "✓ Connected" view.
+		update_option( 'smly_plus_transactional_connection_verified', $subdomain !== '' && $username !== '' );
 	}
 
 	/**
@@ -388,7 +463,13 @@ class SettingsEndpoint {
 			$workflow_id = isset( $row['workflowId'] ) ? (string) $row['workflowId'] : '';
 			$is_fallback = ! empty( $row['isDefaultFallback'] ) ? 1 : 0;
 
-			if ( $trigger === '' || $language === '' || $workflow_id === '' ) {
+			// The allowlist check subsumes the old `$trigger === ''` guard —
+			// '' is never a member of VALID_TRIGGER_TYPES.
+			if ( ! in_array( $trigger, self::VALID_TRIGGER_TYPES, true ) ) {
+				continue;
+			}
+
+			if ( $language === '' || $workflow_id === '' ) {
 				continue;
 			}
 

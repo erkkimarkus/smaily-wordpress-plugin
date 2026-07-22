@@ -146,6 +146,66 @@ final class SettingsRoundTripTest extends TestCase {
 		self::assertTrue( $by_trigger['welcome']['isDefaultFallback'] );
 	}
 
+	public function test_woocommerce_tab_round_trip_including_transactional_emails(): void {
+		// PRO-1504 stage 1 — same writer/reader symmetry check as the
+		// mapping table above, extended to the transactional-emails slice:
+		// the enablement toggle, the transactional account's credentials
+		// (account_key='transactional'), the two new trigger mappings, and
+		// the "counts as shipped" status set.
+		$payload = array(
+			'transactionalEmailsEnabled'  => true,
+			'transactionalCredentials'    => array(
+				'subdomain' => 'trxroundtrip',
+				'username'  => 'trx-user',
+				'password'  => 'trx-secret',
+			),
+			'orderConfirmationEnabled'    => true,
+			'shippingConfirmationEnabled' => true,
+			'shippedOrderStatuses'        => array( 'completed', 'shipped' ),
+			'automationMappings'          => array(
+				array(
+					'triggerType'       => 'order_confirmation',
+					'language'          => 'default',
+					'accountKey'        => 'transactional',
+					'workflowId'        => '301',
+					'isDefaultFallback' => true,
+				),
+				array(
+					'triggerType'       => 'shipping_confirmation',
+					'language'          => 'default',
+					'accountKey'        => 'transactional',
+					'workflowId'        => '302',
+					'isDefaultFallback' => true,
+				),
+			),
+		);
+
+		$response = RestRequestHelper::post(
+			'/settings',
+			array( 'tab' => 'woocommerce', 'data' => $payload )
+		);
+		self::assertSame( 200, $response->get_status() );
+
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertTrue( $saved['transactionalEmailsEnabled'] );
+		self::assertSame( 'trxroundtrip', $saved['transactionalCredentials']['subdomain'] );
+		self::assertSame( 'trx-user', $saved['transactionalCredentials']['username'] );
+		self::assertSame( '', $saved['transactionalCredentials']['password'], 'Password must never round-trip to the boot payload.' );
+		self::assertTrue( $saved['transactionalConnected'], 'A complete credential pair must mark the account verified.' );
+		self::assertTrue( $saved['orderConfirmationEnabled'] );
+		self::assertTrue( $saved['shippingConfirmationEnabled'] );
+		self::assertSame( array( 'completed', 'shipped' ), $saved['shippedOrderStatuses'] );
+
+		$by_trigger = array();
+		foreach ( $saved['automationMappings'] as $row ) {
+			$by_trigger[ $row['triggerType'] ] = $row;
+		}
+		self::assertSame( '301', $by_trigger['order_confirmation']['workflowId'] );
+		self::assertSame( 'transactional', $by_trigger['order_confirmation']['accountKey'] );
+		self::assertSame( '302', $by_trigger['shipping_confirmation']['workflowId'] );
+	}
+
 	public function test_connection_tab_preserves_password_on_empty_resave(): void {
 		// Bug-2.H.19#3 regression guard. The "already-connected" view on
 		// Step 1 leaves password='' in React state. Continue would POST

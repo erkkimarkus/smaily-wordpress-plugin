@@ -222,6 +222,136 @@ final class SettingsEndpointTest extends TestCase {
 		self::assertSame( 10, $this->option_writes['smaily_connect_abandoned_cart_cutoff'] );
 	}
 
+	public function test_woocommerce_tab_persists_transactional_account_and_toggles(): void {
+		$endpoint        = new SettingsEndpoint();
+		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'woocommerce' );
+		$request->set_param(
+			'data',
+			array(
+				'welcomeEnabled'              => false,
+				'firstOrderEnabled'           => false,
+				'abandonedCartEnabled'        => false,
+				'abandonedCartCutoffMinutes'  => 30,
+				'automationMappings'          => array(),
+				'transactionalEmailsEnabled'  => true,
+				'transactionalCredentials'    => array(
+					'subdomain' => 'trxdemo',
+					'username'  => 'bob',
+					'password'  => 'plaintext',
+				),
+				'orderConfirmationEnabled'    => true,
+				'shippingConfirmationEnabled' => true,
+				'shippedOrderStatuses'        => array( 'completed', 'shipped' ),
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertTrue( $response->get_data()['saved'] );
+		self::assertTrue( $this->option_writes['smly_plus_transactional_emails_enabled'] );
+		self::assertTrue( $this->option_writes['smly_plus_order_confirmation_enabled'] );
+		self::assertTrue( $this->option_writes['smly_plus_shipping_confirmation_enabled'] );
+		self::assertSame(
+			array( 'completed', 'shipped' ),
+			$this->option_writes['smly_plus_shipped_order_statuses']
+		);
+
+		$creds = $this->option_writes['smly_plus_credentials_transactional'];
+		self::assertSame( 'trxdemo', $creds['subdomain'] );
+		self::assertSame( 'bob', $creds['username'] );
+		self::assertNotSame( '', $creds['password'], 'Password must be encrypted, not blank.' );
+
+		self::assertTrue( $this->option_writes['smly_plus_transactional_connection_verified'] );
+	}
+
+	public function test_woocommerce_tab_marks_transactional_connection_unverified_when_credentials_incomplete(): void {
+		$endpoint        = new SettingsEndpoint();
+		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'woocommerce' );
+		$request->set_param(
+			'data',
+			array(
+				'transactionalCredentials' => array(
+					'subdomain' => '',
+					'username'  => '',
+					'password'  => '',
+				),
+			)
+		);
+
+		$endpoint->handle( $request );
+
+		self::assertFalse( $this->option_writes['smly_plus_transactional_connection_verified'] );
+	}
+
+	public function test_woocommerce_tab_accepts_transactional_trigger_mappings(): void {
+		$endpoint        = new SettingsEndpoint();
+		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'woocommerce' );
+		$request->set_param(
+			'data',
+			array(
+				'automationMappings' => array(
+					array(
+						'triggerType'       => 'order_confirmation',
+						'language'          => 'default',
+						'accountKey'        => 'transactional',
+						'workflowId'        => '99',
+						'isDefaultFallback' => true,
+					),
+					array(
+						'triggerType'       => 'shipping_confirmation',
+						'language'          => 'default',
+						'accountKey'        => 'transactional',
+						'workflowId'        => '100',
+						'isDefaultFallback' => true,
+					),
+				),
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertTrue( $response->get_data()['saved'] );
+		// 1 TRUNCATE + 2 row INSERTs.
+		self::assertCount( 3, $GLOBALS['wpdb']->queries );
+	}
+
+	public function test_woocommerce_tab_rejects_unknown_trigger_type(): void {
+		$endpoint        = new SettingsEndpoint();
+		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'woocommerce' );
+		$request->set_param(
+			'data',
+			array(
+				'automationMappings' => array(
+					array(
+						'triggerType'       => 'mystery_trigger',
+						'language'          => 'default',
+						'accountKey'        => 'default',
+						'workflowId'        => '1',
+						'isDefaultFallback' => true,
+					),
+				),
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertTrue( $response->get_data()['saved'] );
+		// Only the TRUNCATE — an unknown trigger_type must never reach an INSERT.
+		self::assertCount( 1, $GLOBALS['wpdb']->queries );
+	}
+
 	public function test_recommendations_tab_persists_only_browse_preference(): void {
 		// 3.9: the per-domain sync toggles were removed — connecting the engine
 		// syncs all domains unconditionally. The only persisted Step-4 preference

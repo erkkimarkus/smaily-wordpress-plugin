@@ -26,6 +26,10 @@ interface WorkflowResolverInterface {
 	 * Resolves the Smaily workflow that should fire for a given trigger.
 	 *
 	 * @param string      $trigger_type One of "welcome", "first_order", "abandoned_cart".
+	 *                                  "order_confirmation" and "shipping_confirmation"
+	 *                                  rows exist in the mapping table (PRO-1504) but no
+	 *                                  caller passes them here yet — the transactional
+	 *                                  sender is a later stage.
 	 * @param string|null $language     Detected language code (ISO 639-1 / locale slug)
 	 *                                  or null for single-language sites.
 	 *

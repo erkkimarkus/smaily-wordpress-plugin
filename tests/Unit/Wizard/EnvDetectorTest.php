@@ -277,4 +277,78 @@ final class EnvDetectorTest extends TestCase {
 		self::assertSame( 30, $saved['abandonedCartCutoffMinutes'] );
 		self::assertFalse( $saved['welcomeEnabled'] );
 	}
+
+	public function test_snapshot_carries_order_statuses_bare_slug(): void {
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+		Functions\when( 'wc_get_order_statuses' )->justReturn(
+			array(
+				'wc-completed' => 'Completed',
+				'wc-shipped'   => 'Shipped', // custom status
+			)
+		);
+
+		$snapshot = ( new EnvDetector() )->snapshot();
+
+		self::assertSame(
+			array(
+				array(
+					'slug' => 'completed',
+					'name' => 'Completed',
+				),
+				array(
+					'slug' => 'shipped',
+					'name' => 'Shipped',
+				),
+			),
+			$snapshot['orderStatuses']
+		);
+	}
+
+	public function test_snapshot_order_statuses_empty_when_wc_inactive(): void {
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+
+		// wc_get_order_statuses is defined by setUp() as an alias, so
+		// function_exists() is true here regardless of WC-active state in
+		// this suite — the empty-list default (setUp's justReturn( array() ))
+		// covers the "no statuses registered" branch.
+		$snapshot = ( new EnvDetector() )->snapshot();
+
+		self::assertSame( array(), $snapshot['orderStatuses'] );
+	}
+
+	public function test_saved_settings_carries_transactional_defaults_when_options_absent(): void {
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertFalse( $saved['transactionalEmailsEnabled'] );
+		self::assertSame( '', $saved['transactionalCredentials']['subdomain'] );
+		self::assertSame( '', $saved['transactionalCredentials']['username'] );
+		self::assertSame( '', $saved['transactionalCredentials']['password'] );
+		self::assertFalse( $saved['transactionalConnected'] );
+		self::assertFalse( $saved['orderConfirmationEnabled'] );
+		self::assertFalse( $saved['shippingConfirmationEnabled'] );
+		self::assertSame( array( 'completed' ), $saved['shippedOrderStatuses'] );
+	}
+
+	public function test_saved_settings_reads_transactional_account_credentials_without_password(): void {
+		\Smaily_Connect\Includes\Cypher::$decrypt_return = 'trx-plain-pw';
+
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = false ) {
+				if ( $key === \Smaily\Connect\Settings\Credentials::PHASE2_OPTION_PREFIX . 'transactional' ) {
+					return array(
+						'subdomain' => 'trxdemo',
+						'username'  => 'bob',
+						'password'  => 'enc-blob',
+					);
+				}
+				return $default;
+			}
+		);
+
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertSame( 'trxdemo', $saved['transactionalCredentials']['subdomain'] );
+		self::assertSame( 'bob', $saved['transactionalCredentials']['username'] );
+		self::assertSame( '', $saved['transactionalCredentials']['password'] );
+	}
 }
