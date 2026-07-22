@@ -707,6 +707,27 @@ never through a registered-status filter. Live-walks share the dev wp-env DB
 with the integration suite — a leaked walk order is a delayed test failure.
 (LESSONS §2.16.)
 
+### A test firing a real WC hook must pass its full arg tuple — a short do_action() trips OTHER real listeners
+PHP 8 raises `ArgumentCountError` when a registered callback declares a
+parameter with no default and the hook was fired with too few args — this
+is invisible when you only think about YOUR OWN callback (which usually has
+defaults), but `do_action()` calls EVERY listener on that hook with the same
+args, including unrelated real code still registered (the legacy
+`Subscriber_Synchronization::smaily_checkout_subscribe_customer( $order_id,
+$posted_data, $order )` on `woocommerce_checkout_order_processed`, WooCommerce
+core's own `PointOfSaleEmailHandler::maybe_suppress_email( $enabled, $order )`
+on `woocommerce_email_enabled_*`, and 4.0's own `$enabled` filter passing
+`( bool, $order, $email_instance )`). Found while integration-testing PRO-1504
+Stage 2: `do_action( 'woocommerce_checkout_order_processed', $order_id )`
+(1 arg) and `apply_filters( 'woocommerce_email_enabled_customer_processing_
+order', true )` (1 arg) both fatal with `ArgumentCountError`, NOT from any
+code this session wrote. Fix: fire the hook with the SAME arg count/shape
+real WC would use (`do_action( 'woocommerce_checkout_order_processed',
+$order_id, array(), $order )`; `apply_filters( 'woocommerce_email_enabled_…',
+$enabled, $order, null )`) — check the real firing call site (`grep -n
+"do_action( '<hook>'"` in the WC/plugin source) before hand-rolling a
+shortened `do_action()`/`apply_filters()` in a test.
+
 ### Engine-side automations config is TENANT-scoped — walk residue is visible to real stores
 `/api/v1/automations/config` rows live per TENANT, not per store/connection —
 every store connected to the same tenant (the sandbox is shared by the dev
