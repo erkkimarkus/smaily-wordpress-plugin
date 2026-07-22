@@ -45,10 +45,7 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  */
 class CartPayloadBuilder {
 
-	/** Legacy parity: at most 10 product slots on the wire. */
-	private const MAX_PRODUCTS = 10;
-
-	/** Legacy parity: every product key is prefilled '' for slots 1..10. */
+	/** Legacy parity: every product key is prefilled '' for slots 1..10 (cap: ProductMatrixBuilder::MAX_PRODUCTS). */
 	private const PRODUCT_KEYS = array(
 		'product_base_price',
 		'product_description',
@@ -189,19 +186,44 @@ class CartPayloadBuilder {
 	 * @return array<string, string>
 	 */
 	private function product_fields( array $items, array $sync_fields ): array {
-		$fields = array();
-		foreach ( self::PRODUCT_KEYS as $key ) {
-			for ( $i = 1; $i <= self::MAX_PRODUCTS; $i++ ) {
-				$fields[ $key . '_' . $i ] = '';
-			}
-		}
+		$fields = ProductMatrixBuilder::prefill( self::PRODUCT_KEYS );
 
 		$selected = array_intersect( self::PRODUCT_KEYS, array_keys( array_filter( $sync_fields ) ) );
 		if ( $selected === array() || ! function_exists( 'wc_get_product' ) ) {
 			return $fields;
 		}
 
-		$slot = 1;
+		return ProductMatrixBuilder::fill(
+			$fields,
+			$this->valid_cart_items( $items ),
+			function ( array $pair ) use ( $selected ): array {
+				[ $product, $item ] = $pair;
+
+				$slot_fields = array();
+				foreach ( $selected as $field ) {
+					$value = $this->product_field_value( $field, $product, $item );
+					if ( $value === null ) {
+						continue;
+					}
+					$slot_fields[ $field ] = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 );
+				}
+				return $slot_fields;
+			}
+		);
+	}
+
+	/**
+	 * Cart items narrowed to ones that resolve to a live product — the
+	 * matrix filler only ever sees slot-eligible items (F3-53: a poison
+	 * item or a deleted product is skipped here, before it can consume a
+	 * slot).
+	 *
+	 * @param array<int, mixed> $items
+	 *
+	 * @return array<int, array{0: \WC_Product, 1: array<string, mixed>}>
+	 */
+	private function valid_cart_items( array $items ): array {
+		$valid = array();
 		foreach ( $items as $item ) {
 			// Treat stored rows as wire input (F3-53): skip anything that
 			// isn't our {product_id, quantity} shape instead of fataling.
@@ -214,23 +236,9 @@ class CartPayloadBuilder {
 				continue;
 			}
 
-			if ( $slot > self::MAX_PRODUCTS ) {
-				$fields['over_10_products'] = 'true';
-				break;
-			}
-
-			foreach ( $selected as $field ) {
-				$value = $this->product_field_value( $field, $product, $item );
-				if ( $value === null ) {
-					continue;
-				}
-				$fields[ $field . '_' . $slot ] = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 );
-			}
-
-			++$slot;
+			$valid[] = array( $product, $item );
 		}
-
-		return $fields;
+		return $valid;
 	}
 
 	/**
@@ -290,28 +298,14 @@ class CartPayloadBuilder {
 	}
 
 	/**
-	 * Featured image, else first gallery image (legacy parity).
+	 * Featured image, else first gallery image (legacy parity). Thin wrapper
+	 * over the shared ProductMatrixBuilder fallback — kept as its own
+	 * protected method so unit tests can still stub this exact seam.
 	 *
 	 * @param \WC_Product $product
 	 */
 	protected function product_image_url( $product ): string {
-		$image_id = (int) $product->get_image_id();
-		if ( $image_id > 0 ) {
-			$url = wp_get_attachment_url( $image_id );
-			if ( is_string( $url ) && $url !== '' ) {
-				return $url;
-			}
-		}
-
-		$gallery = $product->get_gallery_image_ids();
-		if ( is_array( $gallery ) && $gallery !== array() ) {
-			$url = wp_get_attachment_url( (int) $gallery[0] );
-			if ( is_string( $url ) && $url !== '' ) {
-				return $url;
-			}
-		}
-
-		return '';
+		return ProductMatrixBuilder::image_url( $product );
 	}
 
 	private function resolver(): ContactLanguageResolver {

@@ -38,10 +38,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class TransactionalPayloadBuilder {
 
-	/** Template parity with CartPayloadBuilder: at most 10 product slots on the wire. */
-	private const MAX_PRODUCTS = 10;
-
-	/** Every product key is prefilled '' for slots 1..10 (legacy Smaily-template parity). */
+	/** Every product key is prefilled '' for slots 1..10 (legacy Smaily-template parity, cap: ProductMatrixBuilder::MAX_PRODUCTS). */
 	private const PRODUCT_KEYS = array(
 		'product_name',
 		'product_sku',
@@ -81,44 +78,38 @@ class TransactionalPayloadBuilder {
 	 * @return array<string, string>
 	 */
 	private function product_fields( \WC_Order $order ): array {
-		$fields = array();
-		foreach ( self::PRODUCT_KEYS as $key ) {
-			for ( $i = 1; $i <= self::MAX_PRODUCTS; $i++ ) {
-				$fields[ $key . '_' . $i ] = '';
-			}
-		}
+		$fields = ProductMatrixBuilder::prefill( self::PRODUCT_KEYS );
 
-		$slot = 1;
+		$valid_items = array();
 		foreach ( $order->get_items() as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Product ) {
-				continue;
+			if ( $item instanceof \WC_Order_Item_Product ) {
+				$valid_items[] = $item;
 			}
-
-			if ( $slot > self::MAX_PRODUCTS ) {
-				$fields['over_10_products'] = 'true';
-				break;
-			}
-
-			$qty = (int) $item->get_quantity();
-			// GROSS (PRO-1241): the order item's get_total()/get_subtotal()
-			// are NET — add the tax share, same basis as OrderPayloadBuilder.
-			$total_gross    = (float) $item->get_total() + (float) $item->get_total_tax();
-			$subtotal_gross = (float) $item->get_subtotal() + (float) $item->get_subtotal_tax();
-
-			$product = $item->get_product();
-
-			$fields[ 'product_name_' . $slot ]       = (string) $item->get_name();
-			$fields[ 'product_sku_' . $slot ]        = $product instanceof \WC_Product ? (string) $product->get_sku() : '';
-			$fields[ 'product_quantity_' . $slot ]   = (string) $qty;
-			$fields[ 'product_price_' . $slot ]      = $qty > 0 ? $this->price_display( $total_gross / $qty ) : '';
-			$fields[ 'product_base_price_' . $slot ] = $qty > 0 ? $this->price_display( $subtotal_gross / $qty ) : '';
-			$fields[ 'product_description_' . $slot ] = $product instanceof \WC_Product ? (string) $product->get_description() : '';
-			$fields[ 'product_image_url_' . $slot ]   = $product instanceof \WC_Product ? $this->product_image_url( $product ) : '';
-
-			++$slot;
 		}
 
-		return $fields;
+		return ProductMatrixBuilder::fill(
+			$fields,
+			$valid_items,
+			function ( \WC_Order_Item_Product $item ): array {
+				$qty = (int) $item->get_quantity();
+				// GROSS (PRO-1241): the order item's get_total()/get_subtotal()
+				// are NET — add the tax share, same basis as OrderPayloadBuilder.
+				$total_gross    = (float) $item->get_total() + (float) $item->get_total_tax();
+				$subtotal_gross = (float) $item->get_subtotal() + (float) $item->get_subtotal_tax();
+
+				$product = $item->get_product();
+
+				return array(
+					'product_name'        => (string) $item->get_name(),
+					'product_sku'         => $product instanceof \WC_Product ? (string) $product->get_sku() : '',
+					'product_quantity'    => (string) $qty,
+					'product_price'       => $qty > 0 ? $this->price_display( $total_gross / $qty ) : '',
+					'product_base_price'  => $qty > 0 ? $this->price_display( $subtotal_gross / $qty ) : '',
+					'product_description' => $product instanceof \WC_Product ? (string) $product->get_description() : '',
+					'product_image_url'   => $product instanceof \WC_Product ? $this->product_image_url( $product ) : '',
+				);
+			}
+		);
 	}
 
 	/**
@@ -134,25 +125,11 @@ class TransactionalPayloadBuilder {
 
 	/**
 	 * Featured image, else first gallery image (CartPayloadBuilder parity).
+	 * Thin wrapper over the shared ProductMatrixBuilder fallback — kept as
+	 * its own protected method so unit tests can still stub this exact seam.
 	 */
 	protected function product_image_url( \WC_Product $product ): string {
-		$image_id = (int) $product->get_image_id();
-		if ( $image_id > 0 ) {
-			$url = wp_get_attachment_url( $image_id );
-			if ( is_string( $url ) && $url !== '' ) {
-				return $url;
-			}
-		}
-
-		$gallery = $product->get_gallery_image_ids();
-		if ( is_array( $gallery ) && $gallery !== array() ) {
-			$url = wp_get_attachment_url( (int) $gallery[0] );
-			if ( is_string( $url ) && $url !== '' ) {
-				return $url;
-			}
-		}
-
-		return '';
+		return ProductMatrixBuilder::image_url( $product );
 	}
 
 	private function currency( \WC_Order $order ): string {
