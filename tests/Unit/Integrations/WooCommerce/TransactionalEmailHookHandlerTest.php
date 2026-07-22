@@ -103,6 +103,55 @@ final class TransactionalEmailHookHandlerTest extends TestCase {
 		self::assertCount( 0, $flusher->calls, 'Once-per-order-per-type: already sent, never re-attempted.' );
 	}
 
+	public function test_block_checkout_order_processed_calls_the_flusher_when_the_gate_is_open(): void {
+		// PRO-1518: the Store-API twin of on_order_processed() — block
+		// checkout never fires woocommerce_checkout_order_processed.
+		$order = $this->fake_order( 20, '' );
+		$flusher = $this->recording_flusher();
+
+		$handler = new TransactionalEmailHookHandler(
+			$this->gate_open_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ),
+			$this->builder_returning( array( 'order_number' => '20' ) ),
+			$flusher
+		);
+		$handler->on_block_checkout_order_processed( $order );
+
+		self::assertCount( 1, $flusher->calls );
+		self::assertSame( TransactionalGate::TRIGGER_ORDER_CONFIRMATION, $flusher->calls[0]['trigger_type'] );
+	}
+
+	public function test_order_confirmation_is_idempotent_across_both_checkout_hooks(): void {
+		// PRO-1518: if a store somehow fired BOTH the classic and Store-API
+		// hooks for the same order, the once-per-order-per-type meta guard
+		// must still cap it at exactly one send. The real TransactionalFlusher
+		// stamps the meta guard as part of send_now() (see TransactionalFlusherTest);
+		// this double mimics that so the guard is actually exercised here,
+		// not just re-asserting the double got called once.
+		$order = $this->fake_order( 21, '' );
+		$meta_key = TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION );
+		$flusher = new class( $meta_key ) extends TransactionalFlusher {
+			public array $calls = array();
+			private string $meta_key;
+			public function __construct( string $meta_key ) {
+				$this->meta_key = $meta_key;
+			}
+			public function send_now( string $trigger_type, \WC_Order $order, WorkflowMatch $match, array $context, string $to_status = '' ): void {
+				$this->calls[] = compact( 'trigger_type', 'context', 'to_status' );
+				$order->update_meta_data( $this->meta_key, TransactionalFlusher::META_STATUS_SENT );
+			}
+		};
+
+		$handler = new TransactionalEmailHookHandler(
+			$this->gate_open_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ),
+			$this->builder_returning( array() ),
+			$flusher
+		);
+		$handler->on_order_processed( 21, array(), $order );
+		$handler->on_block_checkout_order_processed( $order );
+
+		self::assertCount( 1, $flusher->calls, 'The meta guard blocks the second hook once the first has attempted.' );
+	}
+
 	public function test_status_changed_into_a_shipped_status_calls_the_flusher(): void {
 		$order           = $this->fake_order( 4, '' );
 		$this->orders[4] = $order;

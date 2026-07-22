@@ -90,6 +90,52 @@ final class TransactionalEmailsPipelineTest extends TestCase {
 		self::assertSame( TransactionalFlusher::META_STATUS_SENT, $order->get_meta( TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ) ) );
 	}
 
+	public function test_order_confirmation_fires_on_block_checkout_store_api_hook(): void {
+		// PRO-1518: WooCommerce Blocks / Store-API checkout never fires
+		// woocommerce_checkout_order_processed, so this is the Store-API
+		// twin — same gap shape F3-46 already fixed for attribution capture.
+		$this->configure( array( 'order_confirmation' => '4242' ) );
+
+		$product  = $this->make_product( 'Block Checkout Product', 15.00 );
+		$order_id = $this->make_order( 'block@example.test', $product );
+
+		$captured = array();
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 3 );
+		try {
+			$this->fire_block_checkout_order_processed( $order_id );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertCount( 1, $captured, 'Exactly one send-message POST from the Store-API hook.' );
+		self::assertSame( array( 'block@example.test' ), $captured[0]['body']['to'] );
+
+		$order = wc_get_order( $order_id );
+		self::assertSame( TransactionalFlusher::META_STATUS_SENT, $order->get_meta( TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ) ) );
+	}
+
+	public function test_order_confirmation_is_idempotent_across_classic_and_block_checkout_hooks(): void {
+		// PRO-1518: if both hooks ever fired for the same order, the
+		// once-per-order-per-type meta guard must still cap it at one send.
+		$this->configure( array( 'order_confirmation' => '4242' ) );
+
+		$product  = $this->make_product( 'Both Hooks Product', 7.50 );
+		$order_id = $this->make_order( 'both@example.test', $product );
+
+		$captured = array();
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 3 );
+		try {
+			$this->fire_checkout_order_processed( $order_id );
+			$this->fire_block_checkout_order_processed( $order_id );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertCount( 1, $captured, 'The meta guard blocks the Store-API hook once the classic hook already sent.' );
+	}
+
 	public function test_shipping_confirmation_sends_once_and_repeated_flips_do_not_resend(): void {
 		$this->configure( array( 'shipping_confirmation' => '5151' ) );
 
@@ -296,6 +342,14 @@ final class TransactionalEmailsPipelineTest extends TestCase {
 	 */
 	private function fire_checkout_order_processed( int $order_id ): void {
 		do_action( 'woocommerce_checkout_order_processed', $order_id, array(), wc_get_order( $order_id ) );
+	}
+
+	/**
+	 * Fires the real 1-arg woocommerce_store_api_checkout_order_processed
+	 * hook — WC's own Store-API shape ($order), unlike the classic 3-arg hook.
+	 */
+	private function fire_block_checkout_order_processed( int $order_id ): void {
+		do_action( 'woocommerce_store_api_checkout_order_processed', wc_get_order( $order_id ) );
 	}
 
 	/**
