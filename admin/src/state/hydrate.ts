@@ -235,12 +235,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       orderStatuses: env.orderStatuses ?? [],
     },
     smailyCredentials: { ...s.smailyCredentials },
-    smailyConnection:
-      s.smailyConnected &&
-      s.smailyCredentials.subdomain !== '' &&
-      s.smailyCredentials.username !== ''
-        ? { kind: 'success', message: s.smailyCredentials.username }
-        : idleAsync,
+    smailyConnection: deriveCredentialConnection(s.smailyConnected, s.smailyCredentials),
     multilingualMode: mode,
     perLanguageAccounts: [],
     defaultFallbackAccountKey: s.defaultFallbackAccountKey || 'default',
@@ -256,13 +251,10 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       ...emptyCredentials,
       ...s.transactionalCredentials,
     },
-    transactionalConnection:
-      s.transactionalConnected &&
-      s.transactionalCredentials !== undefined &&
-      s.transactionalCredentials.subdomain !== '' &&
-      s.transactionalCredentials.username !== ''
-        ? { kind: 'success', message: s.transactionalCredentials.username }
-        : idleAsync,
+    transactionalConnection: deriveCredentialConnection(
+      s.transactionalConnected,
+      s.transactionalCredentials,
+    ),
     orderConfirmationEnabled: s.orderConfirmationEnabled ?? false,
     shippingConfirmationEnabled: s.shippingConfirmationEnabled ?? false,
     shippedOrderStatuses: s.shippedOrderStatuses ?? [],
@@ -298,6 +290,23 @@ const VALID_TRIGGERS: readonly AutomationTrigger[] = [
   'order_confirmation',
   'shipping_confirmation',
 ];
+
+/**
+ * Map a saved Smaily credential pair + its verified flag into the
+ * AsyncStatus slot the wizard reads — the same rule for the default
+ * and the transactional account: verified AND a usable
+ * subdomain+username pair → success with the username as the display
+ * message, else idle.
+ */
+function deriveCredentialConnection(
+  connected: boolean | undefined,
+  creds: { subdomain: string; username: string } | undefined,
+): WizardState['smailyConnection'] {
+  if (connected && creds !== undefined && creds.subdomain !== '' && creds.username !== '') {
+    return { kind: 'success', message: creds.username };
+  }
+  return idleAsync;
+}
 
 /**
  * Map the rec-engine boot snapshot into the existing AsyncStatus slot

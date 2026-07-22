@@ -213,30 +213,7 @@ class SettingsEndpoint {
 			return $this->error_response( $errors, 400 );
 		}
 
-		// Preserve the stored password when the inbound payload doesn't carry
-		// one. EnvDetector::saved_settings() deliberately omits the password
-		// from the boot payload (security gate), so on second wizard pass
-		// the React state has password=''. Continue on Step 1 would then
-		// overwrite the encrypted secret with an empty string, and every
-		// downstream API call (Workflows fetch, Backfill push) would fail
-		// with "Credentials not configured" the next time the merchant
-		// loaded the wizard. Empty incoming password === "leave as-is";
-		// a non-empty value === "rotate to this".
-		if ( $password === '' ) {
-			$existing           = get_option( self::LEGACY_OPTION_API_CREDENTIALS, array() );
-			$encrypted_password = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
-		} else {
-			$encrypted_password = $this->encrypt_password( $password );
-		}
-
-		update_option(
-			self::LEGACY_OPTION_API_CREDENTIALS,
-			array(
-				'subdomain' => $subdomain,
-				'username'  => $username,
-				'password'  => $encrypted_password,
-			)
-		);
+		$this->persist_credentials( self::LEGACY_OPTION_API_CREDENTIALS, $subdomain, $username, $password );
 
 		// Sub-PR 2.H.15 — mark the default account as verified.
 		//
@@ -272,23 +249,11 @@ class SettingsEndpoint {
 				continue;
 			}
 
-			$option_key = Credentials::PHASE2_OPTION_PREFIX . $account_key;
-			if ( $acc_password === '' ) {
-				$existing_acc = get_option( $option_key, array() );
-				$encrypted    = is_array( $existing_acc ) && isset( $existing_acc['password'] )
-					? (string) $existing_acc['password']
-					: '';
-			} else {
-				$encrypted = $this->encrypt_password( $acc_password );
-			}
-
-			update_option(
-				$option_key,
-				array(
-					'subdomain' => $acc_subdomain,
-					'username'  => $acc_username,
-					'password'  => $encrypted,
-				)
+			$this->persist_credentials(
+				Credentials::PHASE2_OPTION_PREFIX . $account_key,
+				$acc_subdomain,
+				$acc_username,
+				$acc_password
 			);
 		}
 
@@ -416,7 +381,31 @@ class SettingsEndpoint {
 		$username  = isset( $creds['username'] ) ? sanitize_text_field( (string) $creds['username'] ) : '';
 		$password  = isset( $creds['password'] ) ? (string) $creds['password'] : '';
 
-		$option_key = Credentials::PHASE2_OPTION_PREFIX . 'transactional';
+		$this->persist_credentials( Credentials::PHASE2_OPTION_PREFIX . 'transactional', $subdomain, $username, $password );
+
+		// Mirrors save_connection()'s default-account verified flag, but
+		// scoped to whether this save actually carries a usable credential
+		// pair — transactional credentials are optional (only relevant once
+		// the merchant turns the feature on), so an incomplete/cleared pair
+		// must not keep showing a stale "✓ Connected" view.
+		update_option( 'smly_plus_transactional_connection_verified', $subdomain !== '' && $username !== '' );
+	}
+
+	/**
+	 * Persist one Smaily credential set (default, per-language, or
+	 * transactional account — all three save paths share this rule).
+	 *
+	 * Preserves the stored password when the inbound payload doesn't carry
+	 * one. EnvDetector::saved_settings() deliberately omits the password
+	 * from the boot payload (security gate), so on second wizard pass
+	 * the React state has password=''. Continue on Step 1 would then
+	 * overwrite the encrypted secret with an empty string, and every
+	 * downstream API call (Workflows fetch, Backfill push) would fail
+	 * with "Credentials not configured" the next time the merchant
+	 * loaded the wizard. Empty incoming password === "leave as-is";
+	 * a non-empty value === "rotate to this".
+	 */
+	private function persist_credentials( string $option_key, string $subdomain, string $username, string $password ): void {
 		if ( $password === '' ) {
 			$existing  = get_option( $option_key, array() );
 			$encrypted = is_array( $existing ) && isset( $existing['password'] ) ? (string) $existing['password'] : '';
@@ -432,13 +421,6 @@ class SettingsEndpoint {
 				'password'  => $encrypted,
 			)
 		);
-
-		// Mirrors save_connection()'s default-account verified flag, but
-		// scoped to whether this save actually carries a usable credential
-		// pair — transactional credentials are optional (only relevant once
-		// the merchant turns the feature on), so an incomplete/cleared pair
-		// must not keep showing a stale "✓ Connected" view.
-		update_option( 'smly_plus_transactional_connection_verified', $subdomain !== '' && $username !== '' );
 	}
 
 	/**
