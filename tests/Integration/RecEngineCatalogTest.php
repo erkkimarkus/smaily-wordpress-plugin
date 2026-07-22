@@ -498,14 +498,14 @@ final class RecEngineCatalogTest extends TestCase {
 		}
 	}
 
-	public function test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine(): void {
-		// PRO-1498, folds in PRO-1492: the mock must reject an empty product_url
-		// with the same d6_item_error shape the real engine returns — mirrors the
-		// existing category_path check (PRO-1491/e98e092). Proven directly against
-		// a catalog.delete row's stored object (the flusher sends it verbatim, see
-		// IngestFlusher::row_to_object), independent of whether the plugin's own
-		// fallback (ensure_valid_removal(), tested above) ever actually produces
-		// such a row today.
+	public function test_pre_3_8_1_stored_blank_delete_row_is_repaired_and_sent_on_retry(): void {
+		// PRO-1506: PRO-1498's ensure_valid_removal() force-fill ran only at
+		// ENQUEUE time, so a row captured BEFORE that fix shipped kept its
+		// stored blank category_path/product_url verbatim — a merchant
+		// Retrying it from the Event Log resent the identical blank the
+		// engine already rejected, forever. Simulate that OLD (pre-3.8.1)
+		// stored shape directly (bypassing enqueue_delete()) and prove the
+		// flusher itself repairs it now.
 		$base = (string) self::$engine->base_url();
 		EnvSeed::connect(
 			array(
@@ -521,14 +521,16 @@ final class RecEngineCatalogTest extends TestCase {
 		$this->truncate_queue();
 		$queue->enqueue(
 			CatalogHookHandler::EVENT_CATALOG_DELETE,
-			'999999',
+			'999998',
 			array(
 				'object' => array(
-					'sku'           => 'woo-999999',
-					'name'          => 'Blank URL Test',
-					'category_path' => 'food/dry',
+					'sku'           => 'woo-999998',
+					'name'          => 'Legacy Stuck Removal',
+					'category_path' => '',
 					'price'         => 1.0,
+					'in_stock'      => true,
 					'product_url'   => '',
+					'external_id'   => '999998',
 				),
 			)
 		);
@@ -543,8 +545,57 @@ final class RecEngineCatalogTest extends TestCase {
 		);
 		$stats = $flusher->flush();
 
-		self::assertSame( 0, $stats['sent'], 'An empty product_url never reaches "sent" — the mock rejects it like the live engine.' );
-		self::assertSame( 1, $stats['failed'], 'The row is marked failed, not silently sent.' );
+		self::assertSame( 1, $stats['sent'], 'A retried pre-3.8.1 stuck row is repaired and reaches the engine — sent, not rejected.' );
+		self::assertSame( 0, $stats['failed'] );
+
+		$tags = self::$engine->state()['last_catalog_tags'] ?? array();
+		self::assertSame(
+			'true',
+			$tags['woo-999998']['category_defaulted'] ?? null,
+			'The flush-time force-fill is flagged per PRO-1499, same as the enqueue-time one.'
+		);
+	}
+
+	public function test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine(): void {
+		// PRO-1498, folds in PRO-1492: the mock must reject an empty product_url
+		// with the same d6_item_error shape the real engine returns — mirrors the
+		// existing category_path check (PRO-1491/e98e092). PRO-1506 made
+		// IngestFlusher itself repair a stored catalog.delete row's blank
+		// product_url before sending (ensure_valid_removal() at flush time), so
+		// that path can no longer reach the mock with a blank value — this test
+		// now posts directly through the Client to keep proving mock/live
+		// parity on the raw wire shape, independent of the plugin's own
+		// force-fill.
+		$base = (string) self::$engine->base_url();
+		EnvSeed::connect(
+			array(
+				'engine_base_url' => $base,
+				'endpoints'       => self::mock_endpoints( $base ),
+			)
+		);
+
+		$settings = new RecEngineSettings();
+
+		RecEngineMockServer::reset();
+		$client = new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+
+		$response = $client->ingest_catalog(
+			array(
+				array(
+					'event_id'      => 'blank-url-test',
+					'sku'           => 'woo-999999',
+					'name'          => 'Blank URL Test',
+					'category_path' => 'food/dry',
+					'price'         => 1.0,
+					'in_stock'      => false,
+					'product_url'   => '',
+				),
+			)
+		);
+
+		self::assertSame( 0, $response['processed'] ?? null, 'An empty product_url is never processed — the mock rejects it like the live engine.' );
+		self::assertCount( 1, $response['errors'] ?? array() );
+		self::assertSame( 'product_url', $response['errors'][0]['field'] ?? null );
 	}
 
 	public function test_trash_keeps_product_in_stock_false_and_untrash_restores(): void {

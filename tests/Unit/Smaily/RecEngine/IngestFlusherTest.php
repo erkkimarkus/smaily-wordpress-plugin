@@ -154,6 +154,60 @@ final class IngestFlusherTest extends TestCase {
 		self::assertSame( 'del-uuid', $client->sent_products[0]['event_id'], 'event_uuid → event_id on the captured object.' );
 	}
 
+	public function test_delete_row_with_stored_blank_required_fields_is_repaired_at_flush(): void {
+		// PRO-1506: a row captured BEFORE the PRO-1498 enqueue-time fix stored
+		// blank category_path/product_url. Retrying it must repair — not
+		// resend — the blank the engine already rejected.
+		$row               = $this->upsert_row( 8, 0, 'del-blank-uuid' );
+		$row['event_type'] = CatalogHookHandler::EVENT_CATALOG_DELETE;
+		$row['payload']    = (string) json_encode(
+			array(
+				'object' => array(
+					'sku'           => 'GONE-2',
+					'in_stock'      => true,
+					'event_id'      => '',
+					'category_path' => '',
+					'product_url'   => '',
+					'external_id'   => '42',
+				),
+			)
+		);
+
+		$queue  = $this->fake_queue( array( $row ) );
+		$client = $this->success_client();
+		$flush  = $this->fake_flusher( $queue, $client, true );
+
+		$stats = $flush->flush();
+
+		self::assertSame( array( 8 ), $queue->sent, 'A repaired blank tombstone must be sent, never skipped/failed.' );
+		self::assertSame( 0, $stats['skipped'] );
+		self::assertSame( 'uncategorized', $client->sent_products[0]['category_path'] );
+		self::assertNotSame( '', $client->sent_products[0]['product_url'] );
+		self::assertSame( 'true', $client->sent_products[0]['tags']['category_defaulted'], 'A force-filled category_path is flagged, per PRO-1499.' );
+		self::assertFalse( $client->sent_products[0]['in_stock'] );
+		self::assertSame( 'del-blank-uuid', $client->sent_products[0]['event_id'] );
+	}
+
+	public function test_delete_row_with_no_captured_object_falls_back_to_build_unresolvable(): void {
+		// PRO-1506: a row whose payload has no 'object' at all (corrupt or a
+		// legacy shape) must still reach the engine as a minimal tombstone,
+		// never a terminal skip with nothing sent.
+		$row               = $this->upsert_row( 6, 42, 'del-missing-uuid' );
+		$row['event_type'] = CatalogHookHandler::EVENT_CATALOG_DELETE;
+		$row['payload']    = '';
+
+		$queue  = $this->fake_queue( array( $row ) );
+		$client = $this->success_client();
+		$flush  = $this->fake_flusher( $queue, $client, true );
+
+		$stats = $flush->flush();
+
+		self::assertSame( array( 6 ), $queue->sent );
+		self::assertSame( 0, $stats['skipped'] );
+		self::assertSame( 'woo-42', $client->sent_products[0]['sku'] );
+		self::assertFalse( $client->sent_products[0]['in_stock'] );
+	}
+
 	public function test_upsert_for_a_deleted_product_is_skipped_not_sent(): void {
 		// get_product returns null (product gone since enqueue) → terminal skip.
 		$queue  = $this->fake_queue( array( $this->upsert_row( 9, 999, 'u9' ) ) );
@@ -273,6 +327,37 @@ final class IngestFlusherTest extends TestCase {
 		$builder = new class() extends CatalogPayloadBuilder {
 			public function build( \WC_Product $product, string $event_uuid ): array {
 				return array( 'sku' => 'SKU-' . $event_uuid, 'event_id' => $event_uuid, 'in_stock' => true );
+			}
+			public function build_unresolvable( int $product_id, string $event_uuid ): array {
+				return array(
+					'event_id'      => $event_uuid,
+					'sku'           => 'woo-' . $product_id,
+					'name'          => 'Unavailable product #' . $product_id,
+					'category_path' => 'uncategorized',
+					'price'         => 0.0,
+					'in_stock'      => false,
+					'product_url'   => 'https://shop.test/?smaily_connect_removed_product=' . $product_id,
+					'external_id'   => (string) $product_id,
+					'tags'          => array( 'category_defaulted' => 'true' ),
+				);
+			}
+			// Mirrors the real ensure_valid_removal() output shape without calling
+			// the real home_url() — this raw (non-Brain\Monkey) test file has no
+			// WordPress loaded; the real method's behaviour is covered directly in
+			// CatalogPayloadBuilderTest.
+			public function ensure_valid_removal( array $object ): array {
+				if ( (string) ( $object['category_path'] ?? '' ) === '' ) {
+					$object['category_path'] = 'uncategorized';
+					$tags                       = is_array( $object['tags'] ?? null ) ? $object['tags'] : array();
+					$tags['category_defaulted'] = 'true';
+					$object['tags']             = $tags;
+				}
+				$product_url = $object['product_url'] ?? '';
+				$has_url     = is_array( $product_url ) ? $product_url !== array() : (string) $product_url !== '';
+				if ( ! $has_url ) {
+					$object['product_url'] = 'https://shop.test/?smaily_connect_removed_product=' . ( $object['external_id'] ?? '0' );
+				}
+				return $object;
 			}
 		};
 
