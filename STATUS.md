@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1504 Stage 2 — Transactional emails: the
+_Last updated: 2026-07-22 (**PRO-1518 — order-confirmation now also fires on
+WooCommerce Blocks / Store-API checkout.** PRO-1504 Stage 2 (below) wired
+order confirmation to `woocommerce_checkout_order_processed` only — that hook
+NEVER fires for a Store-API/block checkout (WC default since 8.3), so a
+block-checkout store got no order-confirmation send at all. Fixed by mirroring
+the exact F3-46 precedent (`HookHandler::on_block_checkout_order_processed`):
+`TransactionalEmailHookHandler::on_block_checkout_order_processed( \WC_Order
+$order )` bound to `woocommerce_store_api_checkout_order_processed` (1-arg
+Store-API shape, unlike the classic 3-arg hook) in `Bootstrap::init_hooks()`
+right after the classic binding. No new logic — both hooks call the same
+`attempt()`, which already once-per-order-per-type meta-guards on
+`_smly_plus_transactional_order_confirmation_status`, so a store that somehow
+fired both hooks for one order still sends exactly once. Classic-checkout
+behaviour is untouched. **Tests:** +2 unit
+(`TransactionalEmailHookHandlerTest` — Store-API hook calls the flusher when
+the gate is open; idempotence across both hooks, with a flusher double that
+now stamps the meta guard like the real `TransactionalFlusher::send_now()`
+does, so the guard is actually exercised) +2 integration
+(`TransactionalEmailsPipelineTest` — the Store-API hook sends once end-to-end
+against the mocked `message/send.php`; firing both hooks for the same order
+still sends exactly once). **Gates:** `npm run ci:strict` exit=0 (PHPUnit unit
+647/647, was 645, +2; vitest 251/251 unchanged, tsc clean); `sg docker -c
+"composer run test:integration"` OK (173 tests, 883 assertions — was 171, +2),
+sandbox tenant "Smaily Connect test" correctly restored post-run. Docs:
+`docs/DECISIONS.md` PRO-1504 Stage 2 entry extended with a short addendum;
+merchant docs site unchanged (its Transactional-emails section never claimed
+classic-only, so nothing there was stale). **Not released** — code landed on
+`main`, no version bump; the release cut is the orchestrator's call.)
+
+Prior: 2026-07-22 (**PRO-1504 Stage 2 — Transactional emails: the
 sender, native-email suppression, and fail-open fallback landed.** Builds on
 Stage 1's config surface (below) exactly per Erkki's 2026-07-22 design
 approval — no redesign. What shipped:

@@ -3997,6 +3997,20 @@ no schema migration. `Flusher::flush()`'s exclude-list grew from one entry
 (`CartFlusher::EVENT_TYPE`) to three; any FUTURE new Smaily-EventQueue event
 type must make the same deliberate choice CLAUDE.md calls out.
 
+**Addendum — PRO-1518 (2026-07-22): order confirmation also needs the
+Store-API twin.** Point 1 above wired order confirmation to
+`woocommerce_checkout_order_processed` only, which never fires for a
+WooCommerce Blocks / Store-API checkout (WC default since 8.3) — a
+block-checkout store got zero order-confirmation sends. Fixed by mirroring
+the exact F3-46 precedent (`HookHandler::on_block_checkout_order_processed`
+on `woocommerce_store_api_checkout_order_processed`, 1-arg `$order` shape,
+unlike the classic hook's 3 args):
+`TransactionalEmailHookHandler::on_block_checkout_order_processed()` calls
+the SAME `attempt()` the classic hook uses, so the existing
+once-per-order-per-type meta guard (point 1) already makes it safe if a
+store somehow fires both hooks for one order — no new guard needed.
+Shipping confirmation is untouched (it doesn't hang off a checkout hook).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
