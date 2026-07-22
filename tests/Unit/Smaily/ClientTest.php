@@ -27,6 +27,7 @@ final class ClientTest extends TestCase {
 			static fn ( string $what ): string => $what === 'version' ? '6.2.0' : 'https://example.test'
 		);
 		Functions\when( 'apply_filters' )->returnArg( 2 );
+		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 	}
 
 	protected function tearDown(): void {
@@ -229,6 +230,65 @@ final class ClientTest extends TestCase {
 		self::assertStringContainsString( 'list=1', $captured_url );
 		self::assertStringContainsString( 'fields=', $captured_url );
 		self::assertCount( 1, $rows );
+	}
+
+	public function test_send_message_posts_a_json_body_to_message_send_endpoint(): void {
+		// PRO-1504 Stage 2: message/send.php is the one endpoint that takes a
+		// JSON body (Content-Type: application/json), not the form encoding
+		// every other Client method uses.
+		$captured_url  = null;
+		$captured_args = null;
+		Functions\when( 'wp_remote_post' )->alias(
+			static function ( $url, $args ) use ( &$captured_url, &$captured_args ) {
+				$captured_url  = $url;
+				$captured_args = $args;
+				return array(
+					'response' => array( 'code' => 200 ),
+					'body'     => '{"code":101}',
+					'headers'  => array(),
+				);
+			}
+		);
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"code":101}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$response = ( new Client( 'demo', 'alice', 's3cret' ) )->send_message( 4242, 'buyer@example.test', array( 'order_number' => '123' ) );
+
+		self::assertIsString( $captured_url );
+		self::assertStringContainsString( '/api/message/send.php', $captured_url );
+		self::assertIsArray( $captured_args );
+		self::assertSame( 'application/json', $captured_args['headers']['Content-Type'] );
+		$body = json_decode( (string) $captured_args['body'], true );
+		self::assertSame( 4242, $body['autoresponder_id'] );
+		self::assertSame( array( 'buyer@example.test' ), $body['to'] );
+		self::assertSame( '123', $body['context']['order_number'] );
+		self::assertSame( 101, $response['code'] );
+	}
+
+	public function test_send_message_last_exchange_never_carries_the_auth_header(): void {
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"code":101}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"code":101}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$client = new Client( 'demo', 'alice', 's3cret' );
+		$client->send_message( 1, 'a@example.test', array() );
+
+		$exchange = $client->last_exchange();
+		self::assertSame( 'message/send', $exchange['request']['endpoint'] );
+		self::assertStringNotContainsString( 'Authorization', (string) wp_json_encode( $exchange ) );
+	}
+
+	public function test_send_message_throws_api_exception_on_5xx(): void {
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"err":"boom"}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 503 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"err":"boom"}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$this->expectException( ApiException::class );
+
+		( new Client( 'demo', 'alice', 's3cret' ) )->send_message( 1, 'a@example.test', array() );
 	}
 
 	private function successful_response( string $body ): array {

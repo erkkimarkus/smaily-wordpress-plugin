@@ -252,6 +252,37 @@ class Client {
 	}
 
 	/**
+	 * POST /api/message/send.php — a synchronous single-message transactional
+	 * send (PRO-1504 Stage 2, Erkki design 2026-07-22). Distinct wire shape
+	 * from trigger_automation(): a JSON body (not form-encoded), and the
+	 * response is the SAME Smaily {code} envelope (101 = success) — the
+	 * caller (TransactionalFlusher) maps 101 to success and any other code
+	 * (203 validation / 221 invalid autoresponder / other) to a terminal
+	 * failure, matching the general Smaily response-codes convention
+	 * (https://smaily.com/help/api/general/response-codes/).
+	 *
+	 * @param int                  $autoresponder_id Smaily workflow id to fire.
+	 * @param string               $to               Recipient email address.
+	 * @param array<string, mixed> $context           Merge-tag values for the workflow template.
+	 *
+	 * @return array<string, mixed> Decoded JSON body ({code:101,...} on success).
+	 */
+	public function send_message( int $autoresponder_id, string $to, array $context ): array {
+		$body = $this->request(
+			'POST',
+			'message/send',
+			array(
+				'autoresponder_id' => $autoresponder_id,
+				'to'               => array( $to ),
+				'context'          => $context,
+			),
+			true
+		);
+
+		return is_array( $body ) ? $body : array();
+	}
+
+	/**
 	 * Performs a single HTTP request against the configured Smaily subdomain.
 	 *
 	 * @param string                                   $method   "GET" or "POST".
@@ -259,13 +290,20 @@ class Client {
 	 *                                                           e.g. "workflows".
 	 * @param array<int|string, mixed>                 $data     Request payload —
 	 *                                                           query-string for GET,
-	 *                                                           form body for POST.
+	 *                                                           form body for POST
+	 *                                                           (or JSON-encoded body
+	 *                                                           when $json is true).
+	 * @param bool                                      $json     True sends $data as a
+	 *                                                           JSON-encoded POST body
+	 *                                                           (message/send.php) instead
+	 *                                                           of the default form encoding
+	 *                                                           every other endpoint uses.
 	 *
 	 * @throws ApiException On HTTP transport errors and on non-2xx responses.
 	 *
 	 * @return mixed Decoded JSON body.
 	 */
-	private function request( string $method, string $endpoint, array $data ) {
+	private function request( string $method, string $endpoint, array $data, bool $json = false ) {
 		$url = sprintf( 'https://%s.sendsmaily.net/api/%s.php', $this->subdomain, $endpoint );
 
 		// Record the request for the Event Log (F3-44) — method/endpoint/body
@@ -289,6 +327,10 @@ class Client {
 
 		if ( $method === 'GET' ) {
 			$response = wp_remote_get( $url . '?' . http_build_query( $data ), $args );
+		} elseif ( $json ) {
+			$args['headers']['Content-Type'] = 'application/json';
+			$args['body']                    = (string) wp_json_encode( $data );
+			$response                        = wp_remote_post( $url, $args );
 		} else {
 			$args['body'] = $data;
 			$response     = wp_remote_post( $url, $args );
