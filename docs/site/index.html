@@ -718,7 +718,7 @@ td code{white-space:nowrap}
       <h3>Shipping confirmation</h3>
       <p>Sent once, when an order first reaches a status you've marked as <strong>"Counts as shipped"</strong> — pick any number of your store's order statuses (built‑in or custom, e.g. a shipping plugin's "Shipped" status). A later flip back into a shipped status for the same order never sends a second notice.</p>
       <p>While either toggle is on, Smaily Connect quietly takes over WooCommerce's matching built‑in customer email (Processing order / Completed order) so the customer never gets two emails for the same event. Completed‑order suppression only applies when <strong>"completed"</strong> is itself one of your chosen shipped statuses — a custom status (like "Shipped") has no built‑in WooCommerce email to replace.</p>
-      <p>If Smaily can't be reached, or briefly rejects the send, WooCommerce's own email for that order fires automatically as a fallback — a customer is never left without a confirmation. The attempt is recorded in your <a href="#err-retry">Event Log</a> either way.</p>
+      <p>If Smaily can't be reached, or briefly rejects the send, WooCommerce's own email for that order fires automatically as a fallback — a customer is never left without a confirmation. A send that keeps failing is retried for up to about an hour before this fallback kicks in, so a longer Smaily outage doesn't leave the customer waiting indefinitely. The attempt is recorded in your <a href="#err-retry">Event Log</a> either way.</p>
       <div class="note warn">
         <span class="k">Two things your Smaily workflow must satisfy</span>
         <ul>
@@ -735,7 +735,7 @@ td code{white-space:nowrap}
       <h3>Saatmisteade</h3>
       <p>Saadetakse üks kord, kui tellimus jõuab esimest korda staatusesse, mille oled märkinud kui <strong>"Loetakse saadetuks"</strong> — vali suvaline arv oma poe staatuseid (sisseehitatud või kohandatud, nt saatmis‑pluginate "Shipped" staatus). Hilisem tagasipöördumine samasse saadetud‑staatusesse sama tellimuse puhul teist teadet enam ei saada.</p>
       <p>Kui kumbki lüliti on sees, võtab Smaily Connect vaikselt üle WooCommerce'i vastava sisseehitatud kliendi‑e‑kirja (Processing order / Completed order), et klient ei saaks sama sündmuse kohta kaht e‑kirja. Completed‑order e‑kirja mahasurumine kehtib ainult siis, kui <strong>"completed"</strong> ise on üks su valitud saadetud‑staatustest — kohandatud staatusel (nt "Shipped") pole asendatavat sisseehitatud WooCommerce'i e‑kirja.</p>
-      <p>Kui Smailyni ei jõuta või see lükkab saatmise korraks tagasi, käivitub varuvariandina automaatselt WooCommerce'i enda e‑kiri selle tellimuse jaoks — klient ei jää kunagi kinnituseta. Katse jääb mõlemal juhul kirja su <a href="#err-retry">Event Log'i</a>.</p>
+      <p>Kui Smailyni ei jõuta või see lükkab saatmise korraks tagasi, käivitub varuvariandina automaatselt WooCommerce'i enda e‑kiri selle tellimuse jaoks — klient ei jää kunagi kinnituseta. Pidevalt ebaõnnestuvat saatmist proovitakse uuesti kuni umbes tund aega, enne kui see varuvariant käivitub, nii et pikem Smaily katkestus ei jäta klienti lõputult ootama. Katse jääb mõlemal juhul kirja su <a href="#err-retry">Event Log'i</a>.</p>
       <div class="note warn">
         <span class="k">Kaks nõuet su Smaily töövoole</span>
         <ul>

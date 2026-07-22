@@ -3973,6 +3973,10 @@ never had one, and inventing a new retry-ceiling mechanism for one event
 type would be an inconsistency, not a fix; "queue retries exhausted" in the
 design brief is satisfied by a TERMINAL response reached during a retry
 (no more retrying to do), not by a manufactured attempt count.
+**Superseded by PRO-1519 below** — this reasoning missed that a run of
+purely TRANSIENT failures never reaches a terminal response at all, so the
+fail-open path this whole decision exists for could never trigger on that
+class of failure. A ceiling was added, scoped to this class only.
 
 **Tests:** unit — `ClientTest` (+3, `send_message()` JSON body/headers/
 5xx), `TransactionalPayloadBuilderTest` (order-level fields, gross pricing,
@@ -4010,6 +4014,62 @@ the SAME `attempt()` the classic hook uses, so the existing
 once-per-order-per-type meta guard (point 1) already makes it safe if a
 store somehow fires both hooks for one order — no new guard needed.
 Shipping confirmation is untouched (it doesn't hang off a checkout hook).
+
+**Addendum — PRO-1519 (2026-07-22): bounded retry ceiling closes the
+fail-open gap on a persistent transient failure.** Stage 2's own
+"Alternatives considered" (above) rejected a retry ceiling on the grounds
+that fail-open already fires on any TERMINAL response reached during a
+retry. That reasoning has a hole: a run of purely TRANSIENT failures
+(`ApiException` — broken credentials, a prolonged Smaily outage) never
+produces a terminal response, so `record_attempt()` loops the Smaily
+EventQueue's normal unbounded-retry-until-manual-review convention forever
+— which is the right convention for marketing rows (nothing is suppressed
+waiting on a `contact.sync` retry) but wrong here, because
+`TransactionalSuppression` keeps the customer's native WC email suppressed
+for the entire time a transactional row is pending. An unbounded retry
+therefore means: outage persists → customer never gets any email, ever.
+
+**Fix:** `TransactionalFlusher::RETRY_CEILING_SECONDS` = `HOUR_IN_SECONDS`
+(3,600s), checked against the row's `created_at` at the top of `process()`
+(`enforce_retry_ceiling()`) — once exceeded, throw the SAME
+`TerminalDispatchException` a deterministic Smaily rejection throws, so the
+row flows through the existing `mark_failed` + fail-open path with zero new
+fallback logic (the task's own framing). Scoped to the two transactional
+event types ONLY — `enforce_retry_ceiling()` no-ops for any other
+`event_type` (defence in depth: this class only ever drains
+`transactional.order_confirmation` / `transactional.shipping_confirmation`
+rows via `pending()`'s type filter, but the check doesn't rely on that
+alone). The main `Flusher` and `CartFlusher` (marketing-side: `contact.sync`,
+`automation.*`, abandoned-cart) are untouched — no shared code path, no
+option, nothing to configure differently there.
+
+**Why time-based, not attempts-based:** the task allowed either. Time is
+what the customer actually experiences (an hour of no confirmation, not "60
+attempts"), and the two move together anyway — `TransactionalFlusher::
+FLUSH_HOOK` runs every 60s (`Bootstrap::init_hooks()`), so 3,600s ≈ 60
+retries at the steady-state cadence; picking time avoids the ceiling
+silently tightening or loosening if that cadence ever changes. One hour was
+chosen as long enough to ride out a brief blip (a deploy restart, a few
+minutes of 5xx) without prematurely undercutting Smaily's own delivery
+attempt, but short enough that the customer isn't left waiting overnight
+for a confirmation.
+
+**Not touched:** the synchronous first attempt (`send_now()`) — a
+freshly-inserted row's `created_at` is "now", so it's never past the
+ceiling; the sync path's own terminal/transient split is unchanged. The
+`flush()` retry path is the only one this can affect, matching the task's
+scope ("purely the queued-retry path").
+
+**Tests:** unit — `TransactionalFlusherTest` (+3: a row past the ceiling
+fails open without calling the API; a row still within the ceiling keeps
+retrying normally — boundary sanity; a non-transactional-type row is never
+force-failed by the ceiling even when ancient). Integration —
+`TransactionalEmailsPipelineTest` (+2: a row stuck on repeated 5xx fails
+open once its `created_at` is backdated past the ceiling and the next AS
+tick runs — timestamp manipulation, not `sleep()`; a marketing-side
+`contact.sync` row backdated the same way keeps the EventQueue's ordinary
+unbounded-retry convention, proving the ceiling is scoped to
+`TransactionalFlusher` and does not leak into the shared `Flusher`).
 
 ## How to keep this document going
 

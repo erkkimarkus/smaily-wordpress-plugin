@@ -37,6 +37,12 @@ defined( 'ABSPATH' ) || exit;
  *   - record_attempt on ApiException (network error / 5xx / 429 — the
  *     recurring AS tick retries; the row stays 'pending', order-meta stays
  *     'queued' so the WC hook can't double-enqueue meanwhile).
+ *   - mark_failed + fail-open ALSO once a row is older than
+ *     RETRY_CEILING_SECONDS (PRO-1519), even if every failure so far was
+ *     transient — unlike the rest of the Smaily EventQueue (unbounded
+ *     retry-until-manual-review), a transactional row keeps the customer's
+ *     native WC email suppressed the whole time it's pending, so an
+ *     unbounded retry would mean no email ever arrives.
  *
  * Fail-open (design point 7, Erkki decision 2026-07-22): a definitive
  * failure re-fires the native WC email this send would have replaced,
@@ -56,6 +62,26 @@ class TransactionalFlusher {
 	public const AS_GROUP   = EventQueue::AS_GROUP;
 
 	public const DEFAULT_BATCH_SIZE = 50;
+
+	/**
+	 * Bounded retry ceiling (PRO-1519): the Smaily EventQueue's default
+	 * convention is unbounded retry-until-manual-review, which is right for
+	 * marketing rows (cart/welcome/first-order — nothing is suppressed
+	 * waiting on them) but wrong here — a customer's native WC email stays
+	 * SUPPRESSED (TransactionalSuppression) the whole time a row is pending,
+	 * so an unbounded retry means a persistent-but-transient failure
+	 * (revoked credentials, a prolonged Smaily outage) leaves the customer
+	 * with NO confirmation email at all, forever. Time-based (from the
+	 * row's created_at), not attempts-based: the flush AS action runs every
+	 * 60s (Bootstrap), so a count ceiling would be a proxy for elapsed time
+	 * anyway, and time is what the customer actually experiences. One hour
+	 * is long enough to ride out a brief blip (~60 retries at the 60s
+	 * cadence) but short enough that fail-open — re-firing the native email
+	 * — still lands promptly. Applies ONLY to the two transactional event
+	 * types this class owns; the marketing-side Flusher/CartFlusher are
+	 * untouched (see DECISIONS.md PRO-1519).
+	 */
+	public const RETRY_CEILING_SECONDS = HOUR_IN_SECONDS;
 
 	/** Order-meta guard values (once-per-order-per-type). */
 	public const META_STATUS_QUEUED      = 'queued';
@@ -200,6 +226,7 @@ class TransactionalFlusher {
 
 		try {
 			$payload = $this->decode_payload( (string) ( $event['payload'] ?? '' ) );
+			$this->enforce_retry_ceiling( $event_type, $event );
 			$this->dispatch( $payload );
 
 			$this->queue->mark_sent( $id );
@@ -222,6 +249,44 @@ class TransactionalFlusher {
 		$this->record_exchange( $id );
 
 		return $outcome;
+	}
+
+	/**
+	 * PRO-1519: once a transactional row has been sitting past
+	 * RETRY_CEILING_SECONDS, stop retrying — throw the SAME terminal
+	 * exception a deterministic Smaily rejection throws, so it flows through
+	 * the existing mark_failed + fail-open path with no new fallback logic.
+	 * Scoped to the two transactional event types ONLY (defence in depth —
+	 * flush() already only ever pulls these two via pending(), but a bad
+	 * event_type here must never age out a marketing-side row this class
+	 * was never meant to touch).
+	 *
+	 * $event['created_at'] is absent for the synchronous send_now() call
+	 * (the row was just inserted, so it's never past the ceiling) — treated
+	 * as "not yet expired".
+	 *
+	 * @param array<string, mixed> $event
+	 *
+	 * @throws TerminalDispatchException When the row has aged past the ceiling.
+	 */
+	private function enforce_retry_ceiling( string $event_type, array $event ): void {
+		if ( ! in_array( $event_type, array( self::EVENT_TYPE_ORDER_CONFIRMATION, self::EVENT_TYPE_SHIPPING_CONFIRMATION ), true ) ) {
+			return;
+		}
+
+		$created_at = isset( $event['created_at'] ) ? (string) $event['created_at'] : '';
+		if ( $created_at === '' ) {
+			return;
+		}
+
+		$created_ts = strtotime( $created_at . ' UTC' );
+		if ( $created_ts === false ) {
+			return;
+		}
+
+		if ( ( time() - $created_ts ) >= self::RETRY_CEILING_SECONDS ) {
+			throw new TerminalDispatchException( 'retry_ceiling_exceeded' );
+		}
 	}
 
 	/**

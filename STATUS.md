@@ -26,7 +26,45 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1518 — order-confirmation now also fires on
+_Last updated: 2026-07-22 (**PRO-1519 — bounded retry ceiling closes the
+fail-open gap on a persistent transient failure.** The recorded PRO-1504
+fail-open decision assumed a queued transactional row eventually hits either
+success or a TERMINAL Smaily rejection; it missed that a run of purely
+TRANSIENT failures (broken credentials, a prolonged Smaily outage) never
+produces a terminal response, so under the Smaily EventQueue's normal
+unbounded-retry-until-manual-review convention the row (and the native WC
+email `TransactionalSuppression` keeps suppressed the whole time) would
+retry forever — the customer never gets ANY confirmation email. Fixed with a
+TIME-based ceiling scoped to the two transactional event types only:
+`TransactionalFlusher::RETRY_CEILING_SECONDS` = `HOUR_IN_SECONDS`, checked
+against the row's `created_at` at the top of the retry path
+(`enforce_retry_ceiling()`) — once exceeded it throws the SAME
+`TerminalDispatchException` a deterministic Smaily rejection throws, so the
+row flows through the EXISTING `mark_failed` + fail-open path with zero new
+fallback logic. The synchronous first attempt (`send_now()`) is unaffected
+(a fresh row's age is always 0); the main `Flusher` / `CartFlusher`
+(marketing-side rows — `contact.sync`, `automation.*`, abandoned cart) are
+untouched, no shared code path. **Tests:** +3 unit
+(`TransactionalFlusherTest` — past-ceiling fails open without an API call;
+still-within-ceiling keeps retrying normally; a non-transactional-type row
+is never force-failed even when ancient) +2 integration
+(`TransactionalEmailsPipelineTest` — a row stuck on repeated 5xx fails open
+once backdated past the ceiling and the next AS tick runs, timestamp
+manipulation not `sleep()`; a backdated `contact.sync` row proves the
+ceiling doesn't leak into the shared marketing `Flusher`). **Gates:**
+`npm run ci:strict` exit=0 (PHPUnit unit 650/650, was 647, +3; vitest
+251/251 unchanged, tsc clean); `sg docker -c "composer run
+test:integration"` OK (175 tests, 893 assertions — was 173, +2), sandbox
+tenant "Smaily Connect test" correctly restored post-run. Docs:
+`docs/DECISIONS.md` PRO-1504 Stage 2's "Alternatives considered" (which
+rejected a retry ceiling) is marked superseded with a forward-pointer, and a
+full PRO-1519 addendum records the reversal + why time-based, why one hour;
+merchant docs site (`docs/site/index.html`, EN+ET) — the transactional-
+emails section's fail-open sentence now names the ~1-hour bound so it no
+longer implies an untimed guarantee. **Not released** — code landed on
+`main`, no version bump; the release cut is the orchestrator's call.)
+
+Prior: 2026-07-22 (**PRO-1518 — order-confirmation now also fires on
 WooCommerce Blocks / Store-API checkout.** PRO-1504 Stage 2 (below) wired
 order confirmation to `woocommerce_checkout_order_processed` only — that hook
 NEVER fires for a Store-API/block checkout (WC default since 8.3), so a
