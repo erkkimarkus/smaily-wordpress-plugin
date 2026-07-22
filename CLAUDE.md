@@ -266,6 +266,26 @@ an empty `product_url` the same way it already rejected `category_path`
 rows need a post-release re-drive/re-sync once this ships; the code fix alone
 doesn't retroactively repair rows already captured with the old blank shape.
 
+**PRO-1506 — the force-fill above ran ENQUEUE-time only; it now ALSO runs at
+FLUSH time, so a pre-3.8.1 stuck row heals on Retry.** Confirmed live on
+MiuMjau (2026-07-21): re-driving the 52 stuck rows via Event Log Retry failed
+AGAIN with the identical errors — `IngestFlusher::row_to_object()` sends a
+`catalog.delete` row's STORED captured object verbatim (only stamps
+`event_id`/`in_stock=false`), so a row captured BEFORE the PRO-1498 fix just
+resent the same stored blank forever; the enqueue-time fix cannot retroactively
+heal a row already in the queue. The flusher's `catalog.delete` branch now ALSO
+calls `ensure_valid_removal()` on the stored object before send (idempotent —
+a no-op on an already-valid post-3.8.1 capture), and falls back to
+`build_unresolvable( entity_id, event_uuid )` when the row has no captured
+object at all (corrupt/missing payload) instead of a terminal skip with
+nothing sent. This is why `RecEngineCatalogTest::
+test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine` now
+posts a raw blank payload directly through `Client::ingest_catalog()` instead
+of enqueueing-and-flushing — that path can no longer reach the mock with a
+blank value once the flusher repairs it first. MiuMjau's 52 rows still need
+one more live Retry after this ships; the fix makes the NEXT retry succeed, it
+doesn't resend anything by itself.
+
 ### A substituted `category_path` is flagged with `tags.category_defaulted` — never on an empty/unresolved one (PRO-1499)
 Contract v1.6.0 (engine commit `06266a8`) adds optional catalog tag
 `tags.category_defaulted` (`"true"`, omit-on-false): tells the engine a row's

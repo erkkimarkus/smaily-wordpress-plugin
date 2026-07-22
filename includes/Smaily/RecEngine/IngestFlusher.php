@@ -27,7 +27,14 @@ defined( 'ABSPATH' ) || exit;
  *     enqueue is a terminal skip — a catalog.delete row will follow.
  *   - catalog.delete : the product is already gone, so its full object was
  *     captured at delete time in the row payload; here we stamp in_stock=false
- *     and the row's event_uuid as event_id.
+ *     and the row's event_uuid as event_id. The captured object is also run
+ *     through CatalogPayloadBuilder::ensure_valid_removal() HERE, at send
+ *     time (PRO-1506) — not just at enqueue (PRO-1498) — so a row captured
+ *     BEFORE the PRO-1498 fix (a stuck pre-3.8.1 blank category_path/
+ *     product_url) is repaired on Retry instead of resending the same
+ *     blank the engine already rejected once. A row with no captured object
+ *     at all (corrupt/missing payload) falls back to build_unresolvable()
+ *     from the row's entity id, same as the enqueue-time unresolvable path.
  *
  * **N-7: catalog is now D6** (was all-or-nothing). The engine returns
  * `200 {processed, deduplicated, errors:[{index, sku?, field, message}]}` and
@@ -86,8 +93,16 @@ class IngestFlusher extends AbstractD6Flusher {
 			$payload = $this->decode_payload( (string) ( $row['payload'] ?? '' ) );
 			$object  = ( isset( $payload['object'] ) && is_array( $payload['object'] ) ) ? $payload['object'] : null;
 			if ( $object === null ) {
-				return null;
+				// No captured object at all — build a minimal always-valid
+				// tombstone from the row's entity id rather than a terminal
+				// skip with nothing sent (PRO-1506).
+				return $this->builder->build_unresolvable( (int) ( $row['entity_id'] ?? 0 ), $event_uuid );
 			}
+			// PRO-1506: repair a still-blank required field on the STORED
+			// object too — idempotent on an already-valid (post-PRO-1498)
+			// capture, and heals a pre-3.8.1 stuck row on Retry.
+			$object = $this->builder->ensure_valid_removal( $object );
+
 			$object['event_id'] = $event_uuid;
 			$object['in_stock'] = false;
 			return $object;

@@ -3726,6 +3726,67 @@ flags), PRO-1498 (the delete-tombstone force-fill paths this flags), PRO-1224
 needing no schema change), PRO-1486 (the §6 customer_email deprecation this
 sync also carried, independently verified as already covered).
 
+### PRO-1506 — `catalog.delete` force-fill also runs at FLUSH time, so a pre-3.8.1 stuck row heals on Retry
+
+**Context:** PRO-1498's `ensure_valid_removal()`/`build_unresolvable()` run
+ONLY at enqueue time (`CatalogHookHandler::enqueue_delete()`/
+`enqueue_delete_unresolvable()`, `CatalogBackfillJob`). `IngestFlusher::
+row_to_object()` sends a `catalog.delete` row's STORED captured object
+verbatim (only stamping `event_id`/`in_stock=false`) — it never re-derives it.
+Confirmed live on MiuMjau (2026-07-21, post-3.8.1): re-driving the 52 rows
+stuck under the OLD (pre-fix) blank shape via Event Log Retry failed again
+with the identical errors, because the flusher resent the same stored blank
+`category_path`/`product_url` unchanged. PRO-1498 prevents new stuck rows but
+cannot heal old ones — exactly the "Follow-up" gap that decision's entry
+flagged (a targeted re-drive was assumed to be enough; it isn't, because the
+re-drive path itself didn't repair anything).
+
+**Decision:** `IngestFlusher::row_to_object()`'s `catalog.delete` branch now
+also runs the stored object through `CatalogPayloadBuilder::
+ensure_valid_removal()` before stamping `event_id`/`in_stock`, and falls back
+to `build_unresolvable( entity_id, event_uuid )` when the row carries no
+captured object at all (a corrupt/missing payload) instead of a terminal skip
+with nothing sent. Both are idempotent/safe to run unconditionally: on an
+already-valid (post-3.8.1) capture they're a no-op (the fields are already
+non-blank), so this doesn't change enqueue-time behaviour or double-flag an
+already-flagged row.
+
+**Rationale:** single chokepoint, minimum surface — the two builder methods
+already exist and already encode "what does a sendable tombstone look like";
+the bug is purely that the flush path never called them. Fixing it there (not
+by re-deriving at enqueue and re-writing every stuck row in the DB) also heals
+FUTURE stuck rows automatically, not just today's 52 — any future edge case
+that slips a blank required field into a stored capture self-heals on its next
+Retry/backoff tick, not just a one-time manual fix.
+
+**Consequence for the mock-parity test:** `RecEngineCatalogTest::
+test_mock_rejects_empty_product_url_on_a_delete_row_like_the_live_engine`
+used to enqueue a `catalog.delete` row with a blank `product_url` and assert
+the FLUSHER's send got rejected — that path can no longer reach the mock with
+a blank value (the flusher repairs it first), so the test now posts the raw
+blank payload directly through `Client::ingest_catalog()` instead, keeping the
+mock/live parity assertion without depending on now-superseded flusher
+behaviour.
+
+**Tests:** unit (`IngestFlusherTest`) — a stored row with blank
+`category_path`/`product_url` is repaired (force-filled + `tags.
+category_defaulted` stamped) and sent, not skipped/failed; a row with no
+captured `object` at all falls back to `build_unresolvable()` and is sent, not
+terminal-skipped. Integration (`RecEngineCatalogTest`) — a directly-enqueued
+row simulating the pre-3.8.1 stored-blank shape drains successfully on flush
+(`sent:1, failed:0`, `tags.category_defaulted` reaches the engine).
+
+**Follow-up (not this change, operational):** MiuMjau's 52 already-stuck rows
+still need a live Retry (or a fresh re-drive) once this ships — the code fix
+makes the NEXT retry succeed; it doesn't retroactively re-send anything by
+itself.
+
+**Relationships:** PRO-1498 (the enqueue-time force-fill this extends to
+flush time — same two builder methods, new call site), PRO-1499
+(`tags.category_defaulted` — the flush-time force-fill stamps the same flag,
+consistent with the enqueue-time one), F3-43 (the order-item never-drop
+principle both PRO-1498 and this decision extend to catalog).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

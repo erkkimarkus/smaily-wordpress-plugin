@@ -26,7 +26,46 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-21 (**v3.8.1 — RELEASED** (gates green; built/gated by
+_Last updated: 2026-07-22 (**PRO-1506 — `catalog.delete` force-fill now ALSO
+runs at FLUSH time, so a pre-3.8.1 stuck row heals on Retry.** MiuMjau update
++ a Retry of the 52 stuck `catalog.delete` rows (the v3.8.1 entry's assumed
+"last checkbox") FAILED AGAIN with the identical errors (51× empty
+`product_url`, 1× empty `category_path`) — PRO-1498's
+`ensure_valid_removal()`/`build_unresolvable()` ran only at ENQUEUE time
+(`CatalogHookHandler`/`CatalogBackfillJob`); `IngestFlusher::row_to_object()`
+sent a `catalog.delete` row's STORED captured object verbatim, so a row
+captured BEFORE the PRO-1498 fix just resent the same stored blank forever —
+the enqueue-time fix cannot retroactively heal a row already sitting in the
+queue. **Fix:** the flusher's `catalog.delete` branch now also calls
+`ensure_valid_removal()` on the stored object before send (idempotent — a
+no-op on an already-valid post-3.8.1 capture, so enqueue-time behaviour and
+the flag semantics are unchanged), and falls back to
+`build_unresolvable( entity_id, event_uuid )` when the row carries no
+captured object at all (corrupt/missing payload) instead of a terminal skip
+with nothing POSTed. Single chokepoint, no new logic — reuses the two
+PRO-1498 builder methods from a second call site. **Test consequence:**
+`RecEngineCatalogTest::test_mock_rejects_empty_product_url_on_a_delete_row_
+like_the_live_engine` used to prove mock/live parity by enqueueing-then-
+flushing a blank-`product_url` delete row and asserting the engine rejected
+it — that path can no longer reach the mock with a blank value now that the
+flusher repairs it first, so the test now posts the raw blank payload
+directly through `Client::ingest_catalog()` to keep the same parity proof.
+**Tests:** +2 unit (`IngestFlusherTest` — a stored-blank row is repaired and
+sent, not skipped/failed; a row with no captured object falls back to
+`build_unresolvable()` and is sent, not terminal-skipped) +1 integration
+(`RecEngineCatalogTest` — a directly-enqueued row simulating the pre-3.8.1
+stored-blank shape drains successfully on flush, `tags.category_defaulted`
+reaches the engine) +1 rewritten integration (the mock-parity test above).
+**Gates:** `npm run ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit
+unit 597/597, vitest 248/248); `sg docker -c "composer run test:integration"`
+OK (164 tests, 830 assertions), sandbox tenant "Smaily Connect test"
+correctly restored post-run (not MiuMjau). Docs: `docs/DECISIONS.md` new
+PRO-1506 entry, `CLAUDE.md`'s PRO-1498 section extended with the flush-time
+addendum. **Not yet released** — code landed on `main`; MiuMjau's 52 rows
+still need one more live Retry once this ships in a release (the fix makes
+the NEXT retry succeed, it doesn't resend anything by itself).)
+
+Prior: 2026-07-21 (**v3.8.1 — RELEASED** (gates green; built/gated by
 the worker pass, published by the orchestrator the same session — see the
 publication note at the end of this entry). PATCH bump (fixes + hardening, no new
 merchant-facing functionality). Version bumped in all four places
