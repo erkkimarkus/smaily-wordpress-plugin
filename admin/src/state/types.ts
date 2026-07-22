@@ -101,7 +101,12 @@ export interface ModeAccount {
  * (trigger, language, accountKey) combination — Mode B uses
  * accountKey='default' for every row; Mode A varies per language.
  */
-export type AutomationTrigger = 'welcome' | 'first_order' | 'abandoned_cart';
+export type AutomationTrigger =
+  | 'welcome'
+  | 'first_order'
+  | 'abandoned_cart'
+  | 'order_confirmation'
+  | 'shipping_confirmation';
 
 export interface AutomationMapping {
   triggerType: AutomationTrigger;
@@ -260,6 +265,13 @@ export interface WizardState {
      * an absent/empty value as "no docs link".
      */
     docsUrl?: string;
+    /**
+     * Registered WooCommerce order statuses (incl. custom ones), from
+     * `wc_get_order_statuses()` (PRO-1504). Choices for the "counts as
+     * shipped" multi-select. Optional/defaults to [] so pre-existing env
+     * fixtures without it stay valid.
+     */
+    orderStatuses?: Array<{ slug: string; name: string }>;
   };
 
   /** Step 1 — Connect. */
@@ -283,6 +295,22 @@ export interface WizardState {
   abandonedCartEnabled: boolean;
   /** Minutes a cart stays untouched before the abandoned-cart trigger fires. */
   abandonedCartCutoffMinutes: number;
+
+  /**
+   * Transactional emails (PRO-1504, stage 1 — configuration only, no send
+   * path). A separate Smaily account, bound under account_key='transactional',
+   * with its own enablement toggle and two trigger mappings
+   * (order_confirmation, shipping_confirmation) stored the same way as the
+   * three triggers above (rows in `automationMappings` with
+   * accountKey='transactional').
+   */
+  transactionalEmailsEnabled: boolean;
+  transactionalCredentials: SmailyCredentials;
+  transactionalConnection: AsyncStatus;
+  orderConfirmationEnabled: boolean;
+  shippingConfirmationEnabled: boolean;
+  /** WC order-status slugs (bare, no 'wc-' prefix) that count as "shipped". */
+  shippedOrderStatuses: string[];
 
   /**
    * Step 4 — Recommendations. Connecting the rec-engine syncs all domains
@@ -429,6 +457,16 @@ export type WizardAction =
   | { type: 'UPSERT_AUTOMATION_MAPPING'; payload: AutomationMapping }
   | { type: 'REMOVE_AUTOMATION_MAPPING'; payload: { triggerType: AutomationTrigger; language: string; accountKey: string } }
   | { type: 'SET_AUTOMATION_FALLBACK'; payload: { triggerType: AutomationTrigger; language: string; accountKey: string } }
+
+  // Transactional emails (PRO-1504, stage 1) ---------------------------------
+  | { type: 'SET_TRANSACTIONAL_EMAILS_ENABLED'; payload: boolean }
+  | { type: 'SET_TRANSACTIONAL_CREDENTIALS'; payload: Partial<SmailyCredentials> }
+  | { type: 'TEST_TRANSACTIONAL_CONNECTION_START' }
+  | { type: 'TEST_TRANSACTIONAL_CONNECTION_SUCCESS'; payload: { accountName?: string } }
+  | { type: 'TEST_TRANSACTIONAL_CONNECTION_FAILURE'; payload: { error: string } }
+  | { type: 'SET_ORDER_CONFIRMATION_ENABLED'; payload: boolean }
+  | { type: 'SET_SHIPPING_CONFIRMATION_ENABLED'; payload: boolean }
+  | { type: 'TOGGLE_SHIPPED_ORDER_STATUS'; payload: { status: string } }
 
   // Step 4: Recommendations -------------------------------------------------
   | { type: 'SET_REC_ENGINE_FEATURE'; payload: { feature: 'trackBrowsing'; enabled: boolean } }

@@ -65,6 +65,13 @@ export const wizardInitialState: WizardState = {
   abandonedCartEnabled: false,
   abandonedCartCutoffMinutes: 30,
 
+  transactionalEmailsEnabled: false,
+  transactionalCredentials: { ...emptyCredentials },
+  transactionalConnection: idleAsync,
+  orderConfirmationEnabled: false,
+  shippingConfirmationEnabled: false,
+  shippedOrderStatuses: [],
+
   recEngineFeatures: {
     trackBrowsing: false,
   },
@@ -340,6 +347,49 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
               }
             : m,
         ),
+      };
+    }
+
+    // Transactional emails (PRO-1504, stage 1) ------------------------------
+    case 'SET_TRANSACTIONAL_EMAILS_ENABLED':
+      return { ...state, transactionalEmailsEnabled: action.payload };
+
+    case 'SET_TRANSACTIONAL_CREDENTIALS':
+      return {
+        ...state,
+        transactionalCredentials: { ...state.transactionalCredentials, ...action.payload },
+        // Mutating credentials invalidates any previous connection-test result.
+        transactionalConnection: idleAsync,
+      };
+
+    case 'TEST_TRANSACTIONAL_CONNECTION_START':
+      return { ...state, transactionalConnection: { kind: 'pending' } };
+
+    case 'TEST_TRANSACTIONAL_CONNECTION_SUCCESS':
+      return {
+        ...state,
+        transactionalConnection: { kind: 'success', message: action.payload.accountName },
+      };
+
+    case 'TEST_TRANSACTIONAL_CONNECTION_FAILURE':
+      return {
+        ...state,
+        transactionalConnection: { kind: 'failure', error: action.payload.error },
+      };
+
+    case 'SET_ORDER_CONFIRMATION_ENABLED':
+      return { ...state, orderConfirmationEnabled: action.payload };
+
+    case 'SET_SHIPPING_CONFIRMATION_ENABLED':
+      return { ...state, shippingConfirmationEnabled: action.payload };
+
+    case 'TOGGLE_SHIPPED_ORDER_STATUS': {
+      const present = state.shippedOrderStatuses.includes(action.payload.status);
+      return {
+        ...state,
+        shippedOrderStatuses: present
+          ? state.shippedOrderStatuses.filter((s) => s !== action.payload.status)
+          : [...state.shippedOrderStatuses, action.payload.status],
       };
     }
 

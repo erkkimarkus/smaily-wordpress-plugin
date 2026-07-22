@@ -39,6 +39,11 @@ export function buildTabPayload(
         abandonedCartEnabled: state.abandonedCartEnabled,
         abandonedCartCutoffMinutes: state.abandonedCartCutoffMinutes,
         automationMappings: state.automationMappings,
+        transactionalEmailsEnabled: state.transactionalEmailsEnabled,
+        transactionalCredentials: state.transactionalCredentials,
+        orderConfirmationEnabled: state.orderConfirmationEnabled,
+        shippingConfirmationEnabled: state.shippingConfirmationEnabled,
+        shippedOrderStatuses: state.shippedOrderStatuses,
       };
     case 'recommendations':
       return {

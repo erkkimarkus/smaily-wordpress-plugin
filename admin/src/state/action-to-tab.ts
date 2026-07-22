@@ -45,6 +45,11 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'UPSERT_AUTOMATION_MAPPING':
     case 'REMOVE_AUTOMATION_MAPPING':
     case 'SET_AUTOMATION_FALLBACK':
+    case 'SET_TRANSACTIONAL_EMAILS_ENABLED':
+    case 'SET_TRANSACTIONAL_CREDENTIALS':
+    case 'SET_ORDER_CONFIRMATION_ENABLED':
+    case 'SET_SHIPPING_CONFIRMATION_ENABLED':
+    case 'TOGGLE_SHIPPED_ORDER_STATUS':
       return 'woocommerce';
 
     // Recommendations tab
@@ -61,6 +66,9 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'TEST_SMAILY_CONNECTION_START':
     case 'TEST_SMAILY_CONNECTION_SUCCESS':
     case 'TEST_SMAILY_CONNECTION_FAILURE':
+    case 'TEST_TRANSACTIONAL_CONNECTION_START':
+    case 'TEST_TRANSACTIONAL_CONNECTION_SUCCESS':
+    case 'TEST_TRANSACTIONAL_CONNECTION_FAILURE':
     case 'TEST_MODE_ACCOUNT_CONNECTION_START':
     case 'TEST_MODE_ACCOUNT_CONNECTION_SUCCESS':
     case 'TEST_MODE_ACCOUNT_CONNECTION_FAILURE':

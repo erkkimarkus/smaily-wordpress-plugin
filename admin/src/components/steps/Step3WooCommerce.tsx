@@ -5,6 +5,7 @@ import { type WizardAction, type WizardState } from '../../state/types';
 import { Label, NumberInput } from '../primitives';
 import { AutomationSection } from './AutomationSection';
 import { EngineAutomationsSection } from './EngineAutomationsSection';
+import { TransactionalEmailsSection } from './TransactionalEmailsSection';
 
 export interface Step3WooCommerceProps {
   state: WizardState;
@@ -105,6 +106,11 @@ export function Step3WooCommerce({
           </div>
         }
       />
+
+      {/* Transactional emails (PRO-1504, stage 1) — a separate Smaily
+          account + its own two trigger mappings. Configuration only in
+          this stage; no send path exists yet. */}
+      <TransactionalEmailsSection state={state} dispatch={dispatch} />
 
       {/* Engine-run automations (contract §11–§13, T2.2) — a separate
           sub-section: unlike the three store-run triggers above, these

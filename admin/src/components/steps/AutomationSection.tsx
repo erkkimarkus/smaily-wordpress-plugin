@@ -21,6 +21,15 @@ export interface AutomationSectionProps {
   onEnabledChange: (enabled: boolean) => void;
   /** Extra row (e.g. abandoned-cart cutoff slider) rendered above the table. */
   extras?: React.ReactNode;
+  /**
+   * Fixes the mapping row(s) to a specific Smaily account instead of the
+   * multilingual-mode-derived one — used by triggers bound to a separate
+   * Smaily account (transactional-email triggers, PRO-1504). When set,
+   * the section always renders a single row (language='default')
+   * regardless of the site's multilingual mode; the override account has
+   * no per-language variants in stage 1.
+   */
+  accountKeyOverride?: string;
 }
 
 /**
@@ -51,10 +60,11 @@ export function AutomationSection({
   isEnabled,
   onEnabledChange,
   extras,
+  accountKeyOverride,
 }: AutomationSectionProps): React.JSX.Element {
   const isModeA = state.multilingualMode === 'A' && state.env.detectedLanguages.length > 1;
   const isModeB = state.multilingualMode === 'B' && state.env.detectedLanguages.length > 1;
-  const isMultiRow = isModeA || isModeB;
+  const isMultiRow = accountKeyOverride === undefined && (isModeA || isModeB);
 
   const rows = computeRows(state, trigger);
 
@@ -87,7 +97,13 @@ export function AutomationSection({
             isModeA={isModeA}
           />
         ) : (
-          <SingleRow state={state} dispatch={dispatch} trigger={trigger} rows={rows} />
+          <SingleRow
+            state={state}
+            dispatch={dispatch}
+            trigger={trigger}
+            rows={rows}
+            accountKey={accountKeyOverride}
+          />
         )}
       </div>
     </Card>
@@ -144,20 +160,26 @@ function MultiLanguageRows({
   );
 }
 
+interface SingleRowProps extends RowsProps {
+  /** Defaults to 'default' — see AutomationSectionProps.accountKeyOverride. */
+  accountKey?: string;
+}
+
 function SingleRow({
   state,
   dispatch,
   trigger,
   rows,
-}: RowsProps): React.JSX.Element {
-  const mapping = rows.find((r) => r.language === 'default' && r.accountKey === 'default');
+  accountKey = 'default',
+}: SingleRowProps): React.JSX.Element {
+  const mapping = rows.find((r) => r.language === 'default' && r.accountKey === accountKey);
   return (
     <AutomationRow
       state={state}
       dispatch={dispatch}
       trigger={trigger}
       language="default"
-      accountKey="default"
+      accountKey={accountKey}
       mapping={mapping}
       singleRowMode
     />

@@ -58,6 +58,8 @@ export interface BootPayload {
     rss?: RssFeedBootData | null;
     /** Base merchant-docs URL from EnvDetector::snapshot() (PRO-1430). */
     docsUrl?: string;
+    /** Registered WC order statuses from EnvDetector::snapshot() (PRO-1504). */
+    orderStatuses?: Array<{ slug: string; name: string }>;
   };
   savedSettings: {
     smailyCredentials: { subdomain: string; username: string; password: string };
@@ -97,6 +99,16 @@ export interface BootPayload {
       workflowId: string;
       isDefaultFallback: boolean;
     }>;
+    /**
+     * Transactional emails (PRO-1504, stage 1). Credentials mirror
+     * smailyCredentials — password never round-trips.
+     */
+    transactionalEmailsEnabled?: boolean;
+    transactionalCredentials?: { subdomain: string; username: string; password: string };
+    transactionalConnected?: boolean;
+    orderConfirmationEnabled?: boolean;
+    shippingConfirmationEnabled?: boolean;
+    shippedOrderStatuses?: string[];
     /**
      * Step 4 — rec-engine connection. The api_key intentionally never
      * lands here; the React layer only needs the connected flag plus
@@ -153,6 +165,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
         storeTotals: { customers: 0, orders: 0, products: 0 },
         rss: null,
         docsUrl: '',
+        orderStatuses: [],
       },
       smailyCredentials: { ...emptyCredentials },
       smailyConnection: idleAsync,
@@ -166,6 +179,12 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       firstOrderEnabled: false,
       abandonedCartEnabled: false,
       abandonedCartCutoffMinutes: 30,
+      transactionalEmailsEnabled: false,
+      transactionalCredentials: { ...emptyCredentials },
+      transactionalConnection: idleAsync,
+      orderConfirmationEnabled: false,
+      shippingConfirmationEnabled: false,
+      shippedOrderStatuses: [],
       recEngineFeatures: {
         trackBrowsing: false,
       },
@@ -213,6 +232,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       storeTotals: env.storeTotals,
       rss: env.rss ?? null,
       docsUrl: env.docsUrl ?? '',
+      orderStatuses: env.orderStatuses ?? [],
     },
     smailyCredentials: { ...s.smailyCredentials },
     smailyConnection:
@@ -231,6 +251,21 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     firstOrderEnabled: s.firstOrderEnabled,
     abandonedCartEnabled: s.abandonedCartEnabled,
     abandonedCartCutoffMinutes: s.abandonedCartCutoffMinutes,
+    transactionalEmailsEnabled: s.transactionalEmailsEnabled ?? false,
+    transactionalCredentials: {
+      ...emptyCredentials,
+      ...s.transactionalCredentials,
+    },
+    transactionalConnection:
+      s.transactionalConnected &&
+      s.transactionalCredentials !== undefined &&
+      s.transactionalCredentials.subdomain !== '' &&
+      s.transactionalCredentials.username !== ''
+        ? { kind: 'success', message: s.transactionalCredentials.username }
+        : idleAsync,
+    orderConfirmationEnabled: s.orderConfirmationEnabled ?? false,
+    shippingConfirmationEnabled: s.shippingConfirmationEnabled ?? false,
+    shippedOrderStatuses: s.shippedOrderStatuses ?? [],
     // Read the saved browse preference so reload AND re-connect restore the
     // merchant's last choice (disconnect preserves the option server-side).
     recEngineFeatures: {
@@ -256,7 +291,13 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
   };
 }
 
-const VALID_TRIGGERS: readonly AutomationTrigger[] = ['welcome', 'first_order', 'abandoned_cart'];
+const VALID_TRIGGERS: readonly AutomationTrigger[] = [
+  'welcome',
+  'first_order',
+  'abandoned_cart',
+  'order_confirmation',
+  'shipping_confirmation',
+];
 
 /**
  * Map the rec-engine boot snapshot into the existing AsyncStatus slot

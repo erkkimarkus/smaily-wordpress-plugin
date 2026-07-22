@@ -45,6 +45,8 @@ export interface ServerEnv {
   rss?: RssFeedBootData | null;
   /** Base merchant-docs URL from EnvDetector::snapshot() (PRO-1430). */
   docsUrl?: string;
+  /** Registered WC order statuses from EnvDetector::snapshot() (PRO-1504). */
+  orderStatuses?: Array<{ slug: string; name: string }>;
   smailyCredentials?: {
     subdomain?: string;
     username?: string;
@@ -86,6 +88,7 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
       },
       rss: env.rss ?? null,
       docsUrl: env.docsUrl ?? '',
+      orderStatuses: env.orderStatuses ?? [],
     },
 
     smailyCredentials: {
@@ -114,6 +117,13 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     firstOrderEnabled: false,
     abandonedCartEnabled: false,
     abandonedCartCutoffMinutes: 30,
+
+    transactionalEmailsEnabled: false,
+    transactionalCredentials: { ...emptyCredentials },
+    transactionalConnection: idleAsync,
+    orderConfirmationEnabled: false,
+    shippingConfirmationEnabled: false,
+    shippedOrderStatuses: [],
 
     recEngineFeatures: {
       trackBrowsing: false,
