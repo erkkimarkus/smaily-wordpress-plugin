@@ -1,0 +1,127 @@
+<?php
+/**
+ * WC hooks → the transactional-email sender (PRO-1504 Stage 2).
+ *
+ * @package Smaily\Connect\Integrations\WooCommerce
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Integrations\WooCommerce;
+
+defined( 'ABSPATH' ) || exit;
+
+use Smaily\Connect\Smaily\TransactionalFlusher;
+use Smaily\Connect\Smaily\TransactionalGate;
+use Smaily\Connect\Smaily\TransactionalPayloadBuilder;
+
+/**
+ * Two triggers, both once-per-order-per-email-type (an order-meta guard —
+ * design point 1):
+ *
+ *   - order_confirmation: `woocommerce_checkout_order_processed` — a
+ *     one-shot hook (deliberately NOT `woocommerce_thank_you`, which
+ *     re-fires on every thank-you-page revisit).
+ *   - shipping_confirmation: `woocommerce_order_status_changed`, firing
+ *     when the NEW status (bare slug) is in the merchant's
+ *     `smly_plus_shipped_order_statuses` set. Repeated flips into the
+ *     shipped set after the first one are no-ops — the meta guard is
+ *     already set.
+ *
+ * Gating (design point 2) is delegated whole to TransactionalGate — no
+ * consent/opt-out check here (transactional sends override marketing
+ * opt-out, platform answer Q7 / PRO-1380).
+ *
+ * Not final: tests inject gate/builder/flusher doubles.
+ */
+class TransactionalEmailHookHandler {
+
+	private const OPTION_SHIPPED_STATUSES = 'smly_plus_shipped_order_statuses';
+
+	private TransactionalGate $gate;
+	private TransactionalPayloadBuilder $builder;
+	private TransactionalFlusher $flusher;
+
+	public function __construct( TransactionalGate $gate, TransactionalPayloadBuilder $builder, TransactionalFlusher $flusher ) {
+		$this->gate    = $gate;
+		$this->builder = $builder;
+		$this->flusher = $flusher;
+	}
+
+	/**
+	 * `woocommerce_checkout_order_processed` ($order_id, $posted_data, $order).
+	 *
+	 * @param int|string $order_id
+	 */
+	public function on_order_processed( $order_id ): void {
+		$order = $this->load_order( $order_id );
+		if ( $order === null ) {
+			return;
+		}
+
+		$this->attempt( TransactionalGate::TRIGGER_ORDER_CONFIRMATION, $order );
+	}
+
+	/**
+	 * `woocommerce_order_status_changed` ($order_id, $from_status, $to_status, $order).
+	 *
+	 * @param int|string $order_id
+	 * @param string     $from_status
+	 * @param string     $to_status
+	 */
+	public function on_order_status_changed( $order_id, $from_status = '', $to_status = '' ): void {
+		unset( $from_status );
+
+		$to = $this->bare_status( (string) $to_status );
+		if ( ! in_array( $to, $this->shipped_statuses(), true ) ) {
+			return;
+		}
+
+		$order = $this->load_order( $order_id );
+		if ( $order === null ) {
+			return;
+		}
+
+		$this->attempt( TransactionalGate::TRIGGER_SHIPPING_CONFIRMATION, $order, $to );
+	}
+
+	private function attempt( string $trigger_type, \WC_Order $order, string $to_status = '' ): void {
+		$meta_key = TransactionalFlusher::meta_key_for( $trigger_type );
+		if ( (string) $order->get_meta( $meta_key ) !== '' ) {
+			// Already attempted/sent/queued/failed-open for this order+type —
+			// once-per-order-per-email-type (design point 1).
+			return;
+		}
+
+		$match = $this->gate->resolve_if_open( $trigger_type );
+		if ( $match === null ) {
+			// Gate closed (toggle off, no mapping, or credentials incomplete)
+			// — zero behavior change, nothing enqueued, no meta written.
+			return;
+		}
+
+		$context = $this->builder->build( $order );
+		$this->flusher->send_now( $trigger_type, $order, $match, $context, $to_status );
+	}
+
+	/**
+	 * @param int|string $order_id
+	 */
+	private function load_order( $order_id ): ?\WC_Order {
+		if ( ! function_exists( 'wc_get_order' ) ) {
+			return null;
+		}
+		$order = wc_get_order( (int) $order_id );
+		return $order instanceof \WC_Order ? $order : null;
+	}
+
+	/** @return string[] Bare WC status slugs — matches how Settings persists this option. */
+	private function shipped_statuses(): array {
+		$statuses = get_option( self::OPTION_SHIPPED_STATUSES, array( 'completed' ) );
+		return is_array( $statuses ) ? array_map( 'strval', $statuses ) : array( 'completed' );
+	}
+
+	private function bare_status( string $status ): string {
+		return strpos( $status, 'wc-' ) === 0 ? substr( $status, 3 ) : $status;
+	}
+}

@@ -333,14 +333,24 @@ final class FlusherTest extends TestCase {
 
 	public function test_flush_excludes_the_cart_event_type_from_its_drain(): void {
 		// PRO-1195: automation.abandoned_cart rows belong to the CartFlusher
-		// (its own AS action); the main drain must exclude the type at the
-		// pending() query so the two flushers never consume each other's rows.
+		// (its own AS action); PRO-1504 Stage 2 adds the two transactional
+		// types belonging to TransactionalFlusher. The main drain must
+		// exclude all three at the pending() query so no flusher consumes
+		// another's rows.
 		$queue = $this->fake_queue( array() );
 
 		( new Flusher( $queue, $this->automation_router_returning_true(), static fn () => null ) )->flush();
 
 		self::assertSame(
-			array( Flusher::DEFAULT_BATCH_SIZE, null, array( \Smaily\Connect\Smaily\CartFlusher::EVENT_TYPE ) ),
+			array(
+				Flusher::DEFAULT_BATCH_SIZE,
+				null,
+				array(
+					\Smaily\Connect\Smaily\CartFlusher::EVENT_TYPE,
+					\Smaily\Connect\Smaily\TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION,
+					\Smaily\Connect\Smaily\TransactionalFlusher::EVENT_TYPE_SHIPPING_CONFIRMATION,
+				),
+			),
 			$queue->last_pending_args
 		);
 	}

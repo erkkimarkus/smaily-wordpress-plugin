@@ -31,6 +31,10 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler;
  * CartFlusher owns them on its own AS action (PRO-1195); pending() excludes
  * the type so the two drains never consume each other's rows.
  *
+ * `transactional.order_confirmation` / `transactional.shipping_confirmation`
+ * rows are excluded the same way (PRO-1504 Stage 2) — TransactionalFlusher
+ * owns them on its own AS action.
+ *
  * Payload shape (what HookHandler enqueues):
  *
  *   {
@@ -95,7 +99,15 @@ final class Flusher {
 			'retried'   => 0,
 		);
 
-		foreach ( $this->queue->pending( $batch_size, null, array( CartFlusher::EVENT_TYPE ) ) as $event ) {
+		foreach ( $this->queue->pending(
+			$batch_size,
+			null,
+			array(
+				CartFlusher::EVENT_TYPE,
+				TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION,
+				TransactionalFlusher::EVENT_TYPE_SHIPPING_CONFIRMATION,
+			)
+		) as $event ) {
 			++$stats['processed'];
 
 			$id   = (int) ( $event['id'] ?? 0 );

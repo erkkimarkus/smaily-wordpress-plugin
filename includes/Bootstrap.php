@@ -22,6 +22,7 @@ use Smaily\Connect\Integrations\WooCommerce\IdentityHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\LandingCapture;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Integrations\WooCommerce\StorefrontBeacon;
+use Smaily\Connect\Integrations\WooCommerce\TransactionalEmailHookHandler;
 use Smaily\Connect\DB\QueueJanitor;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Privacy\GdprHandler;
@@ -59,6 +60,10 @@ use Smaily\Connect\Smaily\RecEngine\IngestFlusher;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\RecEngine\OrderFlusher;
 use Smaily\Connect\Smaily\RecEngine\OrderPayloadBuilder;
+use Smaily\Connect\Smaily\TransactionalFlusher;
+use Smaily\Connect\Smaily\TransactionalGate;
+use Smaily\Connect\Smaily\TransactionalPayloadBuilder;
+use Smaily\Connect\Smaily\TransactionalSuppression;
 use Smaily\Connect\Smaily\WorkflowResolverInterface;
 
 /**
@@ -110,6 +115,10 @@ final class Bootstrap {
 	private ?CustomerFlusher $customer_flusher            = null;
 	private ?OrderPayloadBuilder $order_builder           = null;
 	private ?OrderFlusher $order_flusher                  = null;
+
+	private ?TransactionalGate $transactional_gate               = null;
+	private ?TransactionalSuppression $transactional_suppression = null;
+	private ?TransactionalFlusher $transactional_flusher         = null;
 
 	/** @var array<string, Client> */
 	private array $smaily_clients = array();
@@ -181,6 +190,10 @@ final class Bootstrap {
 		add_action( 'smly_plus_contact_sync', array( $this, 'on_contact_sync_tick' ) );
 		add_action( 'smly_plus_abandoned_cart', array( $this, 'on_abandoned_cart_tick' ) );
 		add_action( CartFlusher::FLUSH_HOOK, array( $this, 'on_flush_cart_queue' ) );
+
+		// Transactional-email queue-retry (PRO-1504 Stage 2) — drains rows a
+		// synchronous send_now() attempt left `pending` on its own AS action.
+		add_action( TransactionalFlusher::FLUSH_HOOK, array( $this, 'on_flush_transactional_queue' ) );
 
 		// REST endpoints + the AS callback that drives the backfill loop.
 		add_action( 'rest_api_init', array( $this, 'register_rest_endpoints' ) );
@@ -494,6 +507,19 @@ final class Bootstrap {
 		);
 		add_action( 'woocommerce_order_status_changed', array( $order, 'on_order_status_changed' ), 10, 3 );
 
+		// Transactional emails (PRO-1504 Stage 2) — order-confirmation and
+		// shipping-confirmation sends through the separate transactional
+		// Smaily account. TransactionalGate self-gates every attempt, so
+		// registering unconditionally is safe (off by default).
+		$this->transactional_suppression()->register();
+		$transactional = new TransactionalEmailHookHandler(
+			$this->transactional_gate(),
+			new TransactionalPayloadBuilder(),
+			$this->transactional_flusher()
+		);
+		add_action( 'woocommerce_checkout_order_processed', array( $transactional, 'on_order_processed' ), 10, 1 );
+		add_action( 'woocommerce_order_status_changed', array( $transactional, 'on_order_status_changed' ), 10, 3 );
+
 		// Rec-engine identity merge (3.7). On login, explicitly bind the
 		// anon-session cookies to the now-known customer (§7) — complementary to
 		// the engine's automatic browse-event retroactive binding (§6).
@@ -574,6 +600,13 @@ final class Bootstrap {
 			as_schedule_recurring_action( time(), 60, CartFlusher::FLUSH_HOOK, array(), CartFlusher::AS_GROUP );
 		}
 
+		// Transactional-email queue-retry (PRO-1504 Stage 2) — its own
+		// recurring tick so a row a sync send_now() attempt left `pending`
+		// (transient failure) retries without a fresh order event.
+		if ( ! as_has_scheduled_action( TransactionalFlusher::FLUSH_HOOK, array(), TransactionalFlusher::AS_GROUP ) ) {
+			as_schedule_recurring_action( time(), 60, TransactionalFlusher::FLUSH_HOOK, array(), TransactionalFlusher::AS_GROUP );
+		}
+
 		// Abandonment sweep (PRO-1195) — the 15-min cadence Activation seeds;
 		// re-assert on init so a deactivate/reactivate that cancelled the
 		// recurring row restores it without a re-activation (the other
@@ -636,6 +669,15 @@ final class Bootstrap {
 	 */
 	public function on_flush_cart_queue(): void {
 		$this->cart_flusher()->flush();
+	}
+
+	/**
+	 * Action Scheduler callback for smly_plus_flush_transactional_events —
+	 * retries transactional-email rows a sync send_now() attempt left
+	 * `pending` (PRO-1504 Stage 2).
+	 */
+	public function on_flush_transactional_queue(): void {
+		$this->transactional_flusher()->flush();
 	}
 
 	/**
@@ -981,6 +1023,41 @@ final class Bootstrap {
 		}
 
 		return $this->automation_router;
+	}
+
+	/**
+	 * PRO-1504 Stage 2 — the full send-gate (enablement + per-trigger toggle
+	 * + mapping row + transactional-account credentials), shared by the WC
+	 * hook handler and the native-WC-email suppression filters.
+	 */
+	public function transactional_gate(): TransactionalGate {
+		if ( $this->transactional_gate === null ) {
+			$this->transactional_gate = new TransactionalGate( $this->credentials(), $this->workflow_resolver() );
+		}
+
+		return $this->transactional_gate;
+	}
+
+	public function transactional_suppression(): TransactionalSuppression {
+		if ( $this->transactional_suppression === null ) {
+			$this->transactional_suppression = new TransactionalSuppression( $this->transactional_gate() );
+		}
+
+		return $this->transactional_suppression;
+	}
+
+	public function transactional_flusher(): TransactionalFlusher {
+		if ( $this->transactional_flusher === null ) {
+			$bootstrap                   = $this;
+			$this->transactional_flusher = new TransactionalFlusher(
+				$this->event_queue(),
+				static function ( string $account_key ) use ( $bootstrap ): Client {
+					return $bootstrap->smaily_client( $account_key );
+				}
+			);
+		}
+
+		return $this->transactional_flusher;
 	}
 
 	// ---------------------------------------------------------------
