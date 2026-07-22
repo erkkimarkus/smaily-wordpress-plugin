@@ -849,11 +849,16 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 // Browse has NO Layer-1 natural key, so a missing event_id is a per-item
 // error (not a silent no-dedup insert), and an invalid event_type is a
 // per-item error. Sub-counts: an event with a customer_email / visitor_token
-// identity hint is with_customer_match, otherwise anonymous. Scenario
-// triggers ride the FIRST event's event_id prefix (auth-401- / retry-500-).
-// The plugin beacon proxy pre-filters junk (id-less / bad-type → 400 before
-// it reaches here), so this route is the engine's strict D6 validator that
-// a direct Client::ingest_browse call (and the live-walk) exercises.
+// identity hint is with_customer_match, UNLESS the resolved customer has
+// opted out (§10) — then it's forced anonymous (§6/§10 Art 21 engine-side
+// gate, PRO-1517): email is checked directly against the opt-out registry,
+// smaily_visitor_token via the visitor_token->email registry learned from a
+// prior §7 identity/merge (external_id resolution stays unmodeled — no
+// registry for it). Scenario triggers ride the FIRST event's event_id prefix
+// (auth-401- / retry-500-). The plugin beacon proxy pre-filters junk (id-less
+// / bad-type → 400 before it reaches here), so this route is the engine's
+// strict D6 validator that a direct Client::ingest_browse call (and the
+// live-walk) exercises.
 if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
@@ -946,6 +951,18 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 	$seen               = ( isset( $state['browse_event_ids'] ) && is_array( $state['browse_event_ids'] ) )
 		? $state['browse_event_ids']
 		: array();
+	// §6/§10 Art 21 engine-side gate: an opted-out customer is never bound on
+	// any resolution path — the event is stored anonymous. Email is checked
+	// directly against the opt-out registry; smaily_visitor_token is resolved
+	// via `visitor_token_emails` (learned from a prior §7 identity/merge),
+	// mirroring the real engine's server-side token->customer resolution
+	// (PRO-1517). external_id resolution is still unmodeled (no registry).
+	$opted_out_emails    = ( isset( $state['opted_out_emails'] ) && is_array( $state['opted_out_emails'] ) )
+		? $state['opted_out_emails']
+		: array();
+	$visitor_token_emails = ( isset( $state['visitor_token_emails'] ) && is_array( $state['visitor_token_emails'] ) )
+		? $state['visitor_token_emails']
+		: array();
 	$processed          = 0;
 	$deduplicated       = 0;
 	$with_customer      = 0;
@@ -969,9 +986,15 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/browse' ) {
 		}
 		$seen[] = $event_id;
 		++$processed;
-		$has_identity = ( isset( $event['customer_email'] ) && (string) $event['customer_email'] !== '' )
-			|| ( isset( $event['smaily_visitor_token'] ) && (string) $event['smaily_visitor_token'] !== '' );
-		if ( $has_identity ) {
+		$email         = isset( $event['customer_email'] ) ? (string) $event['customer_email'] : '';
+		$visitor_token = isset( $event['smaily_visitor_token'] ) ? (string) $event['smaily_visitor_token'] : '';
+		$token_email   = ( $visitor_token !== '' && isset( $visitor_token_emails[ $visitor_token ] ) )
+			? $visitor_token_emails[ $visitor_token ]
+			: '';
+		$is_opted_out = ( $email !== '' && isset( $opted_out_emails[ $email ] ) )
+			|| ( $token_email !== '' && isset( $opted_out_emails[ $token_email ] ) );
+		$has_identity = ( $email !== '' || $visitor_token !== '' );
+		if ( $has_identity && ! $is_opted_out ) {
 			++$with_customer;
 		} else {
 			++$anonymous;
@@ -1071,6 +1094,17 @@ if ( $method === 'POST' && $path === '/api/v1/identity/merge' ) {
 		'customer_email'       => $email,
 		'merge_reason'         => isset( $body['merge_reason'] ) ? (string) $body['merge_reason'] : '',
 	);
+	// PRO-1517 — record token->email so a later browse event resolved ONLY via
+	// smaily_visitor_token (no email on the event) can be checked against §10
+	// opt-out state at ingest, mirroring the real engine's server-side
+	// visitor_token->customer resolution (§7).
+	$visitor_token = isset( $body['smaily_visitor_token'] ) ? (string) $body['smaily_visitor_token'] : '';
+	if ( $visitor_token !== '' ) {
+		if ( ! isset( $state['visitor_token_emails'] ) || ! is_array( $state['visitor_token_emails'] ) ) {
+			$state['visitor_token_emails'] = array();
+		}
+		$state['visitor_token_emails'][ $visitor_token ] = $email;
+	}
 	save_state( $state_file, $state );
 
 	reply(
@@ -1163,7 +1197,12 @@ if ( $method === 'DELETE' && preg_match( '#^/api/v1/customer/([^/]+)$#', $path, 
 	);
 }
 
-// GDPR opt-out (§10).
+// GDPR opt-out (§10). A `notfound`-prefixed email → 404 (contract: "Response
+// 404 Not Found if the customer doesn't exist"), same trigger convention as
+// export/merge above. The contract gives no example 404 body for §10, so this
+// mirrors the exact shape already used by the sibling §8/§9 routes in this
+// file (and the Shopify reference mock's PRO-1477 fix — commit `cb262c4`,
+// ../shopify-connect) rather than inventing one (PRO-1517).
 if ( $method === 'POST' && preg_match( '#^/api/v1/customer/([^/]+)/opt-out$#', $path, $m ) ) {
 	$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 	if ( ! preg_match( '/^Bearer\s+sk_[A-Za-z0-9_]+$/', $auth ) ) {
@@ -1173,9 +1212,24 @@ if ( $method === 'POST' && preg_match( '#^/api/v1/customer/([^/]+)/opt-out$#', $
 	if ( $email === '{email}' || strpos( $email, '%s' ) !== false ) {
 		reply( 422, array( 'error' => 'unsubstituted_placeholder', 'message' => 'Email path param was not substituted: ' . $email ) );
 	}
+	if ( strpos( $email, 'notfound' ) === 0 ) {
+		reply( 404, array( 'error' => 'not_found', 'message' => 'No customer with email ' . $email ) );
+	}
 	$raw   = (string) file_get_contents( 'php://input' );
 	$body  = json_decode( $raw, true );
 	$flag  = is_array( $body ) && ! empty( $body['opt_out'] );
+	// PRO-1517 — persist opted-out emails so browse ingest (§6) can apply the
+	// §10 Art 21 engine-side binding gate (email-direct and visitor-token-
+	// resolved), mirroring the real engine's server-side enforcement.
+	if ( ! isset( $state['opted_out_emails'] ) || ! is_array( $state['opted_out_emails'] ) ) {
+		$state['opted_out_emails'] = array();
+	}
+	if ( $flag ) {
+		$state['opted_out_emails'][ $email ] = true;
+	} else {
+		unset( $state['opted_out_emails'][ $email ] );
+	}
+	save_state( $state_file, $state );
 	reply(
 		200,
 		array(

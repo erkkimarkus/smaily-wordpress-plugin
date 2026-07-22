@@ -139,6 +139,38 @@ import_errors`), not the HTTP endpoints.
 
 ---
 
+## 5. GDPR opt-out / profiling enforcement (§10, §6 Art 21) — ✅ fixed (PRO-1517)
+
+Cross-repo note from the Shopify team (whose mock closed the same two gaps in
+commit `cb262c4`, `../shopify-connect`): the PHP mock's simulation of the
+engine's **own server-side** GDPR/opt-out behaviour (distinct from the
+plugin's client-side `ProfilingConsent` gate, which is unaffected) had two
+fidelity gaps.
+
+| Dimension | Mock (before PRO-1517) | Real engine (contract §6/§10) | Mock now |
+|-----------|------------------------|-------------------------------|----------|
+| `POST /customer/{email}/opt-out` on an unknown email | **always 200** | **404** ("Response 404 Not Found if the customer doesn't exist") | 404 with `{error:"not_found", message:...}`, same `notfound`-prefix trigger + body shape already used by the sibling §8/§9 routes in this file |
+| Browse ingest (§6) opt-out binding gate | **not modeled at all** — neither the email nor the visitor-token path was checked against opt-out state (the mock had no opt-out registry) | an opted-out customer is never bound on ANY resolution path (email, `smaily_visitor_token`, `external_id`) — the event is stored anonymous | email path AND `smaily_visitor_token`-resolved path (via a token→email registry populated by `POST /identity/merge`) are both gated; `external_id` resolution stays unmodeled (no registry for it exists, same limitation the Shopify reference mock carries) |
+
+**Why this was broader than the Shopify reference's starting point:** the TS
+mock already gated the email path before PRO-1477 (only the token path was
+missing); the PHP mock had **no** opt-out state persistence at all — the
+opt-out endpoint didn't even remember which emails had opted out. Closing the
+token-resolution gap required adding that registry first, which necessarily
+also closed the (previously unmodeled) email-path gate — both are now
+covered, matching the contract's "on any resolution path" wording.
+
+**Fixed in** `tests/Integration/Fixtures/mock-rec-engine/router.php`:
+`identity_merge` records `smaily_visitor_token → customer_email`; the
+opt-out route persists an `opted_out_emails` registry; browse ingest checks
+both the direct email and the token-resolved email against it before
+counting an event `with_customer_match` vs `anonymous`. Covered by
+`tests/Integration/RecEngineMockFidelityTest.php` (5 tests: unknown-customer
+404, known-customer success, token-bound opted-out → anonymous, unbound
+token → still identified, email-carrying opted-out → anonymous).
+
+---
+
 ## Summary: what the mock needs when Route A lands
 
 > **Important**: the "real engine" columns for customers / orders / browse below

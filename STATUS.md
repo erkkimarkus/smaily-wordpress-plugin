@@ -26,7 +26,41 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1519 — bounded retry ceiling closes the
+_Last updated: 2026-07-22 (**PRO-1517 — two mock rec-engine GDPR-path
+fidelity gaps closed (cross-repo note, Shopify mock fix `cb262c4`).** The
+integration mock (`tests/Integration/Fixtures/mock-rec-engine/router.php`)
+simulated the real engine's own server-side GDPR/opt-out behaviour too
+loosely on two paths — a plugin test exercising either would false-green:
+(1) `POST /customer/{email}/opt-out` always returned 200, never the
+contract's 404 for an unknown customer; (2) browse ingest (§6) didn't apply
+the §10 Art 21 engine-side binding gate to a `smaily_visitor_token`-only
+event (no `customer_email` on the event) — in fact the mock had **no**
+opt-out state tracking at all before this (broader than the Shopify mock's
+starting point, which already gated the email path). Fixed: the opt-out
+route now persists an `opted_out_emails` registry and 404s a `notfound`-
+prefixed email (same trigger convention + response shape as the sibling
+§8/§9 routes); `identity_merge` now records `smaily_visitor_token →
+customer_email`; browse ingest checks both the direct email and the
+token-resolved email against the opt-out registry before counting an event
+`with_customer_match` vs `anonymous`. `external_id` resolution stays
+unmodeled (no registry — same limitation the Shopify reference carries).
+**Tests:** +5 integration (`tests/Integration/RecEngineMockFidelityTest.php`,
+new file, calls `Client` directly against the mock — this pins the mock's
+simulated engine behaviour, not a plugin code path): unknown-customer 404,
+known-customer opt-out success, a token bound via identity-merge to an
+opted-out customer is forced anonymous, an unbound token still resolves as
+identified, an email-carrying opted-out event is forced anonymous (this last
+one is new *coverage*, not new *behaviour* pinning — see above, the email
+path had no gate to pin before either). **Gates:** `npm run ci:strict`
+exit=0 (PHPUnit unit 650/650 unchanged — no plugin/production code touched,
+only the mock + integration tests; vitest 251/251 unchanged, tsc clean);
+`sg docker -c "composer run test:integration"` OK (180 tests, 907
+assertions — was 175, +5), sandbox tenant "Smaily Connect test" correctly
+restored post-run. Docs: `docs/audits/MOCK_DIVERGENCE_AUDIT.md` gets a new
+§5 registering + closing both gaps. **Not released** — mock/test-only
+change, no plugin code or version bump; nothing to release.)
+
+Prior: 2026-07-22 (**PRO-1519 — bounded retry ceiling closes the
 fail-open gap on a persistent transient failure.** The recorded PRO-1504
 fail-open decision assumed a queued transactional row eventually hits either
 success or a TERMINAL Smaily rejection; it missed that a run of purely
