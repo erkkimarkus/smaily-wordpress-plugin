@@ -36,8 +36,6 @@ use Smaily\Connect\Smaily\TransactionalPayloadBuilder;
  */
 class TransactionalEmailHookHandler {
 
-	private const OPTION_SHIPPED_STATUSES = 'smly_plus_shipped_order_statuses';
-
 	private TransactionalGate $gate;
 	private TransactionalPayloadBuilder $builder;
 	private TransactionalFlusher $flusher;
@@ -49,12 +47,19 @@ class TransactionalEmailHookHandler {
 	}
 
 	/**
-	 * `woocommerce_checkout_order_processed` ($order_id, $posted_data, $order).
+	 * `woocommerce_checkout_order_processed` ($order_id, $posted_data, $order)
+	 * — WC_Checkout::process_checkout() always passes a real WC_Order (it
+	 * throws before firing the action if order creation failed); the
+	 * wc_get_order() fallback covers only a third party re-firing this
+	 * action manually with fewer args.
 	 *
-	 * @param int|string $order_id
+	 * @param int|string           $order_id
+	 * @param array<string, mixed> $posted_data
 	 */
-	public function on_order_processed( $order_id ): void {
-		$order = $this->load_order( $order_id );
+	public function on_order_processed( $order_id, $posted_data = array(), ?\WC_Order $order = null ): void {
+		unset( $posted_data );
+
+		$order = $order ?? $this->load_order( $order_id );
 		if ( $order === null ) {
 			return;
 		}
@@ -63,21 +68,24 @@ class TransactionalEmailHookHandler {
 	}
 
 	/**
-	 * `woocommerce_order_status_changed` ($order_id, $from_status, $to_status, $order).
+	 * `woocommerce_order_status_changed` ($order_id, $from_status, $to_status,
+	 * $order) — WC_Order::status_transition() always passes $this; the
+	 * wc_get_order() fallback covers only a third party re-firing this
+	 * action manually with fewer args.
 	 *
 	 * @param int|string $order_id
 	 * @param string     $from_status
 	 * @param string     $to_status
 	 */
-	public function on_order_status_changed( $order_id, $from_status = '', $to_status = '' ): void {
+	public function on_order_status_changed( $order_id, $from_status = '', $to_status = '', ?\WC_Order $order = null ): void {
 		unset( $from_status );
 
 		$to = $this->bare_status( (string) $to_status );
-		if ( ! in_array( $to, $this->shipped_statuses(), true ) ) {
+		if ( ! in_array( $to, TransactionalGate::shipped_statuses(), true ) ) {
 			return;
 		}
 
-		$order = $this->load_order( $order_id );
+		$order = $order ?? $this->load_order( $order_id );
 		if ( $order === null ) {
 			return;
 		}
@@ -113,12 +121,6 @@ class TransactionalEmailHookHandler {
 		}
 		$order = wc_get_order( (int) $order_id );
 		return $order instanceof \WC_Order ? $order : null;
-	}
-
-	/** @return string[] Bare WC status slugs — matches how Settings persists this option. */
-	private function shipped_statuses(): array {
-		$statuses = get_option( self::OPTION_SHIPPED_STATUSES, array( 'completed' ) );
-		return is_array( $statuses ) ? array_map( 'strval', $statuses ) : array( 'completed' );
 	}
 
 	private function bare_status( string $status ): string {

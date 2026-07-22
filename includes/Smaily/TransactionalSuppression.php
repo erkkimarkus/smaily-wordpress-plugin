@@ -36,8 +36,6 @@ class TransactionalSuppression {
 	public const EMAIL_CLASS_ORDER_CONFIRMATION    = 'WC_Email_Customer_Processing_Order';
 	public const EMAIL_CLASS_SHIPPING_CONFIRMATION = 'WC_Email_Customer_Completed_Order';
 
-	private const OPTION_SHIPPED_STATUSES = 'smly_plus_shipped_order_statuses';
-
 	/** Request-scoped: true only for the duration of a fail-open re-fire call. */
 	private static bool $bypass = false;
 
@@ -79,7 +77,7 @@ class TransactionalSuppression {
 			return $enabled;
 		}
 
-		return in_array( 'completed', $this->shipped_statuses(), true ) ? false : $enabled;
+		return in_array( 'completed', TransactionalGate::shipped_statuses(), true ) ? false : $enabled;
 	}
 
 	/**
@@ -104,14 +102,5 @@ class TransactionalSuppression {
 		} finally {
 			self::$bypass = false;
 		}
-	}
-
-	/**
-	 * @return string[] Bare WC status slugs (no 'wc-' prefix) — matches how
-	 *                   Settings persists smly_plus_shipped_order_statuses.
-	 */
-	private function shipped_statuses(): array {
-		$statuses = get_option( self::OPTION_SHIPPED_STATUSES, array( 'completed' ) );
-		return is_array( $statuses ) ? array_map( 'strval', $statuses ) : array();
 	}
 }

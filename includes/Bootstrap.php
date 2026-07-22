@@ -517,8 +517,8 @@ final class Bootstrap {
 			new TransactionalPayloadBuilder(),
 			$this->transactional_flusher()
 		);
-		add_action( 'woocommerce_checkout_order_processed', array( $transactional, 'on_order_processed' ), 10, 1 );
-		add_action( 'woocommerce_order_status_changed', array( $transactional, 'on_order_status_changed' ), 10, 3 );
+		add_action( 'woocommerce_checkout_order_processed', array( $transactional, 'on_order_processed' ), 10, 3 );
+		add_action( 'woocommerce_order_status_changed', array( $transactional, 'on_order_status_changed' ), 10, 4 );
 
 		// Rec-engine identity merge (3.7). On login, explicitly bind the
 		// anon-session cookies to the now-known customer (§7) — complementary to

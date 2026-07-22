@@ -48,8 +48,9 @@ defined( 'ABSPATH' ) || exit;
  */
 class TransactionalFlusher {
 
-	public const EVENT_TYPE_ORDER_CONFIRMATION    = 'transactional.order_confirmation';
-	public const EVENT_TYPE_SHIPPING_CONFIRMATION = 'transactional.shipping_confirmation';
+	/** Wire event types — canonical values live on TransactionalGate::TRIGGERS; mirrored here as they're this class's own public API. */
+	public const EVENT_TYPE_ORDER_CONFIRMATION    = TransactionalGate::TRIGGERS[ TransactionalGate::TRIGGER_ORDER_CONFIRMATION ]['event_type'];
+	public const EVENT_TYPE_SHIPPING_CONFIRMATION = TransactionalGate::TRIGGERS[ TransactionalGate::TRIGGER_SHIPPING_CONFIRMATION ]['event_type'];
 
 	public const FLUSH_HOOK = 'smly_plus_flush_transactional_events';
 	public const AS_GROUP   = EventQueue::AS_GROUP;
@@ -60,9 +61,6 @@ class TransactionalFlusher {
 	public const META_STATUS_QUEUED      = 'queued';
 	public const META_STATUS_SENT        = 'sent';
 	public const META_STATUS_FAILED_OPEN = 'failed_open';
-
-	private const META_ORDER_CONFIRMATION    = '_smly_plus_transactional_order_confirmation_status';
-	private const META_SHIPPING_CONFIRMATION = '_smly_plus_transactional_shipping_confirmation_status';
 
 	/** Cap (chars) on each stored exchange field so the queue stays bounded (F3-44). */
 	private const EXCHANGE_MAX = 10000;
@@ -92,24 +90,20 @@ class TransactionalFlusher {
 	 * The order-meta key that guards $trigger_type for one order — checked
 	 * by the HookHandler BEFORE calling send_now() ("already attempted/sent/
 	 * queued/failed-open for this order+type" => skip; design point 1's
-	 * once-per-order-per-email-type rule).
+	 * once-per-order-per-email-type rule). Delegates to TransactionalGate's
+	 * single TRIGGERS map so this and event_type_for()/trigger_type_for()
+	 * can't drift from each other or from the gate's own toggle lookup.
 	 */
 	public static function meta_key_for( string $trigger_type ): string {
-		return $trigger_type === TransactionalGate::TRIGGER_SHIPPING_CONFIRMATION
-			? self::META_SHIPPING_CONFIRMATION
-			: self::META_ORDER_CONFIRMATION;
+		return TransactionalGate::meta_key_for( $trigger_type );
 	}
 
 	public static function event_type_for( string $trigger_type ): string {
-		return $trigger_type === TransactionalGate::TRIGGER_SHIPPING_CONFIRMATION
-			? self::EVENT_TYPE_SHIPPING_CONFIRMATION
-			: self::EVENT_TYPE_ORDER_CONFIRMATION;
+		return TransactionalGate::event_type_for( $trigger_type );
 	}
 
 	private static function trigger_type_for( string $event_type ): string {
-		return $event_type === self::EVENT_TYPE_SHIPPING_CONFIRMATION
-			? TransactionalGate::TRIGGER_SHIPPING_CONFIRMATION
-			: TransactionalGate::TRIGGER_ORDER_CONFIRMATION;
+		return TransactionalGate::trigger_type_for_event( $event_type );
 	}
 
 	/**
@@ -151,7 +145,7 @@ class TransactionalFlusher {
 			return;
 		}
 
-		$this->set_meta( (string) $order_id, $event_type, self::META_STATUS_QUEUED );
+		$this->set_meta( (string) $order_id, $event_type, self::META_STATUS_QUEUED, $order );
 
 		$this->process(
 			array(
@@ -159,7 +153,8 @@ class TransactionalFlusher {
 				'event_type' => $event_type,
 				'entity_id'  => (string) $order_id,
 				'payload'    => (string) wp_json_encode( $payload ),
-			)
+			),
+			$order
 		);
 	}
 
@@ -187,13 +182,17 @@ class TransactionalFlusher {
 
 	/**
 	 * @param array<string, mixed> $event {id, event_type, entity_id, payload}
+	 * @param ?\WC_Order $order Already-loaded order for the synchronous
+	 *                          send_now() call — the async flush() retry has
+	 *                          none, so set_meta()/fail_open() fall back to
+	 *                          loading it by entity_id themselves.
 	 *
 	 * @return string 'sent' | 'failed' | 'retried'
 	 */
-	private function process( array $event ): string {
-		$id            = (int) ( $event['id'] ?? 0 );
-		$event_type    = (string) ( $event['event_type'] ?? '' );
-		$order_id_str  = (string) ( $event['entity_id'] ?? '' );
+	private function process( array $event, ?\WC_Order $order = null ): string {
+		$id                     = (int) ( $event['id'] ?? 0 );
+		$event_type             = (string) ( $event['event_type'] ?? '' );
+		$order_id_str           = (string) ( $event['entity_id'] ?? '' );
 		$this->current_exchange = null;
 
 		$payload = array();
@@ -204,11 +203,11 @@ class TransactionalFlusher {
 			$this->dispatch( $payload );
 
 			$this->queue->mark_sent( $id );
-			$this->set_meta( $order_id_str, $event_type, self::META_STATUS_SENT );
+			$this->set_meta( $order_id_str, $event_type, self::META_STATUS_SENT, $order );
 			$outcome = 'sent';
 		} catch ( TerminalDispatchException $e ) {
 			$this->queue->mark_failed( $id, $e->getMessage() );
-			$this->fail_open( $order_id_str, $event_type, $payload );
+			$this->fail_open( $order_id_str, $event_type, $payload, $order );
 		} catch ( ApiException $e ) {
 			$this->queue->record_attempt( $id, $e->getMessage() );
 			$outcome = 'retried';
@@ -217,7 +216,7 @@ class TransactionalFlusher {
 			// credentials were removed) is deterministic — terminal, never
 			// an eternal retry loop (F3-53).
 			$this->queue->mark_failed( $id, get_class( $e ) . ': ' . $e->getMessage() );
-			$this->fail_open( $order_id_str, $event_type, $payload );
+			$this->fail_open( $order_id_str, $event_type, $payload, $order );
 		}
 
 		$this->record_exchange( $id );
@@ -266,14 +265,21 @@ class TransactionalFlusher {
 	 * so a manually-retried failed row can't double-fire it.
 	 *
 	 * @param array<string, mixed> $payload
+	 * @param ?\WC_Order            $order Already-loaded order (send_now()'s
+	 *                                     sync call) — reused instead of a
+	 *                                     redundant wc_get_order() when set.
 	 */
-	private function fail_open( string $order_id_str, string $event_type, array $payload ): void {
+	private function fail_open( string $order_id_str, string $event_type, array $payload, ?\WC_Order $order = null ): void {
 		$order_id = (int) $order_id_str;
-		if ( $order_id <= 0 || ! function_exists( 'wc_get_order' ) ) {
-			return;
+
+		if ( $order === null ) {
+			if ( $order_id <= 0 || ! function_exists( 'wc_get_order' ) ) {
+				return;
+			}
+			$maybe = wc_get_order( $order_id );
+			$order = $maybe instanceof \WC_Order ? $maybe : null;
 		}
 
-		$order = wc_get_order( $order_id );
 		if ( ! $order instanceof \WC_Order ) {
 			return;
 		}
@@ -305,13 +311,21 @@ class TransactionalFlusher {
 		}
 	}
 
-	private function set_meta( string $order_id_str, string $event_type, string $value ): void {
-		$order_id = (int) $order_id_str;
-		if ( $order_id <= 0 || ! function_exists( 'wc_get_order' ) ) {
-			return;
+	/**
+	 * @param ?\WC_Order $order Already-loaded order (send_now()'s sync call)
+	 *                          — reused instead of a redundant wc_get_order()
+	 *                          when set.
+	 */
+	private function set_meta( string $order_id_str, string $event_type, string $value, ?\WC_Order $order = null ): void {
+		if ( $order === null ) {
+			$order_id = (int) $order_id_str;
+			if ( $order_id <= 0 || ! function_exists( 'wc_get_order' ) ) {
+				return;
+			}
+			$maybe = wc_get_order( $order_id );
+			$order = $maybe instanceof \WC_Order ? $maybe : null;
 		}
 
-		$order = wc_get_order( $order_id );
 		if ( ! $order instanceof \WC_Order ) {
 			return;
 		}
