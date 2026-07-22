@@ -3787,6 +3787,94 @@ flush time — same two builder methods, new call site), PRO-1499
 consistent with the enqueue-time one), F3-43 (the order-item never-drop
 principle both PRO-1498 and this decision extend to catalog).
 
+### PRO-1504 — Transactional emails, Stage 1: config-only surface (Option B — a separate bound Smaily account), no send path (design approved by Erkki 2026-07-22)
+
+**Context:** Erkki wants order-confirmation and shipping-confirmation emails
+sent through Smaily instead of (eventually replacing) WooCommerce's native
+transactional emails. Two designs were on the table: Option A (route through
+the SAME Smaily account/workflows already used for marketing) vs Option B (a
+SEPARATE Smaily account bound purely for transactional sends, isolated from
+marketing deliverability/reputation). Erkki approved **Option B**. Building
+the sender, the native-WC-email suppression, and the fail-open fallback in
+one pass would be a large one-way-doorish surface (customer-facing email
+delivery) landing without a checkpoint — so the work is split: **Stage 1**
+(this decision) is pure configuration, **zero behavior change**; the sender
+is a later, separately-approved stage.
+
+**Decision:** Stage 1 ships:
+1. A second Smaily account bound under `Settings\Credentials` account_key
+   `'transactional'` (the SAME multi-account mechanism Mode A per-language
+   accounts already use — `smly_plus_credentials_transactional`, no new
+   storage class). An enablement toggle (`smly_plus_transactional_emails_
+   enabled`, default OFF) gates whether the section's fields even render.
+2. Two new automation-mapping trigger types, `order_confirmation` and
+   `shipping_confirmation`, stored as ordinary rows in the EXISTING
+   `smly_plus_automation_mapping` table (migration 003 — `(trigger_type,
+   language, account_key, workflow_id, is_default_fallback)` already fits;
+   no schema change) with `account_key='transactional'`. The mapping UI
+   (`AutomationSection`) gained one prop, `accountKeyOverride`, so it always
+   renders a single row pinned to the transactional account instead of
+   deriving the row shape from the site's multilingual mode — this account
+   has no per-language variant in stage 1.
+3. A new setting, `smly_plus_shipped_order_statuses` (array of bare WC
+   status slugs, default `['completed']`), populated from
+   `wc_get_order_statuses()` (incl. custom-registered statuses) via a new
+   `EnvDetector::order_statuses()` env field. Setting only — no order-status
+   change listener exists yet.
+4. `SettingsEndpoint::replace_automation_mappings()` gained an explicit
+   `VALID_TRIGGER_TYPES` allowlist (welcome/first_order/abandoned_cart/
+   order_confirmation/shipping_confirmation) — previously any string reached
+   an INSERT via a bare `sanitize_key()`. Extending it (rather than adding a
+   parallel check) is also a small defense-in-depth fix on the pre-existing
+   three triggers.
+
+**What stage 1 deliberately does NOT do:** no send path, no WC email
+suppression, no order/shipment hook binding, no `AutomationRouter::
+trigger_automation()` call for either new trigger type (confirmed —
+`WorkflowResolverInterface`'s docblock now notes the two new trigger_type
+values exist in the mapping table but no caller passes them yet). With the
+enablement toggle off (default), nothing new renders and no new option
+differs from its pre-stage-1 absence — the plugin's behavior toward
+customers is unchanged whether or not this ships in a release.
+
+**Rationale (why config-first, not sender-first):** the sender + WC-email
+suppression + fail-open fallback is the one-way-door part (a customer-facing
+delivery change, CLAUDE.md's interrupt trigger) — building it without a
+checkpoint would mean writing untested-in-production send logic before Erkki
+has seen the account-binding/mapping UX at all. Stage 1 is fully reversible
+(pure config, unreleased-safe) and lets the mapping UI get checkpointed
+before the higher-stakes stage lands. Reusing `Credentials`' existing
+multi-account mechanism and the existing mapping table means stage 2 is
+"wire a new call site," not "invent new storage."
+
+**Alternatives considered:** Option A (reuse the default/marketing account)
+was rejected by Erkki specifically to keep transactional deliverability
+reputation isolated from marketing sends — a bounce/complaint storm on a
+campaign shouldn't threaten order-confirmation delivery, and vice versa.
+
+**Tests:** unit — `EnvDetectorTest` (new `orderStatuses` snapshot field,
+bare-slug stripping of the `wc-` prefix, `transactionalCredentials`/
+`transactionalConnected`/toggle defaults + password-omitted read-back),
+`SettingsEndpointTest` (transactional account persists with the same
+empty-password-preserves-existing rule as the default account, the verified
+flag tracks credential completeness not the enablement toggle, the two new
+trigger types persist, an unknown trigger_type is dropped before any
+INSERT). Integration — `SettingsRoundTripTest::
+test_woocommerce_tab_round_trip_including_transactional_emails` (writer/
+reader key symmetry, the class of bug this file exists to catch per its
+header note). Component — `TransactionalEmailsSection.test.tsx` (off =
+nothing beyond the toggle renders and no `/workflows` fetch fires; on =
+credential block + both trigger sections appear and their dropdowns fetch
+the `'transactional'` account_key, never `'default'`; the shipped-status
+checkboxes reflect `env.orderStatuses`).
+
+**Relationships:** reuses the Settings\Credentials multi-account mechanism
+(sub-PR 5.A) and the `smly_plus_automation_mapping` table (migration 003)
+wholesale — no new storage primitive. `AutomationSection`'s
+`accountKeyOverride` prop is the one structural addition to a shared
+component; stage 2 (the sender) is the natural next decision entry when it
+lands.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -26,7 +26,48 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1506 — `catalog.delete` force-fill now ALSO
+_Last updated: 2026-07-22 (**PRO-1504 Stage 1 — Transactional emails:
+settings + mapping UI landed, NO send path.** Option B (a separate Smaily
+account bound purely for transactional sends, isolated from marketing
+deliverability — approved by Erkki 2026-07-22) built as pure configuration:
+(1) a second Smaily account under `Settings\Credentials` account_key
+`'transactional'` (reuses the existing multi-account mechanism — no new
+storage class), behind an enablement toggle (`smly_plus_transactional_emails_
+enabled`, default OFF); (2) two new automation-mapping trigger types,
+`order_confirmation` + `shipping_confirmation`, stored as ordinary rows in
+the EXISTING `smly_plus_automation_mapping` table (no schema change) —
+`AutomationSection` gained one prop (`accountKeyOverride`) so the mapping row
+pins to the transactional account instead of the site's multilingual mode;
+(3) a "counts as shipped" order-status multi-select (`smly_plus_shipped_
+order_statuses`, default `['completed']`), choices from `wc_get_order_
+statuses()` via a new `EnvDetector::order_statuses()` env field; (4)
+`SettingsEndpoint::replace_automation_mappings()` gained an explicit
+trigger_type allowlist (previously any string reached an INSERT). With the
+toggle off (default) nothing new renders and no customer-facing behavior
+differs — deliberately NO send path, NO WC-email suppression, NO order/
+shipment hook binding this stage; that's a later, separately-approved stage.
+**Tests:** +7 unit (`EnvDetectorTest` — orderStatuses snapshot + bare-slug
+stripping + transactional saved-settings defaults/read-back; `SettingsEndpointTest`
+— transactional credential persistence/verified-flag, new-toggle persistence,
+trigger_type allowlist accept/reject) +1 integration (`SettingsRoundTripTest`
+— writer/reader key symmetry for the whole transactional slice) +3 vitest
+component (`TransactionalEmailsSection.test.tsx` — off renders nothing beyond
+the toggle and fires no `/workflows` call; on reveals the credential block +
+both trigger sections whose dropdowns fetch the `'transactional'` account_key,
+never `'default'`; shipped-status checkboxes read/toggle `env.orderStatuses`).
+**Gates:** `npm run ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit
+unit 605/605, vitest 251/251, tsc clean); `sg docker -c "composer run
+test:integration"` OK (165 tests, 842 assertions), sandbox tenant "Smaily
+Connect test" correctly restored post-run (not MiuMjau). Docs:
+`docs/DECISIONS.md` new PRO-1504 entry (design + stage split rationale).
+Merchant docs site (`docs/site/index.html`) update deliberately DEFERRED to
+the stage that actually ships/releases this (orchestrator decision — stage 1
+alone is never released, so there's no user-visible behavior yet to
+document). **Not released** — code landed on `main`, no version bump; stage 2
+(the sender, native-email suppression, fail-open fallback) is a separate
+future task/decision.)
+
+Prior: 2026-07-22 (**PRO-1506 — `catalog.delete` force-fill now ALSO
 runs at FLUSH time, so a pre-3.8.1 stuck row heals on Retry.** MiuMjau update
 + a Retry of the 52 stuck `catalog.delete` rows (the v3.8.1 entry's assumed
 "last checkbox") FAILED AGAIN with the identical errors (51× empty
