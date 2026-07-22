@@ -21,7 +21,13 @@ use Smaily\Connect\Smaily\TransactionalPayloadBuilder;
  *
  *   - order_confirmation: `woocommerce_checkout_order_processed` — a
  *     one-shot hook (deliberately NOT `woocommerce_thank_you`, which
- *     re-fires on every thank-you-page revisit).
+ *     re-fires on every thank-you-page revisit). This NEVER fires for a
+ *     WooCommerce Blocks / Store-API checkout (WC default since 8.3), so
+ *     `on_block_checkout_order_processed()` is its Store-API twin on
+ *     `woocommerce_store_api_checkout_order_processed` — same F3-46 gap
+ *     shape (HookHandler::on_block_checkout_order_processed), fixed here
+ *     for PRO-1518. The once-per-order-per-type meta guard in `attempt()`
+ *     makes it safe if both hooks somehow fired for one order.
  *   - shipping_confirmation: `woocommerce_order_status_changed`, firing
  *     when the NEW status (bare slug) is in the merchant's
  *     `smly_plus_shipped_order_statuses` set. Repeated flips into the
@@ -64,6 +70,18 @@ class TransactionalEmailHookHandler {
 			return;
 		}
 
+		$this->attempt( TransactionalGate::TRIGGER_ORDER_CONFIRMATION, $order );
+	}
+
+	/**
+	 * `woocommerce_store_api_checkout_order_processed` ($order) — the
+	 * Store-API twin of on_order_processed() (PRO-1518). Block checkout
+	 * never fires `woocommerce_checkout_order_processed`, so without this a
+	 * block-checkout order got no order-confirmation send at all. The
+	 * once-per-order-per-type meta guard in `attempt()` keeps this safe even
+	 * if a third party's setup somehow fires both hooks for one order.
+	 */
+	public function on_block_checkout_order_processed( \WC_Order $order ): void {
 		$this->attempt( TransactionalGate::TRIGGER_ORDER_CONFIRMATION, $order );
 	}
 

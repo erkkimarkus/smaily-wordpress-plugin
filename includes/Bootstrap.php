@@ -518,6 +518,10 @@ final class Bootstrap {
 			$this->transactional_flusher()
 		);
 		add_action( 'woocommerce_checkout_order_processed', array( $transactional, 'on_order_processed' ), 10, 3 );
+		// Block checkout (Store API, WC default since 8.3) never fires
+		// woocommerce_checkout_order_processed — same F3-46 gap shape,
+		// fixed here for order confirmation (PRO-1518).
+		add_action( 'woocommerce_store_api_checkout_order_processed', array( $transactional, 'on_block_checkout_order_processed' ), 10, 1 );
 		add_action( 'woocommerce_order_status_changed', array( $transactional, 'on_order_status_changed' ), 10, 4 );
 
 		// Rec-engine identity merge (3.7). On login, explicitly bind the
