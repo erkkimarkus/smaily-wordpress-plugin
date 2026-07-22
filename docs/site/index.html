@@ -252,6 +252,7 @@ td code{white-space:nowrap}
         <li><a href="#set-subscribers" data-lang="en">Subscribers</a><a href="#set-subscribers" data-lang="et">Tellijad</a></li>
         <li><a href="#set-consent" data-lang="en">How consent is recorded</a><a href="#set-consent" data-lang="et">Kuidas nõusolek salvestatakse</a></li>
         <li><a href="#set-automations" data-lang="en">Automations</a><a href="#set-automations" data-lang="et">Automaatikad</a></li>
+        <li><a href="#set-transactional" data-lang="en">Transactional emails</a><a href="#set-transactional" data-lang="et">Tehingu‑e‑kirjad</a></li>
         <li><a href="#set-ci" data-lang="en">Campaign Intelligence</a><a href="#set-ci" data-lang="et">Campaign Intelligence</a></li>
         <li><a href="#set-integrations" data-lang="en">Integrations</a><a href="#set-integrations" data-lang="et">Integratsioonid</a></li>
       </ul>
@@ -703,6 +704,44 @@ td code{white-space:nowrap}
       <div class="note">
         <span class="k">Disaini poolest fail‑closed</span>
         <p>Test mode algab <strong>sees</strong>. Test‑režiimi automaatika ilma test‑aadressideta saadab <strong>mitte kellelegi</strong>, kuni lisad vähemalt ühe aadressi — nii ei saa automaatika kunagi klientidele käivituda enne, kui sa seda soovid.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub" id="set-transactional">
+    <h2><span data-lang="en">Transactional emails</span><span data-lang="et">Tehingu‑e‑kirjad</span></h2>
+    <div data-lang="en">
+      <p>Send your order confirmation and shipping notice through Smaily instead of WordPress's own mail, using a <strong>separate Smaily account</strong> bound only to these sends — kept apart from your marketing account so a marketing bounce or complaint can never threaten order‑email delivery.</p>
+      <p><strong>Enable transactional emails</strong> is the master switch; each of the two triggers below has its own switch too, so you can turn on order confirmations without shipping notices, or vice‑versa.</p>
+      <h3>Order confirmation</h3>
+      <p>Sent once, the moment a customer places an order. Map it to a Smaily workflow the same way as the automations above.</p>
+      <h3>Shipping confirmation</h3>
+      <p>Sent once, when an order first reaches a status you've marked as <strong>"Counts as shipped"</strong> — pick any number of your store's order statuses (built‑in or custom, e.g. a shipping plugin's "Shipped" status). A later flip back into a shipped status for the same order never sends a second notice.</p>
+      <p>While either toggle is on, Smaily Connect quietly takes over WooCommerce's matching built‑in customer email (Processing order / Completed order) so the customer never gets two emails for the same event. Completed‑order suppression only applies when <strong>"completed"</strong> is itself one of your chosen shipped statuses — a custom status (like "Shipped") has no built‑in WooCommerce email to replace.</p>
+      <p>If Smaily can't be reached, or briefly rejects the send, WooCommerce's own email for that order fires automatically as a fallback — a customer is never left without a confirmation. The attempt is recorded in your <a href="#err-retry">Event Log</a> either way.</p>
+      <div class="note warn">
+        <span class="k">Two things your Smaily workflow must satisfy</span>
+        <ul>
+          <li>The mapped workflow must have a <strong>single section</strong> — a multi‑section workflow sends every section at once, which isn't what a one‑shot transactional email needs.</li>
+          <li>A subject line that varies per order (e.g. including the order number) must be a <strong>merge tag inside the workflow template</strong> — there's no per‑send subject override from WordPress.</li>
+        </ul>
+      </div>
+    </div>
+    <div data-lang="et">
+      <p>Saada tellimuse kinnitus ja saatmisteade Smaily kaudu (mitte WordPressi enda meili kaudu), kasutades <strong>eraldi Smaily kontot</strong>, mis on seotud ainult nende saadetistega — hoitud lahus su turunduskontost, nii et turunduse tagasipõrge või kaebus ei saa kunagi ohustada tellimuse‑e‑kirjade kohaletoimetamist.</p>
+      <p><strong>Enable transactional emails</strong> on pealüliti; mõlemal allolaval päästikul on ka oma lüliti, nii saad sisse lülitada tellimuskinnitused ilma saatmisteadeteta või vastupidi.</p>
+      <h3>Tellimuse kinnitus</h3>
+      <p>Saadetakse üks kord, hetkel kui klient tellimuse esitab. Seo see Smaily töövooga samamoodi nagu ülal olevad automaatikad.</p>
+      <h3>Saatmisteade</h3>
+      <p>Saadetakse üks kord, kui tellimus jõuab esimest korda staatusesse, mille oled märkinud kui <strong>"Loetakse saadetuks"</strong> — vali suvaline arv oma poe staatuseid (sisseehitatud või kohandatud, nt saatmis‑pluginate "Shipped" staatus). Hilisem tagasipöördumine samasse saadetud‑staatusesse sama tellimuse puhul teist teadet enam ei saada.</p>
+      <p>Kui kumbki lüliti on sees, võtab Smaily Connect vaikselt üle WooCommerce'i vastava sisseehitatud kliendi‑e‑kirja (Processing order / Completed order), et klient ei saaks sama sündmuse kohta kaht e‑kirja. Completed‑order e‑kirja mahasurumine kehtib ainult siis, kui <strong>"completed"</strong> ise on üks su valitud saadetud‑staatustest — kohandatud staatusel (nt "Shipped") pole asendatavat sisseehitatud WooCommerce'i e‑kirja.</p>
+      <p>Kui Smailyni ei jõuta või see lükkab saatmise korraks tagasi, käivitub varuvariandina automaatselt WooCommerce'i enda e‑kiri selle tellimuse jaoks — klient ei jää kunagi kinnituseta. Katse jääb mõlemal juhul kirja su <a href="#err-retry">Event Log'i</a>.</p>
+      <div class="note warn">
+        <span class="k">Kaks nõuet su Smaily töövoole</span>
+        <ul>
+          <li>Seotud töövoog peab olema <strong>ühe sektsiooniga</strong> — mitme sektsiooniga töövoog saadab kõik sektsioonid korraga, mis ei sobi ühekordse tehingu‑e‑kirja jaoks.</li>
+          <li>Tellimuse kohta muutuv teemarida (nt tellimuse numbriga) peab olema <strong>töövoo malli sees liitmärgend (merge tag)</strong> — WordPressist teemarea ülekirjutamist saadetise kohta pole.</li>
+        </ul>
       </div>
     </div>
   </div>

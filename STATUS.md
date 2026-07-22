@@ -26,7 +26,104 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1504 Stage 1 — Transactional emails:
+_Last updated: 2026-07-22 (**PRO-1504 Stage 2 — Transactional emails: the
+sender, native-email suppression, and fail-open fallback landed.** Builds on
+Stage 1's config surface (below) exactly per Erkki's 2026-07-22 design
+approval — no redesign. What shipped:
+(1) **`Smaily\Client::send_message()`** — a new `POST /api/message/send.php`
+call on the transactional account's subdomain (JSON body `{autoresponder_id,
+to, context}`, unlike every other Client method's form encoding; a new
+`$json` flag on the private `request()` helper carries this). Success = HTTP
+200 + body `{code:101}`; ANY other body code (203 validation, 221 invalid
+autoresponder, or unlisted) is TERMINAL; network/5xx/429 throw `ApiException`
+(transient), matching the existing Smaily response-codes convention.
+(2) **`TransactionalGate`** — the single source of truth for "is a
+transactional send allowed right now" (all four: master toggle, per-trigger
+toggle, a mapping row resolves, the mapped account's credentials are
+complete), shared verbatim by the WC hook handler AND the native-email
+suppression filters so they can't drift apart. Deliberately NO consent/
+opt-out check (platform answer Q7, PRO-1380 — transactional overrides
+marketing opt-out).
+(3) **`TransactionalPayloadBuilder`** — builds the `context` merge-tag object
+from a WC_Order: order-level fields (order_number, order_total — already
+GROSS via `get_total()`, currency, payment_method, shipping_method, first/
+last name) + the SAME `product_<field>_1..10` + `over_10_products`
+template-parity matrix CartPayloadBuilder established, sourced from the
+frozen order-item snapshot (survives a since-deleted product) with gross
+per-unit pricing (PRO-1241: `get_total()+get_total_tax()` basis, not the
+product's live price).
+(4) **`TransactionalFlusher`** — one dispatcher for BOTH the synchronous
+first attempt (`send_now()`, called inline from the WC hook) and the queued
+retry (`flush()`, its own AS action `smly_plus_flush_transactional_events`,
+`transactional.order_confirmation` / `transactional.shipping_confirmation`
+event types on the shared Smaily `EventQueue`). `send_now()` ALWAYS enqueues
+the row first — even on an immediate synchronous success — so every attempt
+lands in the Event Log (F3-44 exchange capture), not just failures. The main
+`Flusher` and `CartFlusher` both exclude the two new event types (event-type
+scoping, same discipline as the rec-engine flushers) — `Flusher::flush()`'s
+exclude list now carries three entries.
+(5) **`TransactionalEmailHookHandler`** — `woocommerce_checkout_order_
+processed` (order_confirmation, one-shot, deliberately NOT
+`woocommerce_thank_you`) and `woocommerce_order_status_changed` (shipping_
+confirmation, fires when the bare-slug new status is in `smly_plus_shipped_
+order_statuses`). Both are gated by an order-meta guard
+(`_smly_plus_transactional_{type}_status`, values `queued`/`sent`/
+`failed_open`) checked BEFORE calling the gate — once-per-order-per-type,
+survives repeated status flips into the shipped set.
+(6) **`TransactionalSuppression`** — `woocommerce_email_enabled_customer_
+processing_order` / `_customer_completed_order` filters force `false` ONLY
+while `TransactionalGate::resolve_if_open()` holds for that trigger (never
+touches admin emails); completed-order suppression additionally requires
+`'completed'` to be one of the merchant's chosen shipped statuses (a custom
+status like "Shipped" has no native email to suppress). A request-scoped
+static bypass flag lets fail-open re-fire the very email this class
+suppresses without re-triggering its own filter.
+(7) **Fail-open** (Erkki decision 2026-07-22): a TERMINAL failure — on the
+sync attempt or a later queued retry — re-fires the corresponding native WC
+email (bypassing suppression for that one call) and is itself guarded by the
+SAME order-meta value (`failed_open`) so a manually-retried failed row can't
+double-fire it; when no native email was ever suppressed for that trigger
+(the custom-shipped-status case), fail-open just leaves the `mark_failed`
+row as the record.
+**Tests:** +40 unit across 6 files (`ClientTest` +3 for `send_message()`
+JSON body/auth/5xx; `TransactionalPayloadBuilderTest` — order-level fields,
+gross pricing, deleted-product-line survival, the 10-slot matrix + overflow;
+`TransactionalGateTest` — all four gate conditions independently, resolver
+queried with `language=null`; `TransactionalSuppressionTest` — suppress-
+only-while-open, completed-order's extra shipped-status condition, the
+bypass mechanic; `TransactionalFlusherTest` — success/terminal/transient/
+fail-open/meta-guard/queue-scoping; `TransactionalEmailHookHandlerTest` —
+gate-closed no-op, meta guard, shipped-status membership + `wc-` prefix
+normalisation, repeated-flip no-resend) +1 fixed pre-existing test
+(`FlusherTest`'s exclude-list assertion now expects three event types).
++6 integration (`TransactionalEmailsPipelineTest`, new file) against a real
+wp-env WC order + the Smaily API mocked at `pre_http_request` (the
+established CartPipelineTest pattern — NOT the rec-engine mock, a different
+API): order confirmation sends once with the mapped workflow + product
+matrix; shipping confirmation sends once and a flip-away-then-back doesn't
+resend; native processing-order suppression toggles live with the master
+switch; everything-off is a verified zero-behavior-change no-op; a terminal
+203 marks the queue row failed + sets the fail-open meta (the actual WC
+mailer re-fire logic is unit-covered per the task's own allowance; this run
+DID observe the container attempt a real `sendmail` call and fail
+harmlessly — confirms the wiring reaches the real WC trigger); a 5xx lands
+the row `pending`, the main flusher's own hook leaves it untouched, and
+`TransactionalFlusher`'s dedicated hook drains it to `sent`.
+**Gates:** `npm run ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit
+unit 645/645 — was 605, +40 new across the six files above, plus one
+pre-existing `FlusherTest` assertion updated for the wider exclude-list;
+vitest 251/251 unchanged, tsc clean); `sg docker -c "composer run
+test:integration"` OK (171 tests, 875 assertions — was 165, +6 new), sandbox tenant "Smaily
+Connect test" correctly restored post-run (not MiuMjau). Docs:
+`docs/DECISIONS.md` PRO-1504 Stage 2 entry; merchant docs site
+(`docs/site/index.html`) new "Transactional emails" section in BOTH
+languages (Settings tab TOC + body), covering the account/toggles, the two
+triggers, the suppression behaviour, the fail-open fallback, and the two
+merchant-facing template caveats (single-section workflow; subject line
+must be a merge tag). **Not released** — code landed on `main`, no version
+bump; the release cut is the orchestrator's call.)
+
+Prior: 2026-07-22 (**PRO-1504 Stage 1 — Transactional emails:
 settings + mapping UI landed, NO send path.** Option B (a separate Smaily
 account bound purely for transactional sends, isolated from marketing
 deliverability — approved by Erkki 2026-07-22) built as pure configuration:

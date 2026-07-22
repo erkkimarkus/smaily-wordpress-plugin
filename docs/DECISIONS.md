@@ -3875,6 +3875,128 @@ wholesale — no new storage primitive. `AutomationSection`'s
 component; stage 2 (the sender) is the natural next decision entry when it
 lands.
 
+### PRO-1504 — Transactional emails, Stage 2: the sender, native-email suppression, fail-open fallback (design approved by Erkki 2026-07-22)
+
+**Context:** Stage 1 (above) built the config surface with zero behavior
+change. Stage 2 is the one-way-door part CLAUDE.md's interrupt rule exists
+for — a customer-facing email delivery change — so every design point below
+was fixed by Erkki in the task brief before any code landed; this entry
+records the decisions made, not a re-derivation.
+
+**Decision — six pieces, one gate:**
+
+1. **Triggers.** Order confirmation fires on `woocommerce_checkout_order_
+   processed` (one-shot; deliberately NOT `woocommerce_thank_you`, which
+   re-fires on every thank-you-page revisit). Shipping confirmation fires on
+   `woocommerce_order_status_changed` when the bare-slug new status is in
+   the merchant's `smly_plus_shipped_order_statuses` set. Both are
+   once-per-order-per-email-type via an order-meta guard
+   (`_smly_plus_transactional_{type}_status`) checked before the gate even
+   runs — cheap, and survives a repeated flip into the shipped set.
+
+2. **Gating — `TransactionalGate`.** A send happens only when ALL hold:
+   the master toggle, that trigger's own toggle, a mapping row resolves
+   (`WorkflowResolverInterface::resolve_workflow($trigger, null)` —
+   language is always `null`, this account has no per-language variant),
+   and the mapped account's credentials are complete. Deliberately NO
+   consent/opt-out gate (platform answer Q7, PRO-1380) — transactional
+   sends override marketing opt-out on purpose. The SAME gate object
+   backs both the WC hook handler's decision to send and the suppression
+   filters' decision to suppress, so the two can never disagree about
+   whether the feature is "on" right now.
+
+3. **Send path — `Client::send_message()` + `TransactionalFlusher`.**
+   `POST /api/message/send.php` on the transactional account's subdomain,
+   JSON body `{autoresponder_id, to:[email], context}` — the one Client
+   method that isn't form-encoded (a new `$json` flag on the private
+   `request()` helper). Success = HTTP 200 + body `{code:101}`; ANY other
+   body code is TERMINAL (203/221 are the two documented ones, but the rule
+   is generic: a deterministic Smaily-side rejection never retries, matching
+   the CartFlusher/legacy-API precedent of "non-101 = terminal"); network
+   errors/5xx/429 throw `ApiException` = TRANSIENT. `TransactionalFlusher`
+   is ONE dispatcher for both paths: `send_now()` (called synchronously from
+   the WC hook) ALWAYS enqueues the row first, then dispatches it inline —
+   so a successful sync send still lands in the Event Log (F3-44), not just
+   failures. A transient failure leaves the row `pending`; the flusher's own
+   AS action (`smly_plus_flush_transactional_events`, its own event types
+   `transactional.order_confirmation`/`transactional.shipping_confirmation`)
+   retries it later. No bounded-attempts ceiling was added — the shared
+   Smaily `EventQueue` (unlike the rec-engine `IngestQueue`) has never had
+   one; CartFlusher/the main Flusher retry transient failures indefinitely
+   too, and a stuck row is still visible + manually retryable in the Event
+   Log. Adding a new ceiling mechanism here would have been scope the task
+   didn't ask for.
+
+4. **`context` payload — `TransactionalPayloadBuilder`.** Template parity
+   with the abandoned-cart merge-tag shape (CartPayloadBuilder): the SAME
+   `product_<field>_1..10` + `over_10_products` matrix, plus order-level
+   extras (order_number, order_total, currency, payment_method,
+   shipping_method, first/last name). Sourced from the frozen
+   `WC_Order_Item_Product` snapshot (survives a since-deleted product,
+   unlike CartPayloadBuilder which reads a live `wc_get_product()`) with
+   gross per-unit pricing — `get_total()+get_total_tax()` ÷ qty (PRO-1241
+   basis), not the product's live/current price, since a confirmation email
+   must show what the customer actually paid.
+
+5. **Native-email suppression — `TransactionalSuppression`.** Suppresses
+   `woocommerce_email_enabled_customer_processing_order` and `_customer_
+   completed_order` ONLY while `TransactionalGate::resolve_if_open()` holds
+   for that trigger — never admin emails. Completed-order suppression has
+   one MORE condition: `'completed'` must itself be in the merchant's
+   shipped-status set, because a custom shipped status (e.g. "Shipped") has
+   no native WC email to begin with — suppressing it would just delete a
+   confirmation with nothing replacing it for that status.
+
+6. **Fail-open (Erkki decision 2026-07-22).** A TERMINAL failure — on the
+   sync attempt OR a later queued retry reaching a terminal Smaily response
+   — re-fires the corresponding native WC email, bypassing
+   `TransactionalSuppression` for that ONE call via a request-scoped static
+   flag the suppression filters check first. Guarded by the SAME order-meta
+   value (`failed_open`) so a manually-retried failed row (Event Log
+   "Retry") can't double-fire the native email. When no native email was
+   ever suppressed for that trigger (the custom-shipped-status case),
+   fail-open just leaves the `mark_failed` queue row as the incident record
+   — there's nothing to re-fire.
+
+**Rationale:** every one of the six pieces above was specified in the task
+brief, not derived here — recording WHY each holds (not just what) so a
+future change doesn't accidentally re-open the one-way door without
+re-checking the reasoning. The "always enqueue, even on sync success"
+choice in particular is what makes the Event Log a complete record instead
+of only showing failures — a deliberate trade of one extra DB row per send
+for full observability, consistent with F3-44's original intent.
+
+**Alternatives considered:** a bounded-retry ceiling on the transactional
+queue rows (mirroring the rec-engine `IngestQueue`'s `max_attempts`) was
+considered and rejected — the Smaily-marketing `EventQueue` this reuses has
+never had one, and inventing a new retry-ceiling mechanism for one event
+type would be an inconsistency, not a fix; "queue retries exhausted" in the
+design brief is satisfied by a TERMINAL response reached during a retry
+(no more retrying to do), not by a manufactured attempt count.
+
+**Tests:** unit — `ClientTest` (+3, `send_message()` JSON body/headers/
+5xx), `TransactionalPayloadBuilderTest` (order-level fields, gross pricing,
+deleted-product-line survival via the frozen snapshot, the 10-slot matrix +
+`over_10_products` overflow), `TransactionalGateTest` (all four conditions
+independently, `language=null` on the resolver call), `TransactionalSuppressionTest`
+(suppress-only-while-open, the extra completed-order shipped-status
+condition, the bypass mechanic), `TransactionalFlusherTest` (success/
+terminal/transient/fail-open/meta-guard/queue-scoping), `TransactionalEmailHookHandlerTest`
+(gate-closed no-op, meta guard, `wc-` prefix normalisation, repeated-flip
+no-resend). Integration — `TransactionalEmailsPipelineTest` (order
+confirmation end-to-end against a mocked `message/send.php`; shipping
+confirmation once + no-resend on a flip-away-then-back; suppression toggles
+live with the master switch; everything-off is a verified no-op; a terminal
+203 marks the row failed + sets the fail-open meta; a 5xx lands the row
+`pending`, the main flusher's hook leaves it untouched, the dedicated hook
+drains it).
+
+**Relationships:** extends Stage 1's config surface (account, toggles,
+mapping rows, shipped-status set) with zero storage changes — no new table,
+no schema migration. `Flusher::flush()`'s exclude-list grew from one entry
+(`CartFlusher::EVENT_TYPE`) to three; any FUTURE new Smaily-EventQueue event
+type must make the same deliberate choice CLAUDE.md calls out.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
