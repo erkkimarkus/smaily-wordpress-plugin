@@ -252,6 +252,96 @@ final class TransactionalFlusherTest extends TestCase {
 		self::assertSame( TransactionalFlusher::META_STATUS_FAILED_OPEN, $order->get_meta( TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ) ) );
 	}
 
+	public function test_a_row_past_the_retry_ceiling_fails_open_without_calling_the_api(): void {
+		// PRO-1519: a row that has been sitting pending() past
+		// RETRY_CEILING_SECONDS must terminal-fail (mark_failed + fail-open)
+		// on the NEXT flush tick, without even attempting the call — a
+		// transient-only failure history never exhausts otherwise, and the
+		// customer's native email would stay suppressed forever.
+		$order = $this->fake_order( 509, 'buyer@example.test' );
+		$this->orders[509] = $order;
+
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 21,
+					'event_type' => TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION,
+					'entity_id'  => '509',
+					'payload'    => json_encode( array( 'to' => 'buyer@example.test', 'workflow_id' => 1, 'account_key' => 'transactional', 'context' => array() ) ),
+					'created_at' => gmdate( 'Y-m-d H:i:s', time() - TransactionalFlusher::RETRY_CEILING_SECONDS - 60 ),
+				),
+			)
+		);
+		$client = $this->createMock( Client::class );
+		$client->expects( self::never() )->method( 'send_message' );
+		$client->method( 'last_exchange' )->willReturn( null );
+
+		$fired = $this->stub_native_mailer( 'WC_Email_Customer_Processing_Order' );
+
+		$stats = ( new TransactionalFlusher( $queue, static fn () => $client ) )->flush();
+
+		self::assertSame( array( 'id' => 21, 'error' => 'retry_ceiling_exceeded' ), $queue->marked_failed[0] );
+		self::assertSame( array(), $queue->attempts, 'A ceiling-expired row must not be recorded as another transient attempt.' );
+		self::assertSame( TransactionalFlusher::META_STATUS_FAILED_OPEN, $order->get_meta( TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ) ) );
+		self::assertSame( array( 509 ), $fired->calls, 'Fail-open must re-fire the native email once the ceiling forces a terminal failure.' );
+		self::assertSame( array( 'processed' => 1, 'sent' => 0, 'failed' => 1, 'retried' => 0 ), $stats );
+	}
+
+	public function test_a_row_still_within_the_retry_ceiling_keeps_retrying_as_normal(): void {
+		// Boundary sanity: a row that is old but NOT yet past the ceiling
+		// must follow the ordinary transient-failure path (record_attempt),
+		// not be force-failed early.
+		$order = $this->fake_order( 510, 'buyer@example.test' );
+		$this->orders[510] = $order;
+
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 22,
+					'event_type' => TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION,
+					'entity_id'  => '510',
+					'payload'    => json_encode( array( 'to' => 'buyer@example.test', 'workflow_id' => 1, 'account_key' => 'transactional', 'context' => array() ) ),
+					'created_at' => gmdate( 'Y-m-d H:i:s', time() - TransactionalFlusher::RETRY_CEILING_SECONDS + 60 ),
+				),
+			)
+		);
+		$client = $this->createMock( Client::class );
+		$client->expects( self::once() )->method( 'send_message' )->willThrowException( new ApiException( 'temporary outage', 503 ) );
+		$client->method( 'last_exchange' )->willReturn( array( 'request' => array(), 'response' => array( 'http' => 503 ) ) );
+
+		( new TransactionalFlusher( $queue, static fn () => $client ) )->flush();
+
+		self::assertSame( array(), $queue->marked_failed );
+		self::assertSame( 22, $queue->attempts[0]['id'] );
+	}
+
+	public function test_the_retry_ceiling_never_applies_to_a_non_transactional_event_type(): void {
+		// PRO-1519 scoping: marketing-side queue rows (contact.sync,
+		// automation.* etc.) keep the queue's existing unbounded-retry
+		// convention untouched — the ceiling lives ONLY inside this class
+		// and is itself gated on the two transactional event types, not
+		// merely on which flusher happened to read the row.
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 23,
+					'event_type' => 'contact.sync',
+					'entity_id'  => '999',
+					'payload'    => json_encode( array( 'to' => 'buyer@example.test', 'workflow_id' => 1, 'account_key' => 'transactional', 'context' => array() ) ),
+					'created_at' => gmdate( 'Y-m-d H:i:s', time() - TransactionalFlusher::RETRY_CEILING_SECONDS - ( 10 * DAY_IN_SECONDS ) ),
+				),
+			)
+		);
+		$client = $this->createMock( Client::class );
+		$client->expects( self::once() )->method( 'send_message' )->willThrowException( new ApiException( 'temporary outage', 503 ) );
+		$client->method( 'last_exchange' )->willReturn( array( 'request' => array(), 'response' => array( 'http' => 503 ) ) );
+
+		( new TransactionalFlusher( $queue, static fn () => $client ) )->flush();
+
+		self::assertSame( array(), $queue->marked_failed, 'A non-transactional-type row must never be force-failed by the ceiling.' );
+		self::assertSame( 23, $queue->attempts[0]['id'] );
+	}
+
 	// --- helpers -------------------------------------------------------------
 
 	/**

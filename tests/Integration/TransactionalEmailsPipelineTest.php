@@ -273,6 +273,91 @@ final class TransactionalEmailsPipelineTest extends TestCase {
 		self::assertSame( 'sent', $row['status'] );
 	}
 
+	public function test_a_row_stuck_transient_past_the_retry_ceiling_fails_open_instead_of_retrying_forever(): void {
+		// PRO-1519: a row that keeps hitting a transient failure (5xx) must
+		// stop retrying once it's older than RETRY_CEILING_SECONDS and fail
+		// open — the customer's native order-confirmation email, suppressed
+		// the whole time this row is pending, must eventually re-fire rather
+		// than wait on a Smaily outage that never ends.
+		$this->configure( array( 'order_confirmation' => '4242' ) );
+
+		$product  = $this->make_product( 'Ceiling Product', 5.00 );
+		$order_id = $this->make_order( 'ceiling@example.test', $product );
+
+		$fake_5xx = $this->fake_transport_with_code( 500, 500 );
+		add_filter( 'pre_http_request', $fake_5xx, 10, 3 );
+		try {
+			$this->fire_checkout_order_processed( $order_id );
+		} finally {
+			remove_filter( 'pre_http_request', $fake_5xx, 10 );
+		}
+
+		$row = $this->queue_row( TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION );
+		self::assertNotNull( $row );
+		self::assertSame( 'pending', $row['status'], 'Still transient at this point — sanity check before backdating.' );
+
+		// Simulate the row having sat in the queue past the ceiling (rather
+		// than sleeping for real) by backdating its created_at directly.
+		$this->backdate_queue_row( (int) $row['id'], TransactionalFlusher::RETRY_CEILING_SECONDS + 60 );
+
+		$captured = array();
+		$fake_5xx_again = $this->fake_transport_with_code( 500, 500 );
+		add_filter( 'pre_http_request', $fake_5xx_again, 10, 3 );
+		try {
+			do_action( TransactionalFlusher::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake_5xx_again, 10 );
+		}
+
+		$row = $this->queue_row( TransactionalFlusher::EVENT_TYPE_ORDER_CONFIRMATION );
+		self::assertSame( 'failed', $row['status'], 'Past the ceiling — the next tick must terminal-fail instead of retrying again.' );
+		self::assertStringContainsString( 'retry_ceiling_exceeded', (string) $row['last_error'] );
+
+		$order = wc_get_order( $order_id );
+		self::assertSame(
+			TransactionalFlusher::META_STATUS_FAILED_OPEN,
+			$order->get_meta( TransactionalFlusher::meta_key_for( TransactionalGate::TRIGGER_ORDER_CONFIRMATION ) ),
+			'Fail-open must fire once the ceiling forces the terminal failure.'
+		);
+	}
+
+	public function test_a_non_transactional_queue_row_ignores_the_retry_ceiling(): void {
+		// PRO-1519 scoping: the ceiling is owned entirely by
+		// TransactionalFlusher — a marketing-side row (drained by the main
+		// Flusher, never by TransactionalFlusher) keeps the existing
+		// unbounded-retry convention no matter how old it is.
+		$this->seed_default_credentials();
+
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'smly_plus_event_queue';
+		$wpdb->insert(
+			$table,
+			array(
+				'event_type' => 'contact.sync',
+				'entity_id'  => 'ceiling-scope-test@example.test',
+				'payload'    => wp_json_encode( array( 'email' => 'ceiling-scope-test@example.test' ) ),
+				'created_at' => gmdate( 'Y-m-d H:i:s', time() - TransactionalFlusher::RETRY_CEILING_SECONDS - ( 10 * DAY_IN_SECONDS ) ),
+				'attempts'   => 0,
+				'status'     => 'pending',
+			),
+			array( '%s', '%s', '%s', '%s', '%d', '%s' )
+		);
+
+		$fake_5xx = $this->fake_transport_with_code( 500, 500 );
+		add_filter( 'pre_http_request', $fake_5xx, 10, 3 );
+		try {
+			do_action( EventQueue::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake_5xx, 10 );
+		}
+
+		$row = $this->queue_row( 'contact.sync' );
+		self::assertNotNull( $row );
+		self::assertSame( 'pending', $row['status'], 'The main Flusher has no retry ceiling — an ancient row is still just a normal transient retry.' );
+		self::assertNotSame( 'retry_ceiling_exceeded', $row['last_error'] );
+	}
+
 	// --- helpers -------------------------------------------------------------
 
 	/**
@@ -388,6 +473,30 @@ final class TransactionalEmailsPipelineTest extends TestCase {
 				'filename' => '',
 			);
 		};
+	}
+
+	/** LEGACY_OPTION_KEY / "default" account credentials (Credentials::DEFAULT_ACCOUNT_KEY) — mirrors CartPipelineTest::seed_credentials(). */
+	private function seed_default_credentials(): void {
+		update_option(
+			'smaily_connect_api_credentials',
+			array(
+				'subdomain' => 'testsub',
+				'username'  => 'tester',
+				'password'  => \Smaily_Connect\Includes\Cypher::encrypt( 'test-password' ),
+			)
+		);
+	}
+
+	/** PRO-1519 test-only: push a queue row's created_at back by $seconds without sleeping. */
+	private function backdate_queue_row( int $id, int $seconds ): void {
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'smly_plus_event_queue',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - $seconds ) ),
+			array( 'id' => $id ),
+			array( '%s' ),
+			array( '%d' )
+		);
 	}
 
 	private function queue_count( string $event_type ): int {
