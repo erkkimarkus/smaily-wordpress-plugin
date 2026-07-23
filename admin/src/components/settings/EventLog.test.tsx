@@ -109,5 +109,36 @@ describe('EventLog', () => {
     await waitFor(() => {
       expect(retrySpy).toHaveBeenCalledWith({});
     });
+
+    // The 24h banner (PRO-1539) stays the only surfaced bulk-retry control
+    // when it's showing — no duplicate button alongside it.
+    expect(screen.getAllByRole('button', { name: 'Retry all failed' })).toHaveLength(1);
+  });
+
+  it('shows a reachable Retry all failed control for aged failures with no 24h banner (PRO-1539)', async () => {
+    const AGED_ROW = { ...ROW, created_at: '2026-01-01 00:00:00' };
+    vi.spyOn(eventsApi, 'listEvents').mockResolvedValue({
+      events: [AGED_ROW],
+      total: 1,
+      page: 1,
+      per_page: 50,
+      failed_24h: 0,
+    });
+    const retrySpy = vi.spyOn(eventsApi, 'retryEvents').mockResolvedValue({ reset: 1 });
+
+    render(<EventLog />);
+
+    await screen.findByText('order.upsert');
+
+    // No fresh failures in the last 24h, so the banner is absent...
+    expect(screen.queryByText(/failed events in the last 24 hours/i)).not.toBeInTheDocument();
+
+    // ...but the aged failed row still has a reachable bulk-retry control.
+    const retryAll = await screen.findByRole('button', { name: 'Retry all failed' });
+    fireEvent.click(retryAll);
+
+    await waitFor(() => {
+      expect(retrySpy).toHaveBeenCalledWith({});
+    });
   });
 });

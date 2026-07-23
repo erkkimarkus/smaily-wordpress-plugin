@@ -99,6 +99,9 @@ export function EventLog(): React.JSX.Element {
   );
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  // Rows failed outside the 24h window (e.g. months ago, no fresh failures)
+  // never trip the banner below, so this is the only bulk-retry path for them.
+  const hasFailedRows = rows.some((row) => row.status === 'failed');
 
   return (
     <div className="space-y-4">
@@ -181,6 +184,19 @@ export function EventLog(): React.JSX.Element {
           <Button variant="ghost" type="button" onClick={() => void load()}>
             {__('Refresh', 'smaily-connect')}
           </Button>
+          {/* Covers failed rows the 24h banner above never sees (aged
+              failures with no fresh failures in the last 24h). */}
+          {failed24h === 0 && hasFailedRows && (
+            <Button
+              variant="secondary"
+              type="button"
+              className="ml-auto"
+              loading={retrying}
+              onClick={() => void handleRetry({})}
+            >
+              {__('Retry all failed', 'smaily-connect')}
+            </Button>
+          )}
         </div>
 
         {error !== null && (
