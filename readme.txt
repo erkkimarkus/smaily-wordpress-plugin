@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.9.0
+Stable tag: 3.10.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,10 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.10.0 =
+* Improved: the Transactional emails settings are now discoverable — the account connection lives on the Connection tab (with its own connection test), and the Order-confirmation / Shipping-confirmation triggers now show on the WooCommerce tab once that account is connected, instead of being buried as a fourth section under WooCommerce automations. Wording also clarifies this is a separate Smaily account, not a "sub-account".
+* Improved: the Event Log's "Retry all failed" control is now also shown when older failed events exist without any failures in the last 24 hours, so those can be retried without waiting for a fresh failure.
 
 = 3.9.0 =
 * New: Transactional emails (off by default) — Smaily Connect can now send order confirmation and shipping confirmation emails through a separate Smaily account dedicated to transactional sending, kept isolated from your marketing account's deliverability. When enabled, the matching native WooCommerce email is suppressed; if a Smaily send ever fails, the native WooCommerce email is sent instead so the customer is never left without a confirmation.
@@ -325,6 +329,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.10.0 =
+Transactional emails settings moved to the Connection and WooCommerce tabs for discoverability; Event Log "Retry all failed" now also reachable for older failed events. Safe update.
 
 = 3.9.0 =
 Adds an optional Transactional emails feature (off by default) sending order/shipping confirmations via a dedicated Smaily account, with automatic fallback to native WooCommerce emails on failure. Also includes reliability and security hardening fixes. Safe update.
