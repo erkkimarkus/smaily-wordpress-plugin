@@ -4,8 +4,22 @@
 `smaily-connect` wordpress.org listing.
 **From:** the fork (`erkkimarkus/smaily-wordpress-plugin`), at **v3.0.0 (GA)**.
 **Status:** proposal / decision request. Nothing irreversible has been done — the fork
-ships behind an `Update URI` guard and is distributed only via GitHub Releases. This
-document makes the case and lists what it takes to land; **the decision is Smaily's.**
+is currently distributed only via GitHub Releases. This document makes the case and
+lists what it takes to land; **the decision is Smaily's.**
+
+---
+
+## Current state (2026-07-23)
+
+The fork is at **v3.9.0**; the GA line has been stable since **3.0.0** (2026-06-25) and
+a real-merchant pilot (MiuMjau) has been running on it since. The code-side punch-list
+below is **complete** except the two items that are Smaily-owned by nature (#6
+wordpress.org submission mechanics, #7 pilot sign-off — see the checklist). Notably,
+the `Update URI` guard (item 2 below) that used to keep wordpress.org from overwriting
+the fork was **removed in v3.9.0** (2026-07-23) — the fork is no longer forcing a
+GitHub-only update channel by header; an existing install now transitions onto the
+wordpress.org update channel automatically, with no separate cutover step, the moment
+sendsmaily publishes a release version ≥ what's installed.
 
 ---
 
@@ -53,7 +67,7 @@ The fork contains everything the wordpress.org plugin does **and** supersedes it
 | Credential encryption | **AES-256-CBC, static IV** (an `AUTH_KEY` prefix inside the stored blob — a DB dump leaks the key prefix; equal plaintexts → equal ciphertexts) | **AES-256-GCM**, random per-message nonce; legacy blobs auto-re-encrypted on upgrade |
 | PHP tests | **none** (`composer test` runs only the block's JS tests) | **374 unit (898 assertions) + 114 real-environment integration** (WP 7.0 + WC 10.7 + MariaDB via wp-env) |
 | Static analysis | none at the released tag | **PHPStan level 6**, clean |
-| WordPress.org Plugin Check | — | **clean** (one intentional `Update URI` finding, removed at the merge) — see [`audits/CODE_QUALITY_AUDIT.md`](audits/CODE_QUALITY_AUDIT.md) |
+| WordPress.org Plugin Check | — | **clean** except 2 cosmetic warnings (`slow_db_query_meta_key` on the new transactional-email order-meta gate, v3.9.0) — see [`audits/CODE_QUALITY_AUDIT.md`](audits/CODE_QUALITY_AUDIT.md) |
 | Security audit | — | **0 Critical / 0 High** — see [`audits/SECURITY_AUDIT.md`](audits/SECURITY_AUDIT.md) |
 
 The takeover therefore loses upstream nothing (every 1.x behaviour and option key is
@@ -70,9 +84,11 @@ next major version. Mechanics:
   so the takeover lands monotonically and every existing install upgrades forward cleanly.
   (This is exactly why the fork renumbered to the 2.1.0-beta line and then to 3.0 — see
   DECISIONS F3-35.)
-- **Distribution flips** from GitHub Releases to the wordpress.org SVN flow; the
-  `Update URI` guard that currently keeps wordpress.org from overwriting the fork is
-  removed at that point (it is only load-bearing while forked).
+- **Distribution flips** from GitHub Releases to the wordpress.org SVN flow. The
+  `Update URI` guard that used to keep wordpress.org from overwriting the fork was
+  already removed in v3.9.0 (2026-07-23) — the flip now happens automatically the
+  moment sendsmaily publishes a wordpress.org release version ≥ what's installed, with
+  no separate header change needed at merge time.
 - **Existing merchants** get the rewrite as a normal plugin update; legacy behaviour
   continues until they complete the wizard, so nothing breaks on update.
 
@@ -84,12 +100,46 @@ next major version. Mechanics:
 | 2 | **Remove the `Update URI` header** (the one intentional Plugin Check finding) | fork | ✅ done (2026-07-23, ships in v3.9.0) |
 | 3 | **React admin UI i18n** — wire `@wordpress/i18n` (`__()`, text domain `smaily-connect`) + `wp_set_script_translations`; the UI is currently English-only (0/41 components localized). wordpress.org reviewers expect a translatable UI | fork | ✅ done (W-7) |
 | 4 | **Inline `<script>` → enqueue** — move the admin-notice dismiss handler to an enqueued script | fork | ✅ done (W-5) |
-| 5 | **Reconcile 3 open upstream items** — #120 (translation `.pot` catalogs, manual merge — ours has diverged), #128 (WP7 / minimum-version bump — conflicts with our WC 6.9 floor, decide together), #132 (`release.sh` HTTP-429 recovery — only if the wordpress.org SVN flow is used) | joint | ⏳ discuss |
+| 5 | **Reconcile 3 open upstream items** — #120 (translation `.pot` catalogs, manual merge), #128 (WP7 / minimum-version bump), #132 (`release.sh` HTTP-429 recovery) | fork | ✅ fork-side dispositions below — Smaily confirms |
 | 6 | **wordpress.org submission mechanics** — SVN (not git), readme.txt assets/screenshots, the plugin-review queue | Smaily | ⏳ Smaily-owned |
 | 7 | **Pilot passes** — a real-merchant pilot against the acceptance criteria in [`TESTING.md`](TESTING.md) before the rewrite reaches ~2,000 production installs | joint | ⏳ prerequisite |
 
-Items 2–4 are concrete plugin work the fork can do on a go-ahead. Item 5 needs a short
-joint decision. Items 6–7 are Smaily-owned / gating.
+Items 2–4 are concrete plugin work, done. Item 5's dispositions are below — a quick
+Smaily confirmation closes it, no further fork work is expected. Items 6–7 are
+Smaily-owned / gating.
+
+### Item 5 dispositions (2026-07-23)
+
+- **#120 — translation `.pot` catalogs, manual merge.** Obsoleted by the fork's own
+  i18n pipeline. The fork rebuilt translation tooling around `bin/build-i18n.sh`
+  (esbuild-transpiles the TSX admin source so `wp i18n make-pot` can see the `__()`
+  calls it otherwise can't parse, then regenerates the `.mo`/script-translation-JSON
+  catalogs from the committed `.pot`/`.po`). The fork's `languages/smaily-connect.pot`
+  + `-et.po` are already comprehensive (cover both the legacy admin surface and the
+  new React UI, item 3) and are the intended canonical catalogs once the takeover
+  happens — there is nothing left to merge from upstream's `.pot` addition.
+  **Recommendation: close as obsolete**, no cherry-pick or manual merge needed.
+- **#128 — WP7 support / minimum-version bump.** Checked against the fork's current
+  floors (`readme.txt` / `smaily-connect.php`, 2026-07-23): `Requires at least: 6.6`,
+  `Requires PHP: 8.0`, `Tested up to: 7.0`, `WC requires at least: 6.9`. These already
+  **meet or exceed** #128's ask (PHP floor → 7.4, WP floor → 6.5) and the fork already
+  declares WP 7.0 support, which was #128's headline goal — no code change is needed
+  and there's no floor conflict to reconcile. One point worth a joint confirmation, not
+  a blocker: the fork's PHP floor (8.0) is stricter than #128's ask (7.4) — a
+  fork-side call made for the newer crypto/tooling stack — Smaily should sanity-check
+  it against the wordpress.org install base's PHP distribution before submission.
+  **Recommendation: close as satisfied by the fork's current floors**; Smaily confirms
+  the PHP-8.0 floor is acceptable for the ~2,000 installs.
+- **#132 — `release.sh` HTTP-429 recovery.** Only relevant if the wordpress.org
+  release flow reuses upstream's `release.sh`. The fork carries the file unmodified
+  since the fork point (last touched pre-fork, `e117c2c`) but doesn't use it — the
+  fork's own release process is the local sequence documented in `CLAUDE.md` (build
+  JS/blocks/i18n locally, `composer run package`, `gh release create`), which never
+  invokes `release.sh`. **Recommendation:** if Smaily adopts the fork's release
+  process at takeover, `release.sh` becomes dead code and #132 closes as obsolete
+  alongside it; if Smaily instead keeps using the wordpress.org SVN `release.sh` flow,
+  #132's patch applies cleanly to the fork's untouched copy and should be cherry-picked
+  — a Smaily call, not a fork one.
 
 ## Risks & mitigations
 
@@ -97,10 +147,12 @@ joint decision. Items 6–7 are Smaily-owned / gating.
   the in-place upgrade preserves legacy behaviour until the wizard is completed; the pilot
   (item 7) must pass first; the upgrade path and rollback are documented in
   [`MIGRATION.md`](MIGRATION.md).
-- **Minimum-version bump (#128).** Upstream raises floors; the fork pins WooCommerce 6.9
-  for the pilot merchant. *Mitigation:* reconcile the floors jointly before submission.
-- **Translations.** The `.pot` catalogs diverged (#120) and the React UI is not yet
-  localized (item 3). *Mitigation:* item 3 + a manual `.pot` merge before submission.
+- **Minimum-version bump (#128).** Resolved — the fork's current floors (PHP 8.0, WP
+  6.6, tested to 7.0) already meet or exceed #128's ask; see the item 5 disposition
+  above for the one open confirmation (the PHP-8.0 floor itself).
+- **Translations (#120).** Resolved — the React UI is localized (item 3) and the
+  fork's own i18n pipeline (`bin/build-i18n.sh`) makes its `.pot`/`.po` the canonical
+  catalogs at takeover; see the item 5 disposition above.
 - **Ongoing divergence.** Every week the fork advances, the eventual takeover is more
   work. *Mitigation:* decide direction soon; the fork freezes net-new scope once a
   go-ahead is given.
@@ -116,7 +168,8 @@ and the brand, and the rewrite couples the public plugin to Smaily Campaign Inte
    integration (vs. keeping it fork-/pilot-only)?
 2. If yes — who owns the wordpress.org SVN publish, and on what timeline relative to the
    pilot?
-3. The #128 minimum-version reconciliation (WooCommerce floor) — align on 6.9 vs higher.
+3. Confirm the fork's PHP 8.0 floor (stricter than upstream #128's PHP 7.4 ask) is
+   acceptable for the ~2,000 existing installs — see the item 5 disposition above.
 
 On a "yes," the fork executes items 2–4 and supports items 5–7.
 

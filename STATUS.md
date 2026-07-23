@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**PRO-1534 — contract re-synced byte-identical
+_Last updated: 2026-07-23 (**PRO-1196 prep — upstream-merge proposal refreshed
+to current truth, doc-only.** `docs/UPSTREAM_MERGE_PROPOSAL.md`'s narrative
+still described the fork as shipping behind the `Update URI` guard in three
+places (Status line, the PCP-finding table row, the "Distribution flips"
+mechanics bullet) even though the guard was removed this morning ahead of
+v3.9.0 (see the F3-35 entry below) — corrected all three to the current state
+(guard gone, GitHub-Releases-only for now, stores transition onto the
+wordpress.org update channel automatically once sendsmaily publishes a
+version ≥ installed, no separate cutover step). Added a "Current state
+(2026-07-23)" note near the top: fork at v3.9.0, GA line stable since 3.0.0,
+MiuMjau pilot running, code-side punch-list complete except the two
+Smaily-owned items (#6 submission mechanics, #7 pilot sign-off). **Wrote
+fork-side dispositions for the three open upstream issues** (item 5,
+new "Item 5 dispositions" subsection): **#120** (`.pot` manual merge) —
+obsoleted by the fork's own `bin/build-i18n.sh` pipeline, its `.pot`/`.po`
+become canonical at takeover, recommend closing as obsolete; **#128** (WP7 /
+min-version bump) — checked against the fork's actual current floors
+(`readme.txt`/`smaily-connect.php`: PHP 8.0, WP 6.6, tested to 7.0, WC 6.9)
+and found they already meet or exceed #128's ask (PHP 7.4, WP 6.5) with no
+real conflict, recommend closing as satisfied, flagged one confirmation point
+(the fork's PHP-8.0 floor is stricter than #128's ask — Smaily should
+sanity-check it against the install base); **#132** (`release.sh` HTTP-429) —
+the fork carries the file unmodified since the fork point but its own release
+process (the local sequence in CLAUDE.md) never invokes it, recommend it
+closes as obsolete IF Smaily adopts the fork's release process, else the
+patch applies cleanly and should be cherry-picked. Risks/open-questions
+sections updated to match (both #120 and #128 marked resolved, open question
+3 reworded to the one remaining PHP-floor confirmation). No code changed;
+`.md`-only. Prior:
+
+2026-07-23 (**PRO-1534 — contract re-synced byte-identical
 (engine `21d5c0c`, md5 `2857d7cf…`).** Doc-only errata since the last sync:
 §7 `identity/merge`'s response example listed a `browse_events_already_bound`
 field the route never returns — the actual `merged` trio is
