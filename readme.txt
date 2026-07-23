@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.8.1
+Stable tag: 3.9.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,13 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.9.0 =
+* New: Transactional emails (off by default) — Smaily Connect can now send order confirmation and shipping confirmation emails through a separate Smaily account dedicated to transactional sending, kept isolated from your marketing account's deliverability. When enabled, the matching native WooCommerce email is suppressed; if a Smaily send ever fails, the native WooCommerce email is sent instead so the customer is never left without a confirmation.
+* Fixed: order confirmation emails (see above) now also fire correctly for the WooCommerce Blocks / Store API checkout, not just the classic checkout.
+* Fixed: a product-removal update that previously failed to reach Smaily Campaign Intelligence with an error now repairs and resends automatically on retry, instead of failing with the same error indefinitely.
+* Hardened: a transactional confirmation stuck retrying due to a prolonged connection problem now gives up after about an hour and falls back to the native WooCommerce email, instead of retrying indefinitely.
+* Hardened: text used to personalize transactional emails (customer name, order number, payment/shipping method, product name/description) is now safely escaped before sending.
 
 = 3.8.1 =
 * Fixed: a product removed from Smaily Campaign Intelligence's recommendations (when its underlying WooCommerce data is already gone) is now reliably removed even in edge cases where it previously could be skipped.
@@ -318,6 +325,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.9.0 =
+Adds an optional Transactional emails feature (off by default) sending order/shipping confirmations via a dedicated Smaily account, with automatic fallback to native WooCommerce emails on failure. Also includes reliability and security hardening fixes. Safe update.
 
 = 3.8.1 =
 Reliability + hardening only, no new features. Deleted-product removal from Campaign Intelligence is more reliable; default-category products are now correctly categorized; the browse-tracking endpoint no longer accepts a browser-supplied identity value. Safe update.
