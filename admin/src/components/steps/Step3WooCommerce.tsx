@@ -5,7 +5,7 @@ import { type WizardAction, type WizardState } from '../../state/types';
 import { Label, NumberInput } from '../primitives';
 import { AutomationSection } from './AutomationSection';
 import { EngineAutomationsSection } from './EngineAutomationsSection';
-import { TransactionalEmailsSection } from './TransactionalEmailsSection';
+import { TransactionalTriggersSection } from './TransactionalTriggersSection';
 
 export interface Step3WooCommerceProps {
   state: WizardState;
@@ -107,10 +107,12 @@ export function Step3WooCommerce({
         }
       />
 
-      {/* Transactional emails (PRO-1504, stage 1) — a separate Smaily
-          account + its own two trigger mappings. Configuration only in
-          this stage; no send path exists yet. */}
-      <TransactionalEmailsSection state={state} dispatch={dispatch} />
+      {/* Transactional-email triggers (PRO-1504, stage 1) — the account
+          connection itself lives on the Connection tab (PRO-1540); this
+          renders the two trigger mappings only once that connection is
+          established, and nothing at all otherwise (Erkki's call — no
+          placeholder, no pointer). */}
+      <TransactionalTriggersSection state={state} dispatch={dispatch} />
 
       {/* Engine-run automations (contract §11–§13, T2.2) — a separate
           sub-section: unlike the three store-run triggers above, these

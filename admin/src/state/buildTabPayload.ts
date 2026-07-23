@@ -21,6 +21,8 @@ export function buildTabPayload(
         multilingualMode: state.multilingualMode,
         perLanguageAccounts: state.perLanguageAccounts,
         defaultFallbackAccountKey: state.defaultFallbackAccountKey,
+        transactionalEmailsEnabled: state.transactionalEmailsEnabled,
+        transactionalCredentials: state.transactionalCredentials,
       };
     case 'subscribers':
       return {
@@ -39,8 +41,6 @@ export function buildTabPayload(
         abandonedCartEnabled: state.abandonedCartEnabled,
         abandonedCartCutoffMinutes: state.abandonedCartCutoffMinutes,
         automationMappings: state.automationMappings,
-        transactionalEmailsEnabled: state.transactionalEmailsEnabled,
-        transactionalCredentials: state.transactionalCredentials,
         orderConfirmationEnabled: state.orderConfirmationEnabled,
         shippingConfirmationEnabled: state.shippingConfirmationEnabled,
         shippedOrderStatuses: state.shippedOrderStatuses,

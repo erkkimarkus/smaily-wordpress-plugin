@@ -11,6 +11,7 @@ import {
 import { Card, Radio } from '../primitives';
 import { MultilingualModePicker } from '../wizard';
 import { CredentialBlock } from './CredentialBlock';
+import { TransactionalEmailsSection } from './TransactionalEmailsSection';
 
 export interface Step1ConnectProps {
   state: WizardState;
@@ -132,6 +133,13 @@ export function Step1Connect({
           </Card>
         </>
       )}
+
+      {/* Transactional emails (PRO-1504) — an OPTIONAL capability on top of
+          the main Smaily connection above, relocated here by PRO-1540
+          after the pilot found it undiscoverable inside WooCommerce
+          automations. Its own trigger config lives on the WooCommerce
+          tab/step, gated on this connection (TransactionalTriggersSection). */}
+      <TransactionalEmailsSection state={state} dispatch={dispatch} inSettings={inSettings} />
     </div>
   );
 }

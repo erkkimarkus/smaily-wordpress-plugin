@@ -24,6 +24,8 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'UPDATE_MODE_ACCOUNT_CREDENTIALS':
     case 'SET_DEFAULT_FALLBACK_ACCOUNT_KEY':
     case 'SET_REC_ENGINE_SETUP_TOKEN':
+    case 'SET_TRANSACTIONAL_EMAILS_ENABLED':
+    case 'SET_TRANSACTIONAL_CREDENTIALS':
       return 'connection';
 
     // Subscribers tab
@@ -45,8 +47,6 @@ export function actionToTab(action: WizardAction): SettingsTabKey | null {
     case 'UPSERT_AUTOMATION_MAPPING':
     case 'REMOVE_AUTOMATION_MAPPING':
     case 'SET_AUTOMATION_FALLBACK':
-    case 'SET_TRANSACTIONAL_EMAILS_ENABLED':
-    case 'SET_TRANSACTIONAL_CREDENTIALS':
     case 'SET_ORDER_CONFIRMATION_ENABLED':
     case 'SET_SHIPPING_CONFIRMATION_ENABLED':
     case 'TOGGLE_SHIPPED_ORDER_STATUS':
