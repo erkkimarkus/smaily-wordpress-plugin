@@ -613,6 +613,7 @@ td code{white-space:nowrap}
       </ul>
       <p>If your store sells in more than one language, this tab also offers a <strong>multilingual mode</strong> (a separate Smaily account or workflow per language). Languages are detected automatically from <strong>WPML</strong> or <strong>Polylang</strong> if you run one of them — see <a href="#set-consent">multilingual routing</a>.</p>
       <p>The recommendation‑engine connection is shown here too, with its own <strong>Test</strong> and <strong>Disconnect</strong>.</p>
+      <p>An optional <strong>transactional emails</strong> account — a second, separate Smaily account used only for order/shipping confirmations — is configured here too, below the main connection; see <a href="#set-transactional">Transactional emails</a>.</p>
     </div>
     <div data-lang="et">
       <p>Halda Smaily kontot, mille kaudu Smaily Connect saadab. Andmed valideeritakse Smaily vastu enne salvestamist.</p>
@@ -623,6 +624,7 @@ td code{white-space:nowrap}
       </ul>
       <p>Kui su pood müüb mitmes keeles, pakub see vahekaart ka <strong>mitmekeelset režiimi</strong> (eraldi Smaily konto või töövoog keele kohta). Keeled tuvastatakse automaatselt <strong>WPML‑ist</strong> või <strong>Polylangist</strong>, kui üks neist on kasutusel — vt <a href="#set-consent">mitmekeelne suunamine</a>.</p>
       <p>Siin kuvatakse ka soovitusmootori ühendus koos oma <strong>Test</strong> ja <strong>Disconnect</strong> nuppudega.</p>
+      <p>Ka vabatahtlik <strong>tehingu‑e‑kirjade</strong> konto — teine, eraldi Smaily konto, mida kasutatakse ainult tellimuse/saatmise kinnituste jaoks — seadistatakse siin, põhiühenduse all; vt <a href="#set-transactional">Tehingu‑e‑kirjad</a>.</p>
     </div>
   </div>
 
@@ -675,7 +677,7 @@ td code{white-space:nowrap}
   <div class="sub" id="set-automations">
     <h2><span data-lang="en">Automations</span><span data-lang="et">Automaatikad</span></h2>
     <div data-lang="en">
-      <p>Two kinds of automation live here.</p>
+      <p>Three kinds of automation live here.</p>
       <h3>Store‑run triggers</h3>
       <p>Map a store event to a Smaily workflow: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Abandoned cart has a delay (minutes of inactivity before a cart counts as abandoned). If no workflows appear, none were found on your Smaily account (or Smaily couldn't be reached) — create them in Smaily first.</p>
       <h3>Engine‑run recommendation automations</h3>
@@ -689,9 +691,11 @@ td code{white-space:nowrap}
         <span class="k">Fail‑closed by design</span>
         <p>Test mode starts <strong>on</strong>. A test‑mode automation with no test addresses sends to <strong>no one</strong> until you add at least one address — so an automation can never fire at customers before you mean it to.</p>
       </div>
+      <h3>Transactional‑email triggers</h3>
+      <p>Order confirmation and Shipping confirmation appear here too — but only once you've connected the separate transactional Smaily account on the <a href="#set-connection">Connection tab</a>. See <a href="#set-transactional">Transactional emails</a> for the full walkthrough.</p>
     </div>
     <div data-lang="et">
-      <p>Siin elab kaht liiki automaatikat.</p>
+      <p>Siin elab kolme liiki automaatikat.</p>
       <h3>Poe‑käivitatavad</h3>
       <p>Seo poe sündmus Smaily töövooga: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Pooleli jäänud korval on viivitus (tegevusetuse minutid, enne kui korv loetakse hüljatuks). Kui ühtegi töövoogu ei kuva, ei leitud su Smaily kontolt ühtegi (või Smailyni ei jõutud) — loo need enne Smailys.</p>
       <h3>Mootori‑käivitatavad soovitus‑automaatikad</h3>
@@ -705,6 +709,8 @@ td code{white-space:nowrap}
         <span class="k">Disaini poolest fail‑closed</span>
         <p>Test mode algab <strong>sees</strong>. Test‑režiimi automaatika ilma test‑aadressideta saadab <strong>mitte kellelegi</strong>, kuni lisad vähemalt ühe aadressi — nii ei saa automaatika kunagi klientidele käivituda enne, kui sa seda soovid.</p>
       </div>
+      <h3>Tehingu‑e‑kirjade päästikud</h3>
+      <p>Tellimuse kinnitus ja Saatmisteade ilmuvad ka siia — aga alles pärast eraldi tehingu‑Smaily konto ühendamist <a href="#set-connection">Connection vahekaardil</a>. Täisjuhendi leiad siit: <a href="#set-transactional">Tehingu‑e‑kirjad</a>.</p>
     </div>
   </div>
 
@@ -712,7 +718,11 @@ td code{white-space:nowrap}
     <h2><span data-lang="en">Transactional emails</span><span data-lang="et">Tehingu‑e‑kirjad</span></h2>
     <div data-lang="en">
       <p>Send your order confirmation and shipping notice through Smaily instead of WordPress's own mail, using a <strong>separate Smaily account</strong> bound only to these sends — kept apart from your marketing account so a marketing bounce or complaint can never threaten order‑email delivery.</p>
-      <p><strong>Enable transactional emails</strong> is the master switch; each of the two triggers below has its own switch too, so you can turn on order confirmations without shipping notices, or vice‑versa.</p>
+      <div class="note">
+        <span class="k">Where to find it</span>
+        <p>Two places, on purpose: <strong>Settings → Connection tab</strong> is where you connect the account (toggle → subdomain/username/password → Test connection → the same green "✓ Connected" checkmark your main Smaily connection uses). <strong>Settings → WooCommerce tab</strong> is where the "Order confirmation" and "Shipping confirmation" sections appear — but only once that connection is established; until then the WooCommerce tab shows nothing transactional.</p>
+      </div>
+      <p>On the Connection tab, <strong>Use transactional emails</strong> is the master switch for the account itself; each of the two triggers on the WooCommerce tab has its own switch too, so you can turn on order confirmations without shipping notices, or vice‑versa.</p>
       <h3>Order confirmation</h3>
       <p>Sent once, the moment a customer places an order. Map it to a Smaily workflow the same way as the automations above.</p>
       <h3>Shipping confirmation</h3>
@@ -729,7 +739,11 @@ td code{white-space:nowrap}
     </div>
     <div data-lang="et">
       <p>Saada tellimuse kinnitus ja saatmisteade Smaily kaudu (mitte WordPressi enda meili kaudu), kasutades <strong>eraldi Smaily kontot</strong>, mis on seotud ainult nende saadetistega — hoitud lahus su turunduskontost, nii et turunduse tagasipõrge või kaebus ei saa kunagi ohustada tellimuse‑e‑kirjade kohaletoimetamist.</p>
-      <p><strong>Enable transactional emails</strong> on pealüliti; mõlemal allolaval päästikul on ka oma lüliti, nii saad sisse lülitada tellimuskinnitused ilma saatmisteadeteta või vastupidi.</p>
+      <div class="note">
+        <span class="k">Kust see leida</span>
+        <p>Kaks kohta, meelega: <strong>Settings → Connection vahekaart</strong> on koht, kus ühendad konto (lüliti → subdomeen/kasutajanimi/parool → Test connection → sama roheline "✓ Connected" märge, mida su põhi‑Smaily ühendus kasutab). <strong>Settings → WooCommerce vahekaart</strong> on koht, kus ilmuvad "Order confirmation" ja "Shipping confirmation" jaotised — aga alles siis, kui see ühendus on loodud; enne seda ei näita WooCommerce vahekaart tehingu‑e‑kirjade kohta midagi.</p>
+      </div>
+      <p>Connection vahekaardil on <strong>Use transactional emails</strong> pealüliti konto enda jaoks; mõlemal WooCommerce vahekaardi päästikul on ka oma lüliti, nii saad sisse lülitada tellimuskinnitused ilma saatmisteadeteta või vastupidi.</p>
       <h3>Tellimuse kinnitus</h3>
       <p>Saadetakse üks kord, hetkel kui klient tellimuse esitab. Seo see Smaily töövooga samamoodi nagu ülal olevad automaatikad.</p>
       <h3>Saatmisteade</h3>
