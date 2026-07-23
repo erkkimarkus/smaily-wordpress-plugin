@@ -359,3 +359,168 @@ PHPStan/PHPCS clean). Rides the v3.9.0 cut.
   `123d479` instead of `251a29f` narrows the range by exactly those two
   no-op-for-security commits and creates no gap against the prior audit's
   coverage.
+
+---
+
+## Addendum: pre-v3.10.0 delta `69a83b8..HEAD` (2026-07-23)
+
+- **Baseline:** `69a83b8` — the tip this file's main pass above already
+  audited (the delta ends at `0bf43df`, 17 commits, 35 files, 1937
+  insertions / 322 deletions). Trigger: release boundary (v3.10.0 cut),
+  policy point 1 — audit-and-record scope, no code changes made by this
+  pass.
+- **Auditor:** Claude (Fable 5)
+- **Scope:** full `git diff 69a83b8..HEAD` file-by-file, with a deep pass
+  on the brief's named focus: PRO-1537 escaping fix (already the prior
+  section's Should-fix, resolved same-day — re-confirmed here, not
+  re-litigated), v3.9.0 release-mechanics commits, PRO-1540's
+  `SettingsEndpoint::save_transactional_account()` /
+  `save_transactional_triggers()` handler split, PRO-1534 contract-sync,
+  PRO-1539 EventLog bulk-retry control, PRO-1538 phpcs:ignore comments,
+  docs/walk-script edits.
+
+### Verdict
+
+**0 Blocker, 0 Critical/High/Medium/Low. 0 new findings.** The delta is
+release-mechanics, a UI/settings-persistence refactor with test-verified
+parity, one already-audited security fix, one comment-only PCP
+suppression, and docs/test/mock changes. RESULT: v3.10.0 may proceed.
+
+### 1. PRO-1540 — `SettingsEndpoint` transactional handler split
+
+`save_transactional_account()` (was `save_transactional_emails()`, now
+called from `save_connection()`) and the new `save_transactional_triggers()`
+(the trigger-toggle + shipped-status half, now called from
+`save_woocommerce()`) are a mechanical split of one pre-existing method
+into two, each called from a different existing tab handler — read the
+full diff directly, confirmed:
+
+- **No new route, no capability/nonce change.** `register()`,
+  `permission_check()` (`current_user_can( Constants::CAPABILITY )`), and
+  `handle()`'s `VALID_TABS` allowlist are byte-identical in this delta (not
+  present in the diff at all) — both new private methods are invoked from
+  inside the SAME two pre-existing branches (`save_connection()` for the
+  account half, `save_woocommerce()` for the triggers half), which already
+  ran under the one shared REST route + permission check. No new
+  unauthenticated or lower-privilege path was created.
+- **Credential persistence is unchanged.** `save_transactional_account()`
+  still calls the shared `persist_credentials()` helper (itself untouched
+  in this delta) with the same empty-password-preserves-existing-secret
+  rule, the same `Credentials::PHASE2_OPTION_PREFIX . 'transactional'`
+  option key, and still sets `smly_plus_transactional_connection_verified`
+  from the post-persist subdomain/username presence — identical to the
+  pre-split code, just relocated into its own method and called from a
+  different tab branch.
+- **Sanitization is unchanged.** `save_transactional_triggers()`'s
+  `shippedOrderStatuses` handling (`sanitize_key()` per entry +
+  `array_filter`) is copied verbatim from the pre-split method — same
+  allowlist-shaped cleanse, no new unsanitized field.
+- **Both `save_connection()` and `save_woocommerce()` still end with
+  `return $this->success_response();`** after the new call (confirmed by
+  reading past the diff hunk boundary into the surrounding function body —
+  the diff context alone truncates the closing return) — no early-return
+  or response-shape regression from the split.
+- **Client-side mirrors the split exactly, nothing new added.**
+  `buildTabPayload.ts` moves `transactionalEmailsEnabled` /
+  `transactionalCredentials` from the `woocommerce` tab payload to the
+  `connection` one (and `action-to-tab.ts` re-routes the corresponding
+  dispatch actions the same way) — a pure field relocation, no new field
+  introduced on either side. `CredentialBlock.tsx` (shared by both the
+  default and transactional credential forms, unchanged in this delta)
+  still renders the password as `type="password"`, never round-trips a
+  stored password back into the field.
+- **Test-verified parity.** `SettingsEndpointTest` was split into
+  `test_connection_tab_persists_transactional_account_and_toggle` /
+  `test_connection_tab_marks_transactional_connection_unverified_when_credentials_incomplete`
+  (posting to the `connection` tab) and a new
+  `test_woocommerce_tab_persists_transactional_triggers_and_shipped_statuses`
+  (posting to `woocommerce`, and asserting the woocommerce tab does **not**
+  write the transactional account options) — the split is pinned from both
+  directions, not just asserted by reading the source.
+- **Nothing newly logged.** Neither new method calls any logging/debug
+  function; the diff introduces no `error_log`/`DebugLog` call.
+
+**Conclusion: clean.** A same-behavior refactor — capability check,
+nonce/REST-core enforcement, sanitization, and credential-persistence
+semantics are byte-for-byte preserved, just re-homed across two already-
+authenticated handlers on the same existing route.
+
+### 2. PRO-1539 — EventLog "Retry all failed" (aged-failure) control
+
+`EventLog.tsx` adds a second "Retry all failed" `Button`, shown when
+`failed24h === 0 && hasFailedRows` (rows currently loaded include a
+`status === 'failed'` row outside the 24h window). Its `onClick` calls the
+exact same `handleRetry({})` the pre-existing 24h-banner button already
+called, which POSTs to the pre-existing `retryEvents()` → `/events/retry`
+REST route (`EndpointRegistry.php`, unchanged in this delta — not in the
+diff). No new endpoint, no new PHP surface; the two buttons are mutually
+exclusive (`failed24h > 0` vs `=== 0`), so no duplicate-trigger risk.
+**Conclusion: clean.**
+
+### 3. PRO-1538 — phpcs:ignore comments in `TransactionalGate.php`
+
+The 2-line diff is exactly two standalone `phpcs:ignore
+WordPress.DB.SlowDBQuery.slow_db_query_meta_key` comment lines above the
+two `'meta_key'` config-array entries — no code changed, confirmed by
+reading the full diff. These entries are consumed only as a per-order-id
+meta-guard key (`get_meta`/`update_meta_data` by order id, per the
+existing PRO-1518/1519 logic this audit's main pass already reviewed under
+§2), never a `WP_Query` `meta_query` — the suppression is justified, not a
+scope-widening change. **Conclusion: clean, comment-only.**
+
+### 4. PRO-1537 escaping fix + tests (`c208f9d`/`b459f7c`/`09a8aaf`)
+
+Already this file's Should-fix, resolved same-day and recorded above under
+"Resolution (2026-07-23, same day, PRO-1537)". Re-read directly in this
+pass to confirm the merged diff matches that description exactly: all
+seven previously-raw fields (`order_number`, `payment_method`,
+`shipping_method`, `first_name`, `last_name`, `product_name`,
+`product_description`) now route through a new private
+`TransactionalPayloadBuilder::escape()` helper
+(`htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 )`,
+identical flags to `CartPayloadBuilder`'s idiom); `product_sku` /
+`product_quantity` / prices left untouched as recommended. No new finding;
+not re-litigated as a fresh Should-fix.
+
+### 5. PRO-1534 contract sync + mock alignment
+
+`docs/RECENGINE_API_CONTRACT.md` §7 and
+`tests/Integration/Fixtures/mock-rec-engine/router.php`'s `/identity/merge`
+mock both drop the same non-existent `browse_events_already_bound` field
+from the response example/mock in the same commit — documentation-only per
+the contract's own note ("no code/schema change"), confirmed no plugin
+production-code file reads or writes that field name anywhere in the repo.
+Test-only mock change moves in lockstep with the doc, per the CC-8 sync
+discipline. **Conclusion: clean, doc/test-only.**
+
+### 6. Remaining files — release mechanics, docs, walk script
+
+`STATUS.md`, `docs/DECISIONS.md`, `docs/UPSTREAM_MERGE_PROPOSAL.md`,
+`docs/site/index.html`, `docs/audits/INDEX.md` (self), `readme.txt`,
+`package.json`, `smaily-connect.php` (version bump), `languages/*.po`/
+`*.pot`, `tests/bootstrap.php`, `tests/phpstan-bootstrap.php` — all
+docs/version-pin/i18n-source, no logic. `bin/walk-pro1537-escape-probe.cjs`
+is a live-walk script (not shipped — `bin/` is dev-only, `.zipignore`
+excludes it from the release ZIP by the same rule as every other walk
+script) that reads Smaily sandbox credentials from a `/tmp` file per the
+established secret-safe convention, carries its own
+`sandbox_tenant_not_production`-style gate hardcoded to the `smailydemo`
+sandbox subdomain, and never echoes the password (grepped the full file:
+password appears only in the `Authorization: Basic` header construction
+and the credential-file-shape usage message, never logged/printed).
+**Conclusion: clean.**
+
+### Gates run for this pass
+
+- **None re-run by this addendum** — audit-and-record scope, matching the
+  main pass above. Per-commit `npm run ci:strict` / integration results for
+  this delta are recorded in STATUS.md.
+- PCP against the built ZIP: out of scope here, covered by the v3.10.0
+  release-build worker.
+
+### Assumptions
+
+- Baseline `69a83b8` is read as literally the commit this file's own main
+  pass already audited up to (its own §7) — the addendum's delta is
+  therefore exactly the 17 commits after that point, with zero gap or
+  overlap against the main pass's coverage.

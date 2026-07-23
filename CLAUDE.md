@@ -394,6 +394,20 @@ Facts that must stay true when you touch it:
   background work is **Action Scheduler**; GDPR is the **WP Privacy tools**). The
   keep-current rule is in "Keeping the docs current" above.
 
+**Publishing it live (FTPS).** The live copy at `https://smaily.com/connect-woo/`
+is published over FTPS — Erkki places a 3-line credentials file (host /
+username / password) at `/tmp/smaily-connect-woo-ftp` on request (secret-safe
+convention: never committed, never echoed). The account is chrooted directly
+into the connect-woo web root (contains `index.html` only). Working upload
+recipe: curl with explicit TLS, cert check relaxed (the FTP service cert
+doesn't match the hostname), passive-mode workaround, and credentials via a
+runtime-built `-K` config file (never on the command line):
+```
+curl --ssl-reqd -k --disable-epsv -K <cfg> -T docs/site/index.html ftp://smaily.com/index.html
+```
+**Publish only after the Estonian proofread of changed content** — the
+PRO-1520-established human gate; don't push a language pair live unfiltered.
+
 ### Audits live in `docs/audits/` — re-run after bigger changes
 All audit reports + the register table live in `docs/audits/` (start at
 `docs/audits/INDEX.md`): the Fable codebase audit, the Security audit, the

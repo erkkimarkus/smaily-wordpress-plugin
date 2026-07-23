@@ -26,7 +26,34 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**Three small independent fixes: PRO-1539 (Event Log
+_Last updated: 2026-07-23 (**Pre-v3.10.0 delta security audit (docs-only,
+audit-and-record) + CLAUDE.md docs-site publish-mechanism note.**
+- **Security audit** — addendum appended to
+  `docs/audits/SECURITY_DELTA_2026-07-23.md` ("Addendum: pre-v3.10.0 delta
+  `69a83b8..HEAD`") covering everything landed since this morning's v3.9.0
+  gate audit: PRO-1537's escaping fix (already that file's resolved
+  Should-fix, re-confirmed unchanged); the v3.9.0 release-mechanics commits;
+  PRO-1540's `SettingsEndpoint` handler split
+  (`save_transactional_account()`/`save_transactional_triggers()`) — capability
+  check, REST-core nonce, `persist_credentials()` semantics, and
+  `shippedOrderStatuses` sanitization all confirmed byte-for-byte preserved
+  across the split, test-verified from both directions
+  (`SettingsEndpointTest`); PRO-1534's contract/mock field-name correction
+  (doc/test-only, no plugin code touches the removed field); PRO-1539's new
+  "Retry all failed" button (calls the pre-existing `/events/retry` route,
+  no new endpoint); PRO-1538's `phpcs:ignore` comments (comment-only). **0
+  Blocker/Critical/High/Medium/Low. 0 new findings — v3.10.0 may proceed.**
+  New `docs/audits/INDEX.md` row added (no gates re-run in this pass; per-
+  commit `ci:strict`/integration results already recorded in this file).
+- **CLAUDE.md** — documented the previously-undocumented docs-site publish
+  mechanism (learned today): the live copy at
+  `https://smaily.com/connect-woo/` is published over FTPS via a curl
+  recipe (`--ssl-reqd -k --disable-epsv -K <cfg>`, credentials from a
+  runtime-built `-K` config file, never the command line), chrooted account,
+  credentials placed on request at `/tmp/smaily-connect-woo-ftp`; publish
+  only after the Estonian proofread gate.
+
+Prior: 2026-07-23 (**Three small independent fixes: PRO-1539 (Event Log
 aged-failure bulk retry), PRO-1538 (PCP false-positive suppressions), PRO-1541
 (merchant-docs workflow-dropdown note).**
 - **PRO-1539** — `admin/src/components/settings/EventLog.tsx`'s "Retry all
