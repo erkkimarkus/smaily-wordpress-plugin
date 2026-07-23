@@ -56,15 +56,15 @@ class TransactionalPayloadBuilder {
 	 */
 	public function build( \WC_Order $order ): array {
 		$context = array(
-			'order_number'    => (string) $order->get_order_number(),
+			'order_number'    => $this->escape( (string) $order->get_order_number() ),
 			// Already gross (products + shipping + tax − discounts, as
 			// charged) — do not add get_total_tax() on top (PRO-1241).
 			'order_total'     => $this->price_display( (float) $order->get_total() ),
 			'currency'        => $this->currency( $order ),
-			'payment_method'  => (string) $order->get_payment_method_title(),
-			'shipping_method' => (string) $order->get_shipping_method(),
-			'first_name'      => (string) $order->get_billing_first_name(),
-			'last_name'       => (string) $order->get_billing_last_name(),
+			'payment_method'  => $this->escape( (string) $order->get_payment_method_title() ),
+			'shipping_method' => $this->escape( (string) $order->get_shipping_method() ),
+			'first_name'      => $this->escape( (string) $order->get_billing_first_name() ),
+			'last_name'       => $this->escape( (string) $order->get_billing_last_name() ),
 		);
 
 		return $context + $this->product_fields( $order );
@@ -100,12 +100,12 @@ class TransactionalPayloadBuilder {
 				$product = $item->get_product();
 
 				return array(
-					'product_name'        => (string) $item->get_name(),
+					'product_name'        => $this->escape( (string) $item->get_name() ),
 					'product_sku'         => $product instanceof \WC_Product ? (string) $product->get_sku() : '',
 					'product_quantity'    => (string) $qty,
 					'product_price'       => $qty > 0 ? $this->price_display( $total_gross / $qty ) : '',
 					'product_base_price'  => $qty > 0 ? $this->price_display( $subtotal_gross / $qty ) : '',
-					'product_description' => $product instanceof \WC_Product ? (string) $product->get_description() : '',
+					'product_description' => $product instanceof \WC_Product ? $this->escape( (string) $product->get_description() ) : '',
 					'product_image_url'   => $product instanceof \WC_Product ? $this->product_image_url( $product ) : '',
 				);
 			}
@@ -135,5 +135,15 @@ class TransactionalPayloadBuilder {
 	private function currency( \WC_Order $order ): string {
 		$currency = trim( (string) $order->get_currency() );
 		return $currency !== '' ? $currency : 'EUR';
+	}
+
+	/**
+	 * HTML-escape a merge-tag text value before it goes into the `context`
+	 * object — same treatment CartPayloadBuilder::product_fields() applies
+	 * to its product-derived values (PRO-1537: checkout-attacker-controlled
+	 * fields like first_name/last_name reached message/send.php raw).
+	 */
+	private function escape( string $value ): string {
+		return htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 );
 	}
 }

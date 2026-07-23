@@ -26,7 +26,30 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**v3.9.0 release-gate delta SECURITY audit
+_Last updated: 2026-07-23 (**PRO-1537 — the v3.9.0 security audit's
+Should-fix (Medium) fixed same-day.** `TransactionalPayloadBuilder`'s
+`context` merge-tag fields — `first_name`, `last_name`, `order_number`,
+`payment_method`, `shipping_method`, `product_name`, `product_description`
+— now route through a new private `escape()` helper
+(`htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 )`),
+mirroring `CartPayloadBuilder::product_fields()`'s exact idiom byte-for-byte
+(same flags). `product_sku`/`product_quantity`/prices left untouched, as
+the audit recommended (SKUs are merchant-controlled, prices already go
+through `price_display()`'s strip-tags treatment). **Tests:** +2 unit
+(`TransactionalPayloadBuilderTest` — order-level fields with `<script>`/
+`<b onmouseover=…>`/`&`/quote-bearing input assert the exact
+`htmlspecialchars`-encoded output; product-line `product_name`/
+`product_description` likewise). **Gates:** `npm run ci:strict` exit=0
+(PHPCS 0 errors, PHPStan clean, PHPUnit unit 652/652 — was 650, +2; vitest
+251/251 unchanged, tsc/eslint clean). Integration suite not run (unit-level
+payload-builder change; the release worker runs full gates as part of the
+v3.9.0 cut). Docs: `docs/audits/SECURITY_DELTA_2026-07-23.md` gets a
+Resolution note on the finding (finding text itself left intact) +
+`docs/audits/INDEX.md`'s v3.9.0 register row gets the same-day-fixed note.
+**Not released** — code landed on `main`, rides the v3.9.0 cut the
+orchestrator controls.)
+
+Prior: 2026-07-23 (**v3.9.0 release-gate delta SECURITY audit
 (PRO-1520 acceptance criterion 1) — 0 Blocker/Critical/High, 1 Should-fix
 (Medium), recorded, not fixed (audit-and-record scope).** Delta
 `123d479..69a83b8` (v3.8.1-publication tip to the pre-cut main tip; 5255/153

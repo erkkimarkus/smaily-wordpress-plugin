@@ -27,7 +27,8 @@
 ## Verdict
 
 **0 Blocker, 0 Critical/High. 1 Should-fix (Medium: unescaped merge-tag
-text fields in the new transactional-email `context` payload). 0 Low. 2
+text fields in the new transactional-email `context` payload) — FIXED
+same-day (PRO-1537, see the finding's Resolution note below). 0 Low. 2
 Info (accepted, noted below). RESULT: v3.9.0 may proceed; the should-fix is
 recorded as a fast-follow, not a release blocker** (rationale in the
 finding).
@@ -292,6 +293,16 @@ to every text-shaped field in `TransactionalPayloadBuilder::build()` and
 `product_description` (leave `product_sku`/`product_quantity`/prices as
 they are — SKUs are typically merchant-controlled slugs and prices already
 go through `price_display()`'s strip-tags treatment).
+
+**Resolution (2026-07-23, same day, PRO-1537):** fixed. All seven listed
+fields now route through a new private `escape()` helper
+(`htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 )`,
+byte-identical flags to `CartPayloadBuilder`'s idiom); `product_sku`/
+`product_quantity`/prices left untouched as recommended. Adversarial unit
+tests (`<script>…</script>`, `<b onmouseover=…>`) pin the escaped output for
+both the order-level fields and the per-slot product fields. `npm run
+ci:strict` exit=0 (PHPUnit unit 652/652, +2; vitest 251/251 unchanged; tsc/
+PHPStan/PHPCS clean). Rides the v3.9.0 cut.
 
 ## Info (accepted, no action needed)
 
