@@ -26,7 +26,82 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**v3.9.0 — build/verify/gate sequence RUN, gates
+_Last updated: 2026-07-23 (**PRO-1540 — transactional-emails Settings UI
+restructured: undiscoverability fix, unreleased on main.** The pilot found
+the v3.9.0 "Transactional emails" card (buried as a fourth section under
+WooCommerce automations) undiscoverable. Design settled with Erkki
+2026-07-23; superseded that placement, code unchanged in behavior/storage.
+Split the ONE combined section into TWO, on two tabs:
+  1. **Connection tab** (`Step1Connect.tsx`) — the account itself is now an
+     OPTIONAL capability under the main Smaily connection:
+     `TransactionalEmailsSection.tsx` (moved here from the WooCommerce
+     step/tab) renders the "Use transactional emails" toggle → the same
+     `CredentialBlock` (subdomain/username/password + Test connection +
+     green "✓ Connected" checkmark) the main connection uses, unchanged
+     component reused as-is.
+  2. **WooCommerce tab** (`Step3WooCommerce.tsx`) — a NEW
+     `TransactionalTriggersSection.tsx` renders the Order-confirmation /
+     Shipping-confirmation `AutomationSection`s + the "counts as shipped"
+     picker under their own subheading, styled like
+     `EngineAutomationsSection`'s sub-section pattern — but ONLY when
+     `state.transactionalConnection.kind === 'success'`; otherwise it
+     renders `null` (Erkki's explicit call: no placeholder, no pointer).
+Wiring: `action-to-tab.ts` moved `SET_TRANSACTIONAL_EMAILS_ENABLED`/
+`SET_TRANSACTIONAL_CREDENTIALS` from the woocommerce arm to the connection
+arm; `buildTabPayload.ts` moved the same two fields from the `woocommerce`
+case to the `connection` case. `SettingsEndpoint::save_transactional_emails()`
+split into `save_transactional_account()` (called from `save_connection()`
+— toggle + credentials + the `smly_plus_transactional_connection_verified`
+flag) and `save_transactional_triggers()` (called from `save_woocommerce()`
+— the two trigger toggles + `smly_plus_shipped_order_statuses`). **No
+option-key rename, no field-name rename** — every `smly_plus_*` option and
+every REST field name (`transactionalEmailsEnabled`,
+`orderConfirmationEnabled`, `shippingConfirmationEnabled`,
+`shippedOrderStatuses`, `transactionalCredentials`) is byte-identical to
+v3.9.0; a store already configured on v3.9.0 keeps working, only the tab
+it's edited from changed. `hydrate.ts`/`EnvDetector::saved_settings()`
+needed NO changes — `transactionalConnected` already fed
+`deriveCredentialConnection()` the same way the main account's
+`smailyConnected` does, so the Connection tab's green-checkmark state was
+already server-truth-driven before this change. **Copy fix (Erkki
+flagged):** the "(or sub-account)" phrasing implying a Smaily sub-account
+concept (Smaily has none) is gone from `TransactionalEmailsSection.tsx`'s
+credential-block description; "separate Smaily account" is now the only
+phrasing used, everywhere including `docs/site/index.html`. **Docs-site**:
+rewrote `#set-transactional` (EN+ET pair) to describe the new flow and name
+the concrete locations (Connection tab → toggle → credentials → test →
+checkmark; WooCommerce tab → Order/Shipping sections, gated), plus a
+forward-pointer line each in `#set-connection` and `#set-automations` so a
+reader lands on the right tab from either direction. **Tests:** component
+— rewrote `TransactionalEmailsSection.test.tsx` (Connection-tab
+credential-toggle behavior only now) + new
+`TransactionalTriggersSection.test.tsx` (absent when not connected /
+present + fetches the `'transactional'` workflow list when connected) +
+new `Settings.transactionalPlacement.test.tsx` (tab-placement wiring in
+the real Settings shell). Unit — split
+`SettingsEndpointTest`'s combined woocommerce-tab transactional test into
+a connection-tab test (account) + a woocommerce-tab test (triggers, and
+asserts the woocommerce tab does NOT touch the transactional-account
+options). Integration — split
+`SettingsRoundTripTest`'s combined round-trip test the same way; updated
+`TransactionalEmailsPipelineTest::configure()` to POST the account via
+`tab: 'connection'` and the triggers via `tab: 'woocommerce'` (was a
+single `tab: 'woocommerce'` POST — the account fields would otherwise
+silently no-op under the new routing). **Gates**: `npm run ci:strict`
+exit=0 (PHPCS 0 new findings, PHPStan clean, PHPUnit unit 653/653, vitest
+257/257 across 33 files, tsc/eslint clean); `sg docker -c "composer run
+test:integration"` **OK (181 tests, 916 assertions)**, dev sandbox tenant
+"Smaily Connect test" correctly restored post-run (not MiuMjau,
+`connected=1`) — unrelated to this change (no `smly_rec_*` option was
+touched). **Not done as part of this pass:** no version bump / release cut
+(task scope was the UI restructure on `main`, not a release); i18n
+`.pot`/`.po` regeneration is a release-time step
+(`bin/build-i18n.sh`), not part of `ci:strict`, so left untouched here —
+the next release cut must run it to pick up the new/changed admin strings
+("Use transactional emails", the WooCommerce-tab subheading copy, etc.).
+See `docs/DECISIONS.md` PRO-1540 for the full design record.
+
+Prior: 2026-07-23 (**v3.9.0 — build/verify/gate sequence RUN, gates
 green, and PUBLISHED.** Tag `v3.9.0` on the bump commit
 `1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`, GitHub release at
 https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.9.0,

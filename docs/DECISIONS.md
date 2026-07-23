@@ -4088,6 +4088,109 @@ tick runs — timestamp manipulation, not `sleep()`; a marketing-side
 unbounded-retry convention, proving the ceiling is scoped to
 `TransactionalFlusher` and does not leak into the shared `Flusher`).
 
+### PRO-1540 — Transactional emails: Settings UI restructured across two tabs (undiscoverability fix; design settled with Erkki 2026-07-23)
+
+**Context:** v3.9.0 shipped Transactional emails as ONE combined
+`TransactionalEmailsSection` card — an enablement toggle, the separate
+account's credentials, the connection test, AND both trigger mappings
+(order/shipping confirmation) — mounted as a fourth section at the bottom
+of the WooCommerce automations tab/step. Erkki found it undiscoverable on
+the pilot store: nothing in the Connection tab (where every other Smaily
+account lives) hinted that a second, separate account existed, and the
+feature was buried below three unrelated store-run automations.
+
+**Decision:** Split the one section into two, matching where a merchant
+would actually look:
+1. **Connection tab** (`Step1Connect.tsx`) gets the account itself as an
+   OPTIONAL capability under the main connection — `TransactionalEmailsSection`
+   (same file/component, relocated) renders "Use transactional emails" →
+   the existing `CredentialBlock` (subdomain/username/password + Test
+   connection + the same green "✓ Connected" state the main account uses)
+   reused verbatim, no new validation pattern invented.
+2. **WooCommerce tab** (`Step3WooCommerce.tsx`) gets a NEW
+   `TransactionalTriggersSection` rendering the Order-confirmation /
+   Shipping-confirmation `AutomationSection`s + the shipped-status picker
+   under their own subheading, styled like `EngineAutomationsSection`'s
+   sub-section — gated on `state.transactionalConnection.kind ===
+   'success'`. **Erkki's explicit call:** when not connected, this section
+   renders NOTHING — no placeholder card, no "connect on the Connection
+   tab" pointer. (Contrast with `EngineAutomationsSection`, which DOES show
+   an upsell banner when its own gate is closed — deliberately different
+   here per Erkki's instruction, not an oversight.)
+
+**Wiring, not a rename:** every `smly_plus_*` option key and every REST
+field name (`transactionalEmailsEnabled`, `transactionalCredentials`,
+`orderConfirmationEnabled`, `shippingConfirmationEnabled`,
+`shippedOrderStatuses`) is unchanged — only WHICH Settings-tab payload
+carries which field moved. `action-to-tab.ts` reassigns the two account
+actions (`SET_TRANSACTIONAL_EMAILS_ENABLED`, `SET_TRANSACTIONAL_CREDENTIALS`)
+from the woocommerce arm to the connection arm; `buildTabPayload.ts` moves
+the same two fields between the `connection`/`woocommerce` cases;
+`SettingsEndpoint::save_transactional_emails()` splits into
+`save_transactional_account()` (called from `save_connection()`) and
+`save_transactional_triggers()` (called from `save_woocommerce()`, same
+call site the combined method used). A v3.9.0 store's stored options are
+read identically regardless of which handler last wrote them — no
+migration needed, no data touched. `hydrate.ts`/`EnvDetector::
+saved_settings()` needed zero changes: `transactionalConnected` already
+fed the shared `deriveCredentialConnection()` helper the same way the main
+account's `smailyConnected` does, so the Connection-tab checkmark was
+already server-truth-driven before this ships.
+
+**Copy fix (Erkki flagged in the same review):** `TransactionalEmailsSection`'s
+credential-block description said "A separate Smaily account (or
+sub-account)" — Smaily has no sub-account concept, and the parenthetical
+reads as if it does. Changed to plain "A separate Smaily account…"
+everywhere the phrase appears, including `docs/site/index.html` (which was
+already correct — the plugin-code string was the only offender).
+
+**Rationale:** this is a placement/discoverability fix, not a feature
+change — Erkki was explicit the design was settled and this is
+implementation, not exploration (hence no plan-first checkpoint beyond the
+brief itself). Reusing `CredentialBlock` and `AutomationSection` unchanged
+keeps the fix to wiring + two small new host components, not a rebuild.
+The WC-tab "render nothing" choice (vs. an upsell banner) is deliberate:
+Erkki judged that a placeholder pointing back to Connection would just be
+a second thing to notice-and-ignore for a merchant who hasn't opted into
+the feature at all, unlike Campaign Intelligence (an always-relevant
+upsell) — different call, not an inconsistency to "fix" later.
+
+**Alternatives considered:** keeping the account fields on the WooCommerce
+tab and only moving/duplicating a link — rejected because the credential
+block genuinely belongs next to the OTHER Smaily account (Connection tab
+is where merchants already know to look for "is my Smaily account
+connected"); a single merged tab — rejected, Erkki wanted the trigger
+config to stay a WooCommerce-automations concept, mirroring how
+engine-run automations already live there.
+
+**Tests:** component — rewrote `TransactionalEmailsSection.test.tsx` down
+to the Connection-tab credential/toggle behavior (incl. a regression guard
+that the rendered text never contains "sub-account"); new
+`TransactionalTriggersSection.test.tsx` (absent — empty render, zero
+`/workflows` fetch — when not connected; present + fetches the
+`'transactional'` workflow list, never `'default'`, when connected; the
+shipped-status checkboxes still read `env.orderStatuses`); new
+`Settings.transactionalPlacement.test.tsx` pinning the tab placement in
+the real `Settings` shell (toggle+credentials render under `#connection`;
+the WC tab renders nothing transactional while disconnected and both
+trigger headings once connected). Unit — `SettingsEndpointTest`'s combined
+woocommerce-tab transactional test split into a connection-tab test (the
+account) and a woocommerce-tab test (the triggers + a regression assertion
+that the woocommerce tab does NOT write the transactional-account
+options). Integration — `SettingsRoundTripTest`'s combined round-trip test
+split the same way; `TransactionalEmailsPipelineTest::configure()` updated
+to POST the account via `tab: 'connection'` and the triggers via `tab:
+'woocommerce'` (the old single `tab: 'woocommerce'` POST would otherwise
+silently no-op the account fields under the new routing — caught by the
+full integration run, not by unit tests, since the unit suite doesn't
+exercise `TransactionalGate`'s live send path end to end).
+
+**Relationships:** supersedes ONLY the UI placement decided in PRO-1504
+Stage 1 (the "config-only surface" and Stage 2 "the sender" decisions
+above are otherwise unchanged — same options, same trigger types, same
+send pipeline). `AutomationSection`'s `accountKeyOverride` prop (Stage 1)
+is reused unchanged by the relocated `TransactionalTriggersSection`.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
