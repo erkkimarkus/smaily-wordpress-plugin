@@ -442,9 +442,10 @@ Two gotchas that cost real time (2026-06-25, the pre-3.0 PCP-clean pass):
   push discipline is what made it survivable). Always unzip the ZIP to a DIFFERENT
   dir (`smaily-connect-pkg`) + pin `--slug=smaily-connect`; never target the mounted
   plugin path with destructive container commands.
-Two findings are intentional and remain until specific milestones: `plugin_updater_detected`
-(the `Update URI` clobber-guard, F3-35 — removed at the upstream merge) and, while still
-a beta, `mismatched_plugin_name` (the `(BETA)` Name suffix — dropped at the 3.0 GA bump).
+The `plugin_updater_detected` finding (the `Update URI` clobber-guard, F3-35) is GONE —
+the header was removed 2026-07-23 ahead of the sendsmaily upstream merge (ships in
+v3.9.0; see DECISIONS F3-35). The `mismatched_plugin_name` note is history only: it was
+the `(BETA)` Name suffix, dropped at the 3.0 GA bump.
 
 ### React admin i18n — rebuild with `bin/build-i18n.sh`, never plain `compile-translations`
 The React admin UI strings are wrapped with a thin `wp.i18n` shim

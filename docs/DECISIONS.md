@@ -1811,6 +1811,23 @@ the seam the unit suite must fake), `rss-feed-url.test.ts` +
 
 ### F3-35 — Version renumbered 2.0.0-beta.1 → 2.1.0-beta.1 + `Update URI` header (upstream-collision guard)
 
+> **⚠️ `Update URI` header REMOVED 2026-07-23 (Erkki's direction, ships in
+> v3.9.0), ahead of the sendsmaily upstream merge.** The renumbering half of
+> this decision (2.1.0-beta.1, and the general discipline of staying
+> monotonically above upstream's released version) stands unchanged. Only
+> the header guard is retired. **Rationale:** WP core never offers a LOWER
+> version than what's installed — the wordpress.org listing was frozen at
+> 2.0.0 while this fork is 3.8.1+, so the clobber vector the header guarded
+> against (§ below) cannot fire regardless of the header's presence; the
+> header's only remaining effect was to also block the fork from EVER
+> picking up a legitimate wordpress.org update once sendsmaily publishes a
+> version ≥ the installed one. Removing it now is the intended migration
+> mechanic for the upstream merge: stores transition automatically to the
+> wordpress.org update channel the moment sendsmaily publishes a release at
+> or above the fork's version, with no separate cutover step needed later.
+> See `docs/UPSTREAM_MERGE_PROPOSAL.md` checklist item 2 (now done) and
+> STATUS.md for the release this rides in.
+
 **Context:** preparing the first GitHub release surfaced that upstream
 (sendsmaily) shipped its own **2.0.0** to wordpress.org on 2026-06-03 (#128 —
 a 1.x-line WP-7.0 compatibility bump, ~2000+ active installs; verified live on

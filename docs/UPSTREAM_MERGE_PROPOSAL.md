@@ -81,9 +81,9 @@ next major version. Mechanics:
 | # | Item | Owner | Status |
 |---|---|---|---|
 | 1 | **This proposal** — the case for the takeover | fork | ✅ this document |
-| 2 | **Remove the `Update URI` header** (the one intentional Plugin Check finding) | fork | ⏳ do at the merge — load-bearing until then |
-| 3 | **React admin UI i18n** — wire `@wordpress/i18n` (`__()`, text domain `smaily-connect`) + `wp_set_script_translations`; the UI is currently English-only (0/41 components localized). wordpress.org reviewers expect a translatable UI | fork | ⏳ deferred (CODE_QUALITY_AUDIT §C) |
-| 4 | **Inline `<script>` → enqueue** — move the admin-notice dismiss handler to an enqueued script | fork | ⏳ deferred polish |
+| 2 | **Remove the `Update URI` header** (the one intentional Plugin Check finding) | fork | ✅ done (2026-07-23, ships in v3.9.0) |
+| 3 | **React admin UI i18n** — wire `@wordpress/i18n` (`__()`, text domain `smaily-connect`) + `wp_set_script_translations`; the UI is currently English-only (0/41 components localized). wordpress.org reviewers expect a translatable UI | fork | ✅ done (W-7) |
+| 4 | **Inline `<script>` → enqueue** — move the admin-notice dismiss handler to an enqueued script | fork | ✅ done (W-5) |
 | 5 | **Reconcile 3 open upstream items** — #120 (translation `.pot` catalogs, manual merge — ours has diverged), #128 (WP7 / minimum-version bump — conflicts with our WC 6.9 floor, decide together), #132 (`release.sh` HTTP-429 recovery — only if the wordpress.org SVN flow is used) | joint | ⏳ discuss |
 | 6 | **wordpress.org submission mechanics** — SVN (not git), readme.txt assets/screenshots, the plugin-review queue | Smaily | ⏳ Smaily-owned |
 | 7 | **Pilot passes** — a real-merchant pilot against the acceptance criteria in [`TESTING.md`](TESTING.md) before the rewrite reaches ~2,000 production installs | joint | ⏳ prerequisite |

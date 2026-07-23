@@ -26,7 +26,28 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-22 (**PRO-1517 — two mock rec-engine GDPR-path
+_Last updated: 2026-07-23 (**Upstream-merge prep — the F3-35 `Update URI`
+clobber-guard header removed from `smaily-connect.php`**, ahead of the
+sendsmaily upstream merge (Erkki's direction). WP core never offers a
+LOWER version than what's installed, so the wordpress.org listing (frozen
+at 2.0.0) could never clobber this fork (3.8.1+) regardless of the header;
+removing it now is the intended migration mechanic — stores transition
+automatically onto the wordpress.org update channel the moment sendsmaily
+publishes a release ≥ the installed version, with no separate cutover step
+later. Docs updated in the same commit: DECISIONS.md F3-35 gets a
+superseded note (the renumbering half of that decision stands; only the
+header guard is retired); `docs/UPSTREAM_MERGE_PROPOSAL.md` checklist item
+2 marked done, plus items 3 (React admin i18n) and 4 (inline-script →
+enqueue) corrected from stale "deferred" to done (both shipped earlier,
+W-7/W-5); CLAUDE.md's PCP note updated (`plugin_updater_detected` is no
+longer an intentional finding). **Rides the v3.9.0 cut** a later worker
+runs today (PRO-1520) — this change does not bump the version itself.
+Gates: `npm run ci:strict` exit=0 (doc + header-only change, no test
+behaviour affected; confirmed no test asserts on the `Update URI` header).
+Integration suite not run for this change (release worker runs it as part
+of the v3.9.0 cut).)
+
+Prior: 2026-07-22 (**PRO-1517 — two mock rec-engine GDPR-path
 fidelity gaps closed (cross-repo note, Shopify mock fix `cb262c4`).** The
 integration mock (`tests/Integration/Fixtures/mock-rec-engine/router.php`)
 simulated the real engine's own server-side GDPR/opt-out behaviour too

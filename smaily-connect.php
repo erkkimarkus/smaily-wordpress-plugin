@@ -13,21 +13,8 @@
  * Plugin Name:          Smaily Connect
  * Plugin URI:           https://smaily.com/help/user-manual/smaily-connect-for-wordpress/
  * Text Domain:          smaily-connect
- * Update URI:           https://github.com/erkkimarkus/smaily-wordpress-plugin
  * Version:              3.8.1
 */
-
-/*
- * Update URI (above) is load-bearing, not informational: the folder name
- * matches the wordpress.org `smaily-connect` slug, and upstream ships its
- * own releases there (their 2.0.0 is a 1.x-line WP-7.0 bump, NOT this
- * codebase). Without this header WordPress would offer — or with
- * auto-updates enabled, silently apply — upstream's package over this
- * fork. Any non-wordpress.org value makes core skip w.org updates for
- * this plugin entirely (WP 5.8+). Do not remove until the fork is merged
- * back upstream. The 2.1.x numbering exists for the same collision (see
- * DECISIONS F3-35).
- */
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
