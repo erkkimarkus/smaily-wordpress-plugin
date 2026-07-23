@@ -63,11 +63,13 @@ class TransactionalGate {
 		self::TRIGGER_ORDER_CONFIRMATION    => array(
 			'toggle_option' => 'smly_plus_order_confirmation_enabled',
 			'event_type'    => 'transactional.order_confirmation',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- config value only, consumed as a per-order-id meta guard key (get/update_meta_data by order id), never a WP_Query meta_query; WPCS flags any 'meta_key' array key regardless of context.
 			'meta_key'      => '_smly_plus_transactional_order_confirmation_status',
 		),
 		self::TRIGGER_SHIPPING_CONFIRMATION => array(
 			'toggle_option' => 'smly_plus_shipping_confirmation_enabled',
 			'event_type'    => 'transactional.shipping_confirmation',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- config value only, consumed as a per-order-id meta guard key (get/update_meta_data by order id), never a WP_Query meta_query; WPCS flags any 'meta_key' array key regardless of context.
 			'meta_key'      => '_smly_plus_transactional_shipping_confirmation_status',
 		),
 	);
