@@ -1113,10 +1113,9 @@ if ( $method === 'POST' && $path === '/api/v1/identity/merge' ) {
 			'ok'          => true,
 			'customer_id' => '550e8400-' . md5( $email ),
 			'merged'      => array(
-				'browse_events_updated'      => $already ? 0 : 12,
-				'browse_events_already_bound' => $already ? 12 : 0,
-				'visitor_tokens_bound'       => 1,
-				'session_history_days'       => 22,
+				'browse_events_updated' => $already ? 0 : 12,
+				'visitor_tokens_bound'  => 1,
+				'session_history_days'  => 22,
 			),
 		)
 	);

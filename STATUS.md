@@ -26,7 +26,27 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**PRO-1540 — transactional-emails Settings UI
+_Last updated: 2026-07-23 (**PRO-1534 — contract re-synced byte-identical
+(engine `21d5c0c`, md5 `2857d7cf…`).** Doc-only errata since the last sync:
+§7 `identity/merge`'s response example listed a `browse_events_already_bound`
+field the route never returns — the actual `merged` trio is
+`browse_events_updated` / `visitor_tokens_bound` / `session_history_days`; the
+field explanation and idempotency note were corrected (a repeat merge reports
+`browse_events_updated: 0`, not a separate already-bound count) and an
+Appendix E entry added. **Code follow-through (CC-8):** `grep`'d
+`includes/`/`admin/src/` for the removed field name — no hits;
+`IdentityHookHandler::on_login()` calls `Client::merge_identity()` and never
+reads the response at all (fire-and-log-on-exception only), so no plugin
+behavior depended on the wrong field. **Mock follow-through:** the mock's
+`identity_merge` handler (`tests/Integration/Fixtures/mock-rec-engine/
+router.php`) DID emit `browse_events_already_bound` alongside the correct
+trio — removed it in the same commit so the mock can't mask the same drift
+for a future reader. No wire-shape change on anything the plugin SENDS, so
+no live-walk required. Gates: `bash bin/check-contract-staleness.sh` green
+(`OK: … byte-identical …, engine commit 21d5c0c…`); mock-only PHP touch, ran
+`npm run ci:strict`. Prior:
+
+2026-07-23 (**PRO-1540 — transactional-emails Settings UI
 restructured: undiscoverability fix, unreleased on main.** The pilot found
 the v3.9.0 "Transactional emails" card (buried as a fourth section under
 WooCommerce automations) undiscoverable. Design settled with Erkki

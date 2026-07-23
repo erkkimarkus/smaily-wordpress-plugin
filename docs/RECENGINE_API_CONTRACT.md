@@ -1136,14 +1136,13 @@ At least **one** of `anon_session_id` or `smaily_visitor_token` must be present 
   "customer_id": "550e8400-...",
   "merged": {
     "browse_events_updated": 12,
-    "browse_events_already_bound": 3,
     "visitor_tokens_bound": 1,
     "session_history_days": 22
   }
 }
 ```
 
-`browse_events_updated` = anonymous events bound to customer_id.
+`browse_events_updated` = anonymous events bound to customer_id on this call (already-bound rows are excluded by the `customer_id IS NULL` filter, so a repeat merge reports 0, not a separate already-bound count).
 `session_history_days` = how many days the bound events reach back (gives a sense of how much history the customer recovered).
 
 **Response 404 Not Found**:
@@ -1154,7 +1153,7 @@ At least **one** of `anon_session_id` or `smaily_visitor_token` must be present 
 }
 ```
 
-**Idempotency**: same merge twice = no-op (events already bound; response shows `browse_events_already_bound`).
+**Idempotency**: same merge twice = no-op (events already bound; the second call's `browse_events_updated` reports 0).
 
 ---
 
@@ -1975,6 +1974,9 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 **v1.6.0** (2026-07-21) — **`tags.category_defaulted` on catalog ingest, and a deprecation notice for browse `customer_email`**. MINOR bump per the [Versioning](#versioning) rule (new optional field + a wording-only deprecation notice; nothing existing changes shape or behavior). PRO-1500, Erkki-approved 2026-07-21:
 - **§3 new optional catalog field [`tags.category_defaulted`](#category-defaulted)** — `"true"`, omit-on-false. Marks a row whose `category_path` is a **placeholder** (a store default-category fallback, or a delete-tombstone row synced with *some* category) rather than real taxonomy. Engine behavior: `lib/ingest/attribute-mapping.ts` `mapRawAttributes()` gains a `categoryDefaulted` parameter that skips every category-**slug**-keyed derivation (species-from-category, `category_canonical`, replenishable-from-category) for such a row; **name**-keyed derivations (species/life-stage-from-name, brand) are unaffected, and explicit tenant-sent tags still always win. A row left without `category_canonical` this way stays eligible for the nightly AI category sweep (verified against `lib/catalog/category-sweep.ts` / `lib/catalog/tag-meta.ts` `needsCategorySweep()` — its selection is keyed only on `category_canonical` + `_tag_meta`, so it already includes these rows without any change). Evaluated fresh per upsert from the request's own `tags` — omitting the flag on a later sync (once a real category is known) re-enables normal derivation for that sync, with no stored state to reset.
 - **§6 `customer_email` on browse events marked deprecated for client-originated senders** (documentation only in this release — no code change, no accept-and-ignore yet): no legitimate client-side producer exists, the field is spoofable from browser JS, and the supported logged-in-identity path is the visitor-token cookie + [§7 `identity/merge`](#7-post-apiv1identitymerge). Server-side senders (Make-flow style) may keep sending it during the grace period.
+
+**v1.6.0 — §7 merge response example correction** (documentation-only; no code/schema change). PRO-1533:
+- **Removed the non-existent `browse_events_already_bound` field** from the §7 `identity/merge` response example and idempotency note — the route (`app/api/v1/identity/merge/route.ts`) only ever returns `browse_events_updated` / `visitor_tokens_bound` / `session_history_days`; a repeat merge reports `browse_events_updated: 0` rather than a separate already-bound count.
 
 ---
 
