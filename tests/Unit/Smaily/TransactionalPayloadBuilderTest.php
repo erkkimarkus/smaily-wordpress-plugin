@@ -40,6 +40,45 @@ final class TransactionalPayloadBuilderTest extends TestCase {
 		self::assertSame( 'Maasikas', $context['last_name'] );
 	}
 
+	public function test_order_level_text_fields_are_htmlspecialchars_escaped(): void {
+		// PRO-1537: first_name/last_name are checkout-attacker-controlled —
+		// a plausible content-injection path into a transactional email.
+		$order = $this->fake_order(
+			array(
+				'order_number'    => '<script>alert(1)</script>',
+				'payment_method'  => '<b onmouseover="alert(1)">Card</b>',
+				'shipping_method' => 'Click & Collect',
+				'first_name'      => '<script>alert(1)</script>',
+				'last_name'       => 'O\'Brien & "Sons"',
+			)
+		);
+
+		$context = $this->builder()->build( $order );
+
+		self::assertSame( '&lt;script&gt;alert(1)&lt;/script&gt;', $context['order_number'] );
+		self::assertSame( '&lt;b onmouseover=&quot;alert(1)&quot;&gt;Card&lt;/b&gt;', $context['payment_method'] );
+		self::assertSame( 'Click &amp; Collect', $context['shipping_method'] );
+		self::assertSame( '&lt;script&gt;alert(1)&lt;/script&gt;', $context['first_name'] );
+		self::assertSame( 'O&#039;Brien &amp; &quot;Sons&quot;', $context['last_name'] );
+	}
+
+	public function test_product_line_text_fields_are_htmlspecialchars_escaped(): void {
+		$item  = $this->fake_item(
+			array(
+				'name' => '<script>alert(1)</script>',
+				'qty'  => 1,
+				'total' => 1.0,
+				'product' => $this->fake_product_with_description( '<b onmouseover="alert(1)">desc</b>' ),
+			)
+		);
+		$order = $this->fake_order( array( 'items' => array( $item ) ) );
+
+		$context = $this->builder()->build( $order );
+
+		self::assertSame( '&lt;script&gt;alert(1)&lt;/script&gt;', $context['product_name_1'] );
+		self::assertSame( '&lt;b onmouseover=&quot;alert(1)&quot;&gt;desc&lt;/b&gt;', $context['product_description_1'] );
+	}
+
 	public function test_every_product_slot_is_prefilled_empty_for_template_parity(): void {
 		$order = $this->fake_order( array( 'items' => array() ) );
 
@@ -243,6 +282,28 @@ final class TransactionalPayloadBuilderTest extends TestCase {
 
 			public function get_description( $context = 'view' ) {
 				return '';
+			}
+
+			public function get_gallery_image_ids() {
+				return array();
+			}
+		};
+	}
+
+	private function fake_product_with_description( string $description ): \WC_Product {
+		return new class( $description ) extends \WC_Product {
+			private string $description;
+
+			public function __construct( string $description ) {
+				$this->description = $description;
+			}
+
+			public function get_sku( $context = 'view' ) {
+				return '';
+			}
+
+			public function get_description( $context = 'view' ) {
+				return $this->description;
 			}
 
 			public function get_gallery_image_ids() {
