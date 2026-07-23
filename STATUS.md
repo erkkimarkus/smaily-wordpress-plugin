@@ -26,9 +26,7 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**v3.10.0 — build/verify/gate sequence RUN, gates
-green; publication (GH release + tag) deferred to the orchestrator in this
-session, not performed by this pass.** MINOR bump — the pilot-driven
+_Last updated: 2026-07-23 (**v3.10.0 — PUBLISHED.** MINOR bump — the pilot-driven
 Transactional-emails Settings UI restructure (PRO-1540: account connection
 moved to the Connection tab with its own connection test, Order/Shipping
 trigger sections gated onto the WooCommerce tab only once that account is
@@ -81,10 +79,16 @@ suppressed by PRO-1538, as intended. **`ci:strict` exit=0** (PHPCS 0 errors
 vitest **258/258** across 33 files, tsc/eslint clean). **Integration suite
 RE-RUN in full**: `sg docker -c "composer run test:integration"` **OK (181
 tests, 916 assertions)**, dev sandbox tenant "Smaily Connect test" correctly
-restored post-run (not MiuMjau, `connected=1`). **NOT published**: no `gh
-release`, no git tag — per this task's scope, publication is the
-orchestrator's step. ZIP left at repo root (`smaily-connect.zip`), SHA256
-`45f25d315092e87f4258084eb00d8185529a22f94396bf071914c52c8306e774`.
+restored post-run (not MiuMjau, `connected=1`). **PUBLISHED 2026-07-23**: tag
+`v3.10.0` on bump commit `36977dee2e364ec9af2a006896a2ad108112bbfd`, GH release
+https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.10.0,
+ZIP SHA256
+`45f25d315092e87f4258084eb00d8185529a22f94396bf071914c52c8306e774`. The
+upstream merge PR is now OPEN against the official repo —
+https://github.com/sendsmaily/smaily-wordpress-plugin/pull/135 (v3.10.0
+wholesale replacement per `docs/UPSTREAM_MERGE_PROPOSAL.md`; PRO-1196
+mechanics step done; awaiting sendsmaily review + the "working repo
+afterwards" answer).
 
 Prior: 2026-07-23 (**Pre-v3.10.0 delta security audit (docs-only,
 audit-and-record) + CLAUDE.md docs-site publish-mechanism note.**
