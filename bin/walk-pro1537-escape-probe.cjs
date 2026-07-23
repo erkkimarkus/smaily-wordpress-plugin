@@ -78,6 +78,11 @@ const CONTEXT = {
   first_name: '<b>probe-bold</b>',
   last_name: "O'Brien & Sons",
   shipping_method: '&lt;i&gt;pre-escaped&lt;/i&gt;',
+  // 4. subject — the workflow's SUBJECT field is set to the bare merge tag
+  //    {{subject}}; if the received email's subject shows this value, the
+  //    subject line substitutes context merge tags like the body does (a
+  //    sender can take over the whole subject per-send).
+  subject: 'Probe-subject <b>subj</b> & Co',
 };
 
 function fail(msg) {

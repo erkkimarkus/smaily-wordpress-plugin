@@ -27,16 +27,20 @@ If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
 _Last updated: 2026-07-23 (**v3.9.0 — build/verify/gate sequence RUN, gates
-green; publication (GH release + tag) deferred to the orchestrator in this
-session, not performed by this pass.** MINOR bump — Transactional emails v1
+green, and PUBLISHED.** Tag `v3.9.0` on the bump commit
+`1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`, GitHub release at
+https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.9.0,
+ZIP SHA256 `121e5ab79a7a0ae2209e23c004cb93ce617f555c401ec88c69fbf398dfb14c1c`
+(unchanged from the build below — confirms the published asset matches what
+was gated). MINOR bump — Transactional emails v1
 lands (PRO-1504, off by default), the F3-35 `Update URI` clobber-guard
 removed ahead of the sendsmaily upstream merge. Version bumped in all four
 places (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
 `SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
 tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
 `tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
-(`1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`, on `main`, not pushed — the
-orchestrator pushes + tags). Content since the v3.8.1 tip (`123d479`):
+(`1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`, on `main`, pushed and tagged
+`v3.9.0` by the orchestrator). Content since the v3.8.1 tip (`123d479`):
 PRO-1504 Stages 1+2 (transactional order/shipping-confirmation emails via a
 dedicated Smaily account, native-WC-email suppression, fail-open fallback),
 PRO-1518 (order confirmation also fires on WooCommerce Blocks / Store-API
@@ -57,10 +61,22 @@ the retry-ceiling hardening, and the merge-tag escaping hardening.
 pro1537-escape-probe.cjs` against the smailydemo sandbox):** Smaily's own
 `message/send.php` merge-tag substitution does **NOT** escape `context`
 values itself — a raw `<b>probe-bold</b>` `first_name` rendered as live
-unescaped HTML in the received email. This confirms the plugin-side
-`TransactionalPayloadBuilder::escape()` fix (PRO-1537, already landed) is
-the **only** escaping layer in the pipeline — not a double-escape risk, and
-not optional. Builds: `npm run build:admin && npm run build:client`
+unescaped HTML in the received email, and a pre-escaped `&lt;i&gt;…&lt;/i&gt;`
+`shipping_method` literal displayed as plain `<i>…</i>` text (single decode
+on display, confirming no double-escaping risk). This confirms the
+plugin-side `TransactionalPayloadBuilder::escape()` fix (PRO-1537, already
+landed) is the **only** escaping layer in the pipeline — not a double-escape
+risk, and not optional. **Second finding, same probe run: the SUBJECT line
+substitutes `context` merge tags exactly like the body.** With the workflow
+subject set to the bare `{{subject}}` tag and `context.subject = "Probe-
+subject <b>subj</b> & Co"`, the received email's subject was that literal
+string verbatim — raw passthrough, no stripping or escaping. A sender can
+therefore take over the entire subject line per-send via a `{{subject}}`
+merge tag; HTML isn't stripped there either (harmless in a text header, but
+user-controlled HTML/markup should stay out of it). This is a new
+observation, not a code change — no plugin surface currently feeds a
+merchant/customer-controlled value into a transactional subject. Builds:
+`npm run build:admin && npm run build:client`
 (`dist/admin/admin.js` 290.62 kB, `dist/public/js/sc-runtime.js` 6.47 kB);
 blocks rebuilt (`composer run install-block-modules && composer run
 build`); **i18n rebuild RUN** (`sg docker -c "bash bin/build-i18n.sh"`,
@@ -97,10 +113,11 @@ tsc/eslint clean). **Integration suite RE-RUN in full**: `sg docker -c
 "composer run test:integration"` **OK (180 tests, 907 assertions)** —
 unchanged count from the PRO-1517 mock-fidelity pass (no new integration
 tests landed since), dev sandbox tenant "Smaily Connect test" correctly
-restored post-run (not MiuMjau, `connected=1`). **NOT published**: no `gh
-release`, no git tag — per this task's scope, publication is the
-orchestrator's step. ZIP left at repo root (`smaily-connect.zip`), SHA256
-`121e5ab79a7a0ae2209e23c004cb93ce617f555c401ec88c69fbf398dfb14c1c`.
+restored post-run (not MiuMjau, `connected=1`). **Published 2026-07-23**: tag `v3.9.0` on bump commit
+`1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`,
+https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.9.0,
+ZIP SHA256 `121e5ab79a7a0ae2209e23c004cb93ce617f555c401ec88c69fbf398dfb14c1c`
+(published by the orchestrator, as scoped to this pass at build time).
 
 Prior: 2026-07-23 (**PRO-1537 — the v3.9.0 security audit's
 Should-fix (Medium) fixed same-day.** `TransactionalPayloadBuilder`'s
