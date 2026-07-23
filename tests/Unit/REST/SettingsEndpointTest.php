@@ -222,7 +222,71 @@ final class SettingsEndpointTest extends TestCase {
 		self::assertSame( 10, $this->option_writes['smaily_connect_abandoned_cart_cutoff'] );
 	}
 
-	public function test_woocommerce_tab_persists_transactional_account_and_toggles(): void {
+	public function test_connection_tab_persists_transactional_account_and_toggle(): void {
+		// PRO-1540 — the transactional account connection (toggle +
+		// credentials) moved from the woocommerce tab's payload to the
+		// connection tab's, mirroring where the React UI now renders it.
+		$endpoint = new SettingsEndpoint();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'connection' );
+		$request->set_param(
+			'data',
+			array(
+				'smailyCredentials'          => array(
+					'subdomain' => 'mypetshop',
+					'username'  => 'alice',
+					'password'  => 's3cret',
+				),
+				'transactionalEmailsEnabled' => true,
+				'transactionalCredentials'   => array(
+					'subdomain' => 'trxdemo',
+					'username'  => 'bob',
+					'password'  => 'plaintext',
+				),
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertTrue( $response->get_data()['saved'] );
+		self::assertTrue( $this->option_writes['smly_plus_transactional_emails_enabled'] );
+
+		$creds = $this->option_writes['smly_plus_credentials_transactional'];
+		self::assertSame( 'trxdemo', $creds['subdomain'] );
+		self::assertSame( 'bob', $creds['username'] );
+		self::assertNotSame( '', $creds['password'], 'Password must be encrypted, not blank.' );
+
+		self::assertTrue( $this->option_writes['smly_plus_transactional_connection_verified'] );
+	}
+
+	public function test_connection_tab_marks_transactional_connection_unverified_when_credentials_incomplete(): void {
+		$endpoint = new SettingsEndpoint();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'connection' );
+		$request->set_param(
+			'data',
+			array(
+				'smailyCredentials'        => array(
+					'subdomain' => 'mypetshop',
+					'username'  => 'alice',
+					'password'  => 's3cret',
+				),
+				'transactionalCredentials' => array(
+					'subdomain' => '',
+					'username'  => '',
+					'password'  => '',
+				),
+			)
+		);
+
+		$endpoint->handle( $request );
+
+		self::assertFalse( $this->option_writes['smly_plus_transactional_connection_verified'] );
+	}
+
+	public function test_woocommerce_tab_persists_transactional_triggers_and_shipped_statuses(): void {
 		$endpoint        = new SettingsEndpoint();
 		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
 
@@ -236,12 +300,6 @@ final class SettingsEndpointTest extends TestCase {
 				'abandonedCartEnabled'        => false,
 				'abandonedCartCutoffMinutes'  => 30,
 				'automationMappings'          => array(),
-				'transactionalEmailsEnabled'  => true,
-				'transactionalCredentials'    => array(
-					'subdomain' => 'trxdemo',
-					'username'  => 'bob',
-					'password'  => 'plaintext',
-				),
 				'orderConfirmationEnabled'    => true,
 				'shippingConfirmationEnabled' => true,
 				'shippedOrderStatuses'        => array( 'completed', 'shipped' ),
@@ -251,7 +309,6 @@ final class SettingsEndpointTest extends TestCase {
 		$response = $endpoint->handle( $request );
 
 		self::assertTrue( $response->get_data()['saved'] );
-		self::assertTrue( $this->option_writes['smly_plus_transactional_emails_enabled'] );
 		self::assertTrue( $this->option_writes['smly_plus_order_confirmation_enabled'] );
 		self::assertTrue( $this->option_writes['smly_plus_shipping_confirmation_enabled'] );
 		self::assertSame(
@@ -259,34 +316,10 @@ final class SettingsEndpointTest extends TestCase {
 			$this->option_writes['smly_plus_shipped_order_statuses']
 		);
 
-		$creds = $this->option_writes['smly_plus_credentials_transactional'];
-		self::assertSame( 'trxdemo', $creds['subdomain'] );
-		self::assertSame( 'bob', $creds['username'] );
-		self::assertNotSame( '', $creds['password'], 'Password must be encrypted, not blank.' );
-
-		self::assertTrue( $this->option_writes['smly_plus_transactional_connection_verified'] );
-	}
-
-	public function test_woocommerce_tab_marks_transactional_connection_unverified_when_credentials_incomplete(): void {
-		$endpoint        = new SettingsEndpoint();
-		$GLOBALS['wpdb'] = $this->fake_wpdb_with_mappings();
-
-		$request = new WP_REST_Request();
-		$request->set_param( 'tab', 'woocommerce' );
-		$request->set_param(
-			'data',
-			array(
-				'transactionalCredentials' => array(
-					'subdomain' => '',
-					'username'  => '',
-					'password'  => '',
-				),
-			)
-		);
-
-		$endpoint->handle( $request );
-
-		self::assertFalse( $this->option_writes['smly_plus_transactional_connection_verified'] );
+		// The woocommerce tab must NOT touch the transactional account —
+		// that slice belongs to the connection tab's payload only.
+		self::assertArrayNotHasKey( 'smly_plus_transactional_emails_enabled', $this->option_writes );
+		self::assertArrayNotHasKey( 'smly_plus_credentials_transactional', $this->option_writes );
 	}
 
 	public function test_woocommerce_tab_accepts_transactional_trigger_mappings(): void {

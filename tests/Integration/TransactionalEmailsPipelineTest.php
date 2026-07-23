@@ -375,25 +375,43 @@ final class TransactionalEmailsPipelineTest extends TestCase {
 			);
 		}
 
-		$response = RestRequestHelper::post(
+		// PRO-1540 — the transactional account (toggle + credentials) is
+		// persisted via the connection tab's payload now, alongside the main
+		// account it's an optional capability on top of.
+		$connection_response = RestRequestHelper::post(
 			'/settings',
 			array(
-				'tab'  => 'woocommerce',
+				'tab'  => 'connection',
 				'data' => array(
-					'transactionalEmailsEnabled'    => true,
-					'orderConfirmationEnabled'      => true,
-					'shippingConfirmationEnabled'   => true,
-					'shippedOrderStatuses'          => array( 'completed' ),
-					'transactionalCredentials'      => array(
+					'smailyCredentials'          => array(
+						'subdomain' => 'testsub',
+						'username'  => 'tester',
+						'password'  => 'test-password',
+					),
+					'transactionalEmailsEnabled' => true,
+					'transactionalCredentials'   => array(
 						'subdomain' => 'txsub',
 						'username'  => 'txuser',
 						'password'  => 'txpass',
 					),
-					'automationMappings'            => $rows,
 				),
 			)
 		);
-		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 200, $connection_response->get_status() );
+
+		$woocommerce_response = RestRequestHelper::post(
+			'/settings',
+			array(
+				'tab'  => 'woocommerce',
+				'data' => array(
+					'orderConfirmationEnabled'    => true,
+					'shippingConfirmationEnabled' => true,
+					'shippedOrderStatuses'        => array( 'completed' ),
+					'automationMappings'          => $rows,
+				),
+			)
+		);
+		self::assertSame( 200, $woocommerce_response->get_status() );
 	}
 
 	private function make_product( string $name, float $price ): int {

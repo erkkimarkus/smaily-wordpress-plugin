@@ -146,19 +146,45 @@ final class SettingsRoundTripTest extends TestCase {
 		self::assertTrue( $by_trigger['welcome']['isDefaultFallback'] );
 	}
 
-	public function test_woocommerce_tab_round_trip_including_transactional_emails(): void {
-		// PRO-1504 stage 1 — same writer/reader symmetry check as the
-		// mapping table above, extended to the transactional-emails slice:
-		// the enablement toggle, the transactional account's credentials
-		// (account_key='transactional'), the two new trigger mappings, and
-		// the "counts as shipped" status set.
+	public function test_connection_tab_round_trip_including_transactional_account(): void {
+		// PRO-1540 — the transactional account (toggle + credentials) moved
+		// to the connection tab's payload, mirroring where the React UI now
+		// renders it. Same writer/reader symmetry check PRO-1504 stage 1 had.
 		$payload = array(
-			'transactionalEmailsEnabled'  => true,
-			'transactionalCredentials'    => array(
+			'smailyCredentials'          => array(
+				'subdomain' => 'roundtrip-main',
+				'username'  => 'alice@example.com',
+				'password'  => 'main-secret',
+			),
+			'multilingualMode'           => 'single',
+			'transactionalEmailsEnabled' => true,
+			'transactionalCredentials'   => array(
 				'subdomain' => 'trxroundtrip',
 				'username'  => 'trx-user',
 				'password'  => 'trx-secret',
 			),
+		);
+
+		$response = RestRequestHelper::post(
+			'/settings',
+			array( 'tab' => 'connection', 'data' => $payload )
+		);
+		self::assertSame( 200, $response->get_status() );
+
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertTrue( $saved['transactionalEmailsEnabled'] );
+		self::assertSame( 'trxroundtrip', $saved['transactionalCredentials']['subdomain'] );
+		self::assertSame( 'trx-user', $saved['transactionalCredentials']['username'] );
+		self::assertSame( '', $saved['transactionalCredentials']['password'], 'Password must never round-trip to the boot payload.' );
+		self::assertTrue( $saved['transactionalConnected'], 'A complete credential pair must mark the account verified.' );
+	}
+
+	public function test_woocommerce_tab_round_trip_including_transactional_triggers(): void {
+		// PRO-1504 stage 1 — the two trigger mappings + "counts as shipped"
+		// status set stay on the woocommerce tab (PRO-1540 only moved the
+		// account connection itself, not these).
+		$payload = array(
 			'orderConfirmationEnabled'    => true,
 			'shippingConfirmationEnabled' => true,
 			'shippedOrderStatuses'        => array( 'completed', 'shipped' ),
@@ -188,11 +214,6 @@ final class SettingsRoundTripTest extends TestCase {
 
 		$saved = ( new EnvDetector() )->saved_settings();
 
-		self::assertTrue( $saved['transactionalEmailsEnabled'] );
-		self::assertSame( 'trxroundtrip', $saved['transactionalCredentials']['subdomain'] );
-		self::assertSame( 'trx-user', $saved['transactionalCredentials']['username'] );
-		self::assertSame( '', $saved['transactionalCredentials']['password'], 'Password must never round-trip to the boot payload.' );
-		self::assertTrue( $saved['transactionalConnected'], 'A complete credential pair must mark the account verified.' );
 		self::assertTrue( $saved['orderConfirmationEnabled'] );
 		self::assertTrue( $saved['shippingConfirmationEnabled'] );
 		self::assertSame( array( 'completed', 'shipped' ), $saved['shippedOrderStatuses'] );

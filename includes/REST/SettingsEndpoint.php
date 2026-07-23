@@ -262,6 +262,8 @@ class SettingsEndpoint {
 			: 'default';
 		update_option( 'smly_plus_default_fallback_account', $fallback_key );
 
+		$this->save_transactional_account( $data );
+
 		return $this->success_response();
 	}
 
@@ -338,7 +340,7 @@ class SettingsEndpoint {
 		);
 		update_option( self::LEGACY_OPTION_CART_CUTOFF, $cutoff );
 
-		$this->save_transactional_emails( $data );
+		$this->save_transactional_triggers( $data );
 
 		// Replace the mapping table contents in one shot — Settings always
 		// sends the full list it wants persisted, no partial updates.
@@ -348,31 +350,17 @@ class SettingsEndpoint {
 	}
 
 	/**
-	 * Transactional emails (PRO-1504, stage 1 — configuration only, no send
-	 * path). A separate Smaily account bound under account_key='transactional',
-	 * mirroring how the default account's credentials are persisted in
-	 * save_connection(): empty inbound password = "leave the stored secret
-	 * as-is", non-empty = "rotate to this".
+	 * Transactional emails — the account connection (PRO-1504 stage 1;
+	 * relocated to the Connection tab's payload by PRO-1540). A separate
+	 * Smaily account bound under account_key='transactional', mirroring how
+	 * the default account's credentials are persisted above: empty inbound
+	 * password = "leave the stored secret as-is", non-empty = "rotate to
+	 * this".
 	 *
 	 * @param array<string, mixed> $data
 	 */
-	private function save_transactional_emails( array $data ): void {
+	private function save_transactional_account( array $data ): void {
 		update_option( 'smly_plus_transactional_emails_enabled', ! empty( $data['transactionalEmailsEnabled'] ) );
-		update_option( 'smly_plus_order_confirmation_enabled', ! empty( $data['orderConfirmationEnabled'] ) );
-		update_option( 'smly_plus_shipping_confirmation_enabled', ! empty( $data['shippingConfirmationEnabled'] ) );
-
-		$statuses_raw = isset( $data['shippedOrderStatuses'] ) && is_array( $data['shippedOrderStatuses'] )
-			? $data['shippedOrderStatuses']
-			: array();
-		$statuses     = array_values(
-			array_filter(
-				array_map(
-					static fn ( $s ): string => sanitize_key( (string) $s ),
-					$statuses_raw
-				)
-			)
-		);
-		update_option( 'smly_plus_shipped_order_statuses', $statuses );
 
 		$creds     = isset( $data['transactionalCredentials'] ) && is_array( $data['transactionalCredentials'] )
 			? $data['transactionalCredentials']
@@ -389,6 +377,33 @@ class SettingsEndpoint {
 		// the merchant turns the feature on), so an incomplete/cleared pair
 		// must not keep showing a stale "✓ Connected" view.
 		update_option( 'smly_plus_transactional_connection_verified', $subdomain !== '' && $username !== '' );
+	}
+
+	/**
+	 * Transactional emails — the two trigger toggles + the "counts as
+	 * shipped" order-status set (PRO-1504 stage 1). Rendered on the
+	 * WooCommerce tab (PRO-1540: gated there on the transactional
+	 * connection above being established), so persisted alongside the
+	 * other WooCommerce-tab automations.
+	 *
+	 * @param array<string, mixed> $data
+	 */
+	private function save_transactional_triggers( array $data ): void {
+		update_option( 'smly_plus_order_confirmation_enabled', ! empty( $data['orderConfirmationEnabled'] ) );
+		update_option( 'smly_plus_shipping_confirmation_enabled', ! empty( $data['shippingConfirmationEnabled'] ) );
+
+		$statuses_raw = isset( $data['shippedOrderStatuses'] ) && is_array( $data['shippedOrderStatuses'] )
+			? $data['shippedOrderStatuses']
+			: array();
+		$statuses     = array_values(
+			array_filter(
+				array_map(
+					static fn ( $s ): string => sanitize_key( (string) $s ),
+					$statuses_raw
+				)
+			)
+		);
+		update_option( 'smly_plus_shipped_order_statuses', $statuses );
 	}
 
 	/**
