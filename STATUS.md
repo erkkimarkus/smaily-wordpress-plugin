@@ -26,7 +26,50 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**Upstream-merge prep — the F3-35 `Update URI`
+_Last updated: 2026-07-23 (**v3.9.0 release-gate delta SECURITY audit
+(PRO-1520 acceptance criterion 1) — 0 Blocker/Critical/High, 1 Should-fix
+(Medium), recorded, not fixed (audit-and-record scope).** Delta
+`123d479..69a83b8` (v3.8.1-publication tip to the pre-cut main tip; 5255/153
+lines, 46 files — over the >2,000-line policy threshold, and independently a
+release boundary): full read + adversarial pass on the new transactional-
+email sender (PRO-1504 Stages 1+2), the PRO-1518 Store-API checkout twin,
+the PRO-1519 retry ceiling, the PRO-1506 flush-time tombstone repair, the
+PRO-1517 mock-only fixes, and the F3-35 `Update URI` removal. **Should-fix**:
+`TransactionalPayloadBuilder`'s `context` merge-tag fields (`first_name`,
+`last_name`, `order_number`, `payment_method`, `shipping_method`,
+`product_name`, `product_description`) reach `message/send.php` without the
+`htmlspecialchars()` treatment the sibling `CartPayloadBuilder` already
+applies to the same-purpose fields for the same delivery mechanism —
+`first_name`/`last_name` are attacker-controlled via WC checkout and the
+recipient email is attacker-chosen too, so this is a plausible content-
+injection path into a transactional email IF Smaily's own merge-tag
+substitution doesn't already escape (external, unverified either way); not a
+release blocker (default-off feature, narrow mechanical fix, no proven local
+vulnerability) but flagged as a fast-follow before the feature reaches a
+pilot store. **Confirmed clean**: transactional credential storage reuses
+the existing `encrypt_password()`/`Credentials` path (zero new crypto,
+password never in the boot payload); `Client::send_message()`/
+`TransactionalFlusher` never capture the Authorization header (F3-44 rule
+holds, directly tested); the send gate is genuinely default-off and every
+new WC hook binding is internal/unauthenticated-unreachable; fail-open + the
+once-per-order-per-type meta guard make a double-send structurally
+impossible across sync+retry and across the PRO-1518 twin hooks; the
+PRO-1519 ceiling is type-scoped and time-bounded; no new REST route (the
+new `trigger_type` allowlist genuinely closes the gap named in the Stage 1
+record); PRO-1506 reuses two pre-existing, already-audited
+`CatalogPayloadBuilder` methods at a new call site; PRO-1517 touches only
+`tests/`/`docs/`, nothing shipped; the `Update URI` removal is header-only
+and correctly retires the long-carried intentional PCP
+`plugin_updater_detected` finding (the v3.9.0 PCP run should come back
+clean — a reappearance would be a regression signal, not the old baseline).
+**PCP against the built ZIP explicitly deferred to the release-build worker
+running the v3.9.0 cut later today** (out of scope for this pass). No
+`ci:strict`/integration re-run in this pass (docs-only audit-and-record
+task; STATUS.md already records green gates per code-touching commit in the
+delta). Docs: `docs/audits/SECURITY_DELTA_2026-07-23.md` (new report),
+`docs/audits/INDEX.md` new register row.)
+
+Prior: 2026-07-23 (**Upstream-merge prep — the F3-35 `Update URI`
 clobber-guard header removed from `smaily-connect.php`**, ahead of the
 sendsmaily upstream merge (Erkki's direction). WP core never offers a
 LOWER version than what's installed, so the wordpress.org listing (frozen
