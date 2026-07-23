@@ -26,7 +26,83 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**PRO-1537 — the v3.9.0 security audit's
+_Last updated: 2026-07-23 (**v3.9.0 — build/verify/gate sequence RUN, gates
+green; publication (GH release + tag) deferred to the orchestrator in this
+session, not performed by this pass.** MINOR bump — Transactional emails v1
+lands (PRO-1504, off by default), the F3-35 `Update URI` clobber-guard
+removed ahead of the sendsmaily upstream merge. Version bumped in all four
+places (`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
+`SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
+tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
+`tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
+(`1f0c0f1cbddfc938ffc3ec9dc4a9fe261c5ce7cd`, on `main`, not pushed — the
+orchestrator pushes + tags). Content since the v3.8.1 tip (`123d479`):
+PRO-1504 Stages 1+2 (transactional order/shipping-confirmation emails via a
+dedicated Smaily account, native-WC-email suppression, fail-open fallback),
+PRO-1518 (order confirmation also fires on WooCommerce Blocks / Store-API
+checkout), PRO-1519 (a 1-hour retry ceiling closes the fail-open gap on a
+persistent transient failure), PRO-1506 (`catalog.delete` tombstone repair
+now also runs at flush time, healing a pre-3.8.1 stuck row on Retry),
+PRO-1517 (mock-only rec-engine GDPR-path fidelity fixes, test-only, no
+version-bump-worthy change on its own), the F3-35 `Update URI` header
+removal, and PRO-1537 (transactional `context` merge-tag fields —
+`first_name`/`last_name`/`order_number`/`payment_method`/`shipping_method`/
+`product_name`/`product_description` — now `htmlspecialchars()`-escaped
+before reaching `message/send.php`, closing the Should-fix the v3.9.0 gate
+delta security audit flagged). Five user-facing changelog items (see
+`readme.txt` 3.9.0 entry): the new opt-in Transactional emails feature, the
+Store-API checkout-confirmation fix, the catalog-removal retry-repair fix,
+the retry-ceiling hardening, and the merge-tag escaping hardening.
+**PRO-1537 live-probe outcome (run today, 2026-07-23, `bin/walk-
+pro1537-escape-probe.cjs` against the smailydemo sandbox):** Smaily's own
+`message/send.php` merge-tag substitution does **NOT** escape `context`
+values itself — a raw `<b>probe-bold</b>` `first_name` rendered as live
+unescaped HTML in the received email. This confirms the plugin-side
+`TransactionalPayloadBuilder::escape()` fix (PRO-1537, already landed) is
+the **only** escaping layer in the pipeline — not a double-escape risk, and
+not optional. Builds: `npm run build:admin && npm run build:client`
+(`dist/admin/admin.js` 290.62 kB, `dist/public/js/sc-runtime.js` 6.47 kB);
+blocks rebuilt (`composer run install-block-modules && composer run
+build`); **i18n rebuild RUN** (`sg docker -c "bash bin/build-i18n.sh"`,
+required this cut — the new Transactional-emails admin strings, e.g.
+"Enable transactional emails" / "Counts as shipped", needed extraction into
+`languages/smaily-connect.pot` + `-et.po` and the admin-bundle JSON
+catalog `smaily-connect-et-464ceaab21588225a35cae9f83dfa47d.json`).
+`composer install --no-dev --optimize-autoloader` → `composer run package`
+→ `composer install` (dev vendor restored immediately after packaging,
+verified via `vendor/bin/phpunit` present). **ZIP verified**: 3.9.0 in both
+version strings present in the shipped tree (plugin header, readme Stable
+tag — `package.json` is a dev source file, not shipped, by design);
+required present (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
+`blocks/*/build/*` all three blocks, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + the admin-bundle et JSON,
+`composer.json`); dev artifacts/tests/docs/node_modules/admin-src/dev-vendor
+absent (grep-verified); **1 147 215 B** (vs. v3.8.1's 1 122 412 B — the
+delta is consistent with the new transactional admin UI + backend code).
+**PCP against the built ZIP** (`docker cp` into the wp-env `…-cli-1`
+container, unzipped to `smaily-connect-pkg` — never the bind-mounted
+`smaily-connect` dir — `--slug=smaily-connect --exclude-directories=vendor`,
+temp copies cleaned up after): **`plugin_updater_detected` is GONE** (F3-35
+removal confirmed working — the long-carried intentional finding is
+retired), `mismatched_plugin_name` stays gone. Exactly **2 new WARNING
+findings**, both `WordPress.DB.SlowDBQuery.slow_db_query_meta_key` in
+`includes/Smaily/TransactionalGate.php` (lines 66, 71 — `get_post_meta`/
+`update_post_meta` calls on the new order-meta gate guard). Reported, not
+fixed, per this task's scope (new transactional-code warnings are a
+follow-up, not a release blocker — low-severity WPCS style warning, common
+across WP plugins doing per-order meta reads). **`ci:strict` exit=0**
+(PHPCS 0 errors [only pre-existing warnings], PHPStan clean, PHPUnit unit
+**652/652** — was 650, +2 from PRO-1537's escaping tests; vitest 251/251,
+tsc/eslint clean). **Integration suite RE-RUN in full**: `sg docker -c
+"composer run test:integration"` **OK (180 tests, 907 assertions)** —
+unchanged count from the PRO-1517 mock-fidelity pass (no new integration
+tests landed since), dev sandbox tenant "Smaily Connect test" correctly
+restored post-run (not MiuMjau, `connected=1`). **NOT published**: no `gh
+release`, no git tag — per this task's scope, publication is the
+orchestrator's step. ZIP left at repo root (`smaily-connect.zip`), SHA256
+`121e5ab79a7a0ae2209e23c004cb93ce617f555c401ec88c69fbf398dfb14c1c`.
+
+Prior: 2026-07-23 (**PRO-1537 — the v3.9.0 security audit's
 Should-fix (Medium) fixed same-day.** `TransactionalPayloadBuilder`'s
 `context` merge-tag fields — `first_name`, `last_name`, `order_number`,
 `payment_method`, `shipping_method`, `product_name`, `product_description`
