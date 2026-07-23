@@ -26,7 +26,46 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**PRO-1196 prep — upstream-merge proposal refreshed
+_Last updated: 2026-07-23 (**Three small independent fixes: PRO-1539 (Event Log
+aged-failure bulk retry), PRO-1538 (PCP false-positive suppressions), PRO-1541
+(merchant-docs workflow-dropdown note).**
+- **PRO-1539** — `admin/src/components/settings/EventLog.tsx`'s "Retry all
+  failed" control used to live only inside the 24h-failure Banner
+  (`failed24h > 0`), so a store with old failed rows and no fresh failures
+  (found live on MiuMjau) had no bulk-retry path at all. Added a second
+  "Retry all failed" `Button` next to the status filter, shown whenever
+  `failed24h === 0` but the currently-loaded rows include a failed one —
+  reuses the existing `handleRetry({})` call, so the two controls never
+  render simultaneously (no duplicate-button risk) and the 24h banner is
+  untouched. New vitest case pins the aged path (`failed_24h: 0` + a failed
+  row → control visible and calls `retryEvents({})`); the existing
+  `failed24h > 0` test now also asserts exactly one "Retry all failed" button
+  renders.
+- **PRO-1538** — `includes/Smaily/TransactionalGate.php`'s two `'meta_key'`
+  array-config entries (order/shipping confirmation per-order guard keys)
+  trip PCP's `WordPress.DB.SlowDBQuery.slow_db_query_meta_key` sniff, which
+  pattern-matches any `meta_key` array key regardless of context — these are
+  config values consumed as a per-order-id meta guard
+  (`get_meta`/`update_meta_data` by order id), never a `WP_Query`
+  `meta_query`. Added `phpcs:ignore` comments mirroring the PRO-1436 cart-code
+  suppression idiom (standalone comment line, `sniff -- justification`).
+  Comment-only, no behavior change.
+- **PRO-1541** — `docs/site/index.html` Settings → Automations section gained
+  a bilingual (EN/ET) note covering three workflow-dropdown facts: the
+  dropdowns read the list live from the merchant's Smaily account on every
+  settings-page load (no cache/refresh interval — reload after a Smaily-side
+  change); only **active** Smaily workflows are listed (a deactivated one
+  disappears); and each dropdown lists the workflows of the account its
+  section uses (transactional-email sections list the separate transactional
+  account's workflows, not the main account's).
+
+Gates: `npm run ci:strict` exit=0 (PHPCS 0 errors, PHPStan clean, PHPUnit unit
+653/653, vitest 258/258 incl. the 2 new/updated EventLog cases, eslint/tsc
+clean). Integration suite (`sg docker -c "composer run test:integration"`)
+**not re-run** — no PHP behavior change (Task 2 is phpcs-comment-only; Tasks 1
+and 3 are React/docs-only).
+
+Prior: 2026-07-23 (**PRO-1196 prep — upstream-merge proposal refreshed
 to current truth, doc-only.** `docs/UPSTREAM_MERGE_PROPOSAL.md`'s narrative
 still described the fork as shipping behind the `Update URI` guard in three
 places (Status line, the PCP-finding table row, the "Distribution flips"
