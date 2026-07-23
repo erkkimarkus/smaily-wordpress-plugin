@@ -26,7 +26,67 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**Pre-v3.10.0 delta security audit (docs-only,
+_Last updated: 2026-07-23 (**v3.10.0 — build/verify/gate sequence RUN, gates
+green; publication (GH release + tag) deferred to the orchestrator in this
+session, not performed by this pass.** MINOR bump — the pilot-driven
+Transactional-emails Settings UI restructure (PRO-1540: account connection
+moved to the Connection tab with its own connection test, Order/Shipping
+trigger sections gated onto the WooCommerce tab only once that account is
+connected, "separate Smaily account" wording, docs-site rewrite), the Event
+Log "Retry all failed" reachability fix for aged failures with no fresh
+24h failures (PRO-1539), PCP false-positive `slow_db_query_meta_key`
+suppressions on `TransactionalGate` (PRO-1538), the contract §7
+`identity/merge` errata re-sync (PRO-1534, doc/mock-only, no plugin code
+touched the removed field), the PRO-1537 live-escape-probe walk script
+(tooling, no shipped-code change), and doc-only upstream-merge-prep /
+delta-security-audit work. No option-key or REST-field-name changes in
+PRO-1540 — a store already configured on v3.9.0 keeps working, only the tab
+it edits from changed. Version bumped in all four places
+(`smaily-connect.php` header + `SMAILY_CONNECT_VERSION` +
+`SMAILY_CONNECT_PLUGIN_VERSION`, `package.json`, `readme.txt` Stable
+tag/Changelog/Upgrade Notice) plus the three test pins (`ConstantsTest.php`,
+`tests/bootstrap.php`, `tests/phpstan-bootstrap.php`), committed first
+(`36977dee2e364ec9af2a006896a2ad108112bbfd`, on `main`, not pushed — the
+orchestrator pushes + tags). Two user-facing changelog items (see
+`readme.txt` 3.10.0 entry): the transactional-emails settings relocation for
+discoverability, and the aged-failure Event-Log bulk-retry fix. Builds:
+`npm run build:admin && npm run build:client` (`dist/admin/admin.js`
+291.70 kB, `dist/public/js/sc-runtime.js` 6.47 kB); blocks rebuilt
+(`composer run install-block-modules && composer run build`); **i18n
+rebuild RUN** (`sg docker -c "bash bin/build-i18n.sh"`, required this cut —
+PRO-1540's new admin strings, e.g. "Use transactional emails" / "A separate
+Smaily account used only for transactional sends." / the two
+Connection↔WooCommerce forward-pointer strings, needed extraction into
+`languages/smaily-connect.pot` + `-et.po` and the admin-bundle JSON catalog
+`smaily-connect-et-464ceaab21588225a35cae9f83dfa47d.json`). `composer
+install --no-dev --optimize-autoloader` → `composer run package` →
+`composer install` (dev vendor restored immediately after packaging,
+verified via `vendor/bin/phpunit` present). **ZIP verified**: 3.10.0 in both
+version strings present in the shipped tree (plugin header, readme Stable
+tag — `package.json` is a dev source file, not shipped, by design);
+required present (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
+`blocks/*/build/*` all three blocks, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + the admin-bundle et JSON,
+`composer.json`); dev artifacts/tests/docs/node_modules/admin-src/dev-vendor
+absent (grep-verified); **1 148 878 B** (vs. v3.9.0's 1 147 215 B — the
+small delta is consistent with the two-tab UI restructure + one new admin
+component). **PCP against the built ZIP** (`docker cp` into the wp-env
+`…-cli-1` container, unzipped to `smaily-connect-pkg` — never the
+bind-mounted `smaily-connect` dir — `--slug=smaily-connect
+--exclude-directories=vendor`, temp copies cleaned up after): **0 findings**
+("Success: Checks complete. No errors found.") — the two
+`slow_db_query_meta_key` warnings the v3.9.0 gate carried are now
+suppressed by PRO-1538, as intended. **`ci:strict` exit=0** (PHPCS 0 errors
+[only pre-existing warnings], PHPStan clean, PHPUnit unit **653/653**,
+vitest **258/258** across 33 files, tsc/eslint clean). **Integration suite
+RE-RUN in full**: `sg docker -c "composer run test:integration"` **OK (181
+tests, 916 assertions)**, dev sandbox tenant "Smaily Connect test" correctly
+restored post-run (not MiuMjau, `connected=1`). **NOT published**: no `gh
+release`, no git tag — per this task's scope, publication is the
+orchestrator's step. ZIP left at repo root (`smaily-connect.zip`), SHA256
+`45f25d315092e87f4258084eb00d8185529a22f94396bf071914c52c8306e774`.
+
+Prior: 2026-07-23 (**Pre-v3.10.0 delta security audit (docs-only,
 audit-and-record) + CLAUDE.md docs-site publish-mechanism note.**
 - **Security audit** — addendum appended to
   `docs/audits/SECURITY_DELTA_2026-07-23.md` ("Addendum: pre-v3.10.0 delta

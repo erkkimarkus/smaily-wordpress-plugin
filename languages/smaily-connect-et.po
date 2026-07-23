@@ -27,8 +27,8 @@ msgstr "Ühenda oma WooCommerce'i pood Smailyga e-posti turunduse, automatiseeri
 #. Author of the plugin
 #: smaily-connect.php
 #: integrations/elementor/admin.class.php:29
-#: admin/src/components/settings/EventLog.tsx:149
-#: admin/src/components/settings/EventLog.tsx:189
+#: admin/src/components/settings/EventLog.tsx:150
+#: admin/src/components/settings/EventLog.tsx:201
 msgid "Smaily"
 msgstr "Smaily"
 
@@ -1085,174 +1085,175 @@ msgid "Retry failed."
 msgstr "Uuesti proovimine ebaõnnestus."
 
 #. translators: %d is the number of failed events in the last 24 hours.
-#: admin/src/components/settings/EventLog.tsx:92
+#: admin/src/components/settings/EventLog.tsx:93
 #, js-format
 msgid "%d failed event in the last 24 hours"
 msgid_plural "%d failed events in the last 24 hours"
 msgstr[0] "%d ebaõnnestunud sündmus viimase 24 tunni jooksul"
 msgstr[1] "%d ebaõnnestunud sündmust viimase 24 tunni jooksul"
 
-#: admin/src/components/settings/EventLog.tsx:110
+#: admin/src/components/settings/EventLog.tsx:111
 msgid "View only failed"
 msgstr "Näita ainult ebaõnnestunuid"
 
-#: admin/src/components/settings/EventLog.tsx:120
+#: admin/src/components/settings/EventLog.tsx:121
+#: admin/src/components/settings/EventLog.tsx:181
 msgid "Retry all failed"
 msgstr "Proovi kõiki ebaõnnestunuid uuesti"
 
-#: admin/src/components/settings/EventLog.tsx:124
+#: admin/src/components/settings/EventLog.tsx:125
 msgid "Some records didn’t reach their destination. Review them below."
 msgstr "Mõned kirjed ei jõudnud sihtkohta. Vaata need allpool üle."
 
-#: admin/src/components/settings/EventLog.tsx:130
+#: admin/src/components/settings/EventLog.tsx:131
 msgid "Event log"
 msgstr "Sündmuste logi"
 
-#: admin/src/components/settings/EventLog.tsx:131
+#: admin/src/components/settings/EventLog.tsx:132
 msgid "Sync activity across the Smaily and recommendation-engine queues. Read-only — last 7 days of events."
 msgstr "Sünkroonimistegevus Smaily ja soovitusmootori järjekordades. Ainult lugemiseks — viimase 7 päeva sündmused."
 
-#: admin/src/components/settings/EventLog.tsx:140
+#: admin/src/components/settings/EventLog.tsx:141
 msgid "Filter by source"
 msgstr "Filtreeri allika järgi"
 
-#: admin/src/components/settings/EventLog.tsx:147
+#: admin/src/components/settings/EventLog.tsx:148
 msgid "All sources"
 msgstr "Kõik allikad"
 
-#: admin/src/components/settings/EventLog.tsx:148
+#: admin/src/components/settings/EventLog.tsx:149
 msgid "Recommendations engine"
 msgstr "Soovitusmootor"
 
-#: admin/src/components/settings/EventLog.tsx:156
+#: admin/src/components/settings/EventLog.tsx:157
 msgid "Filter by status"
 msgstr "Filtreeri oleku järgi"
 
-#: admin/src/components/settings/EventLog.tsx:163
+#: admin/src/components/settings/EventLog.tsx:164
 msgid "All statuses"
 msgstr "Kõik olekud"
 
-#: admin/src/components/settings/EventLog.tsx:164
+#: admin/src/components/settings/EventLog.tsx:165
 msgid "Pending"
 msgstr "Ootel"
 
-#: admin/src/components/settings/EventLog.tsx:165
+#: admin/src/components/settings/EventLog.tsx:166
 msgid "Sent"
 msgstr "Saadetud"
 
-#: admin/src/components/settings/EventLog.tsx:166
+#: admin/src/components/settings/EventLog.tsx:167
 msgid "Failed"
 msgstr "Ebaõnnestunud"
 
-#: admin/src/components/settings/EventLog.tsx:167
+#: admin/src/components/settings/EventLog.tsx:168
 msgid "Blocked"
 msgstr "Blokeeritud"
 
-#: admin/src/components/settings/EventLog.tsx:171
+#: admin/src/components/settings/EventLog.tsx:172
 msgid "Refresh"
 msgstr "Värskenda"
 
-#: admin/src/components/settings/EventLog.tsx:176
+#: admin/src/components/settings/EventLog.tsx:188
 msgid "Time (UTC)"
 msgstr "Aeg (UTC)"
 
-#: admin/src/components/settings/EventLog.tsx:177
-#: admin/src/components/settings/EventLog.tsx:300
+#: admin/src/components/settings/EventLog.tsx:189
+#: admin/src/components/settings/EventLog.tsx:312
 msgid "Source"
 msgstr "Allikas"
 
-#: admin/src/components/settings/EventLog.tsx:178
+#: admin/src/components/settings/EventLog.tsx:190
 msgid "Event"
 msgstr "Sündmus"
 
-#: admin/src/components/settings/EventLog.tsx:179
-#: admin/src/components/settings/EventLog.tsx:308
+#: admin/src/components/settings/EventLog.tsx:191
+#: admin/src/components/settings/EventLog.tsx:320
 msgid "Entity"
 msgstr "Olem"
 
-#: admin/src/components/settings/EventLog.tsx:180
-#: admin/src/components/settings/EventLog.tsx:304
+#: admin/src/components/settings/EventLog.tsx:192
+#: admin/src/components/settings/EventLog.tsx:316
 msgid "Status"
 msgstr "Olek"
 
-#: admin/src/components/settings/EventLog.tsx:181
-#: admin/src/components/settings/EventLog.tsx:312
+#: admin/src/components/settings/EventLog.tsx:193
+#: admin/src/components/settings/EventLog.tsx:324
 msgid "Attempts"
 msgstr "Katsed"
 
-#: admin/src/components/settings/EventLog.tsx:182
-#: admin/src/components/settings/EventLog.tsx:324
+#: admin/src/components/settings/EventLog.tsx:194
+#: admin/src/components/settings/EventLog.tsx:336
 msgid "Last error"
 msgstr "Viimane viga"
 
-#: admin/src/components/settings/EventLog.tsx:186
+#: admin/src/components/settings/EventLog.tsx:198
 msgid "No events yet."
 msgstr "Sündmusi veel pole."
 
-#: admin/src/components/settings/EventLog.tsx:189
+#: admin/src/components/settings/EventLog.tsx:201
 msgid "Rec"
 msgstr "Mootor"
 
-#: admin/src/components/settings/EventLog.tsx:213
+#: admin/src/components/settings/EventLog.tsx:225
 #: admin/src/components/steps/EngineAutomationsSection.tsx:175
 msgid "Retry"
 msgstr "Proovi uuesti"
 
-#: admin/src/components/settings/EventLog.tsx:216
+#: admin/src/components/settings/EventLog.tsx:228
 msgid "Details"
 msgstr "Üksikasjad"
 
 #. translators: %d is the total number of events.
-#: admin/src/components/settings/EventLog.tsx:225
+#: admin/src/components/settings/EventLog.tsx:237
 #, js-format
 msgid "%d event"
 msgid_plural "%d events"
 msgstr[0] "%d sündmus"
 msgstr[1] "%d sündmust"
 
-#: admin/src/components/settings/EventLog.tsx:228
+#: admin/src/components/settings/EventLog.tsx:240
 msgid " · loading…"
 msgstr " · laadimine…"
 
-#: admin/src/components/settings/EventLog.tsx:238
+#: admin/src/components/settings/EventLog.tsx:250
 msgid "Previous"
 msgstr "Eelmine"
 
 #. translators: %1$d is the current page number, %2$d is the total page count.
-#: admin/src/components/settings/EventLog.tsx:243
+#: admin/src/components/settings/EventLog.tsx:255
 #, js-format
 msgid "Page %1$d of %2$d"
 msgstr "Lehekülg %1$d / %2$d"
 
-#: admin/src/components/settings/EventLog.tsx:254
+#: admin/src/components/settings/EventLog.tsx:266
 msgid "Next"
 msgstr "Järgmine"
 
-#: admin/src/components/settings/EventLog.tsx:288
+#: admin/src/components/settings/EventLog.tsx:300
 msgid "Close details"
 msgstr "Sulge üksikasjad"
 
-#: admin/src/components/settings/EventLog.tsx:296
+#: admin/src/components/settings/EventLog.tsx:308
 msgid "Close"
 msgstr "Sule"
 
-#: admin/src/components/settings/EventLog.tsx:319
+#: admin/src/components/settings/EventLog.tsx:331
 msgid "Created (UTC)"
 msgstr "Loodud (UTC)"
 
-#: admin/src/components/settings/EventLog.tsx:328
+#: admin/src/components/settings/EventLog.tsx:340
 msgid "Request sent to the engine"
 msgstr "Mootorisse saadetud päring"
 
-#: admin/src/components/settings/EventLog.tsx:329
+#: admin/src/components/settings/EventLog.tsx:341
 msgid "— nothing recorded (not sent, or the row predates this version)"
 msgstr "— midagi pole salvestatud (ei saadetud või rida on sellest versioonist vanem)"
 
-#: admin/src/components/settings/EventLog.tsx:332
+#: admin/src/components/settings/EventLog.tsx:344
 msgid "Engine response"
 msgstr "Mootori vastus"
 
-#: admin/src/components/settings/EventLog.tsx:336
+#: admin/src/components/settings/EventLog.tsx:348
 msgid "Enqueued payload"
 msgstr "Järjekorda pandud sisu"
 
@@ -1526,38 +1527,38 @@ msgstr "Kopeeritud ✓"
 msgid "Copy"
 msgstr "Kopeeri"
 
-#: admin/src/components/steps/Step1Connect.tsx:37
+#: admin/src/components/steps/Step1Connect.tsx:38
 msgid "Step 1 of 6"
 msgstr "1. samm 6-st"
 
-#: admin/src/components/steps/Step1Connect.tsx:38
+#: admin/src/components/steps/Step1Connect.tsx:39
 msgid "Connect your Smaily account"
 msgstr "Ühenda oma Smaily konto"
 
-#: admin/src/components/steps/Step1Connect.tsx:39
+#: admin/src/components/steps/Step1Connect.tsx:40
 msgid "Enter the credentials from your Smaily admin → Settings → API. We'll verify them before saving — nothing is persisted until you click Continue."
 msgstr "Sisesta mandaadid oma Smaily admin → Sätted → API alt. Kontrollime need enne salvestamist — midagi ei salvestata, kuni klõpsad Jätka."
 
-#: admin/src/components/steps/Step1Connect.tsx:55
+#: admin/src/components/steps/Step1Connect.tsx:56
 msgid "Smaily API credentials"
 msgstr "Smaily API kasutajaandmed"
 
-#: admin/src/components/steps/Step1Connect.tsx:78
+#: admin/src/components/steps/Step1Connect.tsx:79
 msgid "Default fallback account"
 msgstr "Vaikimisi varukonto"
 
-#: admin/src/components/steps/Step1Connect.tsx:79
+#: admin/src/components/steps/Step1Connect.tsx:80
 msgid "Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
 msgstr "Kasutatakse, kui kontakti keelt ei õnnestu tuvastada (külastajad, kes registreeruvad enne, kui WPML/Polylang lokaadi valib)."
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:103
+#: admin/src/components/steps/Step1Connect.tsx:105
 #, js-format
 msgid "Account for %s"
 msgstr "%s konto"
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:108
+#: admin/src/components/steps/Step1Connect.tsx:110
 #, js-format
 msgid "Contacts with the %s locale will sync to this Smaily account."
 msgstr "%s lokaadiga kontaktid sünkroonitakse sellesse Smaily kontosse."
@@ -2490,46 +2491,59 @@ msgstr "Dokumentatsioon"
 msgid "If a previously selected workflow no longer appears here, it may have been disabled or deleted in Smaily — your existing selection is kept; check Smaily before choosing a different one."
 msgstr "Kui varem valitud töövoog siin enam ei kuva, võib see olla Smailys välja lülitatud või kustutatud — teie olemasolev valik säilib; kontrollige Smailys, enne kui valite mõne teise."
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:33
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:32
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:15
 msgid "Transactional emails"
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:34
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:33
 msgid "Send order confirmations and shipping notices through a separate Smaily account, kept apart from your marketing sends."
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:45
-msgid "Enable transactional emails"
-msgstr ""
-
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:52
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:51
 msgid "Transactional Smaily account"
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:53
-msgid "A separate Smaily account (or sub-account) used only for transactional sends."
-msgstr ""
-
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:72
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:27
 msgid "Order confirmation"
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:73
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:28
 msgid "Sent when a customer places an order."
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:85
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:40
 msgid "Shipping confirmation"
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:86
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:41
 msgid "Sent when an order reaches one of the statuses marked as shipped below."
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:101
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:53
 msgid "Counts as shipped"
 msgstr ""
 
-#: admin/src/components/steps/TransactionalEmailsSection.tsx:102
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:54
 msgid "Order statuses that trigger the shipping-confirmation email."
+msgstr ""
+
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:44
+msgid "Use transactional emails"
+msgstr ""
+
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:52
+msgid "A separate Smaily account used only for transactional sends."
+msgstr ""
+
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:65
+msgid "Once connected, set up the Order confirmation and Shipping confirmation triggers on the WooCommerce tab."
+msgstr ""
+
+#: admin/src/components/steps/TransactionalEmailsSection.tsx:68
+msgid "Once connected, set up the Order confirmation and Shipping confirmation triggers in the WooCommerce automations step."
+msgstr ""
+
+#: admin/src/components/steps/TransactionalTriggersSection.tsx:16
+msgid "Sent through the separate Smaily account you connected on the Connection tab, kept apart from the marketing automations above."
 msgstr ""
