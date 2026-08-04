@@ -37,6 +37,10 @@ final class StorefrontBeaconTest extends TestCase {
 
 	protected function tearDown(): void {
 		update_option( self::TRACK_OPTION, false );
+		wp_dequeue_script( StorefrontBeacon::HANDLE );
+		wp_dequeue_script( StorefrontBeacon::HANDLE_LANDING );
+		wp_deregister_script( StorefrontBeacon::HANDLE );
+		wp_deregister_script( StorefrontBeacon::HANDLE_LANDING );
 		parent::tearDown();
 	}
 
@@ -83,6 +87,83 @@ final class StorefrontBeaconTest extends TestCase {
 		self::assertSame( 'smaily_anon_sid', $config['cookieNames']['session'] );
 		self::assertSame( 'smaily_rec_id', $config['cookieNames']['recId'] );
 		self::assertSame( 30, $config['sessionTtlDays'] );
+	}
+
+	/**
+	 * PRO-1767: a connected store with browse tracking OFF still needs a
+	 * browser-side attribution writer — its landing pages can be served from a
+	 * full-page cache, where LandingCapture (PHP) never runs at all.
+	 */
+	public function test_enqueues_only_the_attribution_writer_when_tracking_is_off(): void {
+		$this->require_built_bundles();
+		EnvSeed::connect();
+		update_option( self::TRACK_OPTION, false );
+
+		$beacon = $this->beacon();
+		self::assertTrue( $beacon->is_attribution_only_enabled() );
+		$beacon->enqueue();
+
+		self::assertTrue( wp_script_is( StorefrontBeacon::HANDLE_LANDING, 'enqueued' ), 'The attribution writer must load with browse tracking off.' );
+		self::assertFalse( wp_script_is( StorefrontBeacon::HANDLE, 'enqueued' ), 'The browse runtime stays behind its own toggle.' );
+
+		$boot = (string) wp_scripts()->get_data( StorefrontBeacon::HANDLE_LANDING, 'before' )[1];
+		self::assertStringContainsString( 'window.smailyConnectLanding', $boot );
+		self::assertStringContainsString( 'smaily_rec_id', $boot, 'The writer needs the cookie names.' );
+		self::assertStringNotContainsString( 'relay', $boot, 'No proxy URL — this bundle sends nothing.' );
+	}
+
+	public function test_enqueues_only_the_runtime_when_tracking_is_on(): void {
+		$this->require_built_bundles();
+		EnvSeed::connect();
+		update_option( self::TRACK_OPTION, true );
+
+		$beacon = $this->beacon();
+		self::assertFalse( $beacon->is_attribution_only_enabled(), 'The runtime captures the same params — never both writers.' );
+		$beacon->enqueue();
+
+		self::assertTrue( wp_script_is( StorefrontBeacon::HANDLE, 'enqueued' ) );
+		self::assertFalse( wp_script_is( StorefrontBeacon::HANDLE_LANDING, 'enqueued' ) );
+	}
+
+	public function test_enqueues_neither_when_not_connected(): void {
+		$this->require_built_bundles();
+		update_option( self::TRACK_OPTION, false );
+
+		$beacon = $this->beacon();
+		self::assertFalse( $beacon->is_attribution_only_enabled() );
+		$beacon->enqueue();
+
+		self::assertFalse( wp_script_is( StorefrontBeacon::HANDLE, 'enqueued' ) );
+		self::assertFalse( wp_script_is( StorefrontBeacon::HANDLE_LANDING, 'enqueued' ) );
+	}
+
+	public function test_attribution_writer_answers_to_the_landing_capture_master_switch(): void {
+		EnvSeed::connect();
+		update_option( self::TRACK_OPTION, false );
+
+		add_filter( 'smaily_connect_capture_attribution', '__return_false' );
+		$enabled = $this->beacon()->is_attribution_only_enabled();
+		remove_filter( 'smaily_connect_capture_attribution', '__return_false' );
+
+		self::assertFalse( $enabled, 'A merchant who turned attribution capture off does not get a new writer.' );
+	}
+
+	public function test_attribution_config_carries_only_what_the_writer_needs(): void {
+		EnvSeed::connect();
+		$config = $this->beacon()->attribution_config();
+
+		self::assertSame( array( 'cookieNames', 'urlParams', 'cookieTtlDays' ), array_keys( $config ) );
+		self::assertSame( 'smaily_rec_id', $config['cookieNames']['recId'] );
+		self::assertArrayNotHasKey( 'session', $config['cookieNames'], 'The session cookie belongs to the browse runtime.' );
+		self::assertSame( 'smaily_rec', $config['urlParams']['recId'] );
+		self::assertSame( 30, $config['cookieTtlDays']['recId'] );
+	}
+
+	private function require_built_bundles(): void {
+		$dir = SMAILY_CONNECT_PLUGIN_PATH . 'dist/public/js/';
+		if ( ! file_exists( $dir . 'sc-runtime.js' ) || ! file_exists( $dir . 'sc-landing.js' ) ) {
+			self::markTestSkipped( 'Storefront bundles not built — run `npm run build:client`.' );
+		}
 	}
 
 	public function test_page_context_is_other_without_a_storefront_query(): void {
