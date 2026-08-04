@@ -106,22 +106,33 @@ work. Single-object vs batch changes the queue/flush batching for customers.
 today. No plugin error, but the data won't land until Route A stores them.
 Single-object batching change as with customers.
 
-**Open divergence — `smaily_rec_id` must be a UUID (found 2026-08-04, during the
-v1.8.0 contract sync).** The contract's §5 field table types `smaily_rec_id` as a
-plain `string | NO`, but the live route validates it as
+**`smaily_rec_id` must be a UUID (found 2026-08-04 during the v1.8.0 contract
+sync) — ✅ RESOLVED (PRO-1710, 2026-08-04).** The contract's §5 field table types
+`smaily_rec_id` as a plain `string | NO`, but the live route validates it as
 `z.string().uuid().optional()` (`app/api/v1/ingest/orders/route.ts`; the same
 holds for §6 browse) — and orders validate **per-order (D6)**, so ONE order
-carrying a non-UUID `smaily_rec_id` fails permanently with an `errors[]` entry
-while its batch mates go through. The mock does not model this: it never
-inspects `smaily_rec_id`, so any string passes. Plugin side,
-`LandingCapture::is_rec_id()` deliberately accepts any bounded id token
-(`^[A-Za-z0-9._-]{1,64}$`) rather than a UUID, so a visitor arriving with a
-hand-typed or truncated `?smaily_rec=` value gets it cookied → stamped on the
-order → the order is D6-rejected. Not introduced by the v1.8.0 sync (the engine
-constraint predates it; the sync's errata note is what surfaced it) and
-therefore not fixed in that pass — recorded here as the anchor for the
-follow-up, which has to decide the pair together: tighten the capture-side
-shape check, and/or make the mock enforce the UUID so the mock stops masking it.
+carrying a non-UUID `smaily_rec_id` failed permanently with an `errors[]` entry
+while its batch mates went through. The mock did not model this (it never
+inspected the field, so any string passed), and plugin side
+`LandingCapture::is_rec_id()` deliberately accepted any bounded id token
+(`^[A-Za-z0-9._-]{1,64}$`), so a visitor arriving with a hand-typed, truncated or
+crafted `?smaily_rec=` value got it cookied → stamped on the order → that order
+was silently lost to ingest. Not introduced by the v1.8.0 sync (the engine
+constraint predates it; the sync's errata note is what surfaced it).
+
+| Dimension | Mock (before PRO-1710) | Real engine | Mock now | Plugin now |
+|-----------|------------------------|-------------|----------|------------|
+| `smaily_rec_id` shape | never inspected — any string passed | `z.string().uuid()`, validated **per order** (D6) → `errors[{field:"smaily_rec_id", message:"Invalid uuid"}]` | same per-item D6 error, zod's regex + message verbatim | validated at BOTH ends via `Support\RecId`: capture (`LandingCapture`, + the JS `captureUrlParams` twin — same cookie) refuses to cookie a non-UUID; send (`OrderPayloadBuilder`) drops a non-UUID stored on order meta and ships the order un-attributed |
+
+The send-side half exists because the capture fix cannot reach a cookie already
+sitting in a shopper's browser on a live store. The stored order meta is left
+untouched — only the wire object omits the field. `smaily_vt` (visitor token) is
+deliberately NOT uuid-typed: it is an opaque engine token (`z.string()`).
+Typing `smaily_rec_id` as a UUID in the contract document itself is the engine
+ask filed as PRO-1713; §6 browse carries the same engine constraint and is
+**not** covered by this fix (the plugin's JS never puts a rec id on a browse
+event, but `BeaconEndpoint::EVENT_FIELDS` still whitelists a client-supplied
+one — the same class as the unresolved PRO-1486 spoofing follow-up).
 
 ---
 

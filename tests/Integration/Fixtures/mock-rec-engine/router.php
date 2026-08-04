@@ -801,6 +801,25 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 			continue;
 		}
 
+		// Live-engine Zod: `smaily_rec_id: z.string().uuid().optional()`, and
+		// orders validate PER ORDER (D6) — a non-uuid rejects THAT order while
+		// its batch mates go through. The mock not checking it is what let
+		// PRO-1710 hide: a junk `?smaily_rec=` landing value was cookied →
+		// stamped on the order → the order permanently rejected live, green
+		// here. Regex + message mirror zod verbatim (8-4-4-4-12 hex, no
+		// version/variant constraint; "Invalid uuid").
+		if ( isset( $order['smaily_rec_id'] )
+			&& ( ! is_string( $order['smaily_rec_id'] )
+				|| ! preg_match( '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/', $order['smaily_rec_id'] ) ) ) {
+			$errors[] = array(
+				'index'             => $index,
+				'external_order_id' => $external_id,
+				'field'             => 'smaily_rec_id',
+				'message'           => 'Invalid uuid',
+			);
+			continue;
+		}
+
 		if ( strpos( $email, 'd6err-' ) === 0 ) {
 			$errors[] = array(
 				'index'             => $index,
