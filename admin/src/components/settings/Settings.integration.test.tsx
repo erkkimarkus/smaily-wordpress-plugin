@@ -98,7 +98,7 @@ describe('Settings — tab routing + dirty + save', () => {
     expect(screen.getByText(/Smaily connection required/i)).toBeInTheDocument();
 
     // PillTabs render the locked tabs as disabled buttons.
-    expect(screen.getByRole('tab', { name: /subscribers/i })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: /contacts/i })).toBeDisabled();
     expect(screen.getByRole('tab', { name: /woocommerce/i })).toBeDisabled();
     expect(screen.getByRole('tab', { name: /campaign intelligence/i })).toBeDisabled();
     // Connection + Integrations stay accessible.

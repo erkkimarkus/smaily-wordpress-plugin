@@ -237,11 +237,11 @@ td code{white-space:nowrap}
         <li><a href="#install" data-lang="en">Install the plugin</a><a href="#install" data-lang="et">Plugina paigaldus</a></li>
         <li><a href="#dashboard" data-lang="en">The Dashboard</a><a href="#dashboard" data-lang="et">Töölaud</a></li>
         <li><a href="#step1" data-lang="en">Step 1 — Connect Smaily</a><a href="#step1" data-lang="et">Samm 1 — Ühenda Smaily</a></li>
-        <li><a href="#step2" data-lang="en">Step 2 — Subscribers</a><a href="#step2" data-lang="et">Samm 2 — Tellijad</a></li>
+        <li><a href="#step2" data-lang="en">Step 2 — Contacts</a><a href="#step2" data-lang="et">Samm 2 — Kontaktid</a></li>
         <li><a href="#step3" data-lang="en">Step 3 — Automations</a><a href="#step3" data-lang="et">Samm 3 — Automaatikad</a></li>
         <li><a href="#step4" data-lang="en">Step 4 — Recommendations</a><a href="#step4" data-lang="et">Samm 4 — Soovitused</a></li>
-        <li><a href="#step5" data-lang="en">Step 5 — Integrations</a><a href="#step5" data-lang="et">Samm 5 — Integratsioonid</a></li>
-        <li><a href="#step6" data-lang="en">Step 6 — Finish</a><a href="#step6" data-lang="et">Samm 6 — Lõpeta</a></li>
+        <li><a href="#step5" data-lang="en">Step 5 — Forms and RSS feed</a><a href="#step5" data-lang="et">Samm 5 — Vormid ja RSS</a></li>
+        <li><a href="#step6" data-lang="en">Step 6 — Overview</a><a href="#step6" data-lang="et">Samm 6 — Ülevaade</a></li>
       </ul>
     </div>
     <div class="grp">
@@ -249,7 +249,7 @@ td code{white-space:nowrap}
       <a class="gl" href="#settings" data-lang="et">Seaded</a>
       <ul>
         <li><a href="#set-connection" data-lang="en">Connection</a><a href="#set-connection" data-lang="et">Ühendus</a></li>
-        <li><a href="#set-subscribers" data-lang="en">Subscribers</a><a href="#set-subscribers" data-lang="et">Tellijad</a></li>
+        <li><a href="#set-subscribers" data-lang="en">Contacts</a><a href="#set-subscribers" data-lang="et">Kontaktid</a></li>
         <li><a href="#set-consent" data-lang="en">How consent is recorded</a><a href="#set-consent" data-lang="et">Kuidas nõusolek salvestatakse</a></li>
         <li><a href="#set-automations" data-lang="en">Automations</a><a href="#set-automations" data-lang="et">Automaatikad</a></li>
         <li><a href="#set-transactional" data-lang="en">Transactional emails</a><a href="#set-transactional" data-lang="et">Tehingu‑e‑kirjad</a></li>
@@ -425,11 +425,11 @@ td code{white-space:nowrap}
         <li>Download the latest <strong>release ZIP</strong> from the Smaily Connect releases page.</li>
         <li>In WordPress admin, go to <span class="path">Plugins → Add New Plugin → Upload Plugin</span>.</li>
         <li>Choose the ZIP, click <strong>Install Now</strong>, then <strong>Activate</strong>.</li>
-        <li>A new <strong>Smaily Connect</strong> item appears in the left admin sidebar. Click it to open the setup wizard.</li>
+        <li>A new <strong>Smaily Connect</strong> item appears in the left admin sidebar. Click it to open the <strong>Initial setup</strong>.</li>
       </ol>
       <div class="note tip">
         <span class="k">Upgrading from an older Smaily plugin?</span>
-        <p>Smaily Connect installs alongside the legacy Smaily plugin and takes over once you finish the setup wizard — your existing contact sync keeps working until then. Nothing is lost, and you can roll back.</p>
+        <p>Smaily Connect installs alongside the legacy Smaily plugin and takes over once you finish the initial setup — your existing contact sync keeps working until then. Nothing is lost, and you can roll back.</p>
       </div>
     </div>
     <div data-lang="et">
@@ -437,7 +437,7 @@ td code{white-space:nowrap}
         <li>Lae alla uusim <strong>väljalaske‑ZIP</strong> Smaily Connecti väljalaskelehelt.</li>
         <li>WordPressi halduses mine <span class="path">Plugins → Add New Plugin → Upload Plugin</span>.</li>
         <li>Vali ZIP, klõpsa <strong>Install Now</strong> ja siis <strong>Activate</strong>.</li>
-        <li>Vasakusse haldusribasse tekib uus <strong>Smaily Connect</strong>. Klõpsa sellel, et avada seadistus‑viisard.</li>
+        <li>Vasakusse haldusribasse tekib uus <strong>Smaily Connect</strong>. Klõpsa sellel, et avada <strong>Algseadistus</strong>.</li>
       </ol>
       <div class="note tip">
         <span class="k">Uuendad vanemalt Smaily pluginalt?</span>
@@ -481,23 +481,23 @@ td code{white-space:nowrap}
   </div>
 
   <div class="sub" id="step2">
-    <h2><span data-lang="en">Step 2 — Subscribers</span><span data-lang="et">Samm 2 — Tellijad</span></h2>
+    <h2><span data-lang="en">Step 2 — Contacts</span><span data-lang="et">Samm 2 — Kontaktid</span></h2>
     <div data-lang="en">
       <p>Choose who is synced to Smaily and which fields ride along, then bring your existing customers over.</p>
       <ul>
-        <li>Keep <strong>Sync contacts to Smaily</strong> on, and pick a <strong>consent preset</strong> (see <a href="#set-subscribers">Subscribers settings</a>). The default sends only customers who opted in.</li>
+        <li>Keep <strong>Sync contacts to Smaily</strong> on, and pick a <strong>consent preset</strong> (see <a href="#set-subscribers">Contacts settings</a>). The default sends only customers who opted in.</li>
         <li><strong>Email</strong> and <strong>language</strong> are always synced; tick any additional fields you want (name, phone, and so on).</li>
         <li>Optionally show a newsletter opt‑in checkbox during registration or checkout.</li>
-        <li>Under <strong>Import existing users</strong>, press <strong>Start backfill</strong> to send your current customers to Smaily. It runs in the background — you can leave the page.</li>
+        <li>Under <strong>Initial contact import</strong>, press <strong>Start import</strong> to send your current customers to Smaily. It runs in the background — you can leave the page.</li>
       </ul>
     </div>
     <div data-lang="et">
       <p>Vali, kes Smailysse sünkroonitakse ja millised väljad kaasa lähevad, seejärel too olemasolevad kliendid üle.</p>
       <ul>
-        <li>Hoia <strong>Sync contacts to Smaily</strong> sees ja vali <strong>nõusoleku‑eelseade</strong> (vt <a href="#set-subscribers">Tellijate seaded</a>). Vaikeväärtus saadab ainult nõusoleku andnud kliendid.</li>
+        <li>Hoia <strong>Sync contacts to Smaily</strong> sees ja vali <strong>nõusoleku‑eelseade</strong> (vt <a href="#set-subscribers">Kontaktide seaded</a>). Vaikeväärtus saadab ainult nõusoleku andnud kliendid.</li>
         <li><strong>E‑post</strong> ja <strong>keel</strong> sünkroonitakse alati; märgi ära soovitud lisaväljad (nimi, telefon jne).</li>
         <li>Soovi korral näita registreerimisel või kassas uudiskirja nõusoleku‑märkeruutu.</li>
-        <li>Jaotises <strong>Import existing users</strong> vajuta <strong>Start backfill</strong>, et saata praegused kliendid Smailysse. See käib taustal — võid lehelt lahkuda.</li>
+        <li>Jaotises <strong>Initial contact import</strong> vajuta <strong>Start import</strong>, et saata praegused kliendid Smailysse. See käib taustal — võid lehelt lahkuda.</li>
       </ul>
     </div>
   </div>
@@ -563,7 +563,7 @@ td code{white-space:nowrap}
   </div>
 
   <div class="sub" id="step5">
-    <h2><span data-lang="en">Step 5 — Integrations</span><span data-lang="et">Samm 5 — Integratsioonid</span></h2>
+    <h2><span data-lang="en">Step 5 — Forms and RSS feed</span><span data-lang="et">Samm 5 — Vormid ja RSS</span></h2>
     <div data-lang="en">
       <p>Wire Smaily into your storefront. This step is mostly informational — nothing here is required to sync.</p>
       <ul>
@@ -585,7 +585,7 @@ td code{white-space:nowrap}
   </div>
 
   <div class="sub" id="step6">
-    <h2><span data-lang="en">Step 6 — Finish</span><span data-lang="et">Samm 6 — Lõpeta</span></h2>
+    <h2><span data-lang="en">Step 6 — Overview</span><span data-lang="et">Samm 6 — Ülevaade</span></h2>
     <div data-lang="en">
       <p>Review the summary of everything you configured and press <strong>Finish</strong>. This unlocks the <strong>Settings</strong> tabs for ongoing management. You can revisit and change anything later under Settings.</p>
     </div>
@@ -629,7 +629,7 @@ td code{white-space:nowrap}
   </div>
 
   <div class="sub" id="set-subscribers">
-    <h2><span data-lang="en">Subscribers</span><span data-lang="et">Tellijad</span></h2>
+    <h2><span data-lang="en">Contacts</span><span data-lang="et">Kontaktid</span></h2>
     <div data-lang="en">
       <p>Controls who is copied to your Smaily contact list and which fields are sent.</p>
       <p><strong>Sync contacts to Smaily</strong> is the master switch. When off, customers are no longer copied to Smaily; existing contacts and Smaily automations are unaffected.</p>
@@ -903,7 +903,7 @@ td code{white-space:nowrap}
     <div data-lang="en">
       <p>There are four imports:</p>
       <ul>
-        <li><strong>Contacts</strong> → your Smaily contact list (from <a href="#set-subscribers">Subscribers</a>).</li>
+        <li><strong>Contacts</strong> → your Smaily contact list (from <a href="#set-subscribers">Contacts</a>).</li>
         <li><strong>Products</strong>, <strong>Customers</strong>, <strong>Orders</strong> → Campaign Intelligence (from <a href="#set-ci">Campaign Intelligence</a>).</li>
       </ul>
       <p>Each is a one‑time bulk import that runs in the background — you can leave the page and it keeps going. It is <strong>safe to re‑run</strong>: duplicates are impossible by design, because every record carries a stable id. Press <strong>Start</strong> the first time, <strong>Sync again</strong> afterwards.</p>
@@ -915,7 +915,7 @@ td code{white-space:nowrap}
     <div data-lang="et">
       <p>Importe on neli:</p>
       <ul>
-        <li><strong>Contacts</strong> → su Smaily kontaktinimekiri (jaotisest <a href="#set-subscribers">Tellijad</a>).</li>
+        <li><strong>Contacts</strong> → su Smaily kontaktinimekiri (jaotisest <a href="#set-subscribers">Kontaktid</a>).</li>
         <li><strong>Products</strong>, <strong>Customers</strong>, <strong>Orders</strong> → Campaign Intelligence (jaotisest <a href="#set-ci">Campaign Intelligence</a>).</li>
       </ul>
       <p>Iga import on ühekordne masssiire, mis käib taustal — võid lehelt lahkuda ja see jätkab. <strong>Kordamine on ohutu</strong>: duplikaadid on disaini poolest võimatud, sest iga kirje kannab stabiilset id'd. Vajuta esimest korda <strong>Start</strong>, seejärel <strong>Sync again</strong>.</p>
@@ -1152,7 +1152,7 @@ td code{white-space:nowrap}
         <li><strong>Order and product data</strong> — to power automations and, when enabled, recommendations.</li>
         <li><strong>Browse events</strong> — only when you enable browse tracking <em>and</em> the shopper has granted marketing consent through the WP Consent API. The browser itself never sends an email or recommendation id — only an opaque visitor token. If the shopper is logged in and hasn't opted out of personalisation, the plugin attaches their email <em>server‑side</em> before forwarding the event, so recommendations stay linked to their account even mid‑session; the email never reaches the page or the browser.</li>
       </ul>
-      <p>The optional customer fields beyond email are the ones <em>you</em> tick in <a href="#set-subscribers">Subscribers</a>.</p>
+      <p>The optional customer fields beyond email are the ones <em>you</em> tick in <a href="#set-subscribers">Contacts</a>.</p>
     </div>
     <div data-lang="et">
       <ul>
@@ -1160,7 +1160,7 @@ td code{white-space:nowrap}
         <li><strong>Tellimuste ja toodete andmed</strong> — automaatikate ja lubatuna soovituste toitmiseks.</li>
         <li><strong>Sirvimissündmused</strong> — ainult siis, kui lubad sirvimise jälgimise <em>ja</em> klient on WP Consent API kaudu andnud turundusnõusoleku. Brauser ise ei saada kunagi e‑posti ega soovituse‑id'd — ainult läbipaistmatu külastaja‑tokeni. Kui klient on sisse logitud ja ei ole personaliseerimisest loobunud, lisab plugin tema e‑posti aadressi <em>serveripoolselt</em> enne sündmuse edastamist, et soovitused püsiksid seotuna tema kontoga ka poole sessiooni pealt — e‑post ei jõua kunagi lehele ega brauserisse.</li>
       </ul>
-      <p>Valikulised kliendiväljad peale e‑posti on need, mille <em>sina</em> märgid jaotises <a href="#set-subscribers">Tellijad</a>.</p>
+      <p>Valikulised kliendiväljad peale e‑posti on need, mille <em>sina</em> märgid jaotises <a href="#set-subscribers">Kontaktid</a>.</p>
     </div>
   </div>
 

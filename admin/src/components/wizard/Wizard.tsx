@@ -23,21 +23,27 @@ export interface WizardProps {
 }
 
 const STEP_LABELS: Array<{ label: string; description: string }> = [
-  { label: __('Connect', 'smaily-connect'), description: __('Smaily credentials', 'smaily-connect') },
   {
-    label: __('Subscribers', 'smaily-connect'),
-    description: __('Field mapping + backfill', 'smaily-connect'),
+    label: __('Create a connection', 'smaily-connect'),
+    description: __('Set up Smaily account connections', 'smaily-connect'),
   },
   {
-    label: __('WooCommerce', 'smaily-connect'),
-    description: __('Automation triggers', 'smaily-connect'),
+    label: __('Contacts', 'smaily-connect'),
+    description: __('Synchronization settings', 'smaily-connect'),
   },
-  { label: __('Campaign Intelligence', 'smaily-connect'), description: __('Optional', 'smaily-connect') },
   {
-    label: __('Integrations', 'smaily-connect'),
-    description: __('Elementor / CF7 / Blocks', 'smaily-connect'),
+    label: __('Automated letters', 'smaily-connect'),
+    description: __('Setting up triggers for automations', 'smaily-connect'),
   },
-  { label: __('Done', 'smaily-connect'), description: __('Summary + finish', 'smaily-connect') },
+  {
+    label: __('Campaign Intelligence', 'smaily-connect'),
+    description: __('Create a connection with Campaign Intelligence (optional)', 'smaily-connect'),
+  },
+  {
+    label: __('Subscription forms and RSS', 'smaily-connect'),
+    description: __('Setting up subscription forms', 'smaily-connect'),
+  },
+  { label: __('Overview', 'smaily-connect'), description: __('Summary and last check', 'smaily-connect') },
 ];
 
 /**

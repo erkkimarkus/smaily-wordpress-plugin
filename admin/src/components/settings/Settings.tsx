@@ -45,7 +45,7 @@ export interface SettingsProps {
 
 const TABS: Array<{ value: SettingsTabKey | 'integrations' | 'events'; label: string }> = [
   { value: 'connection', label: __('Connection', 'smaily-connect') },
-  { value: 'subscribers', label: __('Subscribers', 'smaily-connect') },
+  { value: 'subscribers', label: __('Contacts', 'smaily-connect') },
   { value: 'woocommerce', label: __('WooCommerce', 'smaily-connect') },
   { value: 'recommendations', label: __('Campaign Intelligence', 'smaily-connect') },
   { value: 'integrations', label: __('Integrations', 'smaily-connect') },
@@ -244,7 +244,7 @@ export function Settings({ initialEnv = {}, initialState }: SettingsProps): Reac
         {!isConnected && (
           <Banner tone="warning" title={__('Smaily connection required', 'smaily-connect')}>
             {__(
-              'Subscribers, WooCommerce, and Campaign Intelligence are locked until your Smaily credentials authenticate. Fix the connection on the Connection tab to unlock them.',
+              'Contacts, WooCommerce, and Campaign Intelligence are locked until your Smaily credentials authenticate. Fix the connection on the Connection tab to unlock them.',
               'smaily-connect',
             )}
           </Banner>

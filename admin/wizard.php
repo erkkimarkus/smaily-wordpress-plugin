@@ -2,7 +2,7 @@
 /**
  * Setup Wizard admin page mount.
  *
- * Registers the `Smaily → Setup wizard` submenu, enqueues the
+ * Registers the `Smaily → Initial setup` submenu, enqueues the
  * Vite-built admin bundle, and renders the React mount node with
  * data-view="wizard". State hydration happens client-side via
  * `window.smailyConnectBoot` (set by wp_localize_script below).
@@ -49,8 +49,8 @@ function smaily_connect_register_admin_pages(): void {
 
 	add_submenu_page(
 		'smaily-connect-wizard',
-		__( 'Setup wizard', 'smaily-connect' ),
-		__( 'Setup wizard', 'smaily-connect' ),
+		__( 'Initial setup', 'smaily-connect' ),
+		__( 'Initial setup', 'smaily-connect' ),
 		$capability,
 		'smaily-connect-wizard',
 		'smaily_connect_render_wizard_page'
