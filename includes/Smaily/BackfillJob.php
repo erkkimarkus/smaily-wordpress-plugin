@@ -316,9 +316,10 @@ class BackfillJob implements BackfillJobInterface {
 			);
 		}
 
-		$after  = isset( $state['cursor_value'] ) ? (int) $state['cursor_value'] : 0;
-		$users  = $this->fetch_users_after( $after, $batch_size );
-		$synced = 0;
+		$after    = isset( $state['cursor_value'] ) ? (int) $state['cursor_value'] : 0;
+		$user_ids = $this->fetch_user_ids_after( $after, $batch_size );
+		$users    = $this->hydrate_users( $user_ids );
+		$synced   = 0;
 
 		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
@@ -328,7 +329,7 @@ class BackfillJob implements BackfillJobInterface {
 				isset( $state['processed_count'] ) ? (string) $state['processed_count'] : '?',
 				isset( $state['total_count'] ) ? (string) $state['total_count'] : '?',
 				$after,
-				count( $users )
+				count( $user_ids )
 			)
 		);
 
@@ -375,15 +376,17 @@ class BackfillJob implements BackfillJobInterface {
 			)
 		);
 
-		$processed = (int) $state['processed_count'] + count( $users );
+		// Rows WALKED is the page the cursor query returned, not the users that
+		// hydrated — so a user deleted between the two can't stall the cursor.
+		$processed = (int) $state['processed_count'] + count( $user_ids );
 		// F3-55: the cumulative "contacts synced" the UI shows — audience
 		// members handled (POSTed now + already-fresh). processed_count keeps
 		// counting rows WALKED (drives percent/ETA); the two diverge exactly
 		// by the audience skips, which is the number Prike read as "30k
 		// contacts go to Smaily".
 		$synced_total = ( isset( $state['synced_count'] ) ? (int) $state['synced_count'] : 0 ) + $synced + $fresh_skips;
-		$cursor       = empty( $users ) ? $after : (int) end( $users )->ID;
-		$completed    = count( $users ) < $batch_size;
+		$cursor       = empty( $user_ids ) ? $after : (int) end( $user_ids );
+		$completed    = count( $user_ids ) < $batch_size;
 
 		$wpdb->update(
 			$table,
@@ -407,33 +410,50 @@ class BackfillJob implements BackfillJobInterface {
 	}
 
 	/**
-	 * @return \WP_User[]
+	 * The next page of user ids after the cursor — the same `WHERE ID > cursor
+	 * ORDER BY ID ASC LIMIT n` walk the rec-engine backfills use
+	 * (CustomerBackfillJob::fetch_ids_after).
+	 *
+	 * PRO-1769: this used to ask get_users() for the FIRST $limit users every
+	 * time and prune `ID > cursor` in PHP, so the second tick re-read page one,
+	 * filtered every row away, and the empty page marked the whole job
+	 * 'completed' — a store with more than one page of users imported only its
+	 * first 100 while reporting success.
+	 *
+	 * @return int[]
 	 */
-	private function fetch_users_after( int $after_id, int $limit ): array {
-		$users = get_users(
-			array(
-				'fields'  => 'all',
-				'orderby' => 'ID',
-				'order'   => 'ASC',
-				'number'  => $limit,
-				'include' => array(), // safe default; overridden by 'after' equivalent below
+	private function fetch_user_ids_after( int $after_id, int $limit ): array {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->users} WHERE ID > %d ORDER BY ID ASC LIMIT %d",
+				$after_id,
+				$limit
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
-		// get_users() doesn't expose a numeric "after id" filter directly; we
-		// emulate it by selecting in ID order and pruning client-side. For
-		// production-sized installs (PLUGIN.md §15 test #19 — 5000 users) a
-		// dedicated SQL query would be faster, but the Phase 1 surface is
-		// kept simple here. Sub-PR 7 may revisit when wiring the REST
-		// progress endpoint.
-		if ( $after_id <= 0 ) {
-			return $users;
+		return array_map( 'intval', is_array( $ids ) ? $ids : array() );
+	}
+
+	/**
+	 * @param int[] $user_ids
+	 *
+	 * @return \WP_User[]
+	 */
+	private function hydrate_users( array $user_ids ): array {
+		if ( $user_ids === array() ) {
+			return array();
 		}
 
-		return array_values(
-			array_filter(
-				$users,
-				static fn ( \WP_User $u ): bool => (int) $u->ID > $after_id
+		return get_users(
+			array(
+				'fields'  => 'all',
+				'include' => $user_ids,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
 			)
 		);
 	}
