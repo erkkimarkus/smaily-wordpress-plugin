@@ -828,6 +828,34 @@ for. Third settings-key drift found in one day (PRO-1683, PRO-1684, this).
    decide which one an absence means, write it down, and make sure something
    asks the merchant again when it matters.
 
+### 2.23 A permissive reader in front of a strict validator loses data quietly — validate where the value ENTERS and where it LEAVES (PRO-1710 `smaily_rec_id`, 2026-08-04)
+
+The rec-id landing capture accepted any bounded id token on purpose ("don't
+hard-fail if the engine's rec_id shape ever changes"), while the engine
+validated the same value as a UUID **per order**. Result: a shopper landing with
+a junk `?smaily_rec=` got it cookied, it rode their order to the engine, and
+that ONE order was rejected permanently — an actual purchase lost, from a URL
+param anyone can type. Every gate was green because the mock never inspected the
+field either (§2.3/§2.4 again — the mock validated our assumption, not reality).
+
+1. **Being lenient about a value you don't own is not defensive; it's deferring
+   someone else's rejection to your most expensive moment.** A landing param
+   costs nothing to discard (no attribution). The same value at checkout costs
+   the whole order. If a field flows from an untrusted edge to a strict
+   validator, the edge is where you enforce the shape.
+2. **A fix at the entry point cannot reach values already stored.** Cookies live
+   in browsers, rows live in queues — a release can't rewrite them. Anything
+   already captured under the old rule keeps arriving, so a second guard at the
+   SEND point (drop the field, keep the record) is part of the same fix, not
+   gold-plating. Same shape as PRO-1498→PRO-1506 (enqueue-time repair that had
+   to be repeated at flush time).
+3. **When the contract document and the engine's code disagree about a type, the
+   code is the authority.** §5 typed this field as a plain `string`; the route
+   typed it `z.string().uuid()`. Ask for the doc to be corrected (PRO-1713), but
+   validate against what the deployed route actually enforces — and mirror that
+   constraint in the mock in the same pass, or the next regression hides exactly
+   as long.
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

@@ -4933,6 +4933,71 @@ policy's permanent branch, which stays correct and untouched); the Event Log
 reason a failed row carries now includes `(Smaily code 227)` so the same
 refusal reads the same way in the log.
 
+### PRO-1710 — A recommendation id is a UUID or it is not attribution: validated where it enters AND where it leaves
+
+**Context:** the engine validates an order's `smaily_rec_id` as
+`z.string().uuid()`, **per order** (D6) — one order carrying anything else is
+permanently rejected with an `errors[]` entry while its batch mates go through.
+The plugin's landing capture deliberately accepted any bounded id token
+(`^[A-Za-z0-9._-]{1,64}$`, F3-46: "don't hard-fail if the engine's rec_id shape
+ever changes"), and the mock never inspected the field. So a visitor landing
+with a hand-typed, truncated or crafted `?smaily_rec=` value got it cookied,
+stamped onto their order at checkout, and **that order never reached the
+engine** — silent loss of a real purchase, with every gate green.
+
+**Decision:** one definition of the shape (`Smaily\Connect\Smaily\RecEngine\
+Support\RecId`, the engine's zod-v3 uuid regex verbatim) enforced at BOTH ends
+of the cookie's life:
+- **capture** — `LandingCapture` (and its JS twin `RecEngineClient::
+  captureUrlParams`, which writes the same cookie) refuses to cookie a non-UUID
+  `smaily_rec`; the landing is then simply un-attributed. The `utm_content`
+  fallback already required this shape and keeps it, now from the same source.
+- **send** — `OrderPayloadBuilder` omits a non-UUID `_smaily_rec_id` from the
+  wire object and lets the order ingest un-attributed (a WP_DEBUG line records
+  the drop; the F3-44 exchange on the queue row shows what actually went out).
+  The stored meta is NOT rewritten — merchant data is left as it is.
+The mock now returns the same per-order D6 error the live route does
+(`field: smaily_rec_id`, `message: "Invalid uuid"`), so this class of drift
+can't hide again. `smaily_vt` is untouched: the visitor token is an opaque
+engine string, not a UUID.
+
+**Rationale:** the send-side half is not redundant with the capture-side fix —
+a cookie already sitting in a shopper's browser on a live store cannot be
+reached by a plugin release, so without it every such shopper's NEXT order
+would still be rejected. Between the order and the attribution, the order wins:
+attribution is an optimisation, an ingested order is the data the whole product
+runs on. And the capture-side half is not redundant with the send-side one
+either — it stops the junk value from ever being persisted, so nothing
+downstream has to know about it.
+
+**Alternatives:** validating only at capture (rejected — leaves live stores
+poisoned indefinitely); validating only at send (rejected — keeps writing
+known-bad cookies and shifts the fix onto every future consumer of that
+cookie); sending the junk value and letting the engine reject the order
+(rejected — that IS the bug); stripping the bad meta off the order (rejected —
+rewriting a merchant's order records to work around a wire constraint is a
+bigger promise than the problem needs); waiting for the contract to type the
+field (PRO-1713 — the live route is the authority, and waiting would leave
+orders failing meanwhile).
+
+**Demonstration:** `RecEngineOrdersTest` drives the real chain on the running
+store — the server-side landing capture, a real WooCommerce order, the real
+classic-checkout stamping and a real flush against the mock: a junk landing
+leaves no meta and the order ingests un-attributed, a genuine UUID rides through
+to the wire exactly as before, and a junk value ALREADY on order meta is dropped
+at send. The two junk cases fail against the pre-fix code (the second one comes
+back `failed` — the now-honest mock D6-rejects the order, which is precisely the
+production symptom). A fourth test posts the raw shape through `Client::
+ingest_orders` to keep the mock pinned to the engine's validation.
+
+**Relationships:** narrows F3-46 (the capture that was deliberately permissive);
+mirrors the PRO-1498/PRO-1506 pattern of repairing at BOTH enqueue and flush
+time for the same reason (a row/cookie captured before the fix can't heal
+itself). §6 browse carries the same engine constraint and is out of scope here —
+the plugin's JS never puts a rec id on a browse event, but the `/relay`
+whitelist still accepts a client-supplied one (the unresolved PRO-1486
+spoofing follow-up).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

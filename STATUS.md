@@ -26,7 +26,45 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1729 — the abandoned-cart reminder now carries
+_Last updated: 2026-08-04 (**PRO-1710 — a junk `?smaily_rec=` in a landing URL
+no longer costs the shopper's whole order.** The engine validates an order's
+`smaily_rec_id` as `z.string().uuid()` and orders validate **per order** (D6),
+so ONE order carrying anything else is rejected permanently while its batch
+mates go through. Our landing capture accepted any bounded token
+(`^[A-Za-z0-9._-]{1,64}$`, F3-46's deliberate leniency) and the mock never
+inspected the field — so a visitor arriving with a hand-typed, truncated or
+crafted rec param got it cookied, stamped onto their order at checkout, and
+**that order was silently lost to ingest**, with every gate green. **Fix:** one
+definition of the shape (`Smaily\RecEngine\Support\RecId`, the engine's zod
+regex verbatim) enforced at BOTH ends of the cookie's life — **capture**
+(`LandingCapture` + its JS twin `captureUrlParams`, which writes the SAME
+cookie) refuses to cookie a non-UUID, and **send** (`OrderPayloadBuilder`) drops
+a non-UUID already stored on order meta and ships the order un-attributed. The
+send-side half is what heals a live store: a cookie already in a shopper's
+browser can't be reached by a release. The stored order meta is left untouched
+(only the wire object omits the field); `smaily_vt` is deliberately NOT
+uuid-typed (opaque engine token). The **mock now returns the same per-order D6
+error the live route does** (`field: smaily_rec_id`, `message: "Invalid uuid"`),
+closing the divergence — `docs/audits/MOCK_DIVERGENCE_AUDIT.md` §3 marked
+RESOLVED. Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK]
+No errors`, PHPUnit unit **729/729**, eslint/tsc clean, vitest **271/271**);
+integration full suite **244 tests, 1417 assertions**, 0 failures.
+**Demonstrated on the running store** — `RecEngineOrdersTest` drives the real
+chain (server-side landing capture → real WC order → real classic-checkout
+stamping → real flush against the mock): a junk landing leaves no meta and the
+order ingests un-attributed, a genuine UUID rides through to the wire exactly as
+before, and a junk value already on order meta is dropped at send; the two junk
+cases **were confirmed to fail against the pre-fix code** (the meta case coming
+back `failed` — the now-honest mock D6-rejecting the order, exactly the
+production symptom). Merchant docs `docs/site/index.html` **unchanged** — no
+user-visible surface (the rec params are engine-generated link internals).
+DECISIONS PRO-1710, LESSONS §2.23. Contract §5 still types the field as a plain
+`string`; typing it as a UUID there is the engine ask **PRO-1713** — not waited
+on, validated against the observed live shape. §6 browse carries the same engine
+constraint and is out of scope (see FOLLOW-UPS in the issue). No version bump —
+ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1729 — the abandoned-cart reminder now carries
 the shopper's NAME, so a template's first-name merge tag renders.** PRO-1680
 found the reminder's product details gated on a selection option
 (`smaily_connect_abandoned_cart_fields`) whose keys default to FALSE and which
