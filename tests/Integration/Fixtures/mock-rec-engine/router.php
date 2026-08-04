@@ -820,6 +820,34 @@ if ( $method === 'POST' && $path === '/api/v1/ingest/orders' ) {
 			continue;
 		}
 
+		// Live-engine Zod: every wire datetime is a strict `.datetime()` — the
+		// `Z` form passes, a `+00:00` offset is "Invalid datetime" (the F3-21
+		// IsoDate scar, which only ever surfaced live). §5's return signals
+		// (v1.8.0, PRO-1633) put a datetime on the LINE for the first time, so
+		// the mock validates it there too. The REASON fields are deliberately
+		// NOT validated — §5 is normative that an unrecognised reason is stored
+		// as `other` and never rejected.
+		$bad_returned_at = false;
+		foreach ( $order_items as $order_item ) {
+			if ( ! is_array( $order_item ) || ! isset( $order_item['returned_at'] ) ) {
+				continue;
+			}
+			if ( ! is_string( $order_item['returned_at'] )
+				|| ! preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/', $order_item['returned_at'] ) ) {
+				$bad_returned_at = true;
+				break;
+			}
+		}
+		if ( $bad_returned_at ) {
+			$errors[] = array(
+				'index'             => $index,
+				'external_order_id' => $external_id,
+				'field'             => 'items.returned_at',
+				'message'           => 'Invalid datetime',
+			);
+			continue;
+		}
+
 		if ( strpos( $email, 'd6err-' ) === 0 ) {
 			$errors[] = array(
 				'index'             => $index,
