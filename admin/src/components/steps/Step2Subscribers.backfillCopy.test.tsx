@@ -112,4 +112,30 @@ describe('Step2Subscribers — audience-aware backfill copy (F3-55)', () => {
     // The walk count must never be presented as the contacts number.
     expect(screen.queryByText(/30000 contacts synced/i)).not.toBeInTheDocument();
   });
+
+  /**
+   * PRO-1715: a store with nobody in the audience finishes the run instantly.
+   * "Done — 0 contacts synced" reads like a failure; say what actually happened.
+   */
+  it('names the nothing-to-sync outcome instead of reporting zero synced', async () => {
+    vi.spyOn(backfillApi, 'getBackfillStatus').mockResolvedValue(
+      status({
+        status: 'completed',
+        processed: 30000,
+        synced: 0,
+        total: 30000,
+        percent: 100,
+        started_at: '2026-08-04 10:00:00',
+        completed_at: '2026-08-04 10:00:00',
+        audience_estimate: 0,
+      }),
+    );
+
+    render(<Step2Subscribers state={state} dispatch={vi.fn()} />);
+
+    expect(
+      await screen.findByText(/Nothing to import — no contacts match your synchronization settings\./i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Done — 0 contacts synced/i)).not.toBeInTheDocument();
+  });
 });

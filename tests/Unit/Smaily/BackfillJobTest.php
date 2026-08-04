@@ -80,11 +80,34 @@ final class BackfillJobTest extends TestCase {
 
 		self::assertSame( 77, $job->start() );
 
-		// One INSERT ... ON DUPLICATE KEY UPDATE + one SELECT id.
-		self::assertCount( 2, $wpdb->prepare_calls );
-		self::assertStringContainsString( 'INSERT INTO wp_smly_plus_backfill_job', $wpdb->prepare_calls[0]['sql'] );
-		self::assertSame( 5000, $wpdb->prepare_calls[0]['args'][3] );
-		self::assertStringContainsString( 'SELECT id FROM wp_smly_plus_backfill_job', $wpdb->prepare_calls[1]['sql'] );
+		// Audience COUNT + one INSERT ... ON DUPLICATE KEY UPDATE + one SELECT id.
+		self::assertCount( 3, $wpdb->prepare_calls );
+		self::assertStringContainsString( 'INSERT INTO wp_smly_plus_backfill_job', $wpdb->prepare_calls[1]['sql'] );
+		self::assertSame( 'running', $wpdb->prepare_calls[1]['args'][2] );
+		self::assertSame( 5000, $wpdb->prepare_calls[1]['args'][3] );
+		self::assertStringContainsString( 'SELECT id FROM wp_smly_plus_backfill_job', $wpdb->prepare_calls[2]['sql'] );
+		self::assertSame( array(), $wpdb->updates, 'A run with an audience is left for the tick to walk.' );
+	}
+
+	/**
+	 * PRO-1715: on a store where nobody is in the sync audience the walk cannot
+	 * produce a contact, so start() closes the run itself instead of leaving a
+	 * 'running' row whose only exit is an Action Scheduler tick — the merchant
+	 * used to watch a progress spinner that never moved.
+	 */
+	public function test_start_completes_immediately_when_the_audience_is_empty(): void {
+		$wpdb            = $this->fake_wpdb_for_start( 77, 0 );
+		$GLOBALS['wpdb'] = $wpdb;
+
+		Functions\when( 'count_users' )->justReturn( array( 'total_users' => 5000 ) );
+
+		self::assertSame( 77, ( new BackfillJob( $this->createMock( Client::class ) ) )->start() );
+
+		self::assertCount( 1, $wpdb->updates );
+		self::assertSame( 'completed', $wpdb->updates[0]['data']['status'] );
+		self::assertSame( 5000, $wpdb->updates[0]['data']['processed_count'], 'Every user is accounted for — each one would have been audience-skipped.' );
+		self::assertSame( 0, $wpdb->updates[0]['data']['synced_count'] );
+		self::assertNotEmpty( $wpdb->updates[0]['data']['completed_at'] );
 	}
 
 	public function test_process_batch_syncs_users_marks_meta_and_updates_progress(): void {
@@ -320,15 +343,23 @@ final class BackfillJobTest extends TestCase {
 		};
 	}
 
-	private function fake_wpdb_for_start( int $stamped_id ): object {
-		return new class( $stamped_id ) {
-			public string $prefix = 'wp_';
+	/**
+	 * @param int $audience Rows ContactAudience::count_audience() finds — the
+	 *                      COUNT() query start() runs before seeding the row.
+	 */
+	private function fake_wpdb_for_start( int $stamped_id, int $audience = 1 ): object {
+		return new class( $stamped_id, $audience ) {
+			public string $prefix   = 'wp_';
+			public string $usermeta = 'wp_usermeta';
 			public array $prepare_calls = array();
 			public array $queries       = array();
+			public array $updates       = array();
 			private int $stamp;
+			private int $audience;
 
-			public function __construct( int $id ) {
-				$this->stamp = $id;
+			public function __construct( int $id, int $audience ) {
+				$this->stamp    = $id;
+				$this->audience = $audience;
 			}
 
 			public function prepare( string $sql, ...$args ): string {
@@ -342,7 +373,14 @@ final class BackfillJobTest extends TestCase {
 			}
 
 			public function get_var( string $sql ) {
-				return (string) $this->stamp;
+				return strpos( $sql, 'COUNT(' ) !== false
+					? (string) $this->audience
+					: (string) $this->stamp;
+			}
+
+			public function update( string $table, array $data, array $where, $format = null, $where_format = null ): int {
+				$this->updates[] = compact( 'table', 'data', 'where' );
+				return 1;
 			}
 		};
 	}

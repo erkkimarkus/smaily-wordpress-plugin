@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\ContactAudience;
@@ -155,6 +156,54 @@ final class ContactBackfillAudienceTest extends TestCase {
 		self::assertSame( $expected_synced, $data['synced'], 'The UI "contacts synced" number comes from synced_count.' );
 		self::assertSame( $expected_walked, $data['processed'] );
 		self::assertSame( $expected_synced, $data['audience_estimate'], 'Post-run (non-running) status carries the audience estimate for the panel hint.' );
+	}
+
+	/**
+	 * PRO-1715: on a store with nothing to sync the run used to be seeded as
+	 * 'running' and left to an Action Scheduler tick — which on a quiet store is
+	 * minutes away — so the merchant watched a progress spinner that never moved
+	 * and cancelled by hand. Started through the real REST route here: it must
+	 * come back already finished, with no tick left behind to reopen the row.
+	 */
+	public function test_starting_with_an_empty_audience_finishes_the_run_without_a_tick(): void {
+		// The route builds its job from the stored Smaily credentials.
+		update_option(
+			'smaily_connect_api_credentials',
+			array(
+				'subdomain' => 'testsub',
+				'username'  => 'tester',
+				'password'  => \Smaily_Connect\Includes\Cypher::encrypt( 'test-password' ),
+			)
+		);
+
+		// Checkout opt-in syncs no accounts at all — the audience is empty
+		// whatever users this store has.
+		update_option( ContactSyncMode::OPTION_MODE, ContactSyncMode::MODE_CHECKOUT_OPTIN );
+		self::assertSame( 0, ( new ContactAudience() )->count_audience() );
+
+		as_unschedule_all_actions( BackfillEndpoint::TICK_HOOK );
+
+		RestRequestHelper::login_as_admin();
+		$start = RestRequestHelper::post( '/backfill/start', array( 'job_type' => 'contacts' ) );
+		self::assertSame( 200, $start->get_status() );
+		self::assertSame(
+			'completed',
+			$start->get_data()['status'],
+			'A backfill with nothing to sync must be finished by the time /start answers.'
+		);
+
+		self::assertSame(
+			array(),
+			as_get_scheduled_actions( array( 'hook' => BackfillEndpoint::TICK_HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ),
+			'A finished run must not leave a tick that would flip its row back to running.'
+		);
+
+		$status = RestRequestHelper::get( '/backfill/status', array( 'job_type' => 'contacts' ) );
+		$data   = $status->get_data();
+		self::assertSame( 'completed', $data['status'] );
+		self::assertSame( 0, $data['synced'] );
+		self::assertSame( 0, $data['audience_estimate'], 'The panel reads this as "nothing to import".' );
+		self::assertNotNull( $data['completed_at'] );
 	}
 
 	// --- helpers -------------------------------------------------------------

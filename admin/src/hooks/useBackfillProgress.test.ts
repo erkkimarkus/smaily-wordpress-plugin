@@ -44,6 +44,42 @@ describe('useBackfillProgress', () => {
     expect(result.current.progress.total).toBe(5_000);
   });
 
+  /**
+   * PRO-1715: a contact import with an empty audience is already finished when
+   * /backfill/start answers. Showing 'running' anyway left the panel spinning
+   * on a job that would never tick again, until the merchant cancelled by hand.
+   */
+  it('start() adopts the terminal state when the server already finished the run', async () => {
+    vi.spyOn(api, 'startBackfill').mockResolvedValue({
+      job_id: 42,
+      status: 'completed',
+      total: 3,
+    });
+    vi.spyOn(api, 'getBackfillStatus').mockResolvedValue({
+      status: 'completed',
+      processed: 3,
+      synced: 0,
+      sent: 0,
+      failed: 0,
+      total: 3,
+      percent: 100,
+      eta_seconds: null,
+      started_at: '2026-08-04 09:00:00',
+      completed_at: '2026-08-04 09:00:00',
+      audience_estimate: 0,
+    });
+
+    const { result } = renderHook(() => useBackfillProgress({ intervalMs: 60_000 }));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.progress.status).toBe('completed');
+    expect(result.current.progress.audienceEstimate).toBe(0);
+    expect(result.current.progress.completedAt).toBe('2026-08-04 09:00:00');
+  });
+
   it('cancel() flips the status to cancelled without waiting for a poll', async () => {
     vi.spyOn(api, 'cancelBackfill').mockResolvedValue({ cancelled: true });
 

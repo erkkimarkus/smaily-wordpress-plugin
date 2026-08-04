@@ -92,6 +92,43 @@ final class BackfillEndpointTest extends TestCase {
 		self::assertSame( 'contacts', $enqueued[0]['args']['job_type'] );
 	}
 
+	/**
+	 * PRO-1715: when start() already closed the run (an empty contact audience
+	 * has nothing to walk) the endpoint must report the terminal status and
+	 * leave no tick behind — a tick would reopen the row as 'running' and put
+	 * the merchant back in front of a spinner.
+	 */
+	public function test_start_reports_a_finished_job_without_scheduling_a_tick(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'job_type', 'contacts' );
+
+		$GLOBALS['wpdb'] = $this->fake_wpdb_with_state(
+			array(
+				'id'              => 77,
+				'status'          => BackfillEndpoint::STATUS_COMPLETED,
+				'processed_count' => '5000',
+				'total_count'     => '5000',
+				'started_at'      => '2026-05-19 12:00:00',
+				'completed_at'    => '2026-05-19 12:00:00',
+			)
+		);
+
+		$enqueued = array();
+		Functions\when( 'as_enqueue_async_action' )->alias(
+			static function ( string $hook, array $args, string $group ) use ( &$enqueued ): int {
+				$enqueued[] = compact( 'hook', 'args', 'group' );
+				return 1;
+			}
+		);
+
+		$endpoint = new BackfillEndpoint( fn (): BackfillJob => $this->fake_job( 77 ) );
+		$response = $endpoint->start( $request );
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( BackfillEndpoint::STATUS_COMPLETED, $response->get_data()['status'] );
+		self::assertSame( array(), $enqueued );
+	}
+
 	public function test_status_returns_idle_when_no_row_exists(): void {
 		$request = new WP_REST_Request();
 		$request->set_param( 'job_type', 'contacts' );
