@@ -72,8 +72,17 @@ export function EngineAutomationsSection({
   state,
   dispatch,
   inSettings = false,
-}: EngineAutomationsSectionProps): React.JSX.Element {
+}: EngineAutomationsSectionProps): React.JSX.Element | null {
   const isConnected = state.recEngineConnection.kind === 'success';
+
+  // PRO-1717: in the wizard a store without Campaign Intelligence gets
+  // nothing here — the very next step IS the Campaign Intelligence
+  // overview + connection path, so an upsell one step earlier is noise.
+  // Settings has no such next step, so its upsell (with the tab CTA)
+  // stays.
+  if (!isConnected && !inSettings) {
+    return null;
+  }
 
   return (
     <div className="space-y-4 border-t border-border-subtle pt-6">
@@ -102,7 +111,10 @@ export function EngineAutomationsSection({
  * Not-connected state: a modest upsell instead of the section. In
  * Settings the CTA jumps to the Campaign Intelligence tab (hash
  * routing); in the wizard the connection happens in the NEXT step, so
- * the copy points forward instead of linking.
+ * the copy points forward instead of linking. Since PRO-1717 the wizard
+ * reaches this only through the not_connected LOAD FAILURE below (boot
+ * said connected, the proxy disagrees) — a plainly not-connected store
+ * renders no section at all there.
  */
 function UpsellBanner({ inSettings }: { inSettings: boolean }): React.JSX.Element {
   return (

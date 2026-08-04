@@ -107,13 +107,23 @@ describe('EngineAutomationsSection', () => {
     expect(window.location.hash).toBe('#recommendations');
   });
 
-  it('shows the next-step hint instead of a CTA in the wizard context', () => {
-    render(<Harness initial={disconnectedState()} inSettings={false} />);
+  it('renders nothing at all in the wizard when the engine is not connected (PRO-1717)', () => {
+    const { container } = render(<Harness initial={disconnectedState()} inSettings={false} />);
 
-    expect(screen.getByText(/at the next setup step/i)).toBeInTheDocument();
+    // The next wizard step is the Campaign Intelligence overview itself,
+    // so step 3 says nothing about it.
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText(/campaign intelligence/i)).not.toBeInTheDocument();
+    expect(catalogMock).not.toHaveBeenCalled();
+  });
+
+  it('still renders the section in the wizard when the engine IS connected (PRO-1717)', async () => {
+    render(<Harness initial={connectedState()} inSettings={false} />);
+
     expect(
-      screen.queryByRole('button', { name: /open campaign intelligence/i }),
-    ).not.toBeInTheDocument();
+      screen.getByText(/campaign intelligence automation workflows/i),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Quantum upsell')).toBeInTheDocument();
   });
 
   it('renders an unknown catalog trigger dynamically with the locale-matched copy + docs link', async () => {
