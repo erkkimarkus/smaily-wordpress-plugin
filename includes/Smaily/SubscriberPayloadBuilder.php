@@ -191,6 +191,40 @@ class SubscriberPayloadBuilder {
 	}
 
 	/**
+	 * The same effective selection, expressed in the LEGACY option key names.
+	 *
+	 * The legacy `Smaily_Connect\*` readers that build the merchant's own
+	 * profile/account/checkout inputs speak the pre-wizard key names
+	 * throughout (`user_dob`, not `birthday`), and each used to read the
+	 * option itself as a map — so on a wizard-configured store they matched
+	 * nothing and the store could no longer COLLECT the very meta this
+	 * builder sends (PRO-1743). Handing them the interpreted selection in
+	 * their own vocabulary keeps every reader on this one interpreter
+	 * without a second translation table to drift.
+	 *
+	 * `store_url`, `user_email` and `language` are always present: the legacy
+	 * settings page forced all three on (`Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS`
+	 * defaults them true and its sanitizer never let them off), and in the new
+	 * namespace they are not a merchant choice at all — email and store are
+	 * sent unconditionally (FIELD_MAPPING.md §1) and language is resolved by
+	 * ContactLanguageResolver (F3-47).
+	 *
+	 * @return array<int, string>
+	 */
+	public static function effective_selection_legacy_keys(): array {
+		$enabled = self::effective_selection();
+
+		$keys = array();
+		foreach ( self::LEGACY_SELECTION_KEYS as $legacy_key => $canonical ) {
+			if ( $canonical === null || in_array( $canonical, $enabled, true ) ) {
+				$keys[] = $legacy_key;
+			}
+		}
+
+		return $keys;
+	}
+
+	/**
 	 * True when the option holds a value this plugin cannot read as a
 	 * selection, so the merchant's real choice is unknown and the fallback
 	 * above is silently in effect. A never-saved option is NOT unreadable —

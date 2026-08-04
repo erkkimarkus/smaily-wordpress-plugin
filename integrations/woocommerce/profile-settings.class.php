@@ -4,6 +4,7 @@ namespace Smaily_Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 use Smaily_Connect\Includes\Options;
 
 class Profile_Settings {
@@ -306,11 +307,11 @@ class Profile_Settings {
 	private function filter_enabled_fields( array $fields ) {
 		$enabled_fields = array();
 
-		$sync_fields                   = get_option(
-			Options::SUBSCRIBER_SYNC_FIELDS_OPTION,
-			Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS
-		);
-		$enabled_sync_fields           = array_keys( array_filter( $sync_fields ) );
+		// Read through the sync's own interpreter: the selection is stored as a
+		// map by the legacy settings page and as a list by the wizard, and read
+		// as a map only, a wizard-configured store matched nothing — so the
+		// inputs that collect this meta were never printed (PRO-1743).
+		$enabled_sync_fields           = SubscriberPayloadBuilder::effective_selection_legacy_keys();
 		$checkout_subscription_enabled = get_option( Options::CHECKOUT_SUBSCRIPTION_ENABLED_OPTION );
 
 		$account_fields         = array(
