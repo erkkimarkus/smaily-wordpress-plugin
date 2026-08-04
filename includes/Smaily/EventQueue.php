@@ -19,8 +19,10 @@ defined( 'ABSPATH' ) || exit;
  * automation.abandoned_cart (PLUGIN.md §9).
  *
  * Storage layout: rows in {prefix}smly_plus_event_queue with status
- * pending → sent (terminal happy path) or pending → failed (terminal
- * after max attempts).
+ * pending → sent (terminal happy path) or pending → failed (terminal:
+ * a refusal that can never succeed, or the retry ceiling reached — see
+ * RetryPolicy). A retry parks the row with next_retry_at in the future;
+ * pending() skips rows that aren't due yet (PRO-1685).
  *
  * Dispatch: enqueue() persists the row immediately and asks Action
  * Scheduler to fire smly_plus_flush_event_queue ASAP, deduplicated via
@@ -32,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
  * This class deliberately does NOT call the Smaily API itself. That keeps
  * enqueue() cheap (it's invoked from hot paths like user_register and
  * woocommerce_checkout_order_processed) and concentrates retry policy in
- * one place — the flush job.
+ * one place — RetryPolicy, which the flush jobs apply.
  *
  * Not final: tests subclass with an anonymous double to record enqueue()
  * calls without standing up $wpdb + Action Scheduler. Same rationale as
@@ -94,13 +96,17 @@ class EventQueue {
 	}
 
 	/**
-	 * Fetch the next batch of pending events for processing.
+	 * Fetch the next batch of due pending events for processing.
 	 *
-	 * The flush hook calls this, processes the rows, and uses mark_sent()
-	 * / mark_failed() to advance their state. Selecting in created_at
-	 * order keeps the queue FIFO so hooks like contact.sync don't end up
-	 * arbitrarily reordered relative to subsequent automation.* events
-	 * for the same user.
+	 * "Due" = status pending AND (never retried OR next_retry_at has passed)
+	 * — a row parked by record_attempt()'s backoff stays out of the drain
+	 * until its wait has elapsed, so a repeatedly-failing row can neither be
+	 * hammered every 60s nor hold a FIFO batch slot against fresher work
+	 * (PRO-1685). The flush hook calls this, processes the rows, and uses
+	 * mark_sent() / mark_failed() / record_attempt() to advance their state.
+	 * Selecting in created_at order keeps the queue FIFO so hooks like
+	 * contact.sync don't end up arbitrarily reordered relative to subsequent
+	 * automation.* events for the same user.
 	 *
 	 * Event-type scoping (PRO-1195): the queue is drained by TWO flushers —
 	 * the main Flusher (contact.sync + welcome/first_order automations) and
@@ -120,8 +126,8 @@ class EventQueue {
 
 		$table = $this->table_name();
 
-		$where = 'status = %s';
-		$args  = array( self::STATUS_PENDING );
+		$where = 'status = %s AND ( next_retry_at IS NULL OR next_retry_at <= %s )';
+		$args  = array( self::STATUS_PENDING, current_time( 'mysql', true ) );
 
 		if ( is_array( $only_types ) && $only_types !== array() ) {
 			$placeholders = implode( ', ', array_fill( 0, count( $only_types ), '%s' ) );
@@ -180,11 +186,21 @@ class EventQueue {
 	}
 
 	/**
-	 * Increment attempt counter and persist last error. Used by the flush
-	 * job between retries — when attempts reaches the policy ceiling the
-	 * caller flips the row to STATUS_FAILED via mark_failed().
+	 * Increment attempt counter, persist last error, and park the row for a
+	 * future retry by stamping next_retry_at = now + $retry_in_seconds
+	 * (computed in SQL against UTC_TIMESTAMP() so it stays timezone-correct
+	 * without a PHP clock read — same mechanism as IngestQueue). Used by the
+	 * flush jobs between retries; when attempts reaches the policy ceiling the
+	 * caller flips the row to STATUS_FAILED via mark_failed() instead —
+	 * RetryPolicy::apply() makes that choice.
+	 *
+	 * The backoff is opt-in (default 0 = due again immediately) so a caller
+	 * that bounds its retries some other way keeps the behaviour it was
+	 * designed around — TransactionalFlusher retries on every tick and stops
+	 * on elapsed time instead (PRO-1519), because a pending transactional row
+	 * suppresses the customer's native WooCommerce email while it waits.
 	 */
-	public function record_attempt( int $id, string $error ): void {
+	public function record_attempt( int $id, string $error, int $retry_in_seconds = 0 ): void {
 		global $wpdb;
 
 		$table = $this->table_name();
@@ -193,8 +209,13 @@ class EventQueue {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table} SET attempts = attempts + 1, last_error = %s WHERE id = %d",
+				"UPDATE {$table}
+					SET attempts = attempts + 1,
+						last_error = %s,
+						next_retry_at = ( UTC_TIMESTAMP() + INTERVAL %d SECOND )
+					WHERE id = %d",
 				$error,
+				$retry_in_seconds,
 				$id
 			)
 		);
@@ -226,9 +247,11 @@ class EventQueue {
 	/**
 	 * Revive terminally-`failed` rows back to `pending` so the recurring flush
 	 * re-attempts them (3.10.1 Event Log recovery). Resets the attempt counter +
-	 * last_error. `$ids` null = every failed row; otherwise only the given ids.
+	 * clears the retry-park + last_error, so a row that hit the RetryPolicy
+	 * ceiling (or a refusal classified permanent) starts fresh and is due
+	 * immediately. `$ids` null = every failed row; otherwise only the given ids.
 	 * Manual-only by design (a deterministic failure would loop under auto-retry).
-	 * Returns the row count. This queue has no next_retry_at column.
+	 * Returns the row count.
 	 *
 	 * @param int[]|null $ids
 	 */
@@ -236,7 +259,7 @@ class EventQueue {
 		global $wpdb;
 		$table = $this->table_name();
 
-		$set = 'SET status = %s, attempts = 0, last_error = NULL';
+		$set = 'SET status = %s, attempts = 0, last_error = NULL, next_retry_at = NULL';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		if ( $ids === null ) {
