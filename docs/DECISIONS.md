@@ -4691,6 +4691,57 @@ estimate as the UI's "nothing to sync" signal; does not touch the rec-engine
 backfills, whose `start()` never returns a terminal status. Merchant docs: the
 import status table gains the new outcome line in both languages.
 
+### PRO-1717 / PRO-1718 / PRO-1720 — three wizard trims: no premature Campaign Intelligence pitch, the account link where it is needed, no Event Log homework
+
+**Context:** Jane's PRO-1645 walkthrough of the setup wizard (approved by Erkki
+2026-08-04) found three places where a step says something the merchant either
+cannot act on yet, or no longer needs.
+
+**Decisions:**
+
+- **PRO-1717 — step 3 shows the Campaign Intelligence automations only to a
+  connected store.** A store without Campaign Intelligence used to get an upsell
+  banner for engine-run automations on step 3, one step before the step that
+  introduces Campaign Intelligence and carries the connection form: the same
+  pitch twice, the first time with nothing to click. `EngineAutomationsSection`
+  now renders `null` when the engine is not connected AND it is not in Settings.
+  A connected store's section is untouched. **Settings keeps its upsell** — it
+  has no "next step", and that banner's CTA is the pointer to the Campaign
+  Intelligence tab. The banner stays reachable in the wizard through one edge
+  only: the `not_connected` load failure (boot said connected, the proxy
+  disagrees), where "connect at the next setup step" is still the right advice.
+- **PRO-1718 — the Smaily account link moved from the last step to the first.**
+  It opens `https://<subdomain>.sendsmaily.net`, which is exactly where step 1
+  sends the merchant to create the API user; on the closing overview step it
+  arrived after the need had passed. It is **removed from the last step**
+  (Jane's ask; no reason found to keep it in both places — the overview is a
+  read-only summary and Settings → Connection carries the account details for
+  later). It renders **only once a subdomain is known**, because the subdomain
+  IS the account address — a permanently disabled button on a fresh install
+  would say nothing. Consequence: the overview's "Open dashboards" card had one
+  possible occupant left, so it renders only when the Campaign Intelligence
+  dashboard exists.
+- **PRO-1720 — the Event Log advisory is gone from the last step.** It told the
+  merchant to watch the Event Log during the first days of operation; nothing
+  there needs watching by hand — the health check raises its own admin notice
+  linking to the log when something fails — so it was length on the step that
+  should read "you're done".
+
+**Alternatives rejected:** keeping a disabled account link on step 1 for
+discoverability (a dead control explains nothing); hiding the step-3 section in
+Settings too (Settings has no connection step to point at).
+
+**Demonstration:** component tests render each surface both ways —
+`EngineAutomationsSection.test.tsx` (wizard + disconnected → empty DOM, no
+catalog fetch; wizard + connected → section and triggers unchanged),
+`Step1Connect.smailyLink.test.tsx` (opens the seeded subdomain's account, absent
+with no subdomain, absent in Settings), `Step6Done.test.tsx` (no Event Log
+mention, no Smaily link, rec-engine card only when connected).
+
+**Relationships:** the moved string keeps its PRO-1746 Estonian wording ("Ava
+oma Smaily konto →"); catalogs rebuilt with `bin/build-i18n.sh`. The merchant
+docs site describes none of the three surfaces, so nothing there became false.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

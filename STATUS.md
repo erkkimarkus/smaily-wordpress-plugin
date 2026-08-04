@@ -26,7 +26,34 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1715 — a contact import with nothing to sync
+_Last updated: 2026-08-04 (**PRO-1717 / PRO-1718 / PRO-1720 — three approved
+wizard trims (Jane's PRO-1645 review, approved by Erkki).** UI only, no PHP
+touched. **PRO-1717:** step 3 no longer pitches the Campaign Intelligence
+automations to a store that hasn't connected Campaign Intelligence —
+`EngineAutomationsSection` renders nothing when the engine is not connected in
+the wizard, because the very next step IS the Campaign Intelligence overview
+plus connection form. A connected store's section is unchanged; **Settings keeps
+its upsell** (no "next step" there — its CTA is the pointer to the tab).
+**PRO-1718:** the "Open Smaily dashboard →" link (ET *"Ava oma Smaily konto →"*,
+PRO-1746's wording, unchanged) moved from the last step to **step 1**, where the
+merchant is told to go create the API user; it is **removed from the last step**
+and renders once a subdomain is known, since that subdomain IS the account
+address. The overview's "Open dashboards" card had only the Campaign
+Intelligence button left, so it now appears only when that dashboard exists.
+**PRO-1720:** the Event Log advisory paragraph is gone from the last step — a
+failing event raises its own admin notice linking to the log, so nothing there
+needs watching by hand. `.pot`/`-et.po` rebuilt via `bin/build-i18n.sh` (the two
+Event Log msgids dropped, the moved link's Estonian translation preserved).
+Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`,
+PHPUnit unit **710/710**, eslint/tsc clean, vitest **270/270** — 6 new/rewritten
+component tests covering each surface both ways); admin bundle rebuilds clean.
+**Integration NOT run** — no PHP changed. Merchant docs `docs/site/index.html`
+**unchanged**: it describes neither step 3's Campaign Intelligence section, nor
+the last step's dashboard link, nor the Event Log advisory, so nothing there
+became false. DECISIONS PRO-1717/1718/1720. No version bump — ships with the
+next release cut._
+
+Prior: 2026-08-04 (**PRO-1715 — a contact import with nothing to sync
 finishes on its own instead of spinning.** On a store where nobody is in the
 sync audience (fresh install with only the administrator, consent mode with no
 opt-ins, or the PRO-1742 "Sync contacts to Smaily" switch off), **Start import**
