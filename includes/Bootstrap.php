@@ -514,6 +514,10 @@ final class Bootstrap {
 			$this->rec_engine_settings()
 		);
 		add_action( 'woocommerce_order_status_changed', array( $order, 'on_order_status_changed' ), 10, 3 );
+		// A PARTIAL refund changes no status, so it needs its own hook to reach
+		// the engine as a line-level return (PRO-1633); a FULL refund flips the
+		// order to `refunded` and rides the status hook above.
+		add_action( 'woocommerce_order_partially_refunded', array( $order, 'on_order_partially_refunded' ), 10, 1 );
 
 		// Transactional emails (PRO-1504 Stage 2) — order-confirmation and
 		// shipping-confirmation sends through the separate transactional

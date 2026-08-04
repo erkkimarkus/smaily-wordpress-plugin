@@ -111,6 +111,51 @@ class OrderHookHandler {
 	}
 
 	/**
+	 * `woocommerce_order_partially_refunded` callback ($order_id, $refund_id).
+	 *
+	 * A PARTIAL WooCommerce refund is invisible to every other path we have: it
+	 * fires no webhook and — unlike a full refund, which flips the order to
+	 * `refunded` and so rides `woocommerce_order_status_changed` above — it does
+	 * not change the order status at all. Without this hook a returned line
+	 * would only reach the engine on some unrelated later re-sync.
+	 *
+	 * WC fires this from wc_create_refund() after the refund is saved, so the
+	 * refund state OrderPayloadBuilder reads is already complete. The row
+	 * carries no payload: the flusher loads the order fresh and re-derives the
+	 * return signals from its refunds (PRO-1633), which is also why a full
+	 * refund needs nothing here.
+	 *
+	 * Deliberately NOT status-filtered: the flusher re-reads the status at send
+	 * time and terminal-skips an order that is no longer a confirmed purchase.
+	 *
+	 * @param int|string $order_id
+	 */
+	public function on_order_partially_refunded( $order_id ): void {
+		if ( ! $this->settings->is_connected() ) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ( $order_id <= 0 ) {
+			return;
+		}
+
+		if ( isset( self::$seen[ $order_id ] ) ) {
+			return;
+		}
+		self::$seen[ $order_id ] = true;
+
+		$this->queue->enqueue(
+			OrderFlusher::EVENT_ORDER_UPSERT,
+			(string) $order_id,
+			array(),
+			null,
+			OrderFlusher::FLUSH_HOOK,
+			OrderFlusher::AS_GROUP
+		);
+	}
+
+	/**
 	 * Reset the per-request dedupe set. Tests use it between cases; production
 	 * never calls it (the static is request-scoped).
 	 */

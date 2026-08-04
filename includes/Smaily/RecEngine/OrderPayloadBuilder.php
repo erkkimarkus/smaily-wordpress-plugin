@@ -54,6 +54,13 @@ use Smaily\Connect\Support\DebugLog;
  * total_amount (± rounding). Do NOT reintroduce a bare get_total()/
  * get_total_discount() money read here.
  *
+ * Return signals (contract v1.8.0 §5, PRO-1633) are derived from the ORDER'S
+ * OWN REFUND STATE on every build — never from a one-shot event payload. The
+ * engine fully REPLACES an order's items on re-ingest, so a later sync that
+ * omits `returned_at` ERASES the return; deriving it here means the live hook,
+ * a flusher retry and the order backfill all re-send it for free (they all
+ * build through this class at send time).
+ *
  * Attribution is async engine-side (N-10): this builder only forwards the
  * stored attribution signals (smaily_rec_id / smaily_visitor_token /
  * smaily_rec_ctx / session_id), stamped onto order meta at checkout by the
@@ -118,6 +125,15 @@ class OrderPayloadBuilder {
 	 * valid enum, and this is it. (DECISIONS F3-42.)
 	 */
 	private const DEFAULT_SALE_STATUS = 'processing';
+
+	/**
+	 * Contract §5: `return_reason_raw` is "truncated to 500 chars, never
+	 * rejected" — we truncate at the source rather than rely on that.
+	 */
+	private const RETURN_REASON_MAX = 500;
+
+	/** WC's own meta key linking a refund line back to the order line it refunds. */
+	private const META_REFUNDED_ITEM_ID = '_refunded_item_id';
 
 	/** Order-meta keys the email HookHandler stamps the attribution cookies into. */
 	private const META_REC_ID        = '_smaily_rec_id';
@@ -219,11 +235,16 @@ class OrderPayloadBuilder {
 	}
 
 	private function ordered_at( \WC_Order $order ): string {
+		$timestamp = $this->order_timestamp( $order );
+		return $timestamp > 0 ? IsoDate::to_z( $timestamp ) : '';
+	}
+
+	private function order_timestamp( \WC_Order $order ): int {
 		$date = $order->get_date_created();
 		if ( ! is_object( $date ) || ! method_exists( $date, 'getTimestamp' ) ) {
-			return '';
+			return 0;
 		}
-		return IsoDate::to_z( (int) $date->getTimestamp() );
+		return (int) $date->getTimestamp();
 	}
 
 	private function currency( \WC_Order $order ): string {
@@ -255,10 +276,14 @@ class OrderPayloadBuilder {
 	 * Rounded to 4 decimals (float-add noise; the contract example itself
 	 * carries a 3-decimal unit_price).
 	 *
+	 * Return signals (v1.8.0 §5, PRO-1633) come from the order's refunds — see
+	 * returns_by_item().
+	 *
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function items( \WC_Order $order ): array {
-		$items = array();
+		$returns = $this->returns_by_item( $order );
+		$items   = array();
 		foreach ( $order->get_items() as $item ) {
 			if ( ! $item instanceof \WC_Order_Item_Product ) {
 				continue;
@@ -288,10 +313,124 @@ class OrderPayloadBuilder {
 				$line['discount_amount'] = round( $discount, 4 );
 			}
 
+			$returned = $returns[ (int) $item->get_id() ] ?? null;
+			if ( $returned !== null && $qty > 0 && $returned['qty'] >= $qty && $returned['timestamp'] > 0 ) {
+				$line['returned_at'] = IsoDate::to_z( $returned['timestamp'] );
+				if ( $returned['reason'] !== '' ) {
+					// Diagnostic only, and always the MERCHANT-side note (WC's
+					// refund `reason` field) — never buyer-written text (§5).
+					$line['return_reason_raw'] = $returned['reason'];
+				}
+				// `return_reason_standardised` is deliberately never sent:
+				// WooCommerce has no structured return taxonomy anywhere, and
+				// §5 says keyword-guessing free text into the enum is worse
+				// than sending nothing.
+			}
+
 			$items[] = $line;
 		}
 
 		return $items;
+	}
+
+	/**
+	 * The order's refund state, collapsed per ORDER line item.
+	 *
+	 * A WooCommerce partial refund fires no webhook and never changes the order
+	 * status, so the refund objects stored on the order are the only record —
+	 * and they are queried fresh on every build so a re-sync can't erase a
+	 * return the engine already has (§5 "items are fully replaced on re-ingest").
+	 *
+	 * Each refund line carries `_refunded_item_id` (the order line it refunds)
+	 * and a NEGATIVE quantity; quantities accumulate across several refunds of
+	 * the same line, and the LATEST contributing refund supplies the date and
+	 * the reason — it is the refund that completed the return.
+	 *
+	 * A line counts as returned only when the FULL line quantity has come back
+	 * (see items()). The contract types `returned_at` per LINE with no
+	 * per-quantity mechanism, and its consumers ("was it kept?", the 180-day
+	 * same-SKU suppression) read it as "the customer does not have this" — so 1
+	 * of 3 refunded is conservatively "kept". An amount-only refund (no line
+	 * quantity) marks nothing: the money moved, the goods did not.
+	 *
+	 * @return array<int, array{qty:int, timestamp:int, reason:string}> keyed by order-item id.
+	 */
+	private function returns_by_item( \WC_Order $order ): array {
+		$refunds = $this->order_refunds( $order );
+		if ( $refunds === array() ) {
+			return array();
+		}
+
+		$returns = array();
+		foreach ( $refunds as $refund ) {
+			if ( ! $refund instanceof \WC_Order_Refund ) {
+				continue;
+			}
+
+			// A refund with no own date falls back to the order date — the same
+			// basis the engine's full-refund derivation uses, and stable across
+			// re-syncs (a now() fallback would move the date every send).
+			$date      = $refund->get_date_created();
+			$timestamp = ( is_object( $date ) && method_exists( $date, 'getTimestamp' ) )
+				? (int) $date->getTimestamp()
+				: 0;
+			if ( $timestamp <= 0 ) {
+				$timestamp = $this->order_timestamp( $order );
+			}
+			$reason = $this->clamp_reason( (string) $refund->get_reason() );
+
+			foreach ( $refund->get_items() as $refunded_item ) {
+				if ( ! $refunded_item instanceof \WC_Order_Item_Product ) {
+					continue;
+				}
+				$item_id = (int) $refunded_item->get_meta( self::META_REFUNDED_ITEM_ID );
+				$qty     = abs( (int) $refunded_item->get_quantity() );
+				if ( $item_id <= 0 || $qty <= 0 ) {
+					continue;
+				}
+
+				$current = $returns[ $item_id ] ?? array(
+					'qty'       => 0,
+					'timestamp' => 0,
+					'reason'    => '',
+				);
+
+				$current['qty'] += $qty;
+				if ( $timestamp >= $current['timestamp'] ) {
+					$current['timestamp'] = $timestamp;
+					$current['reason']    = $reason;
+				}
+
+				$returns[ $item_id ] = $current;
+			}
+		}
+
+		return $returns;
+	}
+
+	/**
+	 * The order's refund objects. Protected so unit tests can supply them —
+	 * the runtime WC_Order shim the unit suite mocks against is minimal and
+	 * carries no get_refunds(). The real read is integration-covered.
+	 *
+	 * @return array<int, mixed>
+	 */
+	protected function order_refunds( \WC_Order $order ): array {
+		if ( ! method_exists( $order, 'get_refunds' ) ) {
+			return array();
+		}
+		return $order->get_refunds();
+	}
+
+	private function clamp_reason( string $raw ): string {
+		$text = trim( $raw );
+		if ( $text === '' ) {
+			return '';
+		}
+		if ( function_exists( 'mb_substr' ) ) {
+			return mb_substr( $text, 0, self::RETURN_REASON_MAX );
+		}
+		return substr( $text, 0, self::RETURN_REASON_MAX );
 	}
 
 	private function meta( \WC_Order $order, string $key ): string {
