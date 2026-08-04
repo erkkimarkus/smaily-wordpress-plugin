@@ -67,17 +67,20 @@ class Client {
 	}
 
 	/**
-	 * Verifies the credentials by hitting the workflows listing endpoint.
+	 * Checks the connection by hitting the workflows listing endpoint, and
+	 * names the cause when it fails: RefusalReason::OK on any 2xx (the body
+	 * content doesn't matter — an empty list is still a valid auth), otherwise
+	 * the classified refusal, so the caller can tell a package block from
+	 * wrong credentials from Smaily being down (PRO-1686).
 	 *
-	 * Returns true on any 2xx response (the body content doesn't matter for
-	 * a connection check — an empty list is still a valid auth).
+	 * @return string One of the RefusalReason constants.
 	 */
-	public function test_connection(): bool {
+	public function check_connection(): string {
 		try {
 			$this->list_autoresponders();
-			return true;
+			return RefusalReason::OK;
 		} catch ( ApiException $e ) {
-			return false;
+			return RefusalReason::classify( $e );
 		}
 	}
 
@@ -358,10 +361,24 @@ class Client {
 		);
 
 		if ( $code < 200 || $code >= 300 ) {
+			// Smaily answers a refusal with its own {code, message} envelope —
+			// carry the code, since it says WHY where the HTTP status only says
+			// that (227 = the account's package doesn't include this API).
+			$smaily_code = is_array( $body ) && isset( $body['code'] ) && is_numeric( $body['code'] )
+				? (int) $body['code']
+				: null;
+
 			throw new ApiException(
-				sprintf( 'Smaily API returned HTTP %d for %s %s', $code, $method, $endpoint ),
+				sprintf(
+					'Smaily API returned HTTP %d for %s %s%s',
+					$code,
+					$method,
+					$endpoint,
+					$smaily_code !== null ? sprintf( ' (Smaily code %d)', $smaily_code ) : ''
+				),
 				$code,
-				$this->retry_after_seconds( $response )
+				$this->retry_after_seconds( $response ),
+				$smaily_code
 			);
 		}
 

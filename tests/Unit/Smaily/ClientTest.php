@@ -16,6 +16,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Smaily\ApiException;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\RefusalReason;
 
 final class ClientTest extends TestCase {
 
@@ -37,7 +38,7 @@ final class ClientTest extends TestCase {
 		parent::tearDown();
 	}
 
-	public function test_test_connection_returns_true_on_2xx_workflows_response(): void {
+	public function test_check_connection_is_ok_on_2xx_workflows_response(): void {
 		Functions\when( 'wp_remote_get' )->justReturn( $this->successful_response( '[]' ) );
 		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
 		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '[]' );
@@ -45,10 +46,10 @@ final class ClientTest extends TestCase {
 
 		$client = new Client( 'demo', 'user', 'pass' );
 
-		self::assertTrue( $client->test_connection() );
+		self::assertSame( RefusalReason::OK, $client->check_connection() );
 	}
 
-	public function test_test_connection_returns_false_on_4xx(): void {
+	public function test_check_connection_names_rejected_credentials_on_4xx(): void {
 		Functions\when( 'wp_remote_get' )->justReturn( $this->successful_response( '{"error":"unauthorized"}' ) );
 		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 401 );
 		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"error":"unauthorized"}' );
@@ -56,10 +57,42 @@ final class ClientTest extends TestCase {
 
 		$client = new Client( 'demo', 'user', 'pass' );
 
-		self::assertFalse( $client->test_connection() );
+		self::assertSame( RefusalReason::CREDENTIALS_REJECTED, $client->check_connection() );
 	}
 
-	public function test_test_connection_returns_false_on_transport_error(): void {
+	public function test_check_connection_names_the_package_on_a_freemium_account(): void {
+		// The exact live answer from a real freemium account (PRO-1686 probe,
+		// 2026-08-04): every endpoint the plugin uses replies 403 {"code":227}.
+		$body = '{"code":227,"message":"A paid package is required."}';
+		Functions\when( 'wp_remote_get' )->justReturn( $this->successful_response( $body ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 403 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( $body );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$client = new Client( 'demo', 'user', 'pass' );
+
+		self::assertSame( RefusalReason::PLAN_BLOCKED, $client->check_connection() );
+	}
+
+	public function test_a_refusal_carries_smailys_own_response_code(): void {
+		$body = '{"code":227,"message":"A paid package is required."}';
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( $body ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 403 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( $body );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		try {
+			( new Client( 'demo', 'user', 'pass' ) )->upsert_subscribers( array( array( 'email' => 'a@b.c' ) ) );
+			self::fail( 'A 403 must throw.' );
+		} catch ( ApiException $e ) {
+			self::assertSame( 403, $e->getCode() );
+			self::assertSame( 227, $e->smaily_code() );
+			// The Event Log reason should say why, not only that.
+			self::assertStringContainsString( 'Smaily code 227', $e->getMessage() );
+		}
+	}
+
+	public function test_check_connection_reports_unreachable_on_transport_error(): void {
 		$err = new \stdClass();
 		Functions\when( 'wp_remote_get' )->justReturn( $err );
 		Functions\when( 'is_wp_error' )->justReturn( true );
@@ -73,7 +106,7 @@ final class ClientTest extends TestCase {
 
 		$client = new Client( 'demo', 'user', 'pass' );
 
-		self::assertFalse( $client->test_connection() );
+		self::assertSame( RefusalReason::UNREACHABLE, $client->check_connection() );
 	}
 
 	public function test_trigger_automation_throws_api_exception_on_5xx(): void {
