@@ -14,7 +14,7 @@ A small set of **named presets keyed to lawful basis**, NOT a toggle matrix. Def
 
 | Preset | Audience | Send `is_unsubscribed`? | Smaily→store reconcile | Automation `force_opt_in` |
 |---|---|---|---|---|
-| **All customers (legitimate interest)** | every customer (+ optional guests) | never (Smaily owns suppression) | no | `false` default; advanced toggle to force |
+| **All customers (legitimate interest)** | every customer (+ optional guests) | never (Smaily owns suppression) | no | `false` |
 | **Subscribers only (consent)** — DEFAULT | only opted-in | opt-in → `0`, opt-out → `1` | yes, both directions | `false` |
 | **Checkout opt-in only** | only the checkout opt-in checkbox (guests + accounts) | `0` on opt-in | no | `false` |
 
@@ -22,7 +22,7 @@ A small set of **named presets keyed to lawful basis**, NOT a toggle matrix. Def
 - **Default = consent** — lawful-safe; never silently broaden audience on upgrade.
 - **`is_unsubscribed` only on an explicit opt-state transition**, never on a routine data sync — so a profile/data refresh can't resurrect a Smaily unsubscribe between reconciles.
 - **`include_guests`** — a checkbox, default off (guests synced only when on; intrinsic to checkout-opt-in).
-- **Automation `force_opt_in` follows the mode** — consent/checkout always `false` (an automation trigger must not re-subscribe); legitimate interest `false` by default, `true` only behind an explicit advanced toggle (GDPR Art. 21: honour unsubscribes).
+- **Automation `force_opt_in` is always `false`** — an automation trigger enrols a contact Smaily has never seen, but must never re-subscribe one who opted out (GDPR Art. 21: honour unsubscribes). The Woo plugin briefly offered a per-store override toggle under legitimate interest; it was retired in PRO-1716 — don't build one.
 - **One audience source of truth** (`ContactAudience` in Woo) consumed by *both* live-sync and the bulk backfill, so they never disagree.
 
 **Woo glue → Shopify equivalent:**
@@ -72,7 +72,7 @@ These are the Smaily endpoints the above uses — same for Woo and Shopify. **Do
 - **Contact upsert** `POST /api/contact.php` — flat addresses: `email`, `language` (short code), `is_unsubscribed` (0/1), custom fields. Absent field = keep; empty = wipe.
 - **Action log** `GET /api/history.php` — `since_seq_id` cursor (gap-free, resumable), `limit`≤10000, `actions[]` filter; rows `{seq_id, email, action, time, value}`; `click.value` = the destination URL (carries `smaily_rec`). Pull-only (no webhooks).
 - **Contact list** `GET /api/contact.php?list=1&fields=email,is_unsubscribed` — offset/limit pages (≤25000).
-- **Automation trigger** `POST /api/autoresponder.php` — `force_opt_in` (bool, default `true` = re-subscribe on trigger; `false` = honour consent). *Undocumented param — now in `re/docs/smaily-api/reference/automations.md`.*
+- **Automation trigger** `POST /api/autoresponder.php` — `force_opt_in` (bool; `true` = re-subscribe on trigger, `false` = honour consent — always send `false`). *Undocumented param — now in `re/docs/smaily-api/reference/automations.md`.*
 
 ## 7. Lessons worth carrying to Shopify
 - Named presets > toggle matrix for consent (maps to lawful basis; no incoherent combos).

@@ -4586,6 +4586,53 @@ read-side remedy (translate on read, never migrate the stored value); the
 audience gate is additive to F3-48's mode policy; the automation decoupling
 follows PRO-1682's reading of what each trigger's consent basis is.
 
+### PRO-1716 — "Force opt-in on automation triggers" is retired; a trigger never re-subscribes, in any preset
+
+**Context:** F3-48.4 made the automation `force_opt_in` flag mode-driven and
+added one escape hatch: an advanced Step-2 toggle, visible only under the
+legitimate-interest preset, that let a store send `force_opt_in=true` — a
+welcome / first-order / abandoned-cart trigger would then override an
+unsubscribe the contact had made in Smaily. It shipped default OFF and stayed
+off: every store that never touched it — which is every store on a fresh
+install — already got `false`. Jane's PRO-1645 review asked for it to go, on
+the PRO-1678 ground rule that triggering an automation for a non-contact adds
+them as an opted-in contact (an accepted constraint) but never overrides an
+existing opt-out. Approved by Erkki (2026-08-04).
+
+**Decision:** remove the setting; `AutomationRouter` passes `false` outright.
+The surviving behaviour is exactly the default state's, so a store that never
+touched the toggle sees no change at all.
+
+- **A store that had it ON loses the override**, deliberately: its triggers
+  stop re-subscribing contacts who unsubscribed in Smaily. This is the only
+  behaviour change in this work, and it is the point of it. Nothing else about
+  the trigger changes — the same workflows fire for the same people, and a
+  contact Smaily has never seen is still enrolled.
+- **The stored option is left in place** as a harmless orphan (nothing reads
+  it). No migration step, no merchant action; `uninstall.php` already sweeps
+  every `smly_plus_*` row by prefix, so it needs no cleanup line of its own.
+- **The REST route stays tolerant.** A browser holding a cached pre-PRO-1716
+  admin bundle still posts `automationForceOptIn`; unknown keys are simply not
+  read, so the save succeeds and the retired option is never written again.
+- **`Client::trigger_automation()`'s default flipped to `false`** to match its
+  two callers, so a future trigger can't opt into re-subscribing by omission —
+  which is how the pre-F3-48.4 code sent `true` everywhere.
+
+**Demonstration:** `tests/Integration/AutomationForceOptInTest.php` drives a
+welcome trigger through the real queue + flusher with only the transport faked
+and asserts `force_opt_in=false` in the three states a live store can be in
+(option never saved, saved on, saved off), plus a settings save carrying the
+retired field returning 200 and leaving the orphan untouched;
+`AutomationRouterTest` pins the same three states at the unit seam, and
+`Step2Subscribers.forceOptIn.test.tsx` pins that the control renders nowhere
+under the one preset that ever showed it (the wizard and Settings render the
+same component).
+
+**Relationships:** narrows F3-48.4 (mode-driven `force_opt_in`) to a constant;
+keeps F3-48's other sub-option (`include_guests`) untouched; follows the
+PRO-1678 ground rules and Jane's PRO-1645 point 3. The merchant docs site never
+documented the setting, so it needed no change.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

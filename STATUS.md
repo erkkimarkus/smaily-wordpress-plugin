@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1746 — the wizard and Settings speak Jane's
+_Last updated: 2026-08-04 (**PRO-1716 — the "Force opt-in on automation
+triggers" setting is retired; automation triggers behave uniformly.** The
+advanced Step-2 toggle (F3-48.4, visible only under the legitimate-interest
+preset, default OFF) let a store send `force_opt_in=true`, so a welcome /
+first-order / abandoned-cart trigger would override an unsubscribe the contact
+had made in Smaily. Jane's PRO-1645 review asked for it to go on the PRO-1678
+ground rule — a trigger may enrol someone Smaily has never seen, but never
+overrides an opt-out. **The surviving behaviour is the default state's**, so a
+store that never touched the toggle sees NO change; **the one behaviour change
+is for a store that had it ON** — its triggers stop re-subscribing
+unsubscribed contacts, which is the point of the work. Removed: the
+`ContactSyncMode::automation_force_opt_in()` policy + its option constant
+(`AutomationRouter` now passes `false` outright), the `SettingsEndpoint` write,
+the `EnvDetector` boot field, and the Step 2 `Toggle` with its two strings
+(`.pot`/`-et.po` rebuilt via `bin/build-i18n.sh`). The stored option is left in
+place as a harmless orphan — no migration, and `uninstall.php` already sweeps
+every `smly_plus_*` row by prefix. The REST route stays tolerant: a cached
+pre-PRO-1716 admin bundle still posting `automationForceOptIn` saves fine
+(unknown keys are simply not read) and never rewrites the option.
+`Client::trigger_automation()`'s default flipped `true` → `false` to match its
+two callers. Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
+`[OK] No errors`, PHPUnit unit **708/708**, eslint/tsc clean, vitest
+**262/262**); integration **226 tests, 1305 assertions**, the only failure a
+missing `dist/build-hash.txt` build artifact (regenerated with `composer run
+package:hash` → `BuildHashTest` green). Merchant docs `docs/site/index.html`
+needed NO change — it never documented the setting. DECISIONS PRO-1716;
+`docs/CONTACT_SYNC_MODES.md` + the Shopify parity doc amended. No version bump
+— ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1746 — the wizard and Settings speak Jane's
 approved copy, in both languages.** A strings-only pass over the admin UI
 against the approved "Copy and translations" document: the menu item is
 **Initial setup** (ET *Algseadistus*), **Subscribers → Contacts** everywhere it

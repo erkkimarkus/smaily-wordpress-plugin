@@ -4,6 +4,12 @@
 > open questions resolved (§ 11). This file is the agreed shape before any code.
 > DECISIONS F3-48 carries the summary + rationale; this file carries the full
 > design. Implementation sub-PRs are listed in § Implementation sequence.
+>
+> **Amended 2026-08-04 (PRO-1716):** the advanced **"Force opt-in on automation
+> triggers"** toggle is RETIRED. Automation `force_opt_in` is now a constant
+> `false` in every preset — a trigger enrols a contact Smaily has never seen,
+> but never overrides an unsubscribe. The passages below that describe the
+> toggle are marked; the rest of the design stands. DECISIONS PRO-1716.
 
 ## 1. Why this exists
 
@@ -44,7 +50,7 @@ sub-options; surfaced in the UI as **three named presets**:
 | Guests | optional (`include_guests`, default **off**) | guest checkout opt-in | guest checkout opt-in (the point) |
 | `is_unsubscribed` sent on upsert | **never** (Smaily owns suppression) | `0` on opt-in; `1` on WP opt-out | `0` on checkbox |
 | Sync-back (Smaily → WP reconcile) | no | **yes** — leavers **and** returners | no |
-| Automation `force_opt_in` | **`false`** default; advanced toggle to force opt-in | **`false`** (trigger fires, consent untouched) | **`false`** |
+| Automation `force_opt_in` | **`false`** (PRO-1716: the advanced toggle is retired) | **`false`** (trigger fires, consent untouched) | **`false`** |
 
 Client 1 = preset 1, Client 2 = preset 2, Client 3 = preset 3. Preset 3 is
 "consent, no accounts, no reconcile, guests" — a coherent bundle, not a fourth
@@ -61,12 +67,11 @@ lawful basis.
 - **Send:** never send `is_unsubscribed` (Smaily owns suppression; a plain upsert
   preserves an existing unsubscribe — confirmed by Erkki).
 - **Sync-back:** none.
-- **Automations:** `force_opt_in=false` **by default** (resolved with Erkki) — even
-  under legitimate interest an explicit unsubscribe is honoured (GDPR Art. 21: the
-  right to object to direct marketing is absolute). A merchant who genuinely wants
-  triggers to re-subscribe enables the advanced **"Force opt-in on automation
-  triggers"** toggle (§ 4), which flips this preset to `true` behind a warning. The
-  strict presets (2, 3) never expose that toggle — they are always `false`.
+- **Automations:** `force_opt_in=false` (resolved with Erkki) — even under
+  legitimate interest an explicit unsubscribe is honoured (GDPR Art. 21: the
+  right to object to direct marketing is absolute). The advanced override
+  toggle this preset originally exposed was retired in PRO-1716; all three
+  presets are always `false`.
 
 ### Preset 2 — Subscribers only (consent) — DEFAULT
 - **Audience:** only customers with `user_newsletter=1` (set via the
@@ -95,10 +100,9 @@ lawful basis.
 
 - **`include_guests`** (bool, default **off**) — include guest-order emails as
   contacts. Off in presets 1/2 by default; intrinsically on in preset 3.
-- **"Force opt-in on automation triggers"** (bool, default **off**) — shown ONLY
-  for preset 1 (legitimate interest); when on, automation triggers send
-  `force_opt_in=true` (re-subscribe on trigger). Behind a warning. Presets 2/3
-  never expose it (always `false`).
+- ~~**"Force opt-in on automation triggers"** (bool, default **off**) — shown
+  ONLY for preset 1 (legitimate interest).~~ **RETIRED (PRO-1716)** — every
+  preset sends `force_opt_in=false`; there is nothing per-store to choose.
 - **Reconcile direction** is derived from the mode (consent → both directions),
   not a user toggle, to keep presets coherent. Developer filters can narrow it.
 - Everything else (segment/list routing, role filters) is a **filter**, not UI.
@@ -114,22 +118,20 @@ Single policy object decides, per mode, what an upsert carries:
 
 ## 6. Automations + `force_opt_in`
 
-`Client::trigger_automation(workflow_id, addresses, force_opt_in=true)` sends a
-Smaily `force_opt_in` flag; `true` (the current default) re-subscribes the
-contact on trigger. Today this is inconsistent: the new `AutomationRouter`
-(welcome / first_order / abandoned_cart) calls it **without** the third arg →
-always `true`, while the **legacy** abandoned-cart cron passes `false`
-(cron.class.php:217).
+`Client::trigger_automation(workflow_id, addresses, force_opt_in)` sends a
+Smaily `force_opt_in` flag; `true` re-subscribes the contact on trigger. When
+this design was written it was inconsistent: the new `AutomationRouter`
+(welcome / first_order / abandoned_cart) called it **without** the third arg,
+whose default was then `true`, while the **legacy** abandoned-cart cron passed
+`false` (cron.class.php:217).
 
-The mode engine unifies this: **the contact-sync mode drives `force_opt_in` on
-every automation trigger** (welcome, first_order, abandoned_cart):
-- consent presets (2, 3) → `force_opt_in=false` (always);
-- legitimate-interest preset (1) → `force_opt_in=false` by default, `true` only
-  if the merchant enables the advanced "Force opt-in on automation triggers"
-  toggle (§ 4) behind a warning.
+The mode engine unified this, and **PRO-1716 made it a constant**: every
+automation trigger (welcome, first_order, abandoned_cart) sends
+`force_opt_in=false`, in every preset. A trigger enrols a contact Smaily has
+never seen, but never re-subscribes one who opted out.
 
-This guarantees you can't pick a strict contact-sync posture while automations
-silently re-subscribe everyone.
+This guarantees automations can't silently re-subscribe anyone, whatever
+contact-sync posture the store picked.
 
 `force_opt_in` is an **undocumented** Smaily API parameter; it is being added to
 our hand-written Smaily API docs in `../re/docs` (separate task) so the behaviour
@@ -195,10 +197,8 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
   triggers may re-subscribe contacts — see settings."* (role="alert").
 - An **`include_guests` `Checkbox`** under the mode card (default off), shown for
   presets 1/2.
-- An advanced **"Force opt-in on automation triggers" `Toggle`** shown ONLY for
-  preset 1, default off, with its own `Banner tone="warning"`: *"Triggering a
-  welcome / abandoned-cart / first-order automation will re-subscribe the contact
-  in Smaily, overriding an existing unsubscribe."*
+- ~~An advanced **"Force opt-in on automation triggers" `Toggle`** shown ONLY
+  for preset 1.~~ **RETIRED (PRO-1716)** — no such control renders anywhere.
 - Preset 2 shows a short info `Banner` that the store mirrors Smaily's
   unsubscribes/returns daily.
 - The existing "Subscription checkboxes" + "Fields to sync" + "Initial backfill"
@@ -209,7 +209,7 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
 
 - Default consent; legitimate interest is deliberate + warned.
 - Audience is never silently broadened on upgrade.
-- Strict (consent) presets force `force_opt_in=false` so automations cannot
+- Every preset sends `force_opt_in=false` (PRO-1716) so automations cannot
   re-subscribe.
 - The lawful basis is the **merchant's** responsibility; the plugin provides a
   faithful mechanism for the chosen basis.
@@ -225,9 +225,9 @@ the existing `Card` / `Toggle` / `Checkbox` / `Banner` primitives:
 
 **Resolved decisions (Erkki, 2026-06-30):**
 1. Preset 1 automation `force_opt_in`: **default `false`** (honour unsubscribes
-   even under legitimate interest — GDPR Art. 21) + an advanced "Force opt-in on
-   automation triggers" toggle (preset 1 only, behind a warning) to override.
-   Presets 2/3 are always `false`.
+   even under legitimate interest — GDPR Art. 21). The advanced override toggle
+   this decision also granted was **retired in PRO-1716** — `false` everywhere,
+   no override.
 2. Preset names: keep **"All customers (legitimate interest)"** / **"Subscribers
    only (consent)"** / **"Checkout opt-in only"**.
 
