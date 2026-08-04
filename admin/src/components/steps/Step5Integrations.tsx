@@ -151,7 +151,7 @@ function SignupFormGuide({ state }: { state: WizardState }): React.JSX.Element {
         {__('How to add a Smaily signup form', 'smaily-connect')}
       </h3>
       <p className="mt-1 text-sm text-text-secondary">
-        {__('Add a newsletter signup form to your store using any of these methods.', 'smaily-connect')}
+        {__('Add a newsletter signup form to your page using any of these methods.', 'smaily-connect')}
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -263,11 +263,11 @@ export function Step5Integrations({
             {__('Step 5 of 6', 'smaily-connect')}
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-text-primary">
-            {__('Integrations', 'smaily-connect')}
+            {__('Forms and RSS feed', 'smaily-connect')}
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
             {__(
-              'Smaily plays nicely with the other tools you already have installed. Configure each one from its own admin page — no extra setup required here.',
+              'Add a newsletter subscription form to any page, to collect new subscribers directly to your Smaily account. Choose the suitable form option for your page and follow the instructions to add the form.',
               'smaily-connect',
             )}
           </p>

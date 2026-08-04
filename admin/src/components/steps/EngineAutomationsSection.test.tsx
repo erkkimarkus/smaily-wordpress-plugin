@@ -110,7 +110,7 @@ describe('EngineAutomationsSection', () => {
   it('shows the next-step hint instead of a CTA in the wizard context', () => {
     render(<Harness initial={disconnectedState()} inSettings={false} />);
 
-    expect(screen.getByText(/in the next step/i)).toBeInTheDocument();
+    expect(screen.getByText(/at the next setup step/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /open campaign intelligence/i }),
     ).not.toBeInTheDocument();

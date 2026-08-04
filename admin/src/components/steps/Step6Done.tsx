@@ -42,11 +42,11 @@ export function Step6Done({
             {__('Step 6 of 6', 'smaily-connect')}
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-text-primary">
-            {__("You're all set", 'smaily-connect')}
+            {__('Overview', 'smaily-connect')}
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
             {__(
-              'Smaily Connect is configured and ready. Click Finish to save and exit the wizard, or review the summary below first.',
+              'Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save.',
               'smaily-connect',
             )}
           </p>
@@ -136,7 +136,7 @@ function computeSummary(state: WizardState): SummaryItem[] {
 
   // Subscribers ----------------------------------------------------------
   items.push({
-    label: __('Subscriber sync enabled', 'smaily-connect'),
+    label: __('Contact sync enabled', 'smaily-connect'),
     active: state.subscriberSyncEnabled,
     detail: state.subscriberSyncEnabled
       ? sprintf(
@@ -149,7 +149,7 @@ function computeSummary(state: WizardState): SummaryItem[] {
 
   if (state.contactsBackfill.status === 'completed') {
     items.push({
-      label: __('Initial backfill complete', 'smaily-connect'),
+      label: __('Initial import complete', 'smaily-connect'),
       active: true,
       detail: sprintf(
         /* translators: %d: number of contacts synced. */

@@ -8,7 +8,7 @@ describe('Step6Done', () => {
   it('renders the static summary frame even when nothing is configured', () => {
     render(<Step6Done state={wizardInitialState} />);
 
-    expect(screen.getByText(/you're all set/i)).toBeInTheDocument();
+    expect(screen.getByText(/overview/i)).toBeInTheDocument();
     expect(screen.getByText(/what's active/i)).toBeInTheDocument();
   });
 

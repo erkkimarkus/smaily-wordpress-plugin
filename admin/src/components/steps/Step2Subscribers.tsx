@@ -63,10 +63,10 @@ export function Step2Subscribers({
       {!inSettings && (
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">{ __( 'Step 2 of 6', 'smaily-connect' ) }</p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'Sync your subscribers', 'smaily-connect' ) }</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'Contact synchronisation to Smaily', 'smaily-connect' ) }</h2>
           <p className="mt-2 text-sm text-text-secondary">
             { __(
-              'Choose which fields to copy from WordPress to Smaily, and decide where to surface the subscription opt-in checkbox.',
+              'Contact synchronisation allows you to send contacts daily to your Smaily account.',
               'smaily-connect',
             ) }
           </p>
@@ -82,16 +82,16 @@ export function Step2Subscribers({
           }
           label={ __( 'Sync contacts to Smaily', 'smaily-connect' ) }
           description={ __(
-            'When on, new WP users + WooCommerce customers are pushed to your Smaily contact list.',
+            'When sync has been enabled, all new subscribers and/or clients are added to your Smaily contact list.',
             'smaily-connect',
           ) }
         />
 
         {state.subscriberSyncEnabled && (
           <div className="mt-5">
-            <p className="text-sm font-medium text-text-primary">{ __( 'Fields to sync', 'smaily-connect' ) }</p>
+            <p className="text-sm font-medium text-text-primary">{ __( 'Fields', 'smaily-connect' ) }</p>
             <p className="mt-1 text-xs text-text-tertiary">
-              { __( 'Email is always synced. Pick the additional fields you want copied across.', 'smaily-connect' ) }
+              { __( 'Email address is synced by default. Choose any additional fields to be added as well.', 'smaily-connect' ) }
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
               {DEFAULT_SYNC_FIELDS.map((field) => (
@@ -110,10 +110,10 @@ export function Step2Subscribers({
 
       {state.subscriberSyncEnabled && (
         <Card
-          title={ __( 'Contact sync mode', 'smaily-connect' ) }
-          description={ __( 'Who is sent to Smaily, by your lawful basis for marketing email.', 'smaily-connect' ) }
+          title={ __( 'Contact synchronisation selection', 'smaily-connect' ) }
+          description={ __( 'Choose which contacts are synced to Smaily, by your lawful basis for marketing email.', 'smaily-connect' ) }
         >
-          <fieldset className="space-y-3" aria-label={ __( 'Contact sync mode', 'smaily-connect' ) }>
+          <fieldset className="space-y-3" aria-label={ __( 'Contact synchronisation selection', 'smaily-connect' ) }>
             {CONTACT_SYNC_MODES.map((mode) => {
               const isSelected = state.contactSyncMode === mode.value;
               const needsCheckout = mode.value === 'checkout_optin';
@@ -142,7 +142,7 @@ export function Step2Subscribers({
                   {isDisabled && (
                     <p className="ml-7 text-xs text-text-tertiary">
                       { __(
-                        'Turn on “Show subscription checkbox during WooCommerce checkout” below to use this mode.',
+                        'Turn on “Show marketing subscription checkbox during checkout” below to use this mode.',
                         'smaily-connect',
                       ) }
                     </p>
@@ -199,7 +199,7 @@ export function Step2Subscribers({
             onChange={(e) =>
               dispatch({ type: 'SET_WORDPRESS_SUBSCRIPTION_CHECKBOX', payload: e.target.checked })
             }
-            label={ __( 'Show subscription checkbox during WordPress registration', 'smaily-connect' ) }
+            label={ __( 'Show marketing subscription checkbox during account registration', 'smaily-connect' ) }
           />
           <Toggle
             name="smly-checkout-subscription"
@@ -207,17 +207,17 @@ export function Step2Subscribers({
             onChange={(e) =>
               dispatch({ type: 'SET_CHECKOUT_SUBSCRIPTION_CHECKBOX', payload: e.target.checked })
             }
-            label={ __( 'Show subscription checkbox during WooCommerce checkout', 'smaily-connect' ) }
+            label={ __( 'Show marketing subscription checkbox during checkout', 'smaily-connect' ) }
           />
         </div>
       </Card>
 
-      <Card title={ __( 'Initial backfill', 'smaily-connect' ) } description={ __( 'Import the existing WordPress users into Smaily.', 'smaily-connect' ) }>
+      <Card title={ __( 'Initial contact import', 'smaily-connect' ) } description={ __( 'Import existing contacts to Smaily.', 'smaily-connect' ) }>
         <p className="text-sm text-text-secondary">
           {state.env.storeTotals.customers > 0
             ? sprintf(
-                // translators: %d is the number of WordPress users.
-                __( '%d users will be processed in batches of 100, ~30 seconds apart.', 'smaily-connect' ),
+                // translators: %d is the number of contacts.
+                __( '%d contacts will be synced to Smaily in batches of 100 with ~30 seconds apart. Contact sync can take some time.', 'smaily-connect' ),
                 state.env.storeTotals.customers,
               )
             : __( 'No existing WordPress users detected — the backfill will be a no-op.', 'smaily-connect' )}
@@ -246,7 +246,7 @@ export function Step2Subscribers({
             loading={isRunning && progress.processed === 0}
             type="button"
           >
-            {isRunning ? __( 'Running…', 'smaily-connect' ) : __( 'Start backfill', 'smaily-connect' )}
+            {isRunning ? __( 'Running…', 'smaily-connect' ) : __( 'Start import', 'smaily-connect' )}
           </Button>
 
           {isRunning && (
@@ -261,22 +261,22 @@ export function Step2Subscribers({
             <ProgressBar
               percent={progress.percent}
               tone={hasFailed ? 'danger' : isComplete ? 'success' : 'brand'}
-              ariaLabel={ __( 'Subscriber backfill progress', 'smaily-connect' ) }
+              ariaLabel={ __( 'Contact import progress', 'smaily-connect' ) }
             />
             <p className="mt-2 text-xs text-text-secondary">
               {/* F3-55: `processed` counts users WALKED (drives the bar);
                   `synced` counts audience members actually handled — the only
                   number that may be labelled "contacts synced". */}
               {isRunning && sprintf(
-                // translators: %1$d is users checked, %2$d is total users, %3$d is contacts synced.
-                __( 'Checked %1$d of %2$d users — %3$d contacts synced.', 'smaily-connect' ),
+                // translators: %1$d is contacts checked, %2$d is total contacts, %3$d is contacts synced.
+                __( 'Checked %1$d of %2$d contacts — %3$d contacts synced.', 'smaily-connect' ),
                 progress.processed,
                 progress.total,
                 progress.synced,
               )}
               {isComplete && sprintf(
-                // translators: %1$d is contacts synced, %2$d is users checked.
-                __( 'Done — %1$d contacts synced (%2$d users checked).', 'smaily-connect' ),
+                // translators: %1$d is contacts synced, %2$d is contacts checked.
+                __( 'Done — %1$d contacts synced (%2$d contacts checked).', 'smaily-connect' ),
                 progress.synced,
                 progress.processed,
               )}
@@ -326,7 +326,7 @@ const CONTACT_SYNC_MODES: ReadonlyArray<{ value: ContactSyncMode; label: string;
     value: 'consent',
     label: __( 'Subscribers only (consent)', 'smaily-connect' ),
     description: __(
-      'Only customers who opted in (the subscription checkbox) are sent to Smaily. The store mirrors Smaily unsubscribes back daily.',
+      'Only contacts who have subscribed to marketing emails are sent to Smaily. Unsubscribed contacts are synced back daily.',
       'smaily-connect',
     ),
   },
@@ -342,7 +342,7 @@ const CONTACT_SYNC_MODES: ReadonlyArray<{ value: ContactSyncMode; label: string;
     value: 'checkout_optin',
     label: __( 'Checkout opt-in only', 'smaily-connect' ),
     description: __(
-      'Only customers who tick the checkout subscription box are sent (guests included). No account sync, no sync-back.',
+      'Only customers (guests included) who subscribe to marketing emails during the checkout are synced to Smaily.',
       'smaily-connect',
     ),
   },

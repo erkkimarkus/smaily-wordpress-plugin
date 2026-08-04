@@ -56,7 +56,13 @@ export function Step4Recommendations({
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
             {__(
-              'Sync product, customer, and order data to Smaily Campaign Intelligence for personalised product recommendations in your campaigns. Optional — you can come back and set this up later.',
+              'Sync product, customer and order data to Smaily Campaign Intelligence to send personalised product recommendations via Smaily automation workflows or in your campaigns. Optional — you can come back and set this up later.',
+              'smaily-connect',
+            )}
+          </p>
+          <p className="mt-2 text-sm text-text-secondary">
+            {__(
+              'Contact Smaily to activate Campaign Intelligence tool and more automation workflows.',
               'smaily-connect',
             )}
           </p>
@@ -71,7 +77,7 @@ export function Step4Recommendations({
       {!inSettings && isConnected && (
         <Banner
           tone="success"
-          title={__('Engine connected — now wire up the engine-run recommendation automations', 'smaily-connect')}
+          title={__('Engine connected — now wire up the Campaign Intelligence automation workflows', 'smaily-connect')}
           actions={
             <Button
               variant="secondary"
@@ -84,7 +90,7 @@ export function Step4Recommendations({
           }
         >
           {__(
-            'Replenishment and win-back automations are configured in Step 3 (WooCommerce automations), below the store-run triggers.',
+            'Replenishment and win-back automations are configured in Step 3 (Automated letters), below the store-run triggers.',
             'smaily-connect',
           )}
         </Banner>
@@ -141,9 +147,10 @@ function SetupCard({
   return (
     <Card title={__('Connect Smaily Campaign Intelligence', 'smaily-connect')}>
       <p className="text-sm text-text-secondary">
-        {__('Paste the setup URL from your Smaily admin → Recommendations. The link looks like', 'smaily-connect')}{' '}
-        <span className="font-mono text-xs">https://&lt;host&gt;/setup/&lt;token&gt;</span>{' '}
-        {__('and is single-use — once accepted, the engine generates a long-lived API key the plugin stores encrypted on this site.', 'smaily-connect')}
+        {__(
+          'Copy the Campaign Intelligence connection URL in the following field and click on Connect to activate the connection.',
+          'smaily-connect',
+        )}
       </p>
 
       <div className="mt-4 space-y-2">

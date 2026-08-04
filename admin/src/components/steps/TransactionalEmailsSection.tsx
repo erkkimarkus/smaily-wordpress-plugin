@@ -58,7 +58,7 @@ export function TransactionalEmailsSection({
     <Card
       title={ __( 'Transactional emails', 'smaily-connect' ) }
       description={ __(
-        'Send order confirmations and shipping notices through a separate Smaily account, kept apart from your marketing sends.',
+        'Create a connection with your transactional Smaily account to send order confirmations and shipping notifications. Contact Smaily support (support@smaily.com) to set up your transactional Smaily account.',
         'smaily-connect',
       ) }
     >
@@ -68,7 +68,7 @@ export function TransactionalEmailsSection({
         onChange={(e) =>
           dispatch({ type: 'SET_TRANSACTIONAL_EMAILS_ENABLED', payload: e.target.checked })
         }
-        label={ __( 'Use transactional emails', 'smaily-connect' ) }
+        label={ __( 'Send transactional emails', 'smaily-connect' ) }
       />
 
       {state.transactionalEmailsEnabled && (
@@ -95,7 +95,7 @@ export function TransactionalEmailsSection({
                   'smaily-connect',
                 )
               : __(
-                  'Once connected, set up the Order confirmation and Shipping confirmation triggers in the WooCommerce automations step.',
+                  'Once the connection has been made, set up order and shipping confirmations under Automations setup step.',
                   'smaily-connect',
                 )}
           </p>

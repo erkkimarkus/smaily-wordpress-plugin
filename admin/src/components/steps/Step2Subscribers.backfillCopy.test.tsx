@@ -68,7 +68,7 @@ describe('Step2Subscribers — audience-aware backfill copy (F3-55)', () => {
 
     render(<Step2Subscribers state={state} dispatch={vi.fn()} />);
 
-    expect(await screen.findByText(/30000 users will be processed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/30000 contacts will be synced to Smaily/i)).toBeInTheDocument();
     expect(screen.queryByText(/will be synced to Smaily as contacts/i)).not.toBeInTheDocument();
   });
 
@@ -87,7 +87,7 @@ describe('Step2Subscribers — audience-aware backfill copy (F3-55)', () => {
     render(<Step2Subscribers state={state} dispatch={vi.fn()} />);
 
     expect(
-      await screen.findByText(/Checked 12400 of 30000 users — 6100 contacts synced\./i),
+      await screen.findByText(/Checked 12400 of 30000 contacts — 6100 contacts synced\./i),
     ).toBeInTheDocument();
   });
 
@@ -107,7 +107,7 @@ describe('Step2Subscribers — audience-aware backfill copy (F3-55)', () => {
     render(<Step2Subscribers state={state} dispatch={vi.fn()} />);
 
     expect(
-      await screen.findByText(/Done — 16012 contacts synced \(30000 users checked\)\./i),
+      await screen.findByText(/Done — 16012 contacts synced \(30000 contacts checked\)\./i),
     ).toBeInTheDocument();
     // The walk count must never be presented as the contacts number.
     expect(screen.queryByText(/30000 contacts synced/i)).not.toBeInTheDocument();

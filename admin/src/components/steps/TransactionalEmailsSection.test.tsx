@@ -20,14 +20,14 @@ describe('TransactionalEmailsSection', () => {
   it('renders only the enablement toggle when off — no credential fields', () => {
     render(<Harness initial={baseState()} />);
 
-    expect(screen.getByRole('switch', { name: /use transactional emails/i })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /send transactional emails/i })).not.toBeChecked();
     expect(screen.queryByLabelText(/subdomain/i)).not.toBeInTheDocument();
   });
 
   it('reveals the transactional credential block when enabled', () => {
     render(<Harness initial={baseState()} />);
 
-    fireEvent.click(screen.getByRole('switch', { name: /use transactional emails/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /send transactional emails/i }));
 
     expect(screen.getByLabelText(/subdomain/i)).toBeInTheDocument();
     // No trigger sections here anymore — they live on the WooCommerce tab
@@ -38,7 +38,7 @@ describe('TransactionalEmailsSection', () => {
 
   it('never describes the account as a "sub-account" (PRO-1540 copy fix)', () => {
     render(<Harness initial={baseState()} />);
-    fireEvent.click(screen.getByRole('switch', { name: /use transactional emails/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /send transactional emails/i }));
 
     expect(document.body.textContent ?? '').not.toMatch(/sub-account/i);
   });

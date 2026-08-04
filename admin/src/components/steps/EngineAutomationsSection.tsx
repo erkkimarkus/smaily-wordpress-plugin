@@ -79,11 +79,11 @@ export function EngineAutomationsSection({
     <div className="space-y-4 border-t border-border-subtle pt-6">
       <div>
         <h3 className="text-lg font-semibold text-text-primary">
-          { __( 'Engine-run recommendation automations', 'smaily-connect' ) }
+          { __( 'Campaign Intelligence automation workflows', 'smaily-connect' ) }
         </h3>
         <p className="mt-1 text-sm text-text-secondary">
           { __(
-            'Unlike the automations above, these are triggered by Smaily Campaign Intelligence — the engine enrols each contact into the Smaily workflow you pick at the moment it predicts (a replenishment running out, a customer at risk of churning). Your store only configures them here; sending happens engine-side.',
+            'Following automated emails are sent by Smaily’s Campaign Intelligence tool that triggers Smaily’s automation workflows at the predicted moment (a replenishment running out, a customer at risk of churning, etc.), based on customer’s previous purchase history and behaviour.',
             'smaily-connect',
           ) }
         </p>
@@ -125,12 +125,12 @@ function UpsellBanner({ inSettings }: { inSettings: boolean }): React.JSX.Elemen
       }
     >
       { __(
-        'Replenishment reminders, win-back campaigns and other engine-run automations send themselves at the right moment for each customer — through your own Smaily workflows.',
+        'Replenishment reminders, win-back campaigns and other engine-run automations sent at the right moment for each customer through Smaily workflows.',
         'smaily-connect',
       ) }{' '}
       {inSettings
         ? __( 'Connect Smaily Campaign Intelligence on the Campaign Intelligence tab to set them up.', 'smaily-connect' )
-        : __( 'You will connect Smaily Campaign Intelligence in the next step — this section unlocks right after.', 'smaily-connect' )}
+        : __( 'You can connect Campaign Intelligence at the next setup step.', 'smaily-connect' )}
     </Banner>
   );
 }

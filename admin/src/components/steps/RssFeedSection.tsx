@@ -60,7 +60,7 @@ export function RssFeedSection({ rss }: RssFeedSectionProps): React.JSX.Element 
     <Card
       title={__('Product RSS feed', 'smaily-connect')}
       description={__(
-        "Load store products straight into your newsletters: paste this feed URL into a Smaily template's RSS block and the products appear in the email. The settings below only shape the URL — nothing is saved here.",
+        "Import products directly into your Smaily template. Paste this RSS feed to the template editor's RSS feed element and select products for import. The settings below only generate the URL — nothing is saved here.",
         'smaily-connect',
       )}
     >

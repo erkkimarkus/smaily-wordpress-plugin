@@ -34,6 +34,8 @@ export function Step3WooCommerce({
   dispatch,
   inSettings = false,
 }: Step3WooCommerceProps): React.JSX.Element {
+  const docsUrl = state.env.docsUrl ?? '';
+
   return (
     <div className="space-y-6">
       {!inSettings && (
@@ -41,10 +43,35 @@ export function Step3WooCommerce({
           <p className="text-sm font-medium uppercase tracking-wide text-text-tertiary">
             { __( 'Step 3 of 6', 'smaily-connect' ) }
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'WooCommerce automations', 'smaily-connect' ) }</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-text-primary">{ __( 'Automated letters', 'smaily-connect' ) }</h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            { __( 'Send marketing and transactional emails via Smaily automation workflows.', 'smaily-connect' ) }
+          </p>
           <p className="mt-2 text-sm text-text-secondary">
             { __(
-              'Map each trigger to a Smaily workflow. Multi-language sites pick a workflow per language; single-language sites pick one workflow per trigger.',
+              'When your page is in a single language, you can connect one workflow. Multi language sites allow connecting multiple workflows or even accounts.',
+              'smaily-connect',
+            ) }
+          </p>
+          <p className="mt-2 text-sm text-text-secondary">
+            { __( 'Create and activate automation workflows in Smaily.', 'smaily-connect' ) }
+            {docsUrl !== '' && (
+              <>
+                {' '}
+                <a
+                  href={`${docsUrl}#set-automations`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  { __( 'Read more here.', 'smaily-connect' ) }
+                </a>
+              </>
+            )}
+          </p>
+          <p className="mt-2 text-sm text-text-secondary">
+            { __(
+              'Note! Newsletter subscription welcome emails can be configured under subscription forms settings.',
               'smaily-connect',
             ) }
           </p>
@@ -66,7 +93,7 @@ export function Step3WooCommerce({
         dispatch={dispatch}
         trigger="first_order"
         title={ __( 'First-order email', 'smaily-connect' ) }
-        description={ __( 'Sent the first time a customer completes an order (wc_get_customer_order_count === 1).', 'smaily-connect' ) }
+        description={ __( 'Sent when a customer purchases for the first time.', 'smaily-connect' ) }
         isEnabled={state.firstOrderEnabled}
         onEnabledChange={(enabled) =>
           dispatch({ type: 'SET_FIRST_ORDER_ENABLED', payload: enabled })
@@ -78,7 +105,7 @@ export function Step3WooCommerce({
         dispatch={dispatch}
         trigger="abandoned_cart"
         title={ __( 'Abandoned-cart reminder', 'smaily-connect' ) }
-        description={ __( 'Fires when a cart has been idle for the cutoff time. Action Scheduler ticks every 15 minutes.', 'smaily-connect' ) }
+        description={ __( 'Sent when the cart has been abandoned for a set amount of time. Note! Abandoned cart check runs every 15 minutes.', 'smaily-connect' ) }
         isEnabled={state.abandonedCartEnabled}
         onEnabledChange={(enabled) =>
           dispatch({ type: 'SET_ABANDONED_CART_ENABLED', payload: enabled })
@@ -101,7 +128,7 @@ export function Step3WooCommerce({
               />
             </div>
             <p className="mt-1 text-xs text-text-tertiary">
-              { __( 'Minimum 10 minutes. The cron job evaluates carts older than this.', 'smaily-connect' ) }
+              { __( 'Minimum 10 minutes. Abandoned carts older than the set period are checked.', 'smaily-connect' ) }
             </p>
           </div>
         }

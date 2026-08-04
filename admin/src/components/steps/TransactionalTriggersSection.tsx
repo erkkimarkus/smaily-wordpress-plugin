@@ -42,7 +42,7 @@ export function TransactionalTriggersSection({
         </h3>
         <p className="mt-1 text-sm text-text-secondary">
           { __(
-            'Sent through the separate Smaily account you connected on the Connection tab, kept apart from the marketing automations above.',
+            'Send transactional emails via transactional Smaily account, which you can connect in the first setup step. Transactional emails should be sent from a separate account than marketing emails.',
             'smaily-connect',
           ) }
         </p>
@@ -66,7 +66,7 @@ export function TransactionalTriggersSection({
         dispatch={dispatch}
         trigger="shipping_confirmation"
         title={ __( 'Shipping confirmation', 'smaily-connect' ) }
-        description={ __( 'Sent when an order reaches one of the statuses marked as shipped below.', 'smaily-connect' ) }
+        description={ __( 'Sent when the order has been completed and is ready to be sent.', 'smaily-connect' ) }
         isEnabled={state.shippingConfirmationEnabled}
         onEnabledChange={(enabled) =>
           dispatch({ type: 'SET_SHIPPING_CONFIRMATION_ENABLED', payload: enabled })

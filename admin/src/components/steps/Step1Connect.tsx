@@ -64,6 +64,7 @@ export function Step1Connect({
   );
 
   const isModeA = state.multilingualMode === 'A' && state.env.detectedLanguages.length > 1;
+  const docsUrl = state.env.docsUrl ?? '';
 
   return (
     <div className="space-y-6">
@@ -77,9 +78,22 @@ export function Step1Connect({
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
             { __(
-              'Enter the credentials from your Smaily admin → Settings → API. We\'ll verify them before saving — nothing is persisted until you click Continue.',
+              'To create a connection, go to your Smaily account’s settings. Create a new API user under the “Integrations” tab and copy subdomain, API username and API password in the plugin. Test the connection and click “Continue →”.',
               'smaily-connect',
             ) }
+            {docsUrl !== '' && (
+              <>
+                {' '}
+                <a
+                  href={`${docsUrl}#step1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  { __( 'User guide to create API credentials', 'smaily-connect' ) }
+                </a>
+              </>
+            )}
           </p>
         </div>
       )}

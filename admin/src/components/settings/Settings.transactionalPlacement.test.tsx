@@ -45,7 +45,7 @@ describe('Settings — transactional-emails tab placement (PRO-1540)', () => {
     window.location.hash = 'connection';
     render(<Settings initialState={connectedState({ transactionalEmailsEnabled: true })} />);
 
-    expect(screen.getByRole('switch', { name: /use transactional emails/i })).toBeChecked();
+    expect(screen.getByRole('switch', { name: /send transactional emails/i })).toBeChecked();
     expect(document.getElementById('smaily-subdomain-transactional')).toBeInTheDocument();
   });
 

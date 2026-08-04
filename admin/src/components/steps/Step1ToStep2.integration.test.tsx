@@ -111,13 +111,13 @@ describe('Step 1 → Step 2 integration', () => {
     expect(screen.getByText(/connected/i)).toBeInTheDocument();
 
     // 3. Step 2 backfill start.
-    fireEvent.click(screen.getByRole('button', { name: /start backfill/i }));
+    fireEvent.click(screen.getByRole('button', { name: /start import/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('state-backfill-status')).toHaveTextContent('running');
     });
 
     // 4. The reducer carried the customer total from env into Step 2's display.
-    expect(screen.getByText(/1,?234 users will be processed/i)).toBeInTheDocument();
+    expect(screen.getByText(/1,?234 contacts will be synced to Smaily/i)).toBeInTheDocument();
   });
 });
