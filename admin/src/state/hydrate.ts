@@ -273,7 +273,12 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       recommendations: false,
     },
     subscriberSyncEnabled: s.subscriberSyncEnabled,
-    syncFields: s.syncFields.length > 0 ? s.syncFields : [...DEFAULT_SYNC_FIELDS],
+    // An empty selection is a real answer — the merchant unticked every
+    // optional field, or upgraded from a store whose legacy settings had
+    // none ticked (PRO-1684). Only a missing/mis-shaped value falls back to
+    // the defaults; treating empty as "nothing saved" showed every box
+    // ticked while nothing optional was being sent.
+    syncFields: Array.isArray(s.syncFields) ? s.syncFields : [...DEFAULT_SYNC_FIELDS],
     wordpressSubscriptionCheckbox: s.wordpressSubscriptionCheckbox,
     checkoutSubscriptionCheckbox: s.checkoutSubscriptionCheckbox,
     contactSyncMode: normalizeContactSyncMode(s.contactSyncMode),

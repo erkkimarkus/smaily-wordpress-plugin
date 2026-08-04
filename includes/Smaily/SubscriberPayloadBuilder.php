@@ -76,6 +76,41 @@ class SubscriberPayloadBuilder {
 	);
 
 	/**
+	 * The pre-wizard option SHAPE — every legacy toggle key → the canonical
+	 * name above, or null for a legacy key that is no longer a choice.
+	 *
+	 * Until F3-45 the merchant's selection was written by the legacy settings
+	 * page (`Sanitizer::sanitize_subscriber_sync_fields()`, removed in
+	 * 9a02618) as a MAP of every key in `Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS`
+	 * → bool — not the list of enabled names the wizard writes. Read as a list
+	 * that map yields `'1'`/`''` values, the SUPPORTED_FIELDS intersection
+	 * matches nothing, and an upgraded store silently synced nothing but
+	 * email + store (PRO-1684).
+	 *
+	 * `null` = no toggle equivalent: `store_url` and `user_email` are sent
+	 * unconditionally (FIELD_MAPPING.md §1) and `language` is resolved by
+	 * ContactLanguageResolver (F3-47), so none of the three is a merchant
+	 * choice any more. `user_dob` is the one real rename (`birthday`).
+	 *
+	 * @var array<string, string|null>
+	 */
+	private const LEGACY_SELECTION_KEYS = array(
+		'store_url'        => null,
+		'user_email'       => null,
+		'language'         => null,
+		'customer_group'   => 'customer_group',
+		'customer_id'      => 'customer_id',
+		'first_name'       => 'first_name',
+		'first_registered' => 'first_registered',
+		'last_name'        => 'last_name',
+		'nickname'         => 'nickname',
+		'site_title'       => 'site_title',
+		'user_dob'         => 'birthday',
+		'user_gender'      => 'user_gender',
+		'user_phone'       => 'user_phone',
+	);
+
+	/**
 	 * Build the Smaily contact payload for a WP user.
 	 *
 	 * @return array<string, mixed>
@@ -132,34 +167,153 @@ class SubscriberPayloadBuilder {
 	 * @return array<int, string>
 	 */
 	private function enabled(): array {
-		$stored = get_option( self::OPTION_SYNC_FIELDS, null );
-		if ( ! is_array( $stored ) ) {
-			// Never-saved or corrupt — fall back to the documented
-			// merchant-friendly default (every cross-channel field on).
-			$stored = self::SUPPORTED_FIELDS;
-		}
-
-		// Reject unknown field names — a stale value in the option
-		// from a future plugin version shouldn't drag bogus keys
-		// into the payload.
-		return array_values(
-			array_intersect( self::SUPPORTED_FIELDS, array_map( 'strval', self::canonical_fields( $stored ) ) )
-		);
+		return self::effective_selection();
 	}
 
 	/**
-	 * Translate a stored field selection to the canonical §2/§3 names.
+	 * The field selection the sync is ACTUALLY using right now.
 	 *
-	 * Only string VALUES are rewritten and every key is preserved, so the
-	 * legacy associative shape (`array( 'user_phone' => false, … )`, whose
-	 * values are booleans) comes back byte-identical — this is not the place
-	 * that teaches the readers to understand that shape.
+	 * Single source for both readers: the payload builders and the wizard's
+	 * checkbox hydration (`EnvDetector::saved_settings()`), so a tick the
+	 * merchant sees always means "this field is being sent" and vice versa.
+	 *
+	 * A selection that can't be read at all — never saved, or a shape no
+	 * writer of this plugin produces — falls back to the documented
+	 * merchant-friendly default (every cross-channel field on) rather than
+	 * to the bare minimum. `selection_unreadable()` is what tells the
+	 * merchant when that fallback is in effect for the second reason.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function effective_selection(): array {
+		return self::interpret_selection( get_option( self::OPTION_SYNC_FIELDS, null ) )
+			?? self::SUPPORTED_FIELDS;
+	}
+
+	/**
+	 * True when the option holds a value this plugin cannot read as a
+	 * selection, so the merchant's real choice is unknown and the fallback
+	 * above is silently in effect. A never-saved option is NOT unreadable —
+	 * that is a fresh install, where the fallback IS the documented default.
+	 */
+	public static function selection_unreadable(): bool {
+		$stored = get_option( self::OPTION_SYNC_FIELDS, null );
+
+		return $stored !== null && self::interpret_selection( $stored ) === null;
+	}
+
+	/**
+	 * Read a stored selection — either shape — as a canonical list of enabled
+	 * field names, or null when it is neither.
+	 *
+	 * Unknown names inside a shape we DO recognise are dropped, not treated
+	 * as unreadable: a stale name from another plugin version shouldn't drag
+	 * bogus keys into the payload, and it says nothing about the rest of the
+	 * merchant's choice.
+	 *
+	 * @param mixed $stored Raw option value.
+	 *
+	 * @return array<int, string>|null
+	 */
+	public static function interpret_selection( $stored ): ?array {
+		if ( ! is_array( $stored ) ) {
+			return null;
+		}
+
+		$names = self::has_string_key( $stored )
+			? self::names_from_legacy_map( $stored )
+			: self::names_from_list( $stored );
+
+		if ( $names === null ) {
+			return null;
+		}
+
+		return array_values( array_intersect( self::SUPPORTED_FIELDS, $names ) );
+	}
+
+	/**
+	 * @param array<int|string, mixed> $stored
+	 */
+	private static function has_string_key( array $stored ): bool {
+		foreach ( array_keys( $stored ) as $key ) {
+			if ( is_string( $key ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * The wizard shape: a list of enabled names. An empty array is a valid
+	 * selection (the merchant unticked everything), not an unreadable one.
+	 *
+	 * @param array<int|string, mixed> $stored
+	 *
+	 * @return array<int, string>|null
+	 */
+	private static function names_from_list( array $stored ): ?array {
+		foreach ( $stored as $value ) {
+			if ( ! is_string( $value ) ) {
+				return null;
+			}
+		}
+
+		return array_values( array_map( 'strval', self::canonical_fields( $stored ) ) );
+	}
+
+	/**
+	 * The legacy shape: name => enabled. Honours the VALUES — a `false` there
+	 * is a real "don't send this", the same answer the legacy sync gave
+	 * (`array_keys( array_filter( $options ) )`, subscriber-synchronization.class.php).
+	 *
+	 * Null when the map isn't recognisably the legacy one: no known legacy key
+	 * at all, or a value that isn't a scalar the legacy writer could have
+	 * produced.
+	 *
+	 * @param array<int|string, mixed> $stored
+	 *
+	 * @return array<int, string>|null
+	 */
+	private static function names_from_legacy_map( array $stored ): ?array {
+		$names   = array();
+		$matched = false;
+
+		foreach ( $stored as $key => $enabled ) {
+			if ( is_array( $enabled ) || is_object( $enabled ) ) {
+				return null;
+			}
+			if ( ! is_string( $key ) || ! array_key_exists( $key, self::LEGACY_SELECTION_KEYS ) ) {
+				continue;
+			}
+
+			$matched = true;
+			// Truthiness matches the legacy writer, which stored false for
+			// an unticked box and never a truthy string for one ('0' is
+			// falsy here exactly as it was there).
+			if ( ! $enabled ) {
+				continue;
+			}
+
+			$canonical = self::LEGACY_SELECTION_KEYS[ $key ];
+			if ( $canonical !== null ) {
+				$names[] = $canonical;
+			}
+		}
+
+		return $matched ? $names : null;
+	}
+
+	/**
+	 * Translate the names in a wizard-shaped selection to the canonical
+	 * §2/§3 spelling. Only string VALUES are rewritten; the legacy MAP shape
+	 * is read by names_from_legacy_map(), not here.
 	 *
 	 * @param array<int|string, mixed> $stored Raw option value.
 	 *
 	 * @return array<int|string, mixed>
 	 */
-	public static function canonical_fields( array $stored ): array {
+	private static function canonical_fields( array $stored ): array {
 		$canonical = array();
 		foreach ( $stored as $key => $value ) {
 			$canonical[ $key ] = is_string( $value ) && isset( self::LEGACY_FIELD_ALIASES[ $value ] )

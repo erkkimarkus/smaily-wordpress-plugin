@@ -436,12 +436,14 @@ class EnvDetector {
 
 			// Step 2: subscribers.
 			'subscriberSyncEnabled'         => (bool) get_option( 'smaily_connect_subscriber_sync_enabled', true ),
-			// Canonicalised so a selection saved under the pre-PRO-1683
-			// wizard names (`phone`/`gender`) still shows its checkbox
-			// ticked — and re-saves under the name the sync reads.
-			'syncFields'                    => SubscriberPayloadBuilder::canonical_fields(
-				(array) get_option( 'smaily_connect_subscriber_sync_fields', array() )
-			),
+			// The selection the sync is REALLY using, read through the same
+			// interpreter — so a store that saved under the pre-PRO-1683
+			// wizard names (`phone`/`gender`) or under the legacy settings
+			// page's name => bool map (PRO-1684) shows exactly the ticks
+			// whose fields are being sent, and can turn any of them off.
+			// Always a list: the legacy map would reach the wizard as a JS
+			// object, whose missing `.length` reads as "nothing saved".
+			'syncFields'                    => SubscriberPayloadBuilder::effective_selection(),
 			// Must match the key SettingsEndpoint::save_subscribers() writes
 			// to. Previously read from `smaily_connect_wp_subscription_enabled`
 			// which was never written anywhere — the checkbox flip in Step 2
