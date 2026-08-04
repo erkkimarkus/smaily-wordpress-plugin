@@ -15,8 +15,11 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Integrations\WooCommerce\HookHandler;
+use Smaily\Connect\Integrations\WooCommerce\LandingCapture;
 use Smaily\Connect\Integrations\WooCommerce\OrderHookHandler;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Client;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
 use Smaily\Connect\Smaily\RecEngine\OrderFlusher;
@@ -26,6 +29,9 @@ use Smaily\Connect\Tests\Integration\Support\EnvScrub;
 use Smaily\Connect\Tests\Integration\Support\EnvSeed;
 
 final class RecEngineOrdersTest extends TestCase {
+
+	/** A genuine engine-issued rec id shape (the engine validates it as a uuid). */
+	private const REC_UUID = '11111111-2222-4333-8444-555555555555';
 
 	private static ?RecEngineMockServer $engine = null;
 
@@ -312,6 +318,98 @@ final class RecEngineOrdersTest extends TestCase {
 		);
 	}
 
+	public function test_uuid_rec_landing_rides_the_order_to_the_engine(): void {
+		// PRO-1710 control case: a GENUINE engine-issued rec id behaves exactly
+		// as before — captured on the landing, stamped at checkout, on the wire.
+		$product  = $this->make_product( 'ORD-REC-OK', '15.00' );
+		$order_id = $this->landing_then_order( self::REC_UUID, 'rec-uuid@example.test', $product );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'], 'stats: ' . wp_json_encode( $stats ) );
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertSame( self::REC_UUID, $payloads[0]['smaily_rec_id'] ?? null, 'Real attribution still reaches the engine.' );
+		self::assertSame( self::REC_UUID, (string) wc_get_order( $order_id )->get_meta( '_smaily_rec_id' ) );
+	}
+
+	public function test_junk_rec_landing_never_reaches_the_order_and_it_ingests_unattributed(): void {
+		// PRO-1710, the whole chain: a visitor lands with a junk ?smaily_rec=,
+		// buys, and the order must ingest — un-attributed, not D6-rejected.
+		// Before the fix the value was cookied → stamped → the order failed
+		// permanently against the (now uuid-validating) engine.
+		$product  = $this->make_product( 'ORD-REC-JUNK', '15.00' );
+		$order_id = $this->landing_then_order( 'not-a-uuid', 'rec-junk@example.test', $product );
+
+		self::assertSame( '', (string) wc_get_order( $order_id )->get_meta( '_smaily_rec_id' ), 'Nothing was captured, so nothing was stamped.' );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'], 'The order ingests normally. stats: ' . wp_json_encode( $stats ) );
+		self::assertSame( 0, $stats['failed'] );
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertArrayNotHasKey( 'smaily_rec_id', $payloads[0] );
+	}
+
+	public function test_a_junk_rec_id_already_on_order_meta_is_dropped_at_send(): void {
+		// The send-side half of PRO-1710: a store that cookied junk BEFORE this
+		// release still carries it on the order meta (the capture fix cannot
+		// reach a cookie already in a browser). The builder drops the field so
+		// the order ships un-attributed instead of failing forever.
+		$product  = $this->make_product( 'ORD-REC-STALE', '15.00' );
+		$order_id = $this->make_order( 'rec-stale@example.test', 'completed', $product );
+		$order    = wc_get_order( $order_id );
+		$order->update_meta_data( '_smaily_rec_id', 'stale-junk-cookie' );
+		$order->save();
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'], 'stats: ' . wp_json_encode( $stats ) );
+		self::assertSame( 0, $stats['failed'] );
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertArrayNotHasKey( 'smaily_rec_id', $payloads[0] );
+		self::assertSame( 'stale-junk-cookie', (string) wc_get_order( $order_id )->get_meta( '_smaily_rec_id' ), 'The stored meta is left alone — only the wire object drops it.' );
+	}
+
+	public function test_mock_rejects_a_non_uuid_smaily_rec_id_like_the_live_engine(): void {
+		// PRO-1710 mock fidelity: the live route validates smaily_rec_id as
+		// `z.string().uuid()` PER ORDER (D6). The plugin can no longer produce
+		// such a payload (capture + send both validate), so this posts the raw
+		// wire shape through the Client — the same pattern the catalog blank
+		// product_url check uses — to keep the mock honest about the engine.
+		$settings = new RecEngineSettings();
+		$client   = new Client( $settings->api_key(), $settings->base_url(), $settings->endpoints(), 2 );
+
+		$response = $client->ingest_orders(
+			array(
+				array(
+					'event_id'          => 'rec-id-shape-test',
+					'external_order_id' => 'WC-REC-SHAPE',
+					'customer_email'    => 'rec-shape@example.test',
+					'ordered_at'        => '2026-08-04T10:00:00Z',
+					'total_amount'      => 10.0,
+					'currency'          => 'EUR',
+					'status'            => 'completed',
+					'smaily_rec_id'     => 'not-a-uuid',
+					'items'             => array(
+						array(
+							'sku'        => 'woo-1',
+							'qty'        => 1,
+							'unit_price' => 10.0,
+							'line_total' => 10.0,
+						),
+					),
+				),
+			)
+		);
+
+		self::assertSame( 0, $response['processed'] ?? null, 'A non-uuid smaily_rec_id is never processed.' );
+		self::assertCount( 1, $response['errors'] ?? array() );
+		self::assertSame( 'smaily_rec_id', $response['errors'][0]['field'] ?? null );
+	}
+
 	public function test_revoked_key_401_fails_batch_without_retry(): void {
 		$product = $this->make_product( 'ORD-SKU-3', '5.00' );
 		$this->make_order( 'auth-401@example.test', 'completed', $product );
@@ -402,6 +500,42 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertInstanceOf( \WC_Product::class, $loaded );
 		self::assertSame( '', $loaded->get_sku(), 'Precondition: the product really has no SKU.' );
 		return $loaded;
+	}
+
+	/**
+	 * Drive the REAL landing → checkout chain for one `?smaily_rec=` value: the
+	 * server-side LandingCapture (only the header write is stubbed — PHPUnit's
+	 * own progress output makes headers_sent() true; set_cookie() still updates
+	 * $_COOKIE, which is exactly what the checkout stamping reads), then the
+	 * real classic-checkout attribution stamping on a real order.
+	 *
+	 * @return int The created order id.
+	 */
+	private function landing_then_order( string $rec_param, string $email, \WC_Product $product ): int {
+		$_GET    = array( 'smaily_rec' => $rec_param );
+		$_COOKIE = array();
+
+		$capture = new class( new RecEngineSettings() ) extends LandingCapture {
+			protected function headers_already_sent(): bool {
+				return false;
+			}
+
+			protected function send_cookie( string $name, string $value, int $expires ): void {
+				// No real Set-Cookie header in a CLI test run; $_COOKIE is what
+				// the checkout stamping reads on the following request anyway.
+			}
+		};
+		$capture->capture();
+
+		$order_id = $this->make_order( $email, 'completed', $product );
+		// The wizard gate is closed (EnvScrub), so this only runs the
+		// attribution stamping — the same call the classic checkout makes.
+		( new HookHandler( new EventQueue() ) )->on_checkout_order_processed( $order_id, array() );
+
+		$_GET    = array();
+		$_COOKIE = array();
+
+		return $order_id;
 	}
 
 	private function make_order( string $email, string $status, \WC_Product $product ): int {

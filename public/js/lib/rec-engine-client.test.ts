@@ -251,18 +251,39 @@ describe('RecEngineClient (3.4.2 cookies + URL-param capture)', () => {
     }
   });
 
+  const REC_UUID = '11111111-2222-4333-8444-555555555555';
+
   it('captures campaign params into cookies and strips them from the URL', () => {
-    window.history.replaceState({}, '', '/landing?smaily_vt=vt1&smaily_rec=r1&smaily_ctx=welcome&keep=1');
+    window.history.replaceState(
+      {},
+      '',
+      `/landing?smaily_vt=vt1&smaily_rec=${REC_UUID}&smaily_ctx=welcome&keep=1`
+    );
     client = new RecEngineClient(makeConfig());
 
     const captured = client.captureUrlParams();
 
     expect(captured).toBe(true);
     expect(document.cookie).toContain('smaily_rec_uid=vt1');
-    expect(document.cookie).toContain('smaily_rec_id=r1');
+    expect(document.cookie).toContain(`smaily_rec_id=${REC_UUID}`);
     expect(document.cookie).toContain('smaily_rec_ctx=welcome');
     // Campaign params stripped; unrelated params kept.
     expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('never cookies a non-uuid rec id, but still strips it (PRO-1710)', () => {
+    // The engine validates smaily_rec_id as a uuid per ORDER (D6) — cookieing
+    // a junk value here would ride the shopper's order and reject it
+    // permanently. Same rule as the PHP LandingCapture (shared cookie).
+    window.history.replaceState({}, '', '/landing?smaily_rec=junk-value&smaily_ctx=welcome');
+    client = new RecEngineClient(makeConfig());
+
+    const captured = client.captureUrlParams();
+
+    expect(captured).toBe(true); // the context WAS captured
+    expect(document.cookie).not.toContain('smaily_rec_id=');
+    expect(document.cookie).toContain('smaily_rec_ctx=welcome');
+    expect(window.location.search).toBe('');
   });
 
   it('saves the cookie BEFORE stripping the URL (attribution must not be lost)', () => {

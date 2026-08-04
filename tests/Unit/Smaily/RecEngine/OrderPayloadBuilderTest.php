@@ -20,6 +20,9 @@ use Smaily\Connect\Smaily\RecEngine\OrderPayloadBuilder;
 
 final class OrderPayloadBuilderTest extends TestCase {
 
+	/** A genuine engine-issued rec id shape (the engine validates it as a uuid). */
+	private const REC_UUID = '11111111-2222-4333-8444-555555555555';
+
 	public function test_build_maps_required_fields_and_event_id(): void {
 		$order = $this->mock_order(
 			array(
@@ -219,7 +222,7 @@ final class OrderPayloadBuilderTest extends TestCase {
 			array(
 				'status' => 'completed',
 				'meta'   => array(
-					'_smaily_rec_id'          => 'rec_abc',
+					'_smaily_rec_id'          => self::REC_UUID,
 					'_smaily_visitor_token'   => 'vt_xyz',
 					'_smaily_rec_ctx'         => 'cart_abandoned',
 					'_smaily_anon_session_id' => 'sess_1',
@@ -232,7 +235,7 @@ final class OrderPayloadBuilderTest extends TestCase {
 		$p       = $builder->build( $present, 'u' );
 		$a       = $builder->build( $absent, 'u' );
 
-		self::assertSame( 'rec_abc', $p['smaily_rec_id'] );
+		self::assertSame( self::REC_UUID, $p['smaily_rec_id'] );
 		self::assertSame( 'vt_xyz', $p['smaily_visitor_token'] );
 		self::assertSame( 'cart_abandoned', $p['smaily_rec_ctx'] );
 		self::assertSame( 'sess_1', $p['session_id'] );
@@ -241,6 +244,32 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertArrayNotHasKey( 'smaily_visitor_token', $a );
 		self::assertArrayNotHasKey( 'smaily_rec_ctx', $a );
 		self::assertArrayNotHasKey( 'session_id', $a );
+	}
+
+	public function test_a_non_uuid_rec_id_is_dropped_and_the_order_still_ships(): void {
+		// PRO-1710 send-side defence: a store that cookied a junk rec_id BEFORE
+		// the capture-side fix still carries it on order meta. The engine
+		// validates smaily_rec_id per ORDER (D6) — sending it would reject that
+		// order permanently, so the field is dropped and the order goes without
+		// attribution. The other attribution signals are untouched (only
+		// smaily_rec_id has an engine-enforced shape).
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'meta'   => array(
+					'_smaily_rec_id'        => 'not-a-uuid',
+					'_smaily_visitor_token' => 'vt_xyz',
+					'_smaily_rec_ctx'       => 'cart_abandoned',
+				),
+			)
+		);
+
+		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+
+		self::assertArrayNotHasKey( 'smaily_rec_id', $payload );
+		self::assertSame( 'vt_xyz', $payload['smaily_visitor_token'], 'The opaque visitor token is NOT uuid-typed — untouched.' );
+		self::assertSame( 'cart_abandoned', $payload['smaily_rec_ctx'] );
+		self::assertSame( 'completed', $payload['status'], 'The order itself still ships.' );
 	}
 
 	public function test_non_product_line_items_are_skipped(): void {

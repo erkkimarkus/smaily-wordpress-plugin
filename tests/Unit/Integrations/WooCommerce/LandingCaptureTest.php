@@ -44,11 +44,17 @@ final class LandingCaptureTest extends TestCase {
 		self::assertSame( self::UUID, $out['rec_id'] );
 	}
 
-	public function test_resolve_accepts_a_non_uuid_smaily_rec_token(): void {
-		// smaily_rec is the engine's authoritative param — a non-uuid id-token
-		// (e.g. a future rec_id shape) is still captured.
+	public function test_resolve_rejects_a_non_uuid_smaily_rec_token(): void {
+		// PRO-1710: the engine validates smaily_rec_id as a uuid PER ORDER (D6),
+		// so a bounded-but-not-uuid token (hand-typed, truncated, crafted) would
+		// ride the order and get that order permanently rejected. Not captured.
 		$out = $this->capture()->resolve( array( 'smaily_rec' => 'rec_abc123' ) );
-		self::assertSame( 'rec_abc123', $out['rec_id'] );
+		self::assertArrayNotHasKey( 'rec_id', $out );
+	}
+
+	public function test_resolve_rejects_a_truncated_uuid(): void {
+		$out = $this->capture()->resolve( array( 'smaily_rec' => substr( self::UUID, 0, 30 ) ) );
+		self::assertArrayNotHasKey( 'rec_id', $out );
 	}
 
 	public function test_resolve_rejects_a_malformed_smaily_rec(): void {
