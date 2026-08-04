@@ -5075,6 +5075,69 @@ sandbox engine.
 IsoDate rule to the first datetime we put on a line; the derive-at-send-time
 shape is the same reasoning as F3-42's "read the status fresh at flush".
 
+### PRO-1767 — Attribution capture loads whenever the store is CONNECTED, as its own tiny bundle
+
+**Context:** the browser-side attribution writer is consent-independent
+(PRO-1388) and exists precisely because a full-page cache serves a campaign
+landing without ever executing PHP, so `LandingCapture` never runs on it. But
+the script carrying that writer — the full browse runtime `sc-runtime.js` — is
+only enqueued when browse tracking is ON. A connected store with browse
+tracking off (the default) plus a page cache therefore had **no attribution
+writer at all**: PHP was skipped by the cache, and the JS was never loaded. The
+sibling Shopify and Magento plugins write these cookies client-side
+unconditionally for exactly this reason (2026-08-04 cross-plugin assessment).
+
+**Decision:**
+- **A second, attribution-only storefront bundle** — `public/js/landing.ts` →
+  `dist/public/js/sc-landing.js` — enqueued by `StorefrontBeacon` when the
+  engine is connected and the full runtime is NOT loaded. It does one thing:
+  read the campaign params, write the three first-party cookies, strip the
+  params. No transport, no consent surface, no session cookie; its boot blob
+  (`window.smailyConnectLanding`) carries cookie names, param names and TTLs and
+  not even the `/relay` URL. ~1.2 kB.
+- **Mutually exclusive with the runtime**, decided at enqueue time
+  (`is_attribution_only_enabled()` returns false whenever `is_enabled()` is
+  true). When browse tracking is on, the runtime's own
+  `captureUrlParams()` does the capture as before — so the cookies are never
+  written twice and neither writer needs to know about the other.
+- **One implementation, shared:** `public/js/lib/attribution.ts` holds the
+  capture (incl. the PRO-1710 UUID check on the rec id) and the cookie write;
+  `RecEngineClient.captureUrlParams()` now delegates to it. Two writers of the
+  same cookies must not be able to drift.
+- **Its gate is LandingCapture's, not the beacon's:** connected + the
+  `smaily_connect_capture_attribution` master switch, and no WooCommerce check
+  (a campaign link can land on any page). Browse telemetry keeps its own
+  unchanged gate — the browse toggle plus marketing consent.
+
+**Rationale:** the alternative was to load the full runtime on browse-off stores
+with a "capture only" flag. Rejected: it ships an event pipeline, a consent
+reader and a proxy URL to a store that has switched all of that off, which is
+both a bigger ad-block target and a much harder thing to defend when a merchant
+asks what the script does. A 1.2 kB writer with no send path is answerable in
+one sentence. Honouring the existing master switch (rather than adding a second
+one) means a merchant who deliberately turned attribution cookies off does not
+silently get a new writer from an update.
+
+**Build consequence (a trap worth naming):** because both bundles import the
+shared module, they must be built in SEPARATE vite passes (`--mode landing`,
+chained from every `build*` script). Verified 2026-08-05: in one pass Rollup
+hoists the shared module into `dist/shared/attribution-<hash>.js` and gives BOTH
+bundles a top-level `import` — at which point neither loads as the classic
+`<script>` `StorefrontBeacon` enqueues, silently breaking browse tracking too.
+
+**Demonstration:** on the running dev store (connected, browse tracking off) a
+storefront request returns the `sc-landing.js` tag and the
+`window.smailyConnectLanding` blob, with no `sc-runtime.js`. The integration
+suite pins the whole enqueue matrix (off+connected → writer only; on+connected →
+runtime only; disconnected → neither; master switch off → neither), and vitest
+covers the shared capture standalone, including the junk-rec-id refusal.
+
+**Relationships:** completes F3-46 / PRO-1388 (the server-side capture stays as
+the non-cached path — the two are deliberately redundant); keeps PRO-1710's UUID
+rule in the one place both bundles read; keeps the F3-41 naming rule (`sc-`
+prefix, no tracker keyword) for the new browser-visible file; does not touch
+F3-50 browse-consent gating in any way.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

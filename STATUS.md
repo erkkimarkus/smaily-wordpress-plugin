@@ -26,7 +26,55 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-05 (**PRO-1633 — a PARTIAL WooCommerce refund now reaches
+_Last updated: 2026-08-05 (**PRO-1767 — a connected store now captures campaign
+attribution in the browser even with browse tracking OFF.** The browser-side
+writer exists because a full-page cache serves a campaign landing without ever
+running PHP, so the server-side `LandingCapture` is blind on exactly the hit
+that matters. But that writer lived inside the full browse runtime
+(`sc-runtime.js`), which is only enqueued when browse tracking is on — so a
+connected store with the toggle off (the default) plus a page cache had **no
+attribution writer at all**, and every campaign click landing there was lost.
+Both sibling plugins (Shopify, Magento) write these cookies client-side
+unconditionally for this reason; this is the reverse-parity fix from the
+2026-08-04 cross-plugin assessment. **Fix:** a second, deliberately tiny
+storefront bundle — `public/js/landing.ts` → `dist/public/js/sc-landing.js`
+(~1.2 kB) — enqueued by `StorefrontBeacon` whenever the engine is connected and
+the full runtime is NOT. It reads the campaign params, writes the three
+first-party cookies, strips the params, and does nothing else: no transport, no
+consent surface, no session cookie, not even the `/relay` URL in its boot blob
+(`window.smailyConnectLanding` = cookie names + param names + TTLs). The two
+bundles are **mutually exclusive** at enqueue time, so the cookies are never
+written twice, and browse telemetry keeps its unchanged gate (browse toggle +
+marketing consent, F3-50). The capture itself moved into
+`public/js/lib/attribution.ts`, shared by both bundles — one implementation,
+so the PRO-1710 UUID check can't drift between them. The new script's gate is
+`LandingCapture`'s, not the beacon's: connected + the
+`smaily_connect_capture_attribution` master switch (a merchant who turned
+attribution capture off does not get a new writer from an update), and no
+WooCommerce check. **Build trap, now documented in CLAUDE.md:** the two storefront
+bundles must be built in SEPARATE vite passes (`--mode landing`, chained from
+every `build*` npm script) — verified 2026-08-05 that a single pass hoists the
+shared module into `dist/shared/attribution-<hash>.js` and gives BOTH bundles a
+top-level `import`, at which point neither loads as the classic `<script>`
+`StorefrontBeacon` enqueues (it would have broken browse tracking too). Gates:
+`npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`,
+PHPUnit unit **738/738**, eslint/tsc clean, vitest **275/275**); integration
+`StorefrontBeaconTest` **11 tests, 32 assertions**, 0 failures; full suite
+**251 tests, 1464 assertions** with only the known `BuildHashTest` artifact
+failure (a vite build with `emptyOutDir` removes `dist/build-hash.txt`; green
+again after `composer run package:hash`). **Demonstrated on the running
+store** — the dev wp-env site (connected, browse tracking off) returns
+`sc-landing.js` + the `window.smailyConnectLanding` blob on a storefront request
+and no `sc-runtime.js`; the integration suite pins the whole enqueue matrix
+(off+connected → writer only; on+connected → runtime only; disconnected →
+neither; master switch off → neither) and vitest covers the shared capture
+standalone incl. the junk-rec-id refusal. Merchant docs `docs/site/index.html`:
+the Campaign Intelligence attribution bullet now says the capture runs in the
+browser as well, so it survives a page cache and a browse-tracking-off store
+(EN + ET) — **not published** (the Estonian proofread gate). DECISIONS PRO-1767.
+No version bump — ships with the next release cut._
+
+Prior: 2026-08-05 (**PRO-1633 — a PARTIAL WooCommerce refund now reaches
 the engine as a line-level RETURN.** Contract v1.8.0 §5 (synced 2026-08-04) adds
 `items[].returned_at` + `return_reason_standardised` / `return_reason_raw`, and
 the engine derives a FULL refund itself from `status: "refunded"` — so the only

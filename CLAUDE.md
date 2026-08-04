@@ -518,7 +518,9 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    `tests/phpstan-bootstrap.php` (else ConstantsTest fails). Commit FIRST so
    `package:hash` stamps a clean (non-`-dirty`) build-hash.
 2. `npm run build:admin && npm run build:client` → `dist/admin/*`,
-   `dist/public/js/beacon.js`.
+   `dist/public/js/sc-runtime.js` + `dist/public/js/sc-landing.js` (the second
+   storefront bundle is built by a chained `build:landing` pass — see the beacon
+   note below; if it's missing from `dist/`, the landing pass didn't run).
 3. `composer run install-block-modules && composer run build` → `blocks/*/build/*`
    (the first installs `blocks/node_modules`; without it `wp-scripts` is missing).
 4. Translations: run **`bash bin/build-i18n.sh`** (needs the wp-env container) to
@@ -530,7 +532,8 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
 5. `composer install --no-dev --optimize-autoloader` (prod vendor) →
    `composer run package` → `composer install` (restore dev so tests work again).
 6. VERIFY the ZIP before releasing: version string; required present
-   (`dist/admin/admin.js`, `dist/public/js/beacon.js`, `blocks/*/build/*`,
+   (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
+   `dist/public/js/sc-landing.js`, `blocks/*/build/*`,
    `vendor/autoload.php`, `languages/*.mo`); NOT present (`tests`, `docs`,
    `node_modules`, `admin/src`, `dist/client`, dev vendor pkgs). `.zipignore`
    excludes `blocks/node_modules` (583M) — a bloated ZIP means it leaked.
@@ -569,6 +572,29 @@ the `beaconUrl` config key) keep "beacon" on purpose — they're not browser-vis
 so renaming them is churn for no benefit. Whether a blocker still catches `/relay` is
 a **manual browser check** (200 with the blocker on); the integration test only proves
 the server dispatches `/relay`.
+
+**There are TWO storefront bundles, and never both on one page (PRO-1767).**
+`sc-runtime.js` is the full browse runtime (loaded on the `is_enabled()` gate:
+connected + browse toggle + WC). `dist/public/js/sc-landing.js` (vite entry key
+`public/js/sc-landing`, source `public/js/landing.ts`) is the attribution-ONLY
+writer, loaded when the store is connected but the runtime is NOT
+(`StorefrontBeacon::is_attribution_only_enabled()` — LandingCapture's gate, incl.
+the `smaily_connect_capture_attribution` master switch, not the beacon's). It
+exists because a browse-off store behind a full-page cache had NO attribution
+writer at all: the cached response never runs PHP, so `LandingCapture` is blind.
+Two facts that must stay true when you touch it:
+- **Both bundles import `public/js/lib/attribution.ts`** (the one capture
+  implementation, incl. the PRO-1710 UUID check) — so they are built in
+  **SEPARATE vite passes** (`vite build --mode landing`, chained from every
+  `build*` npm script). In ONE pass Rollup hoists the shared module into
+  `dist/shared/attribution-<hash>.js` and BOTH bundles get a top-level `import`
+  — neither then loads as the classic `<script>` `StorefrontBeacon` enqueues
+  (verified 2026-08-05; that would silently break browse tracking too). If you
+  add a third storefront entry, give it its own pass.
+- **The tiny bundle stays tiny** (~1.2 kB): URL params → cookies → strip. No
+  transport, no consent surface, no session cookie, no `/relay` URL in its boot
+  blob (`window.smailyConnectLanding` carries cookie names / param names / TTLs
+  and nothing else) — that minimalism is why it can load consent-independently.
 
 ### Browse consent is fail-closed on the WP Consent API — needs the `wp-consent-api` plugin, NOT vendor code (F3-50)
 The beacon sends browse events ONLY when `window.wp_has_consent(category) === true`
