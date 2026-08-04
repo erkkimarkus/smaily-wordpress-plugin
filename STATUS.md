@@ -116,15 +116,29 @@ partial refund → the real hook → the real flusher → the mock): the order s
 is asserted unchanged, the refunded line arrives with a `Z`-form `returned_at` +
 reason, the untouched line arrives clean, and **a later status-driven sync still
 carries the same `returned_at`** (the erase case — the assertion the whole
-design exists for). **LIVE-WALK NOT COMPLETED:** `bin/walk-pro1633-return-
-signals.cjs` is written and run, but the dev wp-env's stored SANDBOX API key is
-**rejected by the engine (401 `Valid API key required`)** — a pre-existing
-connection problem, reproduced on a bare `ping()`, unrelated to this change. The
-walk aborts cleanly on its new health gate (nothing created, no residue); its
-plugin-side checks passed before the gate was added (wire shape + reason + the
-kept line all correct). **Engine acceptance of the new fields is therefore
-UNVERIFIED** — per CC-8 this needs a fresh sandbox setup token and one walk run
-before the change ships to a store. Merchant docs `docs/site/index.html`:
+design exists for). **LIVE-WALK COMPLETED 2026-08-05** (truth-fix: this entry
+first shipped saying it had not been). The dev wp-env's stored SANDBOX API key
+had been **rejected by the engine (401 `Valid API key required`)** — a
+pre-existing connection problem, reproduced on a bare `ping()`, unrelated to
+this change — so the walk aborted cleanly on its new health gate (nothing
+created, no residue). The connection was restored by exchanging a **fresh
+"Smaily Connect test" SANDBOX setup token** through the real
+`SetupExchange`→`store()` path, using the new reusable secret-safe helper
+`bin/exchange-setup-token.php` (token piped over STDIN into the wp-env cli
+container per the CC.3 mechanic; it prints only kind/tenant_name/host/connected
+and hard-aborts on tenant `MiuMjau`). Post-exchange: `ping()` healthy
+(`engine_version 1.2.0`, tenant "Smaily Connect test"), the durable
+`smly_rec_*` snapshot refreshed (PRO-1240/PRO-1256) so a suite run preserves
+it. `RECENGINE_LIVE=1 node bin/walk-pro1633-return-signals.cjs` → **LIVE OK,
+12/12 checks**: the partial refund leaves the status untouched yet enqueues a
+resync, the **live engine ACCEPTS the returned line** (`{"http":200,"outcome":
+"accepted"}`, `sent:1 failed:0`), `returned_at` arrives in the IsoDate `Z` form,
+`return_reason_raw` carries the merchant reason with no
+`return_reason_standardised`, the untouched line stays kept, a later unrelated
+sync still carries the return, and 1-of-3 refunded is still kept. Engine-side
+residue: two ingested sandbox orders (+ their auto-created customers);
+store-side residue none (orders deleted HPOS-correctly, verified 0 rows).
+Merchant docs `docs/site/index.html`:
 the privacy template's "what data is used" bullet now names returns (EN + ET) —
 **not published** (the Estonian proofread gate). DECISIONS PRO-1633, LESSONS
 §2.24, `docs/audits/MOCK_DIVERGENCE_AUDIT.md` §3. No version bump — ships with

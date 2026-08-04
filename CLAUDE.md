@@ -122,6 +122,18 @@ production. `bin/walk-cc3-multilingual.cjs` bakes this safety gate in
 (`sandbox_tenant_not_production`); after CC.3 the dev env is connected to the
 "Smaily Connect test" SANDBOX — keep it there.
 
+**Don't hand-roll that script any more — it's committed as
+`bin/exchange-setup-token.php`** (2026-08-05). It reads the token or full setup
+URL from STDIN, runs the real `parse_setup_url()` → `exchange()` → `store()`
+path, prints only `kind`/`tenant_name`/`engine_host`/`engine_version`/
+`connected`, and exits 2 with `PRODUCTION_TENANT_ABORT` if the tenant comes back
+`MiuMjau`. A bare token (no host) reuses the stored engine base URL. Usage:
+`cat /tmp/smaily_re_setup_token | sg docker -c "docker exec -i <cli> wp eval-file
+wp-content/plugins/smaily-connect/bin/exchange-setup-token.php --allow-root"`,
+then `bash bin/lib-smly-snapshot.sh snapshot` so the new connection becomes the
+durable one a suite run restores, then delete the temp token file (it is
+one-time and now consumed).
+
 ### woocommerce-stubs are PHPStan-only
 `woocommerce-stubs` is in the PHPStan config, NOT the runtime autoload. In unit
 tests, WC objects are built with PHPUnit `createMock` + shared shims (e.g. the
