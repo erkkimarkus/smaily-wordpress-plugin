@@ -26,7 +26,42 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1742 — switching "Sync contacts to Smaily"
+_Last updated: 2026-08-04 (**PRO-1746 — the wizard and Settings speak Jane's
+approved copy, in both languages.** A strings-only pass over the admin UI
+against the approved "Copy and translations" document: the menu item is
+**Initial setup** (ET *Algseadistus*), **Subscribers → Contacts** everywhere it
+names an audience (step rail, Settings tab, Step 6 summary, the ET *tellijad →
+kontaktid* canon), **Field mapping + backfill → Synchronization settings**, the
+platform-neutral **Automated letters** for step 3 (ET *Automaatikad* — no
+"WooCommerce'i" prefix), **Integrations → Forms and RSS feed** (rail
+"Subscription forms and RSS", ET *Vormid ja RSS*) and **Done → Overview**, plus
+per-step clarity rewrites: the API-credential instructions now say where in
+Smaily to create the API user (with a docs link), the sync-mode descriptions are
+written in contact/consent language, the abandoned-cart trigger states the
+15-minute check, the transactional section emphasises the separate account
+(support@smaily.com to get one), the CI step points at the connection URL, and
+the "Initial backfill / Start backfill" pair became "Initial contact import /
+Start import". Estonian is carried in `languages/smaily-connect-et.po` (97
+msgstr set or updated, incl. the previously untranslated PRO-1504 transactional
+strings); `bin/build-i18n.sh` rebuilt the `.pot`, `.mo` and the admin-bundle
+JSON catalog. **Deliberately NOT touched** (owned elsewhere, landed change
+wins): the welcome-trigger description (PRO-1682 — the doc still quotes the
+pre-PRO-1682 wording), the Campaign Intelligence section's existence (PRO-1717
+copy-edited only, not removed) and Step 6's Event Log paragraph (PRO-1720).
+**No behaviour change** — labels, descriptions and translations only; no logic,
+option keys or REST fields moved. Merchant docs `docs/site/index.html` follows
+in BOTH languages (step/tab names, the Initial setup menu item, Start import).
+Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No
+errors`, PHPUnit unit **708/708**, eslint/tsc clean, vitest **261/261**);
+integration suite not re-run — the only PHP touched is the two menu-label
+strings in `admin/wizard.php`. Verified on the running store: the built ET
+catalog resolves all six step titles + the Settings heading, and the rebuilt
+`.mo` resolves the menu item to *Algseadistus*. **Human acceptance still open:
+the Estonian proofread of the changed copy** (the PRO-1520 gate) — and the
+merchant docs site must not be re-published over FTPS until it passes. No
+version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1742 — switching "Sync contacts to Smaily"
 off actually stops the sync.** The wizard/Settings switch has always been
 stored as `smaily_connect_subscriber_sync_enabled`, but the live sync gated on
 `smly_plus_subscriber_sync_enabled` — a key **no version of this plugin has
