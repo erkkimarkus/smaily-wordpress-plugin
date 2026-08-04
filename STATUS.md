@@ -26,7 +26,78 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**Upstream PR #135 unblocked — `sendsmaily/main`
+_Last updated: 2026-08-04 (**Contract re-synced byte-identical to engine
+`547ad4d6` (md5 `3cebdcae…`) — v1.6.0 → v1.8.0, CC-8 pass.** The daily
+`Contract staleness` workflow went red ~2026-08-01; three engine doc commits
+had landed since our last sync (`21d5c0c`): `42b5386` (§2 URL example errata),
+`6d7bb22` + `547ad4d` (v1.8.0 return signals). **Everything that changed, and
+the follow-through call on each:**
+  1. **v1.7.0 — §3 new OPTIONAL catalog field `currency`** (ISO 4217, loose
+     3-uppercase-letter check, engine default `EUR`, mirrors `orders.currency`).
+     We do NOT send it (`CatalogPayloadBuilder` has no currency field;
+     `OrderPayloadBuilder` sends the order-level one). Additive optional field →
+     no plugin change in this pass; **flagged as a follow-up** because a
+     non-EUR store's catalog rows silently land as `EUR`.
+  2. **v1.7.0 — §6 `smaily_rec_id` / `smaily_ctx` are now DEPRECATED,
+     accept-and-ignore** (engine migrations `0080`/`0081` drop the columns; the
+     4th-priority browse-attribution fallback they fed is deleted). The wire
+     still accepts both without error, and our beacon client never sends them
+     (F3-49 data-minimization) — `BeaconEndpoint::EVENT_FIELDS` merely
+     whitelists them if a client supplies them. **Nothing breaks, so no code
+     change now**; dropping the two keys from `EVENT_FIELDS` is a follow-up
+     (it also retires the residual PRO-1486 spoofing surface at zero cost —
+     the engine no longer reads either field).
+  3. **v1.7.0 errata — §5 attribution ladder + `session_id`.** The matching
+     steps now document the real 3-mechanism ladder (rec_id → visitor_token →
+     email-click within a 30-day, tenant-overridable window) instead of the
+     removed `session_id`/`browse_events` step, and `session_id` is described as
+     accept-and-ignore (still stored on the order, no longer read by the
+     matcher). `OrderPayloadBuilder` keeps sending it — the contract explicitly
+     keeps accepting it "so senders don't need a plugin update". No change.
+  4. **v1.7.0 errata — §2 URL-parameters example** (`utm_campaign` dropped,
+     the real `utm_medium=email` added, `smaily_rec` placeholder → a
+     format-valid UUID) and the matching §5/§6 example values. Doc examples
+     only; `LandingCapture` reads none of the utm_* params it changed.
+  5. **v1.8.0 — §5 return signals** (PRO-1633 territory): `items[].returned_at`
+     documented as official (accepted since the first release, never sent by
+     anyone), plus two NEW optional line fields `return_reason_standardised`
+     (7-value vocabulary, never-reject — an unknown value stores as `other`,
+     senders must NOT validate against a closed copy) and `return_reason_raw`
+     (≤500 chars, diagnostic-only, merchant/system note — never buyer free
+     text). Engine-side behavior change with no wire change: a `status:
+     "refunded"` order has every line stamped returned at its own `ordered_at`,
+     so full refunds need nothing from us; partial refunds (which don't change
+     the WC order status at all) would need per-line `returned_at`. ⚠️ Sender
+     obligation to carry into PRO-1633: items are fully REPLACED on re-ingest,
+     so a later sync that omits these fields ERASES the return. **Deliberately
+     not implemented in this pass** — additive optional fields, PRO-1633 owns
+     the sending side.
+**Mock follow-through: none required, and that is not a shortcut.** The mock
+(`tests/Integration/Fixtures/mock-rec-engine/router.php`) validates the
+wrapper key + the specific required fields per endpoint; it does not enforce a
+closed field whitelist, and it stores each order/product verbatim
+(`last_orders_payload`, `last_catalog_tags`), so the three new optional fields
+pass through today exactly as the live engine takes them. Nothing this sync
+changed the shape of anything we already send or receive, so **no live-walk is
+required** either. **Verified follow-through the hard way**: grepped the
+plugin for every renamed/deprecated field (`session_id`, `smaily_rec_id`,
+`smaily_ctx`, `currency`, `utm_*`) rather than assuming — that check is what
+surfaced the follow-up items above. One genuine divergence found and RECORDED
+(not fixed — pre-existing, out of this pass's scope) in
+`docs/audits/MOCK_DIVERGENCE_AUDIT.md` §3: the live orders route validates
+`smaily_rec_id` as `z.string().uuid()` per-order (D6), while the contract types
+it as a plain string, the mock never inspects it, and
+`LandingCapture::is_rec_id()` accepts any bounded token — so a visitor
+arriving with a junk `?smaily_rec=` value gets it cookied onto their order and
+that ONE order is D6-rejected permanently. Gates: `bash
+bin/check-contract-staleness.sh` **green** (`OK: … byte-identical … engine
+commit 547ad4d6…`); `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
+`[OK] No errors`, PHPUnit unit **653/653**, eslint/tsc clean, vitest
+**258/258**). Integration suite deliberately NOT re-run — the delta is
+`.md`-only (contract + this file + the divergence register), no mock or plugin
+code touched; judgement recorded here per the 3.3.x lesson._
+
+Prior: 2026-08-04 (**Upstream PR #135 unblocked — `sendsmaily/main`
 merged into our `main`.** The sendsmaily maintainer (kaittodesk, 2026-07-27)
 reported merge conflicts blocking
 https://github.com/sendsmaily/smaily-wordpress-plugin/pull/135. Erkki's call
@@ -62,7 +133,7 @@ eslint/tsc clean, vitest **258/258**) and `sg docker -c "composer run
 test:integration"` **OK (181 tests, 916 assertions)** with the dev sandbox
 tenant "Smaily Connect test" restored post-run. No plugin version bump —
 the merge changes no shipped behavior of the v3 tree beyond the legacy-class
-maintenance listed above._
+maintenance listed above.
 
 Prior: 2026-07-23 (**v3.10.0 — PUBLISHED.** MINOR bump — the pilot-driven
 Transactional-emails Settings UI restructure (PRO-1540: account connection

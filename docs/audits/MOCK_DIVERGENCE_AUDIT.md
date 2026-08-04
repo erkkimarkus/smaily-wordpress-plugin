@@ -106,6 +106,23 @@ work. Single-object vs batch changes the queue/flush batching for customers.
 today. No plugin error, but the data won't land until Route A stores them.
 Single-object batching change as with customers.
 
+**Open divergence — `smaily_rec_id` must be a UUID (found 2026-08-04, during the
+v1.8.0 contract sync).** The contract's §5 field table types `smaily_rec_id` as a
+plain `string | NO`, but the live route validates it as
+`z.string().uuid().optional()` (`app/api/v1/ingest/orders/route.ts`; the same
+holds for §6 browse) — and orders validate **per-order (D6)**, so ONE order
+carrying a non-UUID `smaily_rec_id` fails permanently with an `errors[]` entry
+while its batch mates go through. The mock does not model this: it never
+inspects `smaily_rec_id`, so any string passes. Plugin side,
+`LandingCapture::is_rec_id()` deliberately accepts any bounded id token
+(`^[A-Za-z0-9._-]{1,64}$`) rather than a UUID, so a visitor arriving with a
+hand-typed or truncated `?smaily_rec=` value gets it cookied → stamped on the
+order → the order is D6-rejected. Not introduced by the v1.8.0 sync (the engine
+constraint predates it; the sync's errata note is what surfaced it) and
+therefore not fixed in that pass — recorded here as the anchor for the
+follow-up, which has to decide the pair together: tighten the capture-side
+shape check, and/or make the mock enforce the UUID so the mock stops masking it.
+
 ---
 
 ## 4. browse — `POST /api/v1/ingest/browse`  📋 engine-team-reported ("cleanest" = wrapper-shape only), ⏳ to verify
