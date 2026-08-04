@@ -182,6 +182,49 @@ final class SubscriberPayloadBuilderTest extends TestCase {
 		self::assertSame( '42', $payload['customer_id'] );
 	}
 
+	public function test_a_selection_saved_under_the_pre_fix_wizard_names_still_syncs(): void {
+		// What every store that used the wizard before PRO-1683 has on
+		// disk: the checkbox list wrote `phone`/`gender`, which this
+		// builder never recognised — both were dropped before the send.
+		Functions\when( 'get_option' )->justReturn( array( 'first_name', 'phone', 'gender' ) );
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+		$this->seed_meta( 42, 'user_phone', '+372 555 12345' );
+		$this->seed_meta( 42, 'user_gender', '0' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( '+372 555 12345', $payload['user_phone'] );
+		self::assertSame( 'Female', $payload['user_gender'] );
+		self::assertArrayNotHasKey( 'phone', $payload, 'The alias only translates the stored selection — the wire names never change.' );
+		self::assertArrayNotHasKey( 'gender', $payload );
+	}
+
+	/**
+	 * The drift PRO-1683 fixed: the wizard's checkbox list is what the
+	 * merchant's selection is saved as, so every name in it must be a name
+	 * this builder supports. A name only the wizard knows is silently
+	 * discarded — no error, no notice, the tick simply does nothing.
+	 */
+	public function test_the_wizard_checkbox_list_only_uses_names_the_builder_supports(): void {
+		$source = (string) file_get_contents( SMAILY_CONNECT_PLUGIN_PATH . 'admin/src/state/types.ts' );
+
+		$matched = preg_match( '/export const DEFAULT_SYNC_FIELDS = \[(.*?)\]/s', $source, $matches );
+		self::assertSame( 1, $matched, 'DEFAULT_SYNC_FIELDS must stay findable in admin/src/state/types.ts.' );
+
+		preg_match_all( "/'([a-z_]+)'/", $matches[1], $names );
+		$wizard_fields = $names[1];
+		self::assertNotEmpty( $wizard_fields );
+
+		$supported = ( new \ReflectionClassConstant( SubscriberPayloadBuilder::class, 'SUPPORTED_FIELDS' ) )->getValue();
+
+		self::assertSame(
+			array(),
+			array_diff( $wizard_fields, (array) $supported ),
+			'Every wizard checkbox must map to a SubscriberPayloadBuilder field, or ticking it does nothing.'
+		);
+	}
+
 	public function test_build_fields_wraps_the_same_set_without_email(): void {
 		Functions\when( 'get_option' )->justReturn( array( 'first_name' ) );
 
