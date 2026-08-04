@@ -53,7 +53,9 @@ use Smaily\Connect\Integrations\WooCommerce\HookHandler;
  *     can't recover either, so we don't waste retry attempts)
  *   - mark_failed on TerminalDispatchException (unknown event_type,
  *     payload decode failure)
- *   - record_attempt on ApiException (transient — AS retry job re-runs)
+ *   - RetryPolicy::apply() on ApiException: a permanent refusal (4xx bar
+ *     429) fails the row at once, anything else is retried with backoff
+ *     until the attempt ceiling (PRO-1685)
  */
 final class Flusher {
 
@@ -126,8 +128,7 @@ final class Flusher {
 				$this->queue->mark_failed( $id, $e->getMessage() );
 				++$stats['failed'];
 			} catch ( ApiException $e ) {
-				$this->queue->record_attempt( $id, $e->getMessage() );
-				++$stats['retried'];
+				++$stats[ RetryPolicy::apply( $this->queue, $id, (int) ( $event['attempts'] ?? 0 ), $e ) ];
 			}
 
 			// Record what was actually sent + the reply, whatever the outcome —

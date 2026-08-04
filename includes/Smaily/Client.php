@@ -21,14 +21,14 @@ use Smaily\Connect\Constants;
  * The legacy Smaily_Connect\Includes\Smaily_Client class stays in place to
  * serve CF7 / Elementor integrations that already call it. This namespaced
  * Client exists so 2.0 code paths get a typed API with explicit
- * Smaily\Connect\Smaily\ApiException error semantics, dependency-injectable
- * HTTP arguments (for tests), and a single place to layer in the retry /
- * backoff strategy that PLUGIN.md §8 prescribes (4xx no-retry, 429 honour
- * Retry-After, 5xx exponential backoff).
+ * Smaily\Connect\Smaily\ApiException error semantics and dependency-injectable
+ * HTTP arguments (for tests).
  *
- * The retry logic itself is added in sub-PR 5 alongside the hook layer that
- * drives the calls — here we expose the synchronous request methods so the
- * AutomationRouter and BackfillJob layers have something to call against.
+ * This client does not retry: every failure surfaces as an ApiException
+ * carrying the status code and any `Retry-After` Smaily sent, and the queue
+ * flushers apply the PLUGIN.md §8 policy to it through RetryPolicy (4xx
+ * no-retry, 429 honour Retry-After, 5xx exponential backoff). Retrying here
+ * as well would both duplicate that and block the Action Scheduler worker.
  *
  * Note: deliberately NOT declared final so tests can mock it directly. The
  * collaborator boundaries (AutomationRouter, BackfillJob) already typehint
@@ -355,11 +355,33 @@ class Client {
 		if ( $code < 200 || $code >= 300 ) {
 			throw new ApiException(
 				sprintf( 'Smaily API returned HTTP %d for %s %s', $code, $method, $endpoint ),
-				$code
+				$code,
+				$this->retry_after_seconds( $response )
 			);
 		}
 
 		return $body;
+	}
+
+	/**
+	 * The `Retry-After` header as whole seconds, or null when absent /
+	 * expressed as an HTTP-date (Smaily sends the delta-seconds form; a date
+	 * falls back to the caller's own backoff rather than being mis-parsed).
+	 *
+	 * @param array<string, mixed> $response A successful wp_remote_* reply (the
+	 *                                       transport-error path throws earlier).
+	 */
+	private function retry_after_seconds( array $response ): ?int {
+		$header = wp_remote_retrieve_header( $response, 'retry-after' );
+		$header = is_array( $header ) ? (string) reset( $header ) : (string) $header;
+
+		if ( ! is_numeric( $header ) ) {
+			return null;
+		}
+
+		$seconds = (int) $header;
+
+		return $seconds > 0 ? $seconds : null;
 	}
 
 	private function user_agent(): string {

@@ -39,7 +39,9 @@ use Smaily\Connect\Support\DebugLog;
  *
  * Error model:
  *   - mark_sent on success and on terminal skips;
- *   - record_attempt on ApiException (transient — the recurring tick retries);
+ *   - RetryPolicy::apply() on ApiException — a permanent refusal (4xx bar
+ *     429) fails the row at once, anything else is retried with backoff
+ *     until the attempt ceiling (PRO-1685);
  *   - mark_failed on TerminalDispatchException (payload decode failure,
  *     a non-101 Smaily body code on the fallback path — deterministic) and
  *     on any other Throwable (F3-53: a deterministic throw must never become
@@ -122,8 +124,7 @@ class CartFlusher {
 				$this->queue->mark_failed( $id, $e->getMessage() );
 				++$stats['failed'];
 			} catch ( ApiException $e ) {
-				$this->queue->record_attempt( $id, $e->getMessage() );
-				++$stats['retried'];
+				++$stats[ RetryPolicy::apply( $this->queue, $id, (int) ( $event['attempts'] ?? 0 ), $e ) ];
 			} catch ( \Throwable $e ) {
 				// Anything else thrown by a cart dispatch is deterministic
 				// data/config — terminal, never an eternal 60s retry loop
