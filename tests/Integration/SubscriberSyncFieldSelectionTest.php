@@ -1,17 +1,23 @@
 <?php
 /**
- * Integration: the Phone / Gender sync-field ticks actually reach Smaily (PRO-1683).
+ * Integration: the merchant's sync-field selection reaches Smaily — whichever
+ * plugin version wrote it (PRO-1683, PRO-1684).
  *
- * The wizard saved the merchant's selection under `phone` / `gender` while the
- * sync has always read `user_phone` / `user_gender` (spec/FIELD_MAPPING.md §2),
- * so both ticks were discarded by the supported-fields intersection before
- * anything was built — no error, no notice, the checkbox simply did nothing.
+ * Two ways a tick used to do nothing:
+ *   - the wizard saved `phone` / `gender` while the sync has always read
+ *     `user_phone` / `user_gender` (spec/FIELD_MAPPING.md §2), so both were
+ *     discarded by the supported-fields intersection (PRO-1683);
+ *   - a store upgraded from the legacy settings page has the selection stored
+ *     as a MAP (name => bool), which read as a list of names matches nothing
+ *     at all, so the store silently synced no optional field whatsoever and
+ *     the wizard showed every box ticked regardless (PRO-1684).
  *
- * These cases drive the REAL save route + the REAL sync pipelines (live contact
- * sync and the backfill) with only the Smaily transport faked, and assert what
- * lands on the wire: both fields present with the value form existing customer
- * templates expect, absent when unticked, absent when the customer has no
- * value, and still present for a store that saved its selection BEFORE the fix.
+ * These cases drive the REAL save route, the REAL legacy writer and the REAL
+ * sync pipelines (live contact sync and the backfill) with only the Smaily
+ * transport faked, and assert what lands on the wire: the merchant's fields
+ * present in the value form existing customer templates expect, absent when
+ * unticked, absent when the customer has no value — plus the wizard hydration
+ * showing exactly the ticks whose fields are being sent.
  *
  * @package Smaily\Connect\Tests\Integration
  */
@@ -21,13 +27,17 @@ declare(strict_types=1);
 namespace Smaily\Connect\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Bootstrap;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler;
+use Smaily\Connect\Notifications\NotificationManager;
+use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 use Smaily\Connect\Tests\Integration\Support\EnvScrub;
+use Smaily\Connect\Tests\Integration\Support\LegacySettingsPage;
 use Smaily\Connect\Tests\Integration\Support\RestRequestHelper;
 use Smaily\Connect\Wizard\EnvDetector;
 
@@ -168,7 +178,163 @@ final class SubscriberSyncFieldSelectionTest extends TestCase {
 		self::assertSame( 'Female', $row['user_gender'] );
 	}
 
+	public function test_a_store_upgraded_from_the_legacy_settings_page_keeps_sending_the_same_fields(): void {
+		// Written by the legacy settings page itself, not by hand.
+		LegacySettingsPage::save_subscriber_sync_fields(
+			array(
+				'first_name'  => 'on',
+				'user_phone'  => 'on',
+				'user_gender' => 'on',
+				'user_dob'    => 'on',
+			)
+		);
+
+		$user_id = $this->make_contact(
+			array(
+				'user_phone'  => '+372 555 12345',
+				'user_gender' => '0',
+				'user_dob'    => '1984-02-24',
+			)
+		);
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		self::assertSame( 'Mari', $row['first_name'], 'What the store synced before the upgrade must still be synced after it.' );
+		self::assertSame( '+372 555 12345', $row['user_phone'] );
+		self::assertSame( 'Female', $row['user_gender'] );
+		self::assertSame( '1984-02-24', $row['birthday'], 'The legacy option keys it `user_dob`; the contact field has always been `birthday`.' );
+
+		self::assertArrayNotHasKey( 'customer_id', $row, 'A box the merchant left unticked stays unticked — the legacy false is a real answer.' );
+		self::assertArrayNotHasKey( 'nickname', $row );
+	}
+
+	public function test_the_legacy_default_of_nothing_ticked_syncs_no_optional_field(): void {
+		// The shape most upgraded stores have: the legacy page's own defaults,
+		// saved once, with no optional box ever ticked.
+		LegacySettingsPage::save_subscriber_sync_fields( array() );
+
+		$user_id = $this->make_contact( array( 'user_phone' => '+372 555 12345' ) );
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		self::assertArrayHasKey( 'email', $row, 'The contact still syncs — email and store are not a choice.' );
+		self::assertArrayHasKey( 'store', $row );
+		self::assertArrayNotHasKey( 'first_name', $row, 'Every optional field was off, and must stay off.' );
+		self::assertArrayNotHasKey( 'user_phone', $row );
+	}
+
+	public function test_after_the_upgrade_the_wizard_ticks_match_what_is_being_sent(): void {
+		LegacySettingsPage::save_subscriber_sync_fields(
+			array(
+				'user_phone'  => 'on',
+				'user_gender' => 'on',
+				'user_dob'    => 'on',
+			)
+		);
+
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertSame(
+			array_values( $saved['syncFields'] ),
+			$saved['syncFields'],
+			'The wizard must receive a LIST — the legacy map arrives as a JS object, whose missing length reads as "nothing saved" and shows every box ticked.'
+		);
+		self::assertEqualsCanonicalizing(
+			array( 'user_phone', 'user_gender', 'birthday' ),
+			$saved['syncFields'],
+			'The ticks are the merchant\'s legacy choice, translated to the names the sync reads.'
+		);
+
+		$user_id = $this->make_contact(
+			array(
+				'user_phone'  => '+372 555 12345',
+				'user_gender' => '1',
+				'user_dob'    => '1984-02-24',
+			)
+		);
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		foreach ( $saved['syncFields'] as $ticked ) {
+			self::assertArrayHasKey( $ticked, $row, 'A ticked box must mean the field is actually being sent.' );
+		}
+		self::assertArrayNotHasKey( 'first_name', $row, 'And an unticked box is one that is not being sent.' );
+	}
+
+	public function test_a_legacy_ticked_field_the_customer_has_no_value_for_is_still_omitted(): void {
+		LegacySettingsPage::save_subscriber_sync_fields(
+			array(
+				'user_phone' => 'on',
+				'user_dob'   => 'on',
+			)
+		);
+
+		$user_id = $this->make_contact( array() );
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		self::assertArrayNotHasKey( 'user_phone', $row, 'No source value → omitted, so an existing Smaily value survives.' );
+		self::assertArrayNotHasKey( 'birthday', $row );
+	}
+
+	public function test_a_selection_we_cannot_read_tells_the_merchant_instead_of_syncing_the_minimum(): void {
+		// Neither shape: not a list of names, not a recognisable legacy map.
+		update_option(
+			SubscriberPayloadBuilder::OPTION_SYNC_FIELDS,
+			array( 'something' => 'no version of this plugin ever wrote' )
+		);
+
+		$user_id = $this->make_contact( array( 'user_phone' => '+372 555 12345' ) );
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		self::assertSame(
+			'+372 555 12345',
+			$row['user_phone'],
+			'An unreadable selection falls back to the documented default, never to the bare minimum.'
+		);
+		self::assertStringContainsString(
+			'could not be read',
+			$this->render_admin_notices(),
+			'…and the merchant is told, so the fallback is not silent.'
+		);
+	}
+
+	public function test_a_fresh_install_syncs_the_documented_default_with_no_complaint(): void {
+		delete_option( SubscriberPayloadBuilder::OPTION_SYNC_FIELDS );
+
+		$user_id = $this->make_contact(
+			array(
+				'user_phone'  => '+372 555 12345',
+				'user_gender' => '1',
+			)
+		);
+
+		$row = $this->row_for( $this->sync_contacts(), $user_id );
+
+		self::assertSame( '+372 555 12345', $row['user_phone'], 'Never saved is not broken — it is the documented default.' );
+		self::assertSame( 'Male', $row['user_gender'] );
+		self::assertContains( 'user_phone', ( new EnvDetector() )->saved_settings()['syncFields'] );
+		self::assertStringNotContainsString( 'could not be read', $this->render_admin_notices() );
+	}
+
 	// --- helpers -------------------------------------------------------------
+
+	/**
+	 * Whatever the plugin would print on an admin screen right now.
+	 */
+	private function render_admin_notices(): string {
+		$manager = new NotificationManager(
+			new RecEngineSettings(),
+			static fn () => Bootstrap::instance()->rec_client(),
+			static fn () => null
+		);
+
+		ob_start();
+		$manager->render();
+
+		return (string) ob_get_clean();
+	}
 
 	/**
 	 * The checkbox list the wizard REALLY offers, read from the admin source —

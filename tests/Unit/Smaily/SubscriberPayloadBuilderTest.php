@@ -201,6 +201,110 @@ final class SubscriberPayloadBuilderTest extends TestCase {
 	}
 
 	/**
+	 * The legacy settings page stored the selection as a MAP of every known
+	 * field => bool. Read as a list of names it matches nothing, which is why
+	 * an upgraded store silently synced no optional field at all (PRO-1684).
+	 */
+	public function test_a_selection_saved_by_the_legacy_settings_page_honours_its_values(): void {
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				'store_url'        => true,
+				'user_email'       => true,
+				'language'         => true,
+				'customer_group'   => false,
+				'customer_id'      => false,
+				'first_name'       => true,
+				'first_registered' => false,
+				'last_name'        => false,
+				'nickname'         => false,
+				'site_title'       => false,
+				'user_dob'         => true,
+				'user_gender'      => true,
+				'user_phone'       => true,
+			)
+		);
+
+		$user = $this->fake_user( 42, 'alice@example.test', array( 'first_name' => 'Alice' ) );
+		$this->seed_meta( 42, 'user_phone', '+372 555 12345' );
+		$this->seed_meta( 42, 'user_gender', '0' );
+		$this->seed_meta( 42, 'user_dob', '1984-02-24' );
+
+		$payload = ( new SubscriberPayloadBuilder() )->build( $user );
+
+		self::assertSame( 'Alice', $payload['first_name'] );
+		self::assertSame( '+372 555 12345', $payload['user_phone'] );
+		self::assertSame( 'Female', $payload['user_gender'] );
+		self::assertSame( '1984-02-24', $payload['birthday'], 'The legacy `user_dob` key is the `birthday` field.' );
+		self::assertArrayNotHasKey( 'customer_id', $payload, 'A legacy false is a real "do not send this".' );
+		self::assertArrayNotHasKey( 'store_url', $payload, 'Legacy keys with no toggle equivalent never become fields.' );
+		self::assertArrayNotHasKey( 'user_dob', $payload );
+	}
+
+	/**
+	 * @dataProvider provide_stored_selections
+	 *
+	 * @param mixed                  $stored
+	 * @param array<int, string>|null $expected
+	 */
+	public function test_interpret_selection_reads_both_shapes_and_admits_when_it_cannot( $stored, ?array $expected ): void {
+		self::assertSame( $expected, SubscriberPayloadBuilder::interpret_selection( $stored ) );
+	}
+
+	/**
+	 * @return array<string, array{0: mixed, 1: array<int, string>|null}>
+	 */
+	public static function provide_stored_selections(): array {
+		return array(
+			'wizard list'                 => array( array( 'first_name', 'user_phone' ), array( 'first_name', 'user_phone' ) ),
+			'pre-PRO-1683 wizard list'    => array( array( 'phone', 'gender' ), array( 'user_phone', 'user_gender' ) ),
+			'empty list is a real answer' => array( array(), array() ),
+			'unknown name is dropped'     => array( array( 'first_name', 'made_up' ), array( 'first_name' ) ),
+			'legacy map'                  => array(
+				array(
+					'user_email' => true,
+					'first_name' => true,
+					'user_dob'   => true,
+					'last_name'  => false,
+				),
+				array( 'first_name', 'birthday' ),
+			),
+			'legacy map, all off'         => array(
+				array(
+					'user_email' => true,
+					'first_name' => false,
+				),
+				array(),
+			),
+			'unknown key inside a legacy map is ignored' => array(
+				array(
+					'first_name'     => true,
+					'some_other_key' => true,
+				),
+				array( 'first_name' ),
+			),
+			'never saved'                 => array( null, null ),
+			'a scalar'                    => array( 'first_name', null ),
+			'a map of nothing we know'    => array( array( 'lorem' => 'ipsum' ), null ),
+			'a list of booleans'          => array( array( true, false ), null ),
+		);
+	}
+
+	public function test_a_never_saved_selection_is_not_reported_as_unreadable(): void {
+		Functions\when( 'get_option' )->justReturn( null );
+
+		self::assertFalse(
+			SubscriberPayloadBuilder::selection_unreadable(),
+			'A fresh install must not nag the merchant about a setting they never touched.'
+		);
+	}
+
+	public function test_a_selection_in_no_known_shape_is_reported_as_unreadable(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'lorem' => 'ipsum' ) );
+
+		self::assertTrue( SubscriberPayloadBuilder::selection_unreadable() );
+	}
+
+	/**
 	 * The drift PRO-1683 fixed: the wizard's checkbox list is what the
 	 * merchant's selection is saved as, so every name in it must be a name
 	 * this builder supports. A name only the wizard knows is silently
