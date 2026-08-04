@@ -26,7 +26,43 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1679 — the first-order automation now also
+_Last updated: 2026-08-04 (**PRO-1680 — an abandoned-cart reminder now always
+carries the cart's products.** `CartPayloadBuilder` read the
+`product_<field>_1..10` slots out of the merchant field-selection option
+(`smaily_connect_abandoned_cart_fields`) whose `product_*` keys ALL default to
+false and which **no UI writes** — so on a fresh install the reminder went out
+with an empty product matrix (an abandoned-cart email with no cart in it); only
+a store carrying a value forward from a version that had the selector sent
+anything. **Owner decision (Erkki, recorded in the issue):** product details are
+always sent, no merchant-facing choice — `product_fields()` now fills every
+`PRODUCT_KEYS` entry unconditionally and never reads the selection, so a stored
+selection from an older version is ignored rather than migrated. Adding a
+selector UI was explicitly rejected. The address fields (`store`, `language`,
+`first_name`, `last_name`) still read the option — untouched. This aligns the
+cart builder with `TransactionalPayloadBuilder`, which already sent its whole
+matrix unconditionally. **What did NOT change, deliberately:** the wire still
+carries all 10 slots with the unused ones as `''`. That is load-bearing — the
+Smaily contact keeps whatever the last send wrote, so overwriting every slot is
+what CLEARS the previous cart's details; "don't render empty rows" is the Smaily
+template's job, not the wire's (template design is out of scope per the issue,
+as are the delay setting and a selector UI). **The "running store"
+demonstration** is `tests/Integration/CartPipelineTest.php`, now running on
+FRESH-INSTALL defaults (it used to seed the fields option with
+`product_name`/`product_quantity` enabled, which is exactly what masked the
+defect): the existing E2E case asserts every product detail reaches the mocked
+Smaily transport, plus two new cases — 11 products flag `over_10_products` on
+the wire with slots capped at 10, and the same shopper abandoning a SECOND
+different cart gets a reminder whose slots 2..10 are all overwritten empty with
+the earlier cart's products appearing nowhere. The suite was confirmed to
+actually pin the fix by reverting it (3 failures). Merchant docs unchanged —
+`docs/site/index.html` never described a product-details choice. Gates:
+`npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`,
+PHPUnit unit **659/659**, eslint/tsc clean, vitest **258/258**);
+`sg docker -c "composer run test:integration"` **OK (190 tests, 1111
+assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily Connect test"
+restored post-run. No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1679 — the first-order automation now also
 fires on the BLOCK checkout.** The trigger hung off
 `woocommerce_checkout_order_processed` alone, so on a block/Store-API checkout
 store — the WooCommerce default — it never fired for anyone; attribution
@@ -66,7 +102,7 @@ errors, PHPStan `[OK] No errors`, PHPUnit unit **658/658**, eslint/tsc clean,
 vitest **258/258**); `sg docker -c "composer run test:integration"` **OK (188
 tests, 950 assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily
 Connect test" restored post-run. No version bump — ships with the next release
-cut._
+cut.
 
 Prior: 2026-08-04 (**Contract re-synced byte-identical to engine
 `547ad4d6` (md5 `3cebdcae…`) — v1.6.0 → v1.8.0, CC-8 pass.** The daily

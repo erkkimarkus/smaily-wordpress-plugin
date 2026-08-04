@@ -40,7 +40,6 @@ final class CartPipelineTest extends TestCase {
 
 	private const STATUS_OPTION = 'smaily_connect_abandoned_cart_status';
 	private const CUTOFF_OPTION = 'smaily_connect_abandoned_cart_cutoff';
-	private const FIELDS_OPTION = 'smaily_connect_abandoned_cart_fields';
 
 	/** @var array<int, int> */
 	private array $created_users = array();
@@ -64,16 +63,9 @@ final class CartPipelineTest extends TestCase {
 			)
 		);
 		update_option( self::CUTOFF_OPTION, 10 );
-		update_option(
-			self::FIELDS_OPTION,
-			array_merge(
-				\Smaily_Connect\Includes\Options::ABANDONED_CART_DEFAULT_FIELDS,
-				array(
-					'product_name'     => true,
-					'product_quantity' => true,
-				)
-			)
-		);
+		// The fields option is deliberately NOT seeded: EnvScrub deleted it, so
+		// every case here runs on FRESH-INSTALL defaults (PRO-1680 — product
+		// details must ride the wire without any stored selection).
 
 		RestRequestHelper::login_as_admin();
 	}
@@ -162,6 +154,13 @@ final class CartPipelineTest extends TestCase {
 		self::assertSame( 'true', $address['is_abandoned_cart'] );
 		self::assertSame( 'E2E Cart Product', $address['product_name_1'], 'Legacy template parity: product fields fill the _1..10 matrix.' );
 		self::assertSame( '2', $address['product_quantity_1'] );
+		// PRO-1680: on a fresh install (no stored field selection) EVERY
+		// product detail rides the wire, not just a merchant-picked subset.
+		self::assertNotSame( '', $address['product_price_1'], 'Product price must be sent without any merchant selection.' );
+		self::assertNotSame( '', $address['product_base_price_1'] );
+		self::assertArrayHasKey( 'product_sku_1', $address );
+		self::assertArrayHasKey( 'product_description_1', $address );
+		self::assertArrayHasKey( 'product_image_url_1', $address );
 		self::assertSame( '', $address['product_name_2'] );
 		self::assertArrayHasKey( 'language', $address, 'Default fields include language — resolver-sourced, never \'\'.' );
 		self::assertNotSame( '', $address['language'] );
@@ -173,6 +172,101 @@ final class CartPipelineTest extends TestCase {
 		self::assertStringContainsString( '"endpoint":"autoresponder"', (string) $event['sent_payload'] );
 		self::assertStringContainsString( '"code":101', (string) $event['last_response'] );
 		self::assertStringNotContainsString( 'Authorization', (string) $event['sent_payload'] );
+	}
+
+	public function test_a_later_cart_overwrites_every_product_slot_from_the_earlier_one(): void {
+		// PRO-1680: the contact's product fields in Smaily are whatever the
+		// LAST send wrote. A second reminder for the same shopper must
+		// therefore overwrite all 10 slots — the earlier cart's details must
+		// survive nowhere.
+		$this->map_abandoned_cart_workflow( '7070' );
+		$this->seed_credentials();
+
+		$user_id = $this->make_user( 'two-carts' );
+		wp_set_current_user( $user_id );
+
+		$first_a = $this->make_product( 'First Cart Alpha', 10.00 );
+		$first_b = $this->make_product( 'First Cart Beta', 20.00 );
+		$second  = $this->make_product( 'Second Cart Only', 30.00 );
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+
+		// Cart #1: two products, abandoned and reminded. (Bootstrap binds the
+		// tracker to woocommerce_cart_updated, which add_to_cart fires — the
+		// per-request guard means only the first add is tracked, so the guard
+		// is reset before the tracking call that must see the WHOLE cart.)
+		$this->boot_wc_cart();
+		WC()->cart->add_to_cart( $first_a, 1 );
+		WC()->cart->add_to_cart( $first_b, 1 );
+		CartHookHandler::reset_request_guard();
+		$handler->on_cart_updated();
+		$this->rewind_tracker_row( (int) $this->tracker_row()['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+		$first_payload = $this->flush_capturing();
+
+		self::assertIsArray( $first_payload );
+		$first_address = $first_payload['addresses'][0];
+		self::assertSame( 'First Cart Alpha', $first_address['product_name_1'] );
+		self::assertSame( 'First Cart Beta', $first_address['product_name_2'] );
+
+		// The shopper empties that cart (the tracker row goes with it) and
+		// later abandons a different one.
+		CartHookHandler::reset_request_guard();
+		WC()->cart->empty_cart();
+		$handler->on_cart_updated();
+		self::assertNull( $this->tracker_row(), 'Emptying the cart clears the tracker row — a later cart earns a fresh reminder.' );
+
+		CartHookHandler::reset_request_guard();
+		WC()->cart->add_to_cart( $second, 1 );
+		$handler->on_cart_updated();
+		$this->rewind_tracker_row( (int) $this->tracker_row()['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+		$second_payload = $this->flush_capturing();
+
+		self::assertIsArray( $second_payload );
+		$second_address = $second_payload['addresses'][0];
+		self::assertSame( 'Second Cart Only', $second_address['product_name_1'] );
+
+		// Every slot past the second cart's single product is sent EMPTY —
+		// that is the wire mechanism that clears the earlier cart from the
+		// contact (a template renders only the filled slots).
+		foreach ( array( 'product_name', 'product_price', 'product_base_price', 'product_sku', 'product_quantity', 'product_description', 'product_image_url' ) as $key ) {
+			for ( $i = 2; $i <= 10; $i++ ) {
+				self::assertArrayHasKey( $key . '_' . $i, $second_address, 'Unused slots must still be present on the wire.' );
+				self::assertSame( '', $second_address[ $key . '_' . $i ], 'Unused slots must be overwritten with an empty value.' );
+			}
+		}
+
+		$serialized = (string) wp_json_encode( $second_address );
+		self::assertStringNotContainsString( 'First Cart Alpha', $serialized, 'The earlier cart must not appear anywhere in the second reminder.' );
+		self::assertStringNotContainsString( 'First Cart Beta', $serialized );
+	}
+
+	public function test_more_than_ten_products_flag_further_items_on_the_wire(): void {
+		$this->map_abandoned_cart_workflow( '7171' );
+		$this->seed_credentials();
+
+		$user_id = $this->make_user( 'over-ten' );
+		wp_set_current_user( $user_id );
+
+		$this->boot_wc_cart();
+		for ( $i = 1; $i <= 11; $i++ ) {
+			WC()->cart->add_to_cart( $this->make_product( 'Bulk Product ' . $i, 1.00 + $i ), 1 );
+		}
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+		CartHookHandler::reset_request_guard();
+		$handler->on_cart_updated();
+		$this->rewind_tracker_row( (int) $this->tracker_row()['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+
+		$payload = $this->flush_capturing();
+
+		self::assertIsArray( $payload );
+		$address = $payload['addresses'][0];
+		self::assertSame( 'true', $address['over_10_products'], 'Past slot 10 the template flag tells the email there are further items.' );
+		self::assertNotSame( '', $address['product_name_10'], 'Slots 1..10 are filled before the flag trips.' );
+		self::assertArrayNotHasKey( 'product_name_11', $address, 'The matrix stops at 10 slots (legacy template parity).' );
 	}
 
 	public function test_guest_cart_syncs_once_a_checkout_email_is_known(): void {
@@ -360,6 +454,24 @@ final class CartPipelineTest extends TestCase {
 				'password'  => \Smaily_Connect\Includes\Cypher::encrypt( 'test-password' ),
 			)
 		);
+	}
+
+	/**
+	 * Drain the cart queue through the mocked transport and return the POST
+	 * body that reached it.
+	 *
+	 * @return mixed
+	 */
+	private function flush_capturing() {
+		$captured = null;
+		$fake     = $this->fake_transport( $captured );
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			do_action( CartFlusher::FLUSH_HOOK );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+		return $captured;
 	}
 
 	/**

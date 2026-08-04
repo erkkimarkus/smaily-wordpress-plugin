@@ -79,9 +79,8 @@ final class CartPayloadBuilderTest extends TestCase {
 	public function test_every_product_slot_is_prefilled_empty_for_legacy_template_parity(): void {
 		// The legacy Smaily API requires ALL fields updated on every send —
 		// the legacy pass prefilled product_<field>_1..10 with '' and
-		// merchant templates rely on that.
-		$this->fields_option['product_name'] = true;
-
+		// merchant templates rely on that. Sending the empty slots is what
+		// clears a previously reminded cart from the contact (PRO-1680).
 		$payload = $this->builder()->build( $this->row( '[]' ) );
 
 		self::assertNotNull( $payload );
@@ -94,11 +93,10 @@ final class CartPayloadBuilderTest extends TestCase {
 		self::assertArrayNotHasKey( 'over_10_products', $payload['fields'] );
 	}
 
-	public function test_selected_product_fields_fill_slots_with_escaped_values(): void {
-		$this->fields_option['product_name']     = true;
-		$this->fields_option['product_quantity'] = true;
-		$this->fields_option['product_price']    = true;
-
+	public function test_fresh_install_defaults_fill_every_product_field_with_escaped_values(): void {
+		// PRO-1680: the fields option's product_* keys all default to false and
+		// no UI can flip them — a fresh install must still send every product
+		// detail, so the selection is not consulted at all.
 		$this->products[11] = $this->product( 'Koera & kassi toit' );
 
 		$payload = $this->builder()->build( $this->row( '[{"product_id":11,"variation_id":0,"quantity":3}]' ) );
@@ -107,12 +105,28 @@ final class CartPayloadBuilderTest extends TestCase {
 		self::assertSame( 'Koera &amp; kassi toit', $payload['fields']['product_name_1'], 'Values are htmlspecialchars-escaped — legacy parity.' );
 		self::assertSame( '3', $payload['fields']['product_quantity_1'] );
 		self::assertSame( '12.40 €', $payload['fields']['product_price_1'], 'Price rides the stubbed display-price seam.' );
-		self::assertSame( '', $payload['fields']['product_name_2'] );
+		self::assertSame( '15.00 €', $payload['fields']['product_base_price_1'] );
+		self::assertSame( 'SKU-1', $payload['fields']['product_sku_1'] );
+		self::assertSame( 'desc', $payload['fields']['product_description_1'] );
+		self::assertSame( '', $payload['fields']['product_name_2'], 'Unused slots still ride the wire empty — that is what clears the previous cart.' );
+	}
+
+	public function test_an_upgraded_stores_product_field_selection_is_ignored(): void {
+		// A store carrying a selection from a version that had the UI: only
+		// product_sku ticked. PRO-1680 — the selection is ignored, everything
+		// is sent.
+		$this->fields_option['product_sku'] = true;
+		$this->products[11]                 = $this->product( 'Toode' );
+
+		$payload = $this->builder()->build( $this->row() );
+
+		self::assertNotNull( $payload );
+		self::assertSame( 'SKU-1', $payload['fields']['product_sku_1'] );
+		self::assertSame( 'Toode', $payload['fields']['product_name_1'], 'An unticked field is sent anyway — there is no merchant-facing choice.' );
+		self::assertSame( '12.40 €', $payload['fields']['product_price_1'] );
 	}
 
 	public function test_more_than_ten_products_sets_the_over_10_flag(): void {
-		$this->fields_option['product_name'] = true;
-
 		$items = array();
 		for ( $i = 1; $i <= 11; $i++ ) {
 			$this->products[ $i ] = $this->product( 'Toode ' . $i );
@@ -132,8 +146,7 @@ final class CartPayloadBuilderTest extends TestCase {
 	public function test_poison_items_and_missing_products_are_skipped_item_level(): void {
 		// F3-53: stored rows are wire input. A bare-string item or a deleted
 		// product skips THAT item; the cart still sends.
-		$this->fields_option['product_name'] = true;
-		$this->products[11]                  = $this->product( 'Survivor' );
+		$this->products[11] = $this->product( 'Survivor' );
 
 		$payload = $this->builder()->build(
 			$this->row( '["i-am-a-string",{"product_id":404,"quantity":1},{"quantity":2},{"product_id":11,"quantity":1}]' )
