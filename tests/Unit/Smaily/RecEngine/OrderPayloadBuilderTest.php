@@ -354,7 +354,189 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 14.0, $payload['items'][0]['line_total'] );
 	}
 
+	// --- return signals (§5 v1.8.0, PRO-1633) --------------------------------
+
+	public function test_an_order_with_no_refunds_carries_no_return_fields(): void {
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'KEPT', 1, '10.00', '10.00', array( 'item_id' => 11, 'product_id' => 100 ) ) ),
+			)
+		);
+
+		$item = ( new OrderPayloadBuilder() )->build( $order, 'u' )['items'][0];
+
+		self::assertArrayNotHasKey( 'returned_at', $item, 'NULL means "kept" — the field is omitted, never sent empty (F2-10).' );
+		self::assertArrayNotHasKey( 'return_reason_raw', $item );
+		self::assertArrayNotHasKey( 'return_reason_standardised', $item );
+	}
+
+	public function test_a_fully_refunded_line_carries_returned_at_and_the_refund_reason(): void {
+		$order = $this->mock_order(
+			array(
+				'status' => 'processing',
+				'items'  => array(
+					$this->mock_item( 'BACK', 2, '20.00', '20.00', array( 'item_id' => 11, 'product_id' => 100 ) ),
+					$this->mock_item( 'KEPT', 1, '10.00', '10.00', array( 'item_id' => 12, 'product_id' => 101 ) ),
+				),
+			)
+		);
+		$builder = $this->builder_with_refunds(
+			array( $this->mock_refund( '2026-07-02 09:00:00', 'Wrong size', array( 11 => 2 ) ) )
+		);
+
+		$items = $builder->build( $order, 'u' )['items'];
+
+		self::assertSame( '2026-07-02T09:00:00Z', $items[0]['returned_at'], 'IsoDate Z form (F3-21) — the refund date, not now().' );
+		self::assertSame( 'Wrong size', $items[0]['return_reason_raw'] );
+		self::assertArrayNotHasKey(
+			'return_reason_standardised',
+			$items[0],
+			'WooCommerce has no return taxonomy — §5 says do not guess one from free text.'
+		);
+		self::assertArrayNotHasKey( 'returned_at', $items[1], 'The untouched line stays kept — a PARTIAL refund is per line.' );
+	}
+
+	public function test_a_partly_refunded_quantity_leaves_the_line_kept(): void {
+		// 1 of 3 back: the contract types returned_at per LINE with no
+		// per-quantity mechanism, and its consumers read it as "the customer
+		// does not have this". The conservative reading is "still kept".
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'PARTIAL', 3, '30.00', '30.00', array( 'item_id' => 11, 'product_id' => 100 ) ) ),
+			)
+		);
+		$builder = $this->builder_with_refunds(
+			array( $this->mock_refund( '2026-07-02 09:00:00', 'One back', array( 11 => 1 ) ) )
+		);
+
+		$item = $builder->build( $order, 'u' )['items'][0];
+
+		self::assertArrayNotHasKey( 'returned_at', $item );
+		self::assertArrayNotHasKey( 'return_reason_raw', $item, 'No return, no reason.' );
+	}
+
+	public function test_quantities_accumulate_across_refunds_and_the_last_one_dates_the_return(): void {
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'PIECEMEAL', 3, '30.00', '30.00', array( 'item_id' => 11, 'product_id' => 100 ) ) ),
+			)
+		);
+		$builder = $this->builder_with_refunds(
+			array(
+				$this->mock_refund( '2026-07-02 09:00:00', 'First one back', array( 11 => 1 ) ),
+				$this->mock_refund( '2026-07-09 15:30:00', 'The rest came back', array( 11 => 2 ) ),
+			)
+		);
+
+		$item = $builder->build( $order, 'u' )['items'][0];
+
+		self::assertSame( '2026-07-09T15:30:00Z', $item['returned_at'], 'The refund that COMPLETED the return dates it.' );
+		self::assertSame( 'The rest came back', $item['return_reason_raw'] );
+	}
+
+	public function test_an_amount_only_refund_returns_nothing(): void {
+		// A goodwill / price-adjustment refund carries no line quantity: the
+		// money moved, the goods did not.
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array( $this->mock_item( 'STILL-HERE', 1, '10.00', '10.00', array( 'item_id' => 11, 'product_id' => 100 ) ) ),
+			)
+		);
+		$builder = $this->builder_with_refunds(
+			array( $this->mock_refund( '2026-07-02 09:00:00', 'Goodwill', array() ) )
+		);
+
+		self::assertArrayNotHasKey( 'returned_at', $builder->build( $order, 'u' )['items'][0] );
+	}
+
+	public function test_a_reasonless_refund_sends_returned_at_alone_and_a_long_reason_is_truncated(): void {
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'items'  => array(
+					$this->mock_item( 'NO-REASON', 1, '10.00', '10.00', array( 'item_id' => 11, 'product_id' => 100 ) ),
+					$this->mock_item( 'LONG-REASON', 1, '10.00', '10.00', array( 'item_id' => 12, 'product_id' => 101 ) ),
+				),
+			)
+		);
+		$builder = $this->builder_with_refunds(
+			array(
+				$this->mock_refund( '2026-07-02 09:00:00', '   ', array( 11 => 1 ) ),
+				$this->mock_refund( '2026-07-02 09:00:00', str_repeat( 'ä', 700 ), array( 12 => 1 ) ),
+			)
+		);
+
+		$items = $builder->build( $order, 'u' )['items'];
+
+		self::assertSame( '2026-07-02T09:00:00Z', $items[0]['returned_at'] );
+		self::assertArrayNotHasKey( 'return_reason_raw', $items[0], 'A blank reason is omitted, not sent as "".' );
+		self::assertSame( 500, mb_strlen( $items[1]['return_reason_raw'] ), '§5 caps return_reason_raw at 500 chars.' );
+	}
+
 	// --- doubles -------------------------------------------------------------
+
+	/**
+	 * A builder whose order_refunds() seam yields the given refund doubles —
+	 * the runtime WC_Order shim the unit suite mocks against has no
+	 * get_refunds(). The real WC read is integration-covered.
+	 *
+	 * @param array<int, \WC_Order_Refund> $refunds
+	 */
+	private function builder_with_refunds( array $refunds ): OrderPayloadBuilder {
+		return new class( $refunds ) extends OrderPayloadBuilder {
+			/** @var array<int, \WC_Order_Refund> */
+			private array $refunds;
+
+			/**
+			 * @param array<int, \WC_Order_Refund> $refunds
+			 */
+			public function __construct( array $refunds ) {
+				$this->refunds = $refunds;
+			}
+
+			protected function order_refunds( \WC_Order $order ): array {
+				return $this->refunds;
+			}
+		};
+	}
+
+	/**
+	 * @param array<int, int> $lines order-item id => refunded quantity (WC stores it negative).
+	 */
+	private function mock_refund( string $date, string $reason, array $lines ): \WC_Order_Refund {
+		$items = array();
+		foreach ( $lines as $item_id => $qty ) {
+			$line = $this->createMock( \WC_Order_Item_Product::class );
+			$line->method( 'get_quantity' )->willReturn( -$qty );
+			$line->method( 'get_meta' )->willReturnCallback(
+				static function ( $key = '', $single = true, $context = 'view' ) use ( $item_id ) {
+					return $key === '_refunded_item_id' ? (string) $item_id : '';
+				}
+			);
+			$items[] = $line;
+		}
+
+		$refund = $this->createMock( \WC_Order_Refund::class );
+		$refund->method( 'get_items' )->willReturn( $items );
+		$refund->method( 'get_reason' )->willReturn( $reason );
+		$refund->method( 'get_date_created' )->willReturn(
+			new class( (int) strtotime( $date . ' UTC' ) ) {
+				private int $ts;
+				public function __construct( int $ts ) {
+					$this->ts = $ts;
+				}
+				public function getTimestamp(): int {
+					return $this->ts;
+				}
+			}
+		);
+
+		return $refund;
+	}
 
 	/**
 	 * @param array<string, mixed> $p
@@ -449,6 +631,22 @@ if ( ! class_exists( \WC_Order_Item_Product::class ) ) {
 			public function get_total( $context = 'view' ) { return '0'; }
 			public function get_subtotal_tax( $context = 'view' ) { return '0'; }
 			public function get_total_tax( $context = 'view' ) { return '0'; }
+			public function get_meta( $key = '', $single = true, $context = 'view' ) { return ''; }
+		}
+PHP
+	);
+}
+
+// WC_Order_Refund shim — a refund is an order whose line items carry a negative
+// quantity plus the `_refunded_item_id` link back to the order line (PRO-1633).
+if ( ! class_exists( \WC_Order_Refund::class ) ) {
+	// phpcs:ignore Squiz.Commenting.ClassComment.Missing -- test shim.
+	eval(
+		<<<'PHP'
+		class WC_Order_Refund {
+			public function get_items( $types = 'line_item' ) { return array(); }
+			public function get_reason( $context = 'view' ) { return ''; }
+			public function get_date_created( $context = 'view' ) { return null; }
 		}
 PHP
 	);

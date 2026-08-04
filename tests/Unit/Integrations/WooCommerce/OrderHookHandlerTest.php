@@ -154,6 +154,41 @@ final class OrderHookHandlerTest extends TestCase {
 		self::assertCount( 1, $queue->enqueued, 'Multiple status changes for one order in a request collapse to one row.' );
 	}
 
+	public function test_a_partial_refund_enqueues_a_resync_although_no_status_changed(): void {
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		// wc_create_refund() fires this with ( $order_id, $refund_id ) — we take
+		// only the order id (Bootstrap registers 1 accepted arg). The order
+		// keeps its status, so nothing else would ever re-sync it.
+		$handler->on_order_partially_refunded( 55 );
+
+		self::assertCount( 1, $queue->enqueued );
+		self::assertSame( OrderFlusher::EVENT_ORDER_UPSERT, $queue->enqueued[0]['type'] );
+		self::assertSame( '55', $queue->enqueued[0]['entity_id'] );
+		self::assertSame( array(), $queue->enqueued[0]['payload'], 'No payload — the flusher re-derives the returns from the order.' );
+		self::assertSame( OrderFlusher::FLUSH_HOOK, $queue->enqueued[0]['flush_hook'] );
+	}
+
+	public function test_a_partial_refund_is_skipped_while_no_engine_is_connected(): void {
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, false );
+
+		$handler->on_order_partially_refunded( 55 );
+
+		self::assertSame( array(), $queue->enqueued );
+	}
+
+	public function test_a_refund_after_a_status_change_reuses_the_same_row(): void {
+		$queue   = $this->fake_queue();
+		$handler = $this->handler( $queue, true );
+
+		$handler->on_order_status_changed( 55, 'pending', 'processing' );
+		$handler->on_order_partially_refunded( 55 );
+
+		self::assertCount( 1, $queue->enqueued, 'One row per order per request — it is built fresh at send time anyway.' );
+	}
+
 	// --- doubles -------------------------------------------------------------
 
 	private function fake_queue(): IngestQueue {

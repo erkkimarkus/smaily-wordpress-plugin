@@ -410,6 +410,82 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 'smaily_rec_id', $response['errors'][0]['field'] ?? null );
 	}
 
+	public function test_a_partial_refund_returns_the_line_and_every_later_sync_keeps_it(): void {
+		// PRO-1633 end-to-end on the real chain: a real WC partial refund
+		// (wc_create_refund) → the real `woocommerce_order_partially_refunded`
+		// hook → the real flusher → the mock engine. A partial refund changes
+		// NO order status, so without the hook the return would never be sent.
+		$returned = $this->make_product( 'ORD-RET-BACK', '10.00' );
+		$kept     = $this->make_product( 'ORD-RET-KEPT', '5.00' );
+		$order_id = $this->make_order_with_lines(
+			'returns@example.test',
+			'processing',
+			array( array( $returned, 2 ), array( $kept, 1 ) )
+		);
+
+		// First send: nothing has come back yet.
+		self::assertSame( 1, $this->flusher()->flush()['sent'] );
+		$before = $this->last_items_by_sku();
+		self::assertArrayNotHasKey( 'returned_at', $before[ 'woo-' . $returned->get_id() ] );
+
+		// The merchant refunds the whole first line, with a reason. New request.
+		OrderHookHandler::reset_seen();
+		$this->refund_line( $order_id, $returned->get_id(), 2, 20.0, 'Ei sobinud' );
+
+		self::assertSame(
+			'processing',
+			wc_get_order( $order_id )->get_status(),
+			'Precondition: a PARTIAL refund leaves the order status untouched — no other path would resync it.'
+		);
+		self::assertSame( 1, $this->flusher()->flush()['sent'], 'The refund hook enqueued a resync of its own.' );
+
+		$items = $this->last_items_by_sku();
+		self::assertMatchesRegularExpression(
+			'/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/',
+			$items[ 'woo-' . $returned->get_id() ]['returned_at'],
+			'IsoDate Z form — the mock rejects anything else, like the live engine.'
+		);
+		self::assertSame( 'Ei sobinud', $items[ 'woo-' . $returned->get_id() ]['return_reason_raw'] );
+		self::assertArrayNotHasKey(
+			'return_reason_standardised',
+			$items[ 'woo-' . $returned->get_id() ],
+			'WooCommerce has no return taxonomy — the enum is never guessed.'
+		);
+		self::assertArrayNotHasKey( 'returned_at', $items[ 'woo-' . $kept->get_id() ], 'The other line stays kept.' );
+
+		// The sender obligation (§5): items are fully REPLACED on re-ingest, so
+		// an unrelated later sync that omitted the return would erase it. This
+		// one is driven by a real status change, not by the refund.
+		$returned_at = $items[ 'woo-' . $returned->get_id() ]['returned_at'];
+		OrderHookHandler::reset_seen();
+		wc_get_order( $order_id )->update_status( 'completed' );
+
+		self::assertSame( 1, $this->flusher()->flush()['sent'] );
+		$after = $this->last_items_by_sku();
+		self::assertSame(
+			$returned_at,
+			$after[ 'woo-' . $returned->get_id() ]['returned_at'] ?? null,
+			'A later sync re-derives the return from the order refunds — same date, never erased.'
+		);
+	}
+
+	public function test_a_partly_refunded_quantity_leaves_the_line_kept(): void {
+		// 1 of 3 back: the contract has no per-quantity return mechanism, so a
+		// line is returned only when the whole quantity has come back.
+		$product  = $this->make_product( 'ORD-RET-PARTQTY', '10.00' );
+		$order_id = $this->make_order_with_lines( 'partqty@example.test', 'processing', array( array( $product, 3 ) ) );
+
+		self::assertSame( 1, $this->flusher()->flush()['sent'] );
+
+		OrderHookHandler::reset_seen();
+		$this->refund_line( $order_id, $product->get_id(), 1, 10.0, 'One of three' );
+
+		self::assertSame( 1, $this->flusher()->flush()['sent'] );
+		$item = $this->last_items_by_sku()[ 'woo-' . $product->get_id() ];
+		self::assertArrayNotHasKey( 'returned_at', $item );
+		self::assertArrayNotHasKey( 'return_reason_raw', $item, 'No return, no reason.' );
+	}
+
 	public function test_revoked_key_401_fails_batch_without_retry(): void {
 		$product = $this->make_product( 'ORD-SKU-3', '5.00' );
 		$this->make_order( 'auth-401@example.test', 'completed', $product );
@@ -535,6 +611,72 @@ final class RecEngineOrdersTest extends TestCase {
 		$_GET    = array();
 		$_COOKIE = array();
 
+		return $order_id;
+	}
+
+	/**
+	 * The wire items of the LAST order the mock received, keyed by sku.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function last_items_by_sku(): array {
+		$orders = self::$engine->state()['last_orders_payload'] ?? array();
+		self::assertIsArray( $orders );
+		self::assertNotSame( array(), $orders, 'The mock recorded no order payload.' );
+
+		$items = array();
+		foreach ( ( end( $orders )['items'] ?? array() ) as $item ) {
+			$items[ (string) $item['sku'] ] = $item;
+		}
+		return $items;
+	}
+
+	/**
+	 * A REAL WooCommerce refund of one line — the same call the admin refund
+	 * screen makes, so the real refund hooks fire.
+	 */
+	private function refund_line( int $order_id, int $product_id, int $qty, float $amount, string $reason ): void {
+		$order = wc_get_order( $order_id );
+		self::assertInstanceOf( \WC_Order::class, $order );
+
+		$line_items = array();
+		foreach ( $order->get_items() as $item_id => $item ) {
+			if ( (int) $item->get_product_id() === $product_id ) {
+				$line_items[ $item_id ] = array(
+					'qty'          => $qty,
+					'refund_total' => $amount,
+				);
+			}
+		}
+		self::assertNotSame( array(), $line_items, 'Precondition: the order carries the line being refunded.' );
+
+		$refund = wc_create_refund(
+			array(
+				'order_id'       => $order_id,
+				'amount'         => $amount,
+				'reason'         => $reason,
+				'line_items'     => $line_items,
+				'refund_payment' => false,
+				'restock_items'  => false,
+			)
+		);
+		self::assertInstanceOf( \WC_Order_Refund::class, $refund );
+	}
+
+	/**
+	 * @param array<int, array{0:\WC_Product, 1:int}> $lines product + quantity.
+	 */
+	private function make_order_with_lines( string $email, string $status, array $lines ): int {
+		$order = wc_create_order();
+		$order->set_billing_email( $email );
+		foreach ( $lines as $line ) {
+			$order->add_product( $line[0], $line[1] );
+		}
+		$order->calculate_totals();
+		$order->set_status( $status );
+		$order_id = (int) $order->save();
+
+		$this->created_orders[] = $order_id;
 		return $order_id;
 	}
 
