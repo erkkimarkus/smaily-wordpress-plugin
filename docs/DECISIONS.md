@@ -4998,6 +4998,83 @@ the plugin's JS never puts a rec id on a browse event, but the `/relay`
 whitelist still accepts a client-supplied one (the unresolved PRO-1486
 spoofing follow-up).
 
+### PRO-1633 — A return is a property of the ORDER, re-derived on every send; a line comes back only in full
+
+**Context:** contract v1.8.0 §5 documents three line-level return fields
+(`returned_at`, `return_reason_standardised`, `return_reason_raw`) and the
+engine derives a FULL refund itself from `status: "refunded"`. A WooCommerce
+**partial** refund is the case nothing else covers: it fires no webhook and
+does not change the order status at all, so an order with one line sent back
+looked identical to one nobody returned. §5 also warns that items are **fully
+replaced on re-ingest** — a later sync that omits `returned_at` ERASES the
+return, and the engine has no way to notice.
+
+**Decision:**
+- **Derive, never carry.** `OrderPayloadBuilder` reads the order's own refunds
+  (`WC_Order::get_refunds()`) on every build and stamps the return fields from
+  them. The refund event supplies nothing but a nudge — the queue row stays
+  payload-less. The sender obligation is then satisfied by construction: the
+  live hook, a flusher retry and the order backfill all build through this one
+  class at send time, so every future sync re-derives and re-sends the same
+  return. It also means a store that switches this on later carries its
+  historical returns automatically, on the next sync of each order — no
+  backfill of refunds was written, and none is needed.
+- **One new binding.** `woocommerce_order_partially_refunded` → an
+  `order.upsert` row (`OrderHookHandler::on_order_partially_refunded`,
+  registered in Bootstrap). A FULL refund needs nothing: it flips the order to
+  `refunded`, which the existing status hook already resyncs, and the engine
+  derives all-lines-returned from the status either way.
+- **A line is returned only when the WHOLE quantity has come back.** Refunded
+  quantities accumulate across several refunds; the refund that completes the
+  return supplies the date (IsoDate `Z` — F3-21) and the reason.
+- **`return_reason_raw` is WooCommerce's merchant-side refund reason**,
+  trimmed, capped at 500 chars, omitted when blank.
+  **`return_reason_standardised` is never sent** — WooCommerce has no
+  structured return taxonomy anywhere, and §5 is explicit that keyword-guessing
+  free text into the enum is worse than sending nothing.
+
+**Rationale:** the alternative — treating the refund event as the source and
+storing what we sent — would need its own persistence, would drift from the
+merchant's actual refund records, and would break the moment a refund is
+edited or deleted in the admin. Reading the order is the only source that
+cannot disagree with itself. The cost is one extra `get_refunds()` query per
+order built (WC caches it per order); acceptable next to the order + items
+reads already happening.
+
+**The one-of-three question, and why it is answered conservatively:** the
+contract types `returned_at` per LINE and offers no per-quantity mechanism, so
+a line of qty 3 with 1 refunded has no honest representation. Its consumers
+(180-day same-SKU suppression, the "was it kept?" trigger preconditions) read
+the field as "the customer does not have this" — which is false while the
+customer kept 2. So a partly-refunded quantity stays **kept**, and the signal
+is under-reported rather than wrong. Whether the engine would rather have the
+line flagged (or gain a `returned_qty`) is an open question for the engine
+team, filed alongside this work; it is a widening, not a reversal, so it does
+not block. An **amount-only** refund (no line quantity — a goodwill or
+price-adjustment refund) likewise marks nothing: the money moved, the goods did
+not.
+
+**Best-effort, by design:** stores that process refunds outside WooCommerce
+send nothing here, and §5 says NULL means "kept", which is the correct default.
+A refund DELETED in the admin still leaves its return standing in the engine
+until the order's next sync re-derives it — accepted (no
+`woocommerce_refund_deleted` binding was added), because the derivation
+self-heals on any later sync and a deleted refund is rare.
+
+**Demonstration:** `RecEngineOrdersTest` drives the real chain on the running
+store — a real `wc_create_refund()` partial refund, the real
+`woocommerce_order_partially_refunded` binding, the real flusher, the mock
+engine: the order status is asserted unchanged, the refunded line arrives with
+a `Z`-form `returned_at` + the reason, the untouched line arrives clean, and a
+LATER status-driven sync still carries the same `returned_at` (the erase case).
+The mock now rejects a non-`Z` `returned_at` per order, like every other engine
+datetime. `bin/walk-pro1633-return-signals.cjs` mirrors it against the live
+sandbox engine.
+
+**Relationships:** implements contract v1.8.0 §5 (PRO-1597); extends the F3-21
+IsoDate rule to the first datetime we put on a line; the derive-at-send-time
+shape is the same reasoning as F3-42's "read the status fresh at flush".
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

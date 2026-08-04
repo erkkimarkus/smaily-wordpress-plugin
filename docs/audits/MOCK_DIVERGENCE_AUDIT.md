@@ -134,6 +134,21 @@ ask filed as PRO-1713; §6 browse carries the same engine constraint and is
 event, but `BeaconEndpoint::EVENT_FIELDS` still whitelists a client-supplied
 one — the same class as the unresolved PRO-1486 spoofing follow-up).
 
+**`items[].returned_at` is validated as the `Z` form (added 2026-08-05,
+PRO-1633).** Contract v1.8.0 §5 puts a datetime on the ORDER LINE for the first
+time, and the engine's Zod `.datetime()` has rejected a `+00:00` offset on every
+other field (the F3-21 IsoDate scar, which surfaced live twice and never in the
+mock). The mock now returns a per-order D6 error (`field: items.returned_at`,
+`message: "Invalid datetime"`) for a line whose `returned_at` is not
+`YYYY-MM-DDThh:mm:ss[.fff]Z`, so a builder regression can't reach the engine
+unnoticed. The two REASON fields are deliberately **not** validated: §5 is
+normative that an unrecognised `return_reason_standardised` is stored as `other`
+and never rejected, and an over-long `return_reason_raw` is truncated, not
+refused. The engine's acceptance of the whole shape is
+`bin/walk-pro1633-return-signals.cjs` — ⏳ **not yet run to completion**: the
+dev wp-env's stored sandbox API key is currently rejected (401) and needs a
+fresh setup token.
+
 ---
 
 ## 4. browse — `POST /api/v1/ingest/browse`  📋 engine-team-reported ("cleanest" = wrapper-shape only), ⏳ to verify

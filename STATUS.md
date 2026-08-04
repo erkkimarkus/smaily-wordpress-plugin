@@ -26,7 +26,63 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1710 — a junk `?smaily_rec=` in a landing URL
+_Last updated: 2026-08-05 (**PRO-1633 — a PARTIAL WooCommerce refund now reaches
+the engine as a line-level RETURN.** Contract v1.8.0 §5 (synced 2026-08-04) adds
+`items[].returned_at` + `return_reason_standardised` / `return_reason_raw`, and
+the engine derives a FULL refund itself from `status: "refunded"` — so the only
+case needing us is the PARTIAL refund, which fires no webhook and **does not
+change the order status at all**, making a returned line indistinguishable from
+a kept one. **Fix, two parts.** (1) One new binding —
+`woocommerce_order_partially_refunded` → an `order.upsert` row
+(`OrderHookHandler::on_order_partially_refunded`); a full refund still rides the
+existing status hook. (2) The return fields are **DERIVED from the order's own
+refunds on every build** (`OrderPayloadBuilder::returns_by_item()` reads
+`get_refunds()` fresh), never carried on the event. That is the load-bearing
+choice: §5 warns that items are **fully replaced on re-ingest**, so a later sync
+omitting `returned_at` ERASES the return silently — deriving at send time means
+the live hook, a flusher retry AND the order backfill all re-send it for free
+(they all build through this class), and a store switching this on later carries
+its historical returns on each order's next sync, with no refund backfill
+written or needed. **Semantics:** a line is returned only when its FULL quantity
+has come back (quantities accumulate across refunds; the refund that completes
+it supplies the date via `IsoDate` and the reason) — the contract types
+`returned_at` per LINE with no per-quantity mechanism and its consumers read it
+as "the customer does not have this", so 1-of-3 stays *kept* (conservative,
+under-reports rather than lies; a widening question for the engine team, filed,
+non-blocking). An **amount-only** refund marks nothing. `return_reason_raw` is
+WooCommerce's merchant-side refund reason (trimmed, capped at 500, omitted when
+blank); `return_reason_standardised` is **never sent** — Woo has no return
+taxonomy and §5 forbids guessing one from free text. Best-effort by design:
+stores refunding off-platform send nothing, and NULL means "kept". A refund
+DELETED in the admin leaves its return standing until the order's next sync
+re-derives it (accepted; no `woocommerce_refund_deleted` binding). The **mock
+now rejects a non-`Z` `returned_at` per order** (`field: items.returned_at`) —
+the first datetime we put on a LINE, and the F3-21 scar says only the live
+engine ever caught that class; the two REASON fields are deliberately NOT
+validated (§5: never rejected). Gates: `npm run ci:strict` **exit=0** (PHPCS 0
+errors, PHPStan `[OK] No errors`, PHPUnit unit **738/738**, eslint/tsc clean,
+vitest **271/271**); integration full suite **246 tests, 1448 assertions**, 0
+failures. **Demonstrated on the running
+store** — `RecEngineOrdersTest` drives the real chain (real `wc_create_refund()`
+partial refund → the real hook → the real flusher → the mock): the order status
+is asserted unchanged, the refunded line arrives with a `Z`-form `returned_at` +
+reason, the untouched line arrives clean, and **a later status-driven sync still
+carries the same `returned_at`** (the erase case — the assertion the whole
+design exists for). **LIVE-WALK NOT COMPLETED:** `bin/walk-pro1633-return-
+signals.cjs` is written and run, but the dev wp-env's stored SANDBOX API key is
+**rejected by the engine (401 `Valid API key required`)** — a pre-existing
+connection problem, reproduced on a bare `ping()`, unrelated to this change. The
+walk aborts cleanly on its new health gate (nothing created, no residue); its
+plugin-side checks passed before the gate was added (wire shape + reason + the
+kept line all correct). **Engine acceptance of the new fields is therefore
+UNVERIFIED** — per CC-8 this needs a fresh sandbox setup token and one walk run
+before the change ships to a store. Merchant docs `docs/site/index.html`:
+the privacy template's "what data is used" bullet now names returns (EN + ET) —
+**not published** (the Estonian proofread gate). DECISIONS PRO-1633, LESSONS
+§2.24, `docs/audits/MOCK_DIVERGENCE_AUDIT.md` §3. No version bump — ships with
+the next release cut._
+
+Prior: 2026-08-04 (**PRO-1710 — a junk `?smaily_rec=` in a landing URL
 no longer costs the shopper's whole order.** The engine validates an order's
 `smaily_rec_id` as `z.string().uuid()` and orders validate **per order** (D6),
 so ONE order carrying anything else is rejected permanently while its batch

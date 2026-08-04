@@ -856,6 +856,31 @@ field either (§2.3/§2.4 again — the mock validated our assumption, not reali
    constraint in the mock in the same pass, or the next regression hides exactly
    as long.
 
+### 2.24 When the receiver REPLACES rather than merges, a field must be derived at send time — carrying it on the event silently erases it later (PRO-1633 return signals, 2026-08-05)
+
+The engine replaces an order's items wholesale on every re-ingest. So a return
+flag we sent once is erased by the next sync of that order that doesn't repeat
+it — and nothing anywhere reports the erasure: no error, no `errors[]` entry,
+just a signal quietly reverting to "kept". The obvious implementation (the
+refund event carries the returned lines into the queue row) would have worked
+perfectly on the day of the refund and been wrong on the next status change.
+
+1. **Ask "does the receiver merge or replace?" before deciding where a field
+   comes from.** On a REPLACE contract, every send must be a complete statement
+   of current truth, so each field has to be re-derivable from durable state at
+   send time. Anything derived from the triggering EVENT is correct exactly
+   once. (This is why our queue rows have carried empty payloads since F3-36 —
+   the same instinct, now with a second reason behind it.)
+2. **Derive-at-send makes the retry, the backfill and the "we turned it on
+   late" case free.** No historical backfill of refunds was written, because
+   any order re-synced for any reason re-reads its refunds and carries them.
+   The feature became "one hook + one derivation" instead of "one hook + a
+   store of what we sent + a reconciliation pass".
+3. **Test the ERASURE, not just the write.** The regression this class of bug
+   produces looks like a passing test: the first send is correct. The
+   integration test therefore drives a LATER, unrelated sync of the same order
+   and asserts the field is still there — that assertion is the whole point.
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity
