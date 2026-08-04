@@ -174,9 +174,9 @@ final class CartPayloadBuilderTest extends TestCase {
 	}
 
 	public function test_guest_names_come_from_the_captured_columns(): void {
-		$this->fields_option['first_name'] = true;
-		$this->fields_option['last_name']  = true;
-
+		// PRO-1729: fresh-install defaults have first_name/last_name off and no
+		// UI can flip them — the checkout-captured name rides the reminder
+		// anyway.
 		$row               = $this->row();
 		$row['first_name'] = 'Mari';
 		$row['last_name']  = 'Maasikas';
@@ -188,9 +188,37 @@ final class CartPayloadBuilderTest extends TestCase {
 		self::assertSame( 'Maasikas', $payload['fields']['last_name'] );
 	}
 
-	public function test_registered_user_wins_over_captured_columns_and_uses_for_user_language(): void {
-		$this->fields_option['first_name'] = true;
+	public function test_an_unknown_name_is_omitted_rather_than_sent_empty(): void {
+		// Contact-level omit rule (F3-47): Smaily leaves an ABSENT field intact
+		// and WIPES an empty one, so a shopper we have no name for must not
+		// clear the name their contact already carries. (The opposite of the
+		// product slots, which are deliberately overwritten empty.)
+		$payload = $this->builder()->build( $this->row() );
 
+		self::assertNotNull( $payload );
+		self::assertArrayNotHasKey( 'first_name', $payload['fields'] );
+		self::assertArrayNotHasKey( 'last_name', $payload['fields'] );
+	}
+
+	public function test_an_upgraded_stores_name_field_selection_is_ignored(): void {
+		// A store carrying a selection from a version that had the UI: only
+		// first_name ticked. PRO-1729 — the selection is ignored, BOTH names
+		// are sent.
+		$this->fields_option['first_name'] = true;
+		$this->fields_option['last_name']  = false;
+
+		$row               = $this->row();
+		$row['first_name'] = 'Mari';
+		$row['last_name']  = 'Maasikas';
+
+		$payload = $this->builder()->build( $row );
+
+		self::assertNotNull( $payload );
+		self::assertSame( 'Mari', $payload['fields']['first_name'] );
+		self::assertSame( 'Maasikas', $payload['fields']['last_name'], 'An unticked name is sent anyway — there is no merchant-facing choice.' );
+	}
+
+	public function test_registered_user_wins_over_captured_columns_and_uses_for_user_language(): void {
 		Functions\when( 'get_userdata' )->alias(
 			static function ( int $id ) {
 				if ( $id !== 42 ) {

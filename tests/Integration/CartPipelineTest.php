@@ -27,6 +27,9 @@ use Smaily\Connect\Tests\Integration\Support\RestRequestHelper;
  *     tracker row never re-reminds.
  *   - GUEST capture: an email typed at checkout (update_order_review POST)
  *     attaches the identity to the session row; the reminder carries it.
+ *   - NAMES (PRO-1729): with no stored field selection the shopper's name
+ *     rides the reminder — and when there is no name to send, the fields are
+ *     OMITTED rather than sent empty (an empty value wipes the Smaily contact).
  *   - Settings CARRY-OVER (upgrade continuity): with no mapping row, the
  *     legacy option's autoresponder_id drives the send — an upgrading store
  *     needs zero reconfiguration.
@@ -269,6 +272,35 @@ final class CartPipelineTest extends TestCase {
 		self::assertArrayNotHasKey( 'product_name_11', $address, 'The matrix stops at 10 slots (legacy template parity).' );
 	}
 
+	public function test_the_shoppers_name_rides_the_reminder_on_a_fresh_install(): void {
+		// PRO-1729: the name fields were gated on the same never-written
+		// selection PRO-1680 retired for the products, so a fresh install's
+		// reminder carried no name and a template's first-name merge tag
+		// rendered nothing.
+		$this->map_abandoned_cart_workflow( '9090' );
+		$this->seed_credentials();
+
+		$address = $this->remind_one_cart( $this->make_user( 'named-cart', 'Mari', 'Maasikas' ) );
+
+		self::assertSame( 'Mari', $address['first_name'], 'The shopper\'s name must ride the reminder with no stored field selection.' );
+		self::assertSame( 'Maasikas', $address['last_name'] );
+	}
+
+	public function test_a_shopper_with_no_stored_name_omits_the_name_fields(): void {
+		// Contact-level omit rule (F3-47): Smaily leaves an ABSENT field intact
+		// and WIPES an empty one — a nameless shopper must not clear the name
+		// their contact already carries. (The product slots are the opposite by
+		// design: sending them empty is what clears the previous cart.)
+		$this->map_abandoned_cart_workflow( '9191' );
+		$this->seed_credentials();
+
+		$address = $this->remind_one_cart( $this->make_user( 'nameless-cart' ) );
+
+		self::assertArrayNotHasKey( 'first_name', $address, 'An unknown name is omitted, never sent empty.' );
+		self::assertArrayNotHasKey( 'last_name', $address );
+		self::assertSame( '', $address['product_name_2'], 'The product slots still ride the wire empty — only the CONTACT fields are omit-on-unknown.' );
+	}
+
 	public function test_guest_cart_syncs_once_a_checkout_email_is_known(): void {
 		$this->map_abandoned_cart_workflow( '5151' );
 		$this->seed_credentials();
@@ -311,6 +343,10 @@ final class CartPipelineTest extends TestCase {
 		self::assertIsArray( $captured );
 		self::assertSame( 'guest-cart@example.test', $captured['addresses'][0]['email'] );
 		self::assertSame( '5151', (string) $captured['autoresponder'] );
+		// PRO-1729: a guest has no WP profile, so the checkout-captured columns
+		// are the name source — and they ride the reminder unselected.
+		self::assertSame( 'Mari', $captured['addresses'][0]['first_name'] );
+		self::assertSame( 'Maasikas', $captured['addresses'][0]['last_name'] );
 	}
 
 	public function test_legacy_autoresponder_id_carries_over_as_the_fallback(): void {
@@ -500,12 +536,38 @@ final class CartPipelineTest extends TestCase {
 		};
 	}
 
-	private function make_user( string $slug ): int {
+	/**
+	 * Drive one shopper's cart the whole way: track → age past the cutoff →
+	 * sweep → flush, and hand back the address the transport received.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function remind_one_cart( int $user_id ): array {
+		wp_set_current_user( $user_id );
+
+		$this->boot_wc_cart();
+		WC()->cart->add_to_cart( $this->make_product( 'Reminded Product', 7.50 ), 1 );
+
+		$handler = new CartHookHandler( new CartSessionStore() );
+		CartHookHandler::reset_request_guard();
+		$handler->on_cart_updated();
+		$this->rewind_tracker_row( (int) $this->tracker_row()['id'], 30 * MINUTE_IN_SECONDS );
+		do_action( 'smly_plus_abandoned_cart' );
+
+		$payload = $this->flush_capturing();
+		self::assertIsArray( $payload, 'The reminder must reach the transport.' );
+
+		return $payload['addresses'][0];
+	}
+
+	private function make_user( string $slug, string $first = '', string $last = '' ): int {
 		$user_id = wp_insert_user(
 			array(
 				'user_login' => 'smly_cart_' . $slug . '_' . wp_generate_password( 6, false ),
 				'user_email' => $slug . '-' . wp_generate_password( 6, false ) . '@example.test',
 				'user_pass'  => wp_generate_password( 20 ),
+				'first_name' => $first,
+				'last_name'  => $last,
 			)
 		);
 		self::assertIsInt( $user_id );
