@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\AutomationMarker;
 use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\ContactReconciler;
 use Smaily\Connect\Smaily\ContactSyncMode;
@@ -114,7 +115,7 @@ class HookHandler {
 			$this->maybe_enqueue(
 				self::EVENT_AUTOMATION_WELCOME,
 				(string) $user_id,
-				$this->build_automation_payload( $user )
+				$this->build_automation_payload( $user, 'welcome' )
 			);
 		}
 	}
@@ -277,10 +278,13 @@ class HookHandler {
 		$order_id = (string) $order->get_id();
 		$payload  = array(
 			'email'  => $email,
-			'fields' => array(
-				'order_id'       => $order_id,
-				'order_total'    => (string) $order->get_total(),
-				'order_currency' => $order->get_currency(),
+			'fields' => array_merge(
+				array(
+					'order_id'       => $order_id,
+					'order_total'    => (string) $order->get_total(),
+					'order_currency' => $order->get_currency(),
+				),
+				AutomationMarker::stamp( 'first_order' )
 			),
 		);
 
@@ -413,12 +417,18 @@ class HookHandler {
 	}
 
 	/**
+	 * @param string $trigger AutomationRouter trigger slug — also picks the
+	 *                        PRO-1681 marker field recording this run.
+	 *
 	 * @return array<string, mixed>
 	 */
-	private function build_automation_payload( \WP_User $user ): array {
+	private function build_automation_payload( \WP_User $user, string $trigger ): array {
 		$payload = array(
 			'email'  => (string) $user->user_email,
-			'fields' => $this->payload_builder()->build_fields( $user ),
+			'fields' => array_merge(
+				$this->payload_builder()->build_fields( $user ),
+				AutomationMarker::stamp( $trigger )
+			),
 		);
 
 		$language = $this->detect_language_for_user( $user );

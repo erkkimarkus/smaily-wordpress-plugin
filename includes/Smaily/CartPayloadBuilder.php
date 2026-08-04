@@ -22,7 +22,9 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  * `product_<field>_1..10` matrix with all slots prefilled empty + the
  * `over_10_products` flag). The address-field selection comes from the same
  * `smaily_connect_abandoned_cart_fields` option, so an upgrading store's
- * templates keep rendering without reconfiguration.
+ * templates keep rendering without reconfiguration. PRO-1681 adds the
+ * `abandoned_cart_automation_at` run marker on top — purely additive, the
+ * legacy field names and meanings are unchanged.
  *
  * PRODUCT details are NOT selectable (PRO-1680): every `product_<field>` is
  * always sent, whatever that option holds. The option's product_* keys were
@@ -142,7 +144,12 @@ class CartPayloadBuilder {
 	private function contact_fields( array $row, ?\WP_User $user, array $sync_fields, string $language ): array {
 		// Business requirement carried over verbatim: distinguishes
 		// abandoned-cart contacts from marketing contacts on shared accounts.
-		$fields = array( 'is_abandoned_cart' => 'true' );
+		// The PRO-1681 run marker rides ALONGSIDE it — `is_abandoned_cart`
+		// keeps its template meaning untouched.
+		$fields = array_merge(
+			array( 'is_abandoned_cart' => 'true' ),
+			AutomationMarker::stamp( 'abandoned_cart' )
+		);
 
 		$first = $user instanceof \WP_User && (string) $user->first_name !== ''
 			? (string) $user->first_name
