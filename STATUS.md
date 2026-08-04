@@ -26,7 +26,55 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1683 — ticking Phone and Gender in the
+_Last updated: 2026-08-04 (**PRO-1684 — a store upgraded from an older
+Connect version syncs the fields it always did, and the wizard shows them.**
+The legacy settings page stored the merchant's selection as a MAP
+(`Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS` keys → bool, written by
+`Sanitizer::sanitize_subscriber_sync_fields()` — deleted with the legacy
+view layer at F3-45, 9a02618); `SubscriberPayloadBuilder` reads a LIST of
+enabled names, so on an upgraded store the map's `'1'`/`''` values matched
+nothing and every optional field silently vanished — while the wizard showed
+the OPPOSITE, because that map reaches the browser as a JS object whose
+missing `.length` made `hydrate.ts` fall back to "all ten boxes ticked".
+**Fixed read-side, like PRO-1683** (no write-migration, so it heals however
+the plugin was updated and the original stored value is never destroyed):
+`SubscriberPayloadBuilder::interpret_selection()` understands both shapes,
+and `effective_selection()` is now the single source for BOTH readers — the
+payload builders AND `EnvDetector::saved_settings()` — so a tick the merchant
+sees always means the field is being sent. **The map's VALUES are honoured**
+(a legacy `false` is a real "don't send this", the same answer the legacy
+sync gave); the legacy→current key map is documented in DECISIONS —
+`user_dob`→`birthday` is the one real rename, and `store_url`/`user_email`/
+`language` map to nothing because they were never optional (§1 / F3-47).
+**An unreadable selection is admitted, not guessed**: neither shape ⇒ the
+documented default (every cross-channel field on, NOT the bare minimum) plus
+a dismissible `notice-warning` telling the merchant to re-save
+(`NotificationManager::SYNC_FIELDS_ADVISORY_KEY`, the F3-50 advisory
+pattern); a never-saved option is a fresh install and is never nagged.
+`hydrate.ts` now treats an empty list as an answer (`Array.isArray`, not
+`.length > 0`) — the legacy default of nothing ticked IS an empty selection.
+Nothing on the wire changed (field names and value forms untouched, PRO-1678
+ground rule; a field with no source value is still OMITTED, never empty).
+**The demonstration** (`tests/Integration/SubscriberSyncFieldSelectionTest
+.php`, six new cases) seeds the option through the REAL legacy writer —
+`Support\LegacySettingsPage`, its method body copied verbatim from
+`9a02618^` and verified to return arrays identical to the historical class
+over every shape a merchant could post — then drives the real sync pipeline
+and the real wizard hydration with only the Smaily transport faked; plus a
+new `admin/src/state/hydrate.test.ts` for the browser half. Confirmed to pin
+the change by disabling the legacy branch (4/11 integration fail) and by
+restoring the `.length` check (2/3 vitest fail). Merchant docs
+`docs/site/index.html` updated in BOTH languages (Settings → Subscribers →
+Fields to sync: upgrades keep the old selection; the notice when it can't be
+read). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK]
+No errors`, PHPUnit unit **702/702**, eslint/tsc clean, vitest **261/261**);
+`sg docker -c "composer run test:integration"` **OK (211 tests, 1251
+assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily Connect
+test" restored post-run. Human acceptance still open: confirming the
+interpretation against a genuine production store's stored option value. No
+version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1683 — ticking Phone and Gender in the
 setup wizard now actually syncs them.** The wizard saved the merchant's
 selection under `phone` / `gender` while the sync has always read
 `user_phone` / `user_gender` (spec/FIELD_MAPPING.md §2), so

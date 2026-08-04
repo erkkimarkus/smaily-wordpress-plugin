@@ -4388,6 +4388,80 @@ by reverting the three call sites (3/3 fail).
 (product matrix); follows F3-47's omit-vs-empty rule; parallel to but
 separate from F3-21's `IsoDate` (rec-engine wire).
 
+### PRO-1684 — The stored field selection is read in BOTH shapes; an unreadable one is told, not guessed
+
+**Context:** a store upgraded from a pre-wizard Connect version synced only
+`email` + `store`, silently. The legacy settings page wrote the selection as a
+MAP — `Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS` keys → bool, produced by
+`Sanitizer::sanitize_subscriber_sync_fields()` (deleted with the legacy view
+layer at F3-45, 9a02618) — while `SubscriberPayloadBuilder` reads a LIST of
+enabled names. Read as a list, the map yields `'1'`/`''` values, the
+SUPPORTED_FIELDS intersection matches nothing, and every optional field
+vanishes. The wizard then showed the OPPOSITE: the map reaches the browser as
+a JS object whose missing `.length` made `hydrate.ts` fall back to "every box
+ticked", so the merchant saw ten fields ticked while none was being sent.
+
+**Decision:** one read-side interpreter,
+`SubscriberPayloadBuilder::interpret_selection()`, understands both shapes and
+returns the canonical list — or `null` when the value is neither.
+`effective_selection()` (option → interpreter → documented default) is the
+single source for BOTH readers: the payload builders and the wizard's
+hydration (`EnvDetector::saved_settings()`), so a tick the merchant sees always
+means the field is being sent.
+
+- **The map's VALUES are honoured** — a legacy `false` is a real "don't send
+  this", the same answer the legacy sync itself gave (`array_keys(
+  array_filter( $options ) )`). "Same fields as before the upgrade" is the
+  values, not the key set.
+- **The legacy → current key map** (`LEGACY_SELECTION_KEYS`): `user_dob` →
+  `birthday` is the one real rename; `customer_group`, `customer_id`,
+  `first_name`, `first_registered`, `last_name`, `nickname`, `site_title`,
+  `user_gender`, `user_phone` are unchanged; `store_url`, `user_email` and
+  `language` map to nothing — they were never optional (`email`/`store` are
+  sent unconditionally per FIELD_MAPPING.md §1, language is resolved by
+  `ContactLanguageResolver`, F3-47).
+- **Read-side, not a write-migration** — the PRO-1683 precedent, for the same
+  reason: it heals however the plugin was updated instead of depending on an
+  upgrade hook a ZIP install may never fire. The issue's "take a copy before
+  converting" concern is met by never converting: the stored value is left
+  exactly as the legacy page wrote it, so an interpretation we got wrong is
+  undone by shipping a different interpreter, with nothing to restore.
+- **Unreadable is admitted, not guessed.** Neither shape (no known legacy key,
+  or values no writer could produce) ⇒ the sync falls back to the documented
+  default (every cross-channel field on, the same fallback a never-saved
+  option gets — NOT the bare minimum) and a dismissible `notice-warning` tells
+  the merchant to re-save their selection (`NotificationManager::
+  SYNC_FIELDS_ADVISORY_KEY`, the F3-50 consent-advisory pattern: live, not
+  cron-driven, 24h dismiss cooldown). A never-saved option is NOT unreadable —
+  a fresh install is not nagged. The advisory deliberately reads no other
+  option: gating it on the sync-enabled toggle would entangle it with that
+  key's own drift (PRO-1742), and a selection worth fixing is worth fixing
+  before sync is switched back on.
+- **Unknown NAMES inside a shape we recognise are still dropped**, not
+  escalated to unreadable: a stale name says nothing about the rest of the
+  merchant's choice, and this is what the list shape already did.
+- **`hydrate.ts` now treats an empty list as an answer** (`Array.isArray`, not
+  `.length > 0`). The legacy default — nothing optional ticked — is an empty
+  selection, and the old length check rendered exactly that case as "all
+  ticked".
+- **Nothing on the wire changed:** field names and value forms are untouched
+  (PRO-1678 ground rule), and a field with no source value is still OMITTED,
+  never sent empty (F3-47 rule 2).
+
+**Demonstration:** `tests/Integration/SubscriberSyncFieldSelectionTest.php`
+seeds the option through `Support\LegacySettingsPage` — the legacy sanitizer's
+method body copied verbatim from `9a02618^`, verified to return arrays
+identical to the historical class over every shape a merchant could post — and
+drives the REAL sync pipeline and the REAL wizard hydration with only the
+Smaily transport faked. Confirmed to pin the change by disabling the legacy
+branch (4/11 fail) and by restoring the `.length` check (2/3 vitest fail).
+Confirmation against a genuine production store's stored value is human
+acceptance.
+
+**Relationships:** same class of bug and the same read-side remedy as PRO-1683
+(`phone`/`gender`); the advisory follows F3-50's config-advisory pattern; the
+omit-vs-empty rule is F3-47's.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
