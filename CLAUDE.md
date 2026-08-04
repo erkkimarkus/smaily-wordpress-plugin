@@ -822,6 +822,31 @@ URL from the endpoints-map carries the engine's placeholder syntax — confirm i
 (`{name}` vs `%s`) before picking a substitution function; a 404 echoing an
 un-interpolated token is YOUR request, not an engine bug. (LESSONS §2.9.)
 
+### Merging `upstream/main` (sendsmaily) — MERGE, ours wins, and audit the CLEAN hunks
+The upstream PR (#135) folds this rewrite into `sendsmaily/smaily-wordpress-plugin`.
+When upstream lands maintenance on the legacy plugin, our PR goes un-mergeable and the
+fix is a **merge of `upstream/main` into our `main` — never a rebase, never a
+force-push** (Erkki, 2026-08-04). Conflict rule: **our side wins** — the v3 rewrite
+replaces the legacy plugin, so files we deleted (the legacy admin UI, `phpcs.xml`)
+stay deleted, and the plugin header, `readme.txt` header, `composer.json`/`.lock`,
+`.wp-env.json`, `.zipignore` and `languages/*` keep our values.
+**The hazard is not the conflicts — it's what merges CLEANLY**, because git never
+shows it to you. Two real bites in the 2026-08-04 merge:
+- **A moved `namespace`.** Upstream moved `includes/smaily-helper.class.php`'s
+  `namespace` to the top of the file; taking "ours" at the ABSPATH-guard conflict
+  marker left the file with **two** `namespace` declarations — a PHP fatal no marker
+  flagged. After any upstream merge, `php -l` **every** changed PHP file before the
+  gates (`for f in $(git diff HEAD --name-only …); do php -l "$f"; done`).
+- **An upstream-only config that shadows one of ours.** Upstream's `phpstan.neon` has
+  no counterpart here, so it lands clean — and PHPStan prefers `phpstan.neon` over our
+  `phpstan.neon.dist`, silently swapping the whole analysis config (their level-5
+  legacy scan + stubs we don't install) and breaking `composer run analyze`. Dropped
+  deliberately. Check every upstream-only file for the same shadowing before keeping it.
+Do keep upstream substance that doesn't collide (their legacy bug/quality fixes,
+`release.sh`, the wp-env dev env + `contributing.md`, their changelog entries) — and
+if a kept doc references something our tree doesn't have, fix the reference in the same
+commit rather than importing a false doc.
+
 ---
 
 ## How we work (the rhythm)

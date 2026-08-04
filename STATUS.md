@@ -26,7 +26,45 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-07-23 (**v3.10.0 — PUBLISHED.** MINOR bump — the pilot-driven
+_Last updated: 2026-08-04 (**Upstream PR #135 unblocked — `sendsmaily/main`
+merged into our `main`.** The sendsmaily maintainer (kaittodesk, 2026-07-27)
+reported merge conflicts blocking
+https://github.com/sendsmaily/smaily-wordpress-plugin/pull/135. Erkki's call
+(2026-08-04): resolve by **merging** upstream into our main — never rebase,
+never force-push. Merge commit `4a3d979` (parents `4acbd80` + upstream
+`87fdae9`) folds in the 17 upstream commits landed since our fork point
+`a7e9f65` (#118–#134), all of them maintenance on the LEGACY plugin our
+rewrite replaces. **Conflict rule: ours wins on every contested file** — the
+legacy admin UI (`admin/smaily-admin*.class.php`, its partials, `admin/css`,
+`admin/js`) stays deleted, `phpcs.xml` stays superseded by
+`phpcs.xml.dist`, and the plugin header, `readme.txt` header,
+`composer.json`/`composer.lock`, `.wp-env.json`, `.zipignore` and both
+translation catalogs keep our values (our WP 6.6 / PHP 8.0 floors already
+exceed the #128 bump to 6.5 / 7.4). **Upstream substance kept where it
+doesn't collide:** the legacy-class quality + PHPStan fixes (#118/#119/
+#129/#133), the checkout-optin / Elementor / cron / profile-field bug fixes
+(#121–#126), the `release.sh` HTTP-429 recovery (#132), the wp-env dev
+environment + rewritten `contributing.md` (#134 — `Dockerfile`,
+`compose*.yaml`, `user.sh` accordingly deleted), and upstream's 1.6.2 /
+2.0.0 changelog entries in `readme.txt` + `readme.md`. **Deliberately NOT
+taken:** upstream's `phpstan.neon` (PHPStan prefers it over our
+`phpstan.neon.dist` when no `-c` is passed, and it analyses the legacy tree
+at level 5 against stubs we don't install → would break `composer run
+analyze`); `.wp-env.min.json` was taken but raised to WP 6.6 / PHP 8.0 to
+match this plugin's real floors, and the `start`/`start:min`/`stop` scripts
+`contributing.md` documents were added to `composer.json`. One merge-hazard
+caught by hand: `includes/smaily-helper.class.php` came out of the merge
+with a DUPLICATE `namespace` declaration (upstream moved it to the top of
+the file, we keep it after the docblock) — a PHP fatal that no conflict
+marker flagged; fixed in the merge commit. **Gates:** `npm run ci:strict`
+exit=0 (PHPCS clean, PHPStan `[OK] No errors`, PHPUnit unit **653/653**,
+eslint/tsc clean, vitest **258/258**) and `sg docker -c "composer run
+test:integration"` **OK (181 tests, 916 assertions)** with the dev sandbox
+tenant "Smaily Connect test" restored post-run. No plugin version bump —
+the merge changes no shipped behavior of the v3 tree beyond the legacy-class
+maintenance listed above._
+
+Prior: 2026-07-23 (**v3.10.0 — PUBLISHED.** MINOR bump — the pilot-driven
 Transactional-emails Settings UI restructure (PRO-1540: account connection
 moved to the Connection tab with its own connection test, Order/Shipping
 trigger sections gated onto the WooCommerce tab only once that account is

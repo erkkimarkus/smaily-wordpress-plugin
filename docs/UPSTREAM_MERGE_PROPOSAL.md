@@ -110,6 +110,15 @@ Smaily-owned / gating.
 
 ### Item 5 dispositions (2026-07-23)
 
+> **Update (2026-08-04) — `sendsmaily/main` merged into the fork's `main`** to clear
+> the conflicts blocking PR #135. The dispositions below stand, with one fact changed:
+> **#132 is no longer pending a cherry-pick** — the `release.sh` HTTP-429 recovery came
+> in with the merge, so the fork's copy is upstream's current one whichever release flow
+> Smaily keeps. #120 and #128 resolved exactly as recommended: the fork's translation
+> catalogs and its WP 6.6 / PHP 8.0 floors won the merge. The other 14 upstream commits
+> (#118–#134) were legacy-plugin maintenance; their non-colliding parts merged in, the
+> legacy admin UI this rewrite deletes stayed deleted. Details in STATUS.md.
+
 - **#120 — translation `.pot` catalogs, manual merge.** Obsoleted by the fork's own
   i18n pipeline. The fork rebuilt translation tooling around `bin/build-i18n.sh`
   (esbuild-transpiles the TSX admin source so `wp i18n make-pot` can see the `__()`
