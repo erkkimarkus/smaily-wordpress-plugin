@@ -4742,6 +4742,56 @@ mention, no Smaily link, rec-engine card only when connected).
 oma Smaily konto →"); catalogs rebuilt with `bin/build-i18n.sh`. The merchant
 docs site describes none of the three surfaces, so nothing there became false.
 
+### PRO-1769 — The contact import pages in SQL (`WHERE ID > cursor`), not in PHP after a first page it re-reads
+
+**Context:** `BackfillJob::fetch_users_after()` asked `get_users()` for the
+first `$batch_size` users (`orderby ID ASC`, no offset, no cursor) and then
+pruned `ID > cursor` in PHP. Tick 1 walked page one correctly; tick 2 asked for
+page one AGAIN, filtered every row away as already-past-the-cursor, and the
+empty page satisfied `count( $users ) < $batch_size` — the walk's "no more
+users" signal — so the job marked itself `completed`. A store with more than
+one page of users imported only its first 100 contacts and reported success.
+**Reproduced on the dev store before any fix** (151 users, 150 opted in, the
+real REST `/backfill/start` + real Action Scheduler ticks, Smaily transport
+faked): two ticks, 99 of 150 opt-ins POSTed (`pro1769_001..099`), row
+`completed` with `processed_count=100/151`, `/backfill/status` reporting
+`{"status":"completed","percent":66,"synced":99,"audience_estimate":150}`.
+
+**Why nobody reported it:** a store whose whole user table fits in one batch —
+which is most WooCommerce stores, and every automated test we had (the
+integration walk used `process_batch( 200 )` against ~10 users) — behaves
+correctly, because the FIRST page is also the last one. On a bigger store the
+failure is silent by construction: the panel says *completed*, the first 100
+contacts really do arrive in Smaily, and everyone who registers or orders after
+that arrives through the live hooks — so the store looks synced. It never
+self-heals either: the daily refresh re-seeds the cursor at NULL, re-walks the
+same first page (skipping it as fresh) and completes again.
+
+**Decision:** page the walk the way the rec-engine backfills already do —
+`SELECT ID FROM wp_users WHERE ID > %d ORDER BY ID ASC LIMIT %d`
+(`CustomerBackfillJob::fetch_ids_after()` is the template), then hydrate that
+id list through `get_users( include )`. The cursor, the walked count and the
+"was this the last page" test all read the ID page, so a user deleted between
+the two queries cannot stall the cursor. Audience semantics are untouched:
+`ContactAudience::should_sync_user()` still filters each hydrated user
+(PRO-1742's switch, F3-48's presets) and PRO-1715's empty-audience fast path
+still closes a run at `start()`.
+
+**Alternatives:** an `offset`-based `WP_User_Query` (rejected — a user deleted
+mid-walk shifts the window and silently skips someone; the codebase's own
+pattern is an id cursor); leaving `get_users()` to do the paging (it has no
+"after id" argument, which is what produced the PHP-side prune in the first
+place).
+
+**Relationships:** pinned twice — a unit test asserts the stored cursor reaches
+the QUERY (`WHERE ID > %d` with the cursor and the batch size as its args), and
+`ContactBackfillAudienceTest::test_a_store_with_several_pages_of_users_syncs_every_audience_member`
+runs the real walk with a batch size of 2 and asserts every seeded audience
+member was POSTed (it fails on the pre-fix code). Re-demonstrated on the dev
+store after the fix: 150/150 opt-ins POSTed, `processed 151/151`, `percent 100`;
+a single-page store (6 users) still finishes in one tick, unchanged. Nothing in
+the merchant docs site described the paging, so nothing there became false.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

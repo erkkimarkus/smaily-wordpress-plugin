@@ -26,7 +26,41 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1717 / PRO-1718 / PRO-1720 — three approved
+_Last updated: 2026-08-04 (**PRO-1769 — the contact import stopped after its
+first 100 contacts and reported success; it now walks the whole user table.**
+`BackfillJob::fetch_users_after()` asked `get_users()` for the FIRST batch every
+tick and pruned `ID > cursor` in PHP, so tick 2 re-read page one, filtered it
+empty, and the empty page (the walk's "no users left" signal) marked the job
+`completed`. **Reproduced on the dev store first**, through the real REST
+`/backfill/start` + real Action Scheduler ticks with the Smaily transport faked:
+151 users / 150 opted in → 99 contacts POSTed, row `completed`,
+`/backfill/status` = `{"status":"completed","percent":66,"synced":99,
+"audience_estimate":150}`. **Why upgraded stores looked fine:** a store whose
+user table fits in one batch (most of them — and every test we had, the
+integration walk used `process_batch( 200 )` on ~10 users) is correct, because
+its first page is also its last; on a bigger store the loss is silent — the
+panel says completed, the first 100 contacts do arrive, and later signups arrive
+via the live hooks. It never healed itself either: the daily refresh restarts at
+cursor NULL and re-walks the same page. **Fix:** page in SQL like the rec-engine
+backfills (`SELECT ID FROM wp_users WHERE ID > %d ORDER BY ID ASC LIMIT %d`, the
+`CustomerBackfillJob::fetch_ids_after()` template) and hydrate that id page via
+`get_users( include )`; cursor / walked count / last-page test all read the id
+page. Audience semantics unchanged (PRO-1742 switch + F3-48 presets via
+`ContactAudience`, PRO-1715's empty-audience fast path). **Re-demonstrated on the
+dev store:** 150/150 opt-ins POSTed (`pro1769_001..150`), `processed 151/151`,
+`percent 100`, 2 ticks; a single-page store (6 users) still finishes in one tick
+with `6/6` walked, `5` synced. Gates: `npm run ci:strict` **exit=0** (PHPCS 0
+errors, PHPStan `[OK] No errors`, PHPUnit unit **711/711**, eslint/tsc clean,
+vitest **270/270**); integration **228 tests, 1329 assertions**, incl. the new
+`ContactBackfillAudienceTest::test_a_store_with_several_pages_of_users_syncs_every_audience_member`
+(fails on the pre-fix code) — the one failure in the full-suite run
+(`BackwardCompatTest::test_legacy_subscriber_sync_is_stripped_after_wizard_finish`)
+is **pre-existing suite-order noise**: it fails identically on the unmodified
+tree and passes when run alone. Merchant docs `docs/site/index.html`
+**unchanged** — it never described the paging, so nothing there became false.
+DECISIONS PRO-1769. No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1717 / PRO-1718 / PRO-1720 — three approved
 wizard trims (Jane's PRO-1645 review, approved by Erkki).** UI only, no PHP
 touched. **PRO-1717:** step 3 no longer pitches the Campaign Intelligence
 automations to a store that hasn't connected Campaign Intelligence —
