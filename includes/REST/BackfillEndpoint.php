@@ -166,10 +166,15 @@ class BackfillEndpoint {
 		$job_id = $job->start();
 		\Smaily\Connect\Support\DebugLog::write( sprintf( '[smaily-connect backfill.endpoint.start] start() returned row_id=%d', $job_id ) );
 
+		$row    = $this->read_state( $job_type );
+		$status = is_array( $row ) ? (string) $row['status'] : self::STATUS_RUNNING;
+
 		// Schedule the first AS tick so backfill processing begins
 		// immediately. The tick handler reschedules itself until the job
-		// reaches its terminal state.
-		if ( function_exists( 'as_enqueue_async_action' ) ) {
+		// reaches its terminal state. A job start() already finished has
+		// nothing to tick for (PRO-1715: an empty contact audience) — and a
+		// tick would flip its row back to 'running'.
+		if ( $status === self::STATUS_RUNNING && function_exists( 'as_enqueue_async_action' ) ) {
 			as_enqueue_async_action(
 				self::TICK_HOOK,
 				array( 'job_type' => $job_type ),
@@ -177,12 +182,10 @@ class BackfillEndpoint {
 			);
 		}
 
-		$row = $this->read_state( $job_type );
-
 		return new WP_REST_Response(
 			array(
 				'job_id' => $job_id,
-				'status' => is_array( $row ) ? (string) $row['status'] : self::STATUS_RUNNING,
+				'status' => $status,
 				'total'  => is_array( $row ) ? (int) $row['total_count'] : 0,
 			),
 			200

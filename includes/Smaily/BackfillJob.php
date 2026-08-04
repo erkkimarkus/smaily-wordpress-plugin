@@ -26,7 +26,8 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  * cron):
  *
  *   1. start() seeds a smly_plus_backfill_job row with total_count and
- *      status='running'.
+ *      status='running' — or, when the sync audience is empty, closes it as
+ *      'completed' on the spot, because a walk could not sync anyone (PRO-1715).
  *   2. process_batch() handles up to $batch_size users, then either
  *      schedules the next iteration (when the cursor hasn't reached
  *      total_count) or marks status='completed'.
@@ -97,15 +98,25 @@ class BackfillJob implements BackfillJobInterface {
 
 		$table = $this->table_name();
 
+		// PRO-1715: with an empty audience the walk has nothing to POST, so the
+		// run is recorded as finished right here rather than as 'running' with
+		// an Action Scheduler tick as its only way out — on a quiet store that
+		// tick can be minutes away, and until then the merchant watched a
+		// progress spinner that never moved and cancelled by hand. Every user
+		// is accounted for (each one would have been audience-skipped), so the
+		// run completes at 100% with zero contacts synced.
+		$nothing_to_sync = $this->has_empty_audience();
+
 		// $reset_freshness=false is the daily-refresh path (F3-48.3): keep the
 		// _smaily_synced_at markers so the walk re-syncs only users outside the
 		// freshness window, not everyone. The merchant-driven "Start backfill"
-		// keeps the default (true) — a deliberate full re-sync.
+		// keeps the default (true) — a deliberate full re-sync. A run that syncs
+		// no-one has nothing to re-sync either, so it leaves the markers alone.
 		//
 		// Defensive against unit-test fakes that don't seed $wpdb->usermeta
-		// (BackfillJobTest's anonymous wpdb only exposes `prefix`). In
-		// production $wpdb is always the WP-bootstrapped instance.
-		if ( $reset_freshness && $wpdb instanceof \wpdb ) {
+		// (BackfillJobTest passes an anonymous stand-in). In production $wpdb
+		// is always the WP-bootstrapped instance.
+		if ( $reset_freshness && ! $nothing_to_sync && $wpdb instanceof \wpdb ) {
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 			$cleared = $wpdb->query(
 				$wpdb->prepare(
@@ -166,13 +177,53 @@ class BackfillJob implements BackfillJobInterface {
 			: '(none)';
 		\Smaily\Connect\Support\DebugLog::write(
 			sprintf(
-				'[smaily-connect backfill.start] row_id=%d wpdb_last_error=%s',
+				'[smaily-connect backfill.start] row_id=%d wpdb_last_error=%s nothing_to_sync=%s',
 				$id,
-				$last_error
+				$last_error,
+				$nothing_to_sync ? 'yes' : 'no'
 			)
 		);
 
+		if ( $nothing_to_sync ) {
+			$this->mark_nothing_to_sync( $id, $total );
+		}
+
 		return $id;
+	}
+
+	/**
+	 * True when the contact-sync mode's audience is empty — the switch is off,
+	 * the mode syncs no accounts, or nobody has opted in — so a walk cannot
+	 * produce a single contact (PRO-1715). Shared by start() and the daily
+	 * refresh so neither leaves work scheduled that has nothing to do.
+	 */
+	public function has_empty_audience(): bool {
+		return $this->audience()->count_audience() === 0;
+	}
+
+	/**
+	 * Close the freshly-seeded row as a finished run that synced no-one. Written
+	 * as a second statement rather than folded into the INSERT because
+	 * $wpdb->prepare() turns a null %s into an empty string, which a DATETIME
+	 * NULL column will not take.
+	 */
+	private function mark_nothing_to_sync( int $job_id, int $total ): void {
+		global $wpdb;
+
+		$wpdb->update(
+			$this->table_name(),
+			array(
+				// Every user is accounted for: with an empty audience each one
+				// would have been skipped, so the walk is done before it starts.
+				'processed_count' => $total,
+				'synced_count'    => 0,
+				'status'          => 'completed',
+				'completed_at'    => current_time( 'mysql', true ),
+			),
+			array( 'id' => $job_id ),
+			array( '%d', '%d', '%s', '%s' ),
+			array( '%d' )
+		);
 	}
 
 	/**

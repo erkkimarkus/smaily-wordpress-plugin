@@ -200,6 +200,13 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
       if (!mountedRef.current) {
         return;
       }
+      // The server can finish a run before it answers — a contact backfill with
+      // an empty audience has nothing to walk (PRO-1715). Read the real terminal
+      // state instead of showing a progress spinner that would never advance.
+      if (response.status !== 'running') {
+        await pollOnce();
+        return;
+      }
       setProgress({
         status: 'running',
         processed: 0,
@@ -219,7 +226,7 @@ export function useBackfillProgress(options: UseBackfillProgressOptions = {}): U
         setPollError(err instanceof Error ? err.message : __( 'Failed to start backfill', 'smaily-connect' ));
       }
     }
-  }, [jobType]);
+  }, [jobType, pollOnce]);
 
   const cancel = useCallback(async (): Promise<void> => {
     try {

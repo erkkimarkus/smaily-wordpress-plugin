@@ -401,6 +401,14 @@ final class Bootstrap {
 		}
 
 		$job->start( false );
+
+		// PRO-1715: an empty audience means start() already recorded the run as
+		// finished — a tick would only walk the user table to reach the same
+		// answer, and would reopen a row that is already closed.
+		if ( $job->has_empty_audience() ) {
+			return;
+		}
+
 		as_schedule_single_action(
 			time() + 5,
 			BackfillEndpoint::TICK_HOOK,

@@ -57,6 +57,9 @@ export function Step2Subscribers({
   const isComplete = progress.status === 'completed';
   const hasFailed = progress.status === 'failed';
   const wasCancelled = progress.status === 'cancelled';
+  // The run finished without a contact to sync because the audience is empty
+  // — not because the walk went wrong (PRO-1715).
+  const nothingToSync = progress.synced === 0 && progress.audienceEstimate === 0;
 
   return (
     <div className="space-y-6">
@@ -257,12 +260,16 @@ export function Step2Subscribers({
                 progress.total,
                 progress.synced,
               )}
-              {isComplete && sprintf(
-                // translators: %1$d is contacts synced, %2$d is contacts checked.
-                __( 'Done — %1$d contacts synced (%2$d contacts checked).', 'smaily-connect' ),
-                progress.synced,
-                progress.processed,
-              )}
+              {/* PRO-1715: a run that had no-one to sync is its own outcome —
+                  "Done — 0 contacts synced" reads like a failure. */}
+              {isComplete && (nothingToSync
+                ? __( 'Nothing to import — no contacts match your synchronization settings.', 'smaily-connect' )
+                : sprintf(
+                    // translators: %1$d is contacts synced, %2$d is contacts checked.
+                    __( 'Done — %1$d contacts synced (%2$d contacts checked).', 'smaily-connect' ),
+                    progress.synced,
+                    progress.processed,
+                  ))}
               {hasFailed && (progress.error
                 ? sprintf(
                     // translators: %s is the error message.
