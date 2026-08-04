@@ -20,9 +20,18 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  * SAME merchant-built Smaily autoresponder templates the legacy pass fed
  * (`is_abandoned_cart`, `store`, `first_name`/`last_name`, and the
  * `product_<field>_1..10` matrix with all slots prefilled empty + the
- * `over_10_products` flag). The selection comes from the same
+ * `over_10_products` flag). The address-field selection comes from the same
  * `smaily_connect_abandoned_cart_fields` option, so an upgrading store's
  * templates keep rendering without reconfiguration.
+ *
+ * PRODUCT details are NOT selectable (PRO-1680): every `product_<field>` is
+ * always sent, whatever that option holds. The option's product_* keys were
+ * unreachable from any UI and default to false, so a fresh install sent a
+ * reminder with no product detail at all; a stored selection (from a version
+ * that had the UI) is ignored the same way. Templates decide what to RENDER —
+ * the wire always carries the full matrix, which is also what CLEARS the
+ * previous cart's details from the contact (every slot is overwritten, unused
+ * ones with '').
  *
  * Differences from the legacy `Cron::prepare_*` pair, by design:
  *   - input is the tracker row's own JSON shape (scalars), never a
@@ -106,7 +115,7 @@ class CartPayloadBuilder {
 			: $this->resolver()->for_guest();
 
 		$fields = $this->contact_fields( $row, $user, $sync_fields, $language )
-			+ $this->product_fields( $items, $sync_fields );
+			+ $this->product_fields( $items );
 
 		$payload = array(
 			'email'  => $email,
@@ -166,7 +175,8 @@ class CartPayloadBuilder {
 					break;
 				default:
 					// user_email rides the payload's top-level email; the
-					// product_* selection is handled in product_fields().
+					// option's product_* keys are ignored — product details are
+					// always sent (PRO-1680).
 					break;
 			}
 		}
@@ -177,30 +187,30 @@ class CartPayloadBuilder {
 	/**
 	 * The `product_<field>_1..10` matrix, mirroring the legacy
 	 * `Cron::prepare_products_data()`: every slot prefilled '' (the legacy
-	 * Smaily API requires all fields updated every send), selected fields filled
-	 * per item, `over_10_products` flagged past slot 10.
+	 * Smaily API requires all fields updated every send — that is what clears
+	 * the previous cart from the contact), EVERY product field filled per item
+	 * (PRO-1680: no merchant-facing selection), `over_10_products` flagged past
+	 * slot 10.
 	 *
-	 * @param array<int, mixed>    $items       Own-shape cart items.
-	 * @param array<string, mixed> $sync_fields
+	 * @param array<int, mixed> $items Own-shape cart items.
 	 *
 	 * @return array<string, string>
 	 */
-	private function product_fields( array $items, array $sync_fields ): array {
+	private function product_fields( array $items ): array {
 		$fields = ProductMatrixBuilder::prefill( self::PRODUCT_KEYS );
 
-		$selected = array_intersect( self::PRODUCT_KEYS, array_keys( array_filter( $sync_fields ) ) );
-		if ( $selected === array() || ! function_exists( 'wc_get_product' ) ) {
+		if ( ! function_exists( 'wc_get_product' ) ) {
 			return $fields;
 		}
 
 		return ProductMatrixBuilder::fill(
 			$fields,
 			$this->valid_cart_items( $items ),
-			function ( array $pair ) use ( $selected ): array {
+			function ( array $pair ): array {
 				[ $product, $item ] = $pair;
 
 				$slot_fields = array();
-				foreach ( $selected as $field ) {
+				foreach ( self::PRODUCT_KEYS as $field ) {
 					$value = $this->product_field_value( $field, $product, $item );
 					if ( $value === null ) {
 						continue;

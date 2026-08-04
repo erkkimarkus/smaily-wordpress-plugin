@@ -3337,6 +3337,34 @@ over; the legacy email pass it patched is retired); F3-37 (backlog guard —
 same filter, now in the sweeper); F3-44 (exchange capture); F3-47 (resolver
 language, `for_guest` added); Linear PRO-1195.
 
+**Addendum — PRO-1680 (2026-08-04): product details are ALWAYS sent; the
+field selection no longer governs them.** The "upgrade continuity" rule above
+had `CartPayloadBuilder` read the product slots out of the same
+`smaily_connect_abandoned_cart_fields` option as the address fields. Every
+`product_*` key in that option defaults to FALSE and **no UI writes the option
+at all** (`Options::get_settings()` exposes it as `cart_options`, nothing
+consumes that; the React Settings/wizard never posts it), so on a fresh
+install the reminder went out with the whole `product_<field>_1..10` matrix
+empty — an abandoned-cart email with no cart in it. Only a store carrying a
+value forward from a version that HAD the selector sent anything.
+**Owner decision (Erkki):** product details are always sent, with no
+merchant-facing choice — so `product_fields()` now fills every
+`PRODUCT_KEYS` entry unconditionally and never reads `$sync_fields`; a stored
+selection from an older version is ignored rather than migrated. The address
+fields (`store`, `language`, `first_name`, `last_name`) keep reading the
+option — untouched, out of scope. Adding a selector UI was explicitly rejected
+(it is a template concern: the Smaily template decides what to RENDER, the
+wire always carries everything). This aligns the cart builder with
+`TransactionalPayloadBuilder`, which already sent its whole matrix
+unconditionally. **The full-matrix send is load-bearing, not cosmetic:** the
+Smaily contact keeps whatever the last send wrote, so writing all 10 slots —
+unused ones as `''` — is what clears the PREVIOUS cart's details from the
+contact. Empty slots must therefore stay ON the wire; "don't show empty rows"
+is the template's job. Demonstrated in `CartPipelineTest` against the real
+pipeline (two carts for one shopper; the earlier cart's products appear
+nowhere in the second reminder) — confirmed to fail with the fix reverted.
+Linear PRO-1680.
+
 ### PRO-1194 (sign-off) — Privacy-policy template: legal entity, URL, lawful-basis framing confirmed
 
 **Context:** the merchant privacy-policy template in `docs/DATA_MODEL_GDPR.md`

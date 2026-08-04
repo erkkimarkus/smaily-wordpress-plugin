@@ -752,6 +752,40 @@ mock (built to whatever I assumed) would happily hide.
    (which the test controls) restored them. When you change what a field carries,
    grep the mock for every trigger keyed on it.
 
+### 2.21 A test that seeds a NON-DEFAULT config never tests the fresh install — and a setting no UI writes is a dead switch (PRO-1680 abandoned-cart product details, 2026-08-04)
+
+Abandoned-cart reminders went out with an empty `product_<field>_1..10` matrix on
+every fresh install: `CartPayloadBuilder` gated the product slots on the
+`smaily_connect_abandoned_cart_fields` option, whose `product_*` keys all default
+to FALSE — and **nothing in the plugin ever writes that option**. It survives only
+as an upgrade artefact from a version that had the selector, so a store's reminder
+had products iff it was old enough. Every gate was green throughout.
+
+1. **Seeding a non-default value in `setUp()` tests the config you invented, not
+   the one merchants get.** `CartPipelineTest` seeded the fields option with
+   `product_name`/`product_quantity` enabled to have something to assert — which
+   is precisely the configuration that hid the defect. When a behaviour depends on
+   an option, at least one case must run on the **shipped default**; seed a
+   non-default only to pin the non-default branch, and say so in the test.
+   (Sibling of §2.19: there the fixture hid a writer↔reader shape seam, here it
+   hid the default's behaviour.)
+2. **An option with a reader and no writer is a defect, not a feature.** Grep both
+   directions before trusting a setting: `get_option` gave three call sites,
+   `update_option` gave none. A read-only option silently freezes behaviour at
+   whatever history left behind — and it is invisible on any fresh install, so no
+   amount of dev-environment testing surfaces it.
+3. **"Configurable" is not automatically the safer answer.** The fix was to DELETE
+   the choice (products are always sent) rather than build the missing UI: the
+   downstream Smaily template already decides what to render, so a second switch
+   upstream only adds a way to be wrong. Ask whether the consumer already has the
+   control before adding one.
+4. **When empty values are load-bearing, say so where someone might "clean them
+   up".** The unused slots ride the wire as `''` on purpose — the Smaily contact
+   keeps whatever the last send wrote, so overwriting all 10 slots is what clears
+   the PREVIOUS cart. An "optimisation" that omits empty fields would silently
+   resurrect the old cart in the next reminder. It is now pinned by a two-cart
+   integration case, not just a comment.
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity
