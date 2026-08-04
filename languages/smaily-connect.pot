@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-04T19:18:32+00:00\n"
+"POT-Creation-Date: 2026-08-04T20:16:09+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -80,55 +80,63 @@ msgid "User newsletter subscription"
 msgstr ""
 
 #: blocks/checkout-optin/smaily-integration.class.php:61
-#: integrations/woocommerce/profile-settings.class.php:409
+#: integrations/woocommerce/profile-settings.class.php:410
 msgid "Subscribe to newsletter"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:324
+#: includes/Notifications/NotificationManager.php:369
 msgid "Smaily Connect: browse tracking is on, but no cookie-consent signal was found, so no browse data is being collected. Install the free WP Consent API plugin so your consent banner (CookieYes, Complianz, Real Cookie Banner, …) can tell Smaily when a visitor consents."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:355
+#: includes/Notifications/NotificationManager.php:400
 msgid "Smaily Connect: your saved list of contact fields to sync could not be read, so every supported field is being synced. Open the Subscribers settings, tick the fields you want and save to fix it."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:368
+#: includes/Notifications/NotificationManager.php:413
 msgid "Open Subscribers settings"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:376
+#: includes/Notifications/NotificationManager.php:421
 msgid "Install WP Consent API"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:399
+#: includes/Notifications/NotificationManager.php:444
 msgid "Invalid request."
 msgstr ""
 
 #. translators: %d: number of failed sync events in the last 24 hours.
-#: includes/Notifications/NotificationManager.php:424
+#: includes/Notifications/NotificationManager.php:469
 #, php-format
 msgid "Smaily Connect: %d sync event failed in the last 24 hours."
 msgid_plural "Smaily Connect: %d sync events failed in the last 24 hours."
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/Notifications/NotificationManager.php:435
+#: includes/Notifications/NotificationManager.php:480
 msgid "Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:442
+#: includes/Notifications/NotificationManager.php:487
 msgid "Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:448
+#: includes/Notifications/NotificationManager.php:494
+msgid "Smaily Connect: Smaily is refusing every request because this account's package does not include API access. Contact sync and email automations stay stopped until the account is on a package that includes it — waiting will not restore them, and the credentials cannot be checked until then."
+msgstr ""
+
+#: includes/Notifications/NotificationManager.php:501
+msgid "Smaily Connect: Smaily is rejecting the saved API credentials, so contact sync and email automations have stopped. Check the subdomain, API username and password under Settings → Connection."
+msgstr ""
+
+#: includes/Notifications/NotificationManager.php:507
 msgid "Smaily Connect: a sync health check needs your attention."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:455
+#: includes/Notifications/NotificationManager.php:514
 msgid "View Event Log"
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:474
+#: includes/Notifications/NotificationManager.php:533
 msgid "Dismiss"
 msgstr ""
 
@@ -233,15 +241,23 @@ msgstr ""
 msgid "Subdomain + username are required."
 msgstr ""
 
-#: includes/REST/TestConnectionEndpoint.php:85
+#: includes/REST/TestConnectionEndpoint.php:86
 msgid "You do not have permission to test the Smaily connection."
 msgstr ""
 
-#: includes/REST/TestConnectionEndpoint.php:102
+#: includes/REST/TestConnectionEndpoint.php:103
 msgid "Subdomain, username, and password are required."
 msgstr ""
 
-#: includes/REST/TestConnectionEndpoint.php:116
+#: includes/REST/TestConnectionEndpoint.php:129
+msgid "Smaily refused the request because this account's package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all."
+msgstr ""
+
+#: includes/REST/TestConnectionEndpoint.php:136
+msgid "Smaily could not be reached. This looks temporary — try again in a moment."
+msgstr ""
+
+#: includes/REST/TestConnectionEndpoint.php:139
 msgid "Smaily did not accept those credentials."
 msgstr ""
 
@@ -759,38 +775,38 @@ msgstr ""
 msgid "In every 15 minutes"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:114
+#: integrations/woocommerce/profile-settings.class.php:115
 msgid "Additional Information"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:373
+#: integrations/woocommerce/profile-settings.class.php:374
 #: admin/src/components/steps/Step2Subscribers.tsx:252
 msgid "Gender"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:377
+#: integrations/woocommerce/profile-settings.class.php:378
 msgid "Male"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:378
+#: integrations/woocommerce/profile-settings.class.php:379
 msgid "Female"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:387
+#: integrations/woocommerce/profile-settings.class.php:388
 #: admin/src/components/steps/Step2Subscribers.tsx:250
 msgid "Phone"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:388
+#: integrations/woocommerce/profile-settings.class.php:389
 msgid "Enter phone number"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:398
+#: integrations/woocommerce/profile-settings.class.php:399
 #: admin/src/components/steps/Step2Subscribers.tsx:251
 msgid "Birthday"
 msgstr ""
 
-#: integrations/woocommerce/profile-settings.class.php:399
+#: integrations/woocommerce/profile-settings.class.php:400
 msgid "Enter birthday"
 msgstr ""
 

@@ -46,17 +46,17 @@ msgstr "Tuvastati mitu Contact Form 7 vormi! Palun kontrollige Smaily Connect-i 
 msgid "Email"
 msgstr "E-post"
 
-#: integrations/woocommerce/profile-settings.class.php:398
+#: integrations/woocommerce/profile-settings.class.php:399
 #: admin/src/components/steps/Step2Subscribers.tsx:251
 msgid "Birthday"
 msgstr "Sünnipäev"
 
-#: integrations/woocommerce/profile-settings.class.php:373
+#: integrations/woocommerce/profile-settings.class.php:374
 #: admin/src/components/steps/Step2Subscribers.tsx:252
 msgid "Gender"
 msgstr "Sugu"
 
-#: integrations/woocommerce/profile-settings.class.php:387
+#: integrations/woocommerce/profile-settings.class.php:388
 #: admin/src/components/steps/Step2Subscribers.tsx:250
 msgid "Phone"
 msgstr "Telefon"
@@ -97,7 +97,7 @@ msgid "User newsletter subscription"
 msgstr "Kasutaja uudiskirja tellimus"
 
 #: blocks/checkout-optin/smaily-integration.class.php:61
-#: integrations/woocommerce/profile-settings.class.php:409
+#: integrations/woocommerce/profile-settings.class.php:410
 msgid "Subscribe to newsletter"
 msgstr "Liitu uudiskirjaga"
 
@@ -128,35 +128,35 @@ msgstr "Liitu"
 msgid "Smaily credentials not validated. Subscription form will not work!"
 msgstr "Puudub Smaily API ühendus. Liitumisvorm ei tööta!"
 
-#: includes/Notifications/NotificationManager.php:399
+#: includes/Notifications/NotificationManager.php:444
 msgid "Invalid request."
 msgstr "Vigane päring."
 
 #. translators: %d: number of failed sync events in the last 24 hours.
-#: includes/Notifications/NotificationManager.php:424
+#: includes/Notifications/NotificationManager.php:469
 #, php-format
 msgid "Smaily Connect: %d sync event failed in the last 24 hours."
 msgid_plural "Smaily Connect: %d sync events failed in the last 24 hours."
 msgstr[0] "Smaily Connect: viimase 24 tunni jooksul ebaõnnestus %d sünkroonimissündmus."
 msgstr[1] "Smaily Connect: viimase 24 tunni jooksul ebaõnnestus %d sünkroonimissündmust."
 
-#: includes/Notifications/NotificationManager.php:435
+#: includes/Notifications/NotificationManager.php:480
 msgid "Smaily Connect: Smaily Campaign Intelligence has been unreachable for over an hour — sync is queued and will resume automatically when it recovers."
 msgstr "Smaily Connect: Smaily Campaign Intelligence on olnud kättesaamatu üle tunni — sünkroonimine on järjekorras ja jätkub automaatselt, kui ühendus taastub."
 
-#: includes/Notifications/NotificationManager.php:442
+#: includes/Notifications/NotificationManager.php:487
 msgid "Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers."
 msgstr "Smaily Connect: Smaily API on olnud kättesaamatu üle tunni — kontaktide sünkroonimine ja e-posti automatiseeringud on peatatud, kuni ühendus taastub."
 
-#: includes/Notifications/NotificationManager.php:448
+#: includes/Notifications/NotificationManager.php:507
 msgid "Smaily Connect: a sync health check needs your attention."
 msgstr "Smaily Connect: sünkroonimise seisundikontroll vajab sinu tähelepanu."
 
-#: includes/Notifications/NotificationManager.php:455
+#: includes/Notifications/NotificationManager.php:514
 msgid "View Event Log"
 msgstr "Vaata sündmuste logi"
 
-#: includes/Notifications/NotificationManager.php:474
+#: includes/Notifications/NotificationManager.php:533
 msgid "Dismiss"
 msgstr "Peida"
 
@@ -253,15 +253,15 @@ msgstr "Andmekogum (payload) peab olema objekt."
 msgid "Subdomain + username are required."
 msgstr "Alamdomeen ja kasutajanimi on kohustuslikud."
 
-#: includes/REST/TestConnectionEndpoint.php:85
+#: includes/REST/TestConnectionEndpoint.php:86
 msgid "You do not have permission to test the Smaily connection."
 msgstr "Sul ei ole õigust Smaily ühendust testida."
 
-#: includes/REST/TestConnectionEndpoint.php:102
+#: includes/REST/TestConnectionEndpoint.php:103
 msgid "Subdomain, username, and password are required."
 msgstr "Alamdomeen, kasutajanimi ja parool on kohustuslikud."
 
-#: includes/REST/TestConnectionEndpoint.php:116
+#: includes/REST/TestConnectionEndpoint.php:139
 msgid "Smaily did not accept those credentials."
 msgstr "Smaily ei aktsepteerinud neid sisselogimisandmeid."
 
@@ -747,23 +747,23 @@ msgstr "Veateated"
 msgid "In every 15 minutes"
 msgstr "Iga 15 minuti järel"
 
-#: integrations/woocommerce/profile-settings.class.php:114
+#: integrations/woocommerce/profile-settings.class.php:115
 msgid "Additional Information"
 msgstr "Lisateave"
 
-#: integrations/woocommerce/profile-settings.class.php:377
+#: integrations/woocommerce/profile-settings.class.php:378
 msgid "Male"
 msgstr "Mees"
 
-#: integrations/woocommerce/profile-settings.class.php:378
+#: integrations/woocommerce/profile-settings.class.php:379
 msgid "Female"
 msgstr "Naine"
 
-#: integrations/woocommerce/profile-settings.class.php:388
+#: integrations/woocommerce/profile-settings.class.php:389
 msgid "Enter phone number"
 msgstr "Sisestage telefoninumber"
 
-#: integrations/woocommerce/profile-settings.class.php:399
+#: integrations/woocommerce/profile-settings.class.php:400
 msgid "Enter birthday"
 msgstr "Sisestage sünnipäev"
 
@@ -2053,11 +2053,11 @@ msgstr "Smailysse edastatakse kõik kliendid, sõltumata turundusnõusolekust. T
 msgid "Checkout opt-in only"
 msgstr "Ainult kassas turunduskirjade nõusoleku andnud kontaktid"
 
-#: includes/Notifications/NotificationManager.php:324
+#: includes/Notifications/NotificationManager.php:369
 msgid "Smaily Connect: browse tracking is on, but no cookie-consent signal was found, so no browse data is being collected. Install the free WP Consent API plugin so your consent banner (CookieYes, Complianz, Real Cookie Banner, …) can tell Smaily when a visitor consents."
 msgstr "Smaily Connect: sirvimise jälgimine on sees, aga küpsiste-nõusoleku signaali ei leitud, seega sirvimisandmeid ei koguta. Paigalda tasuta WP Consent API plugin, et sinu nõusolekubänner (CookieYes, Complianz, Real Cookie Banner, …) saaks Smailyle edastada, millal külastaja nõustub."
 
-#: includes/Notifications/NotificationManager.php:376
+#: includes/Notifications/NotificationManager.php:421
 msgid "Install WP Consent API"
 msgstr "Paigalda WP Consent API"
 
@@ -2299,11 +2299,11 @@ msgstr ""
 msgid "Initial setup"
 msgstr "Algseadistus"
 
-#: includes/Notifications/NotificationManager.php:355
+#: includes/Notifications/NotificationManager.php:400
 msgid "Smaily Connect: your saved list of contact fields to sync could not be read, so every supported field is being synced. Open the Subscribers settings, tick the fields you want and save to fix it."
 msgstr ""
 
-#: includes/Notifications/NotificationManager.php:368
+#: includes/Notifications/NotificationManager.php:413
 msgid "Open Subscribers settings"
 msgstr ""
 
@@ -2568,3 +2568,19 @@ msgstr "Kokkuvõte ja viimane kontroll"
 #: admin/src/components/steps/Step2Subscribers.tsx:190
 msgid "Nothing to import — no contacts match your synchronization settings."
 msgstr "Pole midagi importida — ükski kontakt ei vasta sinu sünkroniseerimise seadetele."
+
+#: includes/Notifications/NotificationManager.php:494
+msgid "Smaily Connect: Smaily is refusing every request because this account's package does not include API access. Contact sync and email automations stay stopped until the account is on a package that includes it — waiting will not restore them, and the credentials cannot be checked until then."
+msgstr "Smaily Connect: Smaily keeldub igast päringust, sest selle konto pakett ei sisalda API-ligipääsu. Kontaktide sünkroonimine ja e-posti automatiseeringud jäävad seisma, kuni konto on paketil, mis API-t sisaldab — ootamine neid ei taasta ja kontoandmeid ei saa enne seda kontrollida."
+
+#: includes/Notifications/NotificationManager.php:501
+msgid "Smaily Connect: Smaily is rejecting the saved API credentials, so contact sync and email automations have stopped. Check the subdomain, API username and password under Settings → Connection."
+msgstr "Smaily Connect: Smaily lükkab salvestatud API-sisselogimisandmed tagasi, mistõttu kontaktide sünkroonimine ja e-posti automatiseeringud on seiskunud. Kontrolli alamdomeeni, API-kasutajanime ja parooli jaotises Settings → Connection."
+
+#: includes/REST/TestConnectionEndpoint.php:129
+msgid "Smaily refused the request because this account's package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all."
+msgstr "Smaily keeldus päringust, sest selle konto pakett ei sisalda API-ligipääsu. Ühendamiseks uuenda Smailys paketti — enne seda ei saa sisselogimisandmeid üldse kontrollida."
+
+#: includes/REST/TestConnectionEndpoint.php:136
+msgid "Smaily could not be reached. This looks temporary — try again in a moment."
+msgstr "Smailyni ei jõudnud. See tundub ajutine — proovi hetke pärast uuesti."
