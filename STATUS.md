@@ -26,7 +26,47 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1769 — the contact import stopped after its
+_Last updated: 2026-08-04 (**PRO-1743 — a wizard-configured store can COLLECT
+the contact fields it ticked again.** PRO-1683/PRO-1684 taught the sync to read
+the merchant's field selection in both stored shapes; two readers in the legacy
+tree were left doing `array_keys( array_filter( $option ) )`, which on a
+wizard-configured store (the selection is a LIST of names there) matches
+nothing. Consequences: `Profile_Settings::filter_enabled_fields()` printed **no
+Phone / Gender / Birthday input at all** on the WordPress profile, the
+WooCommerce account form and the checkout — so the store could not collect the
+very meta the sync had just been fixed to send (live whenever WooCommerce is
+active and credentials are saved) — and
+`Subscriber_Synchronization::order_optin_subscriber()` sent a guest who ticked
+the checkout newsletter box to Smaily **without an email address** (reachable
+until the wizard finishes; LegacyHookBridge strips those hooks afterwards).
+**Fix:** both read `SubscriberPayloadBuilder::effective_selection_legacy_keys()`
+— the SAME interpreter, re-expressed in the legacy key names those readers speak
+(`user_dob`, not the contact field's `birthday`), so a third shape drift cannot
+split them again. `store_url`/`user_email`/`language` are always in that answer:
+the legacy settings page forced all three on, and in the new namespace they are
+not a merchant choice (email + store unconditional, language via
+ContactLanguageResolver). The legacy namespace calling into the new one is the
+existing bridge pattern (`Cron` → `ContactLanguageResolver`/`AutomationRouter`),
+not a new mechanism. **A store configured before the wizard is unchanged**,
+including that an unticked box stays unticked. Gates: `npm run ci:strict`
+**exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit **714/714**,
+eslint/tsc clean, vitest **270/270**); integration full suite **234 tests, 1367
+assertions** with the only failure `BuildHashTest` (the gitignored
+`dist/build-hash.txt` artifact was missing — green after `composer run
+package:hash`), incl. the new `tests/Integration/SubscriberFieldFormsTest.php`
+(**OK, 6 tests**) which renders the REAL form hooks (`show_user_profile`,
+`woocommerce_edit_account_form`, `woocommerce_checkout_fields`) and drives the
+REAL guest opt-in on the running store with only the Smaily transport faked —
+**2 of its 6 cases fail against the pre-fix code** (no inputs printed; a POST
+with no email). Not covered server-side: the checkout page's own conditional
+tags (the documented harness limit), so "the input renders on a real checkout
+screen" stays a manual pilot check. Merchant docs `docs/site/index.html`
+**unchanged** — it already describes ticking additional fields, which is what
+now happens. DECISIONS PRO-1743. Follow-up left open: `Data_Handler::
+get_user_data()` still reads the option as a map (registered-user opt-in,
+pre-wizard window only). No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1769 — the contact import stopped after its
 first 100 contacts and reported success; it now walks the whole user table.**
 `BackfillJob::fetch_users_after()` asked `get_users()` for the FIRST batch every
 tick and pruned `ID > cursor` in PHP, so tick 2 re-read page one, filtered it

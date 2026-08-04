@@ -4792,6 +4792,58 @@ store after the fix: 150/150 opt-ins POSTed, `processed 151/151`, `percent 100`;
 a single-page store (6 users) still finishes in one tick, unchanged. Nothing in
 the merchant docs site described the paging, so nothing there became false.
 
+### PRO-1743 — The legacy readers of the field selection get the interpreter's answer in their own key names
+
+**Context:** PRO-1683/PRO-1684 taught the SYNC to read the merchant's field
+selection in both stored shapes (the wizard's list of names, the pre-wizard
+settings page's map of name => on/off). Two readers in the legacy
+`Smaily_Connect\*` tree were left behind, both still doing
+`array_keys( array_filter( $option ) )`: `Profile_Settings::
+filter_enabled_fields()`, which decides whether the plugin's Phone / Gender /
+Birthday inputs are printed on the WordPress profile, the WooCommerce account
+form and the checkout, and `Subscriber_Synchronization::order_optin_subscriber()`,
+which builds the contact for a guest who ticks the checkout newsletter box. On
+a wizard-configured store that map read matches nothing, so the store could not
+COLLECT the very meta the sync had just been fixed to send, and a guest opt-in
+went to Smaily without so much as an email address. The forms reader is live
+whenever WooCommerce is active and credentials are saved; the opt-in reader
+only until the wizard finishes (LegacyHookBridge then strips its hooks).
+
+**Decision:** both read through `SubscriberPayloadBuilder::
+effective_selection_legacy_keys()` — the same interpreter, re-expressed in the
+LEGACY option key names those readers speak (`user_dob`, not the contact
+field's `birthday`). `store_url` / `user_email` / `language` are always in that
+answer: the legacy settings page forced all three on and never let them off,
+and in the new namespace they are not a merchant choice at all (email and store
+are sent unconditionally, language is resolved by ContactLanguageResolver).
+
+**Rationale:** the legacy namespace already calls into the new one where the
+logic is shared (`Cron` uses `ContactLanguageResolver` / `AutomationRouter`), so
+there was a pattern to follow rather than a bridge to invent. Handing the
+readers canonical names instead would have meant a second translation table
+inside the legacy tree — exactly the drift that produced this issue.
+
+**Alternatives:** rewriting the two readers to speak canonical names (rejected —
+larger diff in code we keep close to upstream, and `user_dob` is the meta key
+the form field itself is named after, so the rename would have to stop halfway);
+migrating the stored option to one shape (rejected for the third time, same
+reason as PRO-1683/PRO-1684 — a read-side fix heals a store however it was
+updated, an upgrade routine only heals the stores that run it).
+
+**Demonstration:** `tests/Integration/SubscriberFieldFormsTest.php` renders the
+REAL form hooks (`show_user_profile`, `woocommerce_edit_account_form`,
+`woocommerce_checkout_fields`) and drives the REAL guest opt-in path on the
+running store with only the Smaily transport faked, against both stored shapes;
+2 of its 6 cases fail against the pre-fix code (no inputs printed at all; a POST
+with no email). Unchanged for a legacy-configured store, including that an
+unticked box stays unticked.
+
+**Relationships:** completes PRO-1683/PRO-1684 (the sync side) — the selection
+now has exactly one interpreter with two vocabularies. `Data_Handler::
+get_user_data()` still reads the option as a map for the registered-user opt-in
+path; same class of bug, same pre-wizard-only window, left as a follow-up rather
+than folded in.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
