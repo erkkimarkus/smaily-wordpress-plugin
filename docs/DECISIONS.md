@@ -4525,6 +4525,67 @@ unchanged); deliberately does NOT change F3-20's rec-engine A-filter or F3-48's
 contact-sync audience; the wizard's trigger description and the merchant docs'
 Welcome bullet were corrected in the same commit (both languages).
 
+### PRO-1742 — One accessor owns the "Sync contacts to Smaily" switch, and an OFF answer is actually stored
+
+**Context:** the switch has always been written as
+`smaily_connect_subscriber_sync_enabled` (the wizard's save route today, the
+pre-wizard settings page before it), but the live sync gated on
+`smly_plus_subscriber_sync_enabled` — a key **no version of this plugin has
+ever written** (verified across the whole git history). Both default to on, so
+nothing looked wrong day to day; a merchant who switched contact sync OFF kept
+sending every account change to Smaily. Reproduced on the running store before
+any fix: the switch saved off through the real REST settings route, then a new
+account + opt-in + profile edit still POSTed two contact rows, and the contact
+backfill POSTed as well. This is the third settings-key drift found in a day
+(PRO-1683, PRO-1684).
+
+**Decision:** the legacy key is canonical — it is the one every version has
+written, so an upgraded store's stored choice is honoured with no migration —
+and every surface reads it through one accessor,
+`ContactSyncMode::sync_enabled()` (default on, never memoised).
+
+- **Consumers:** the four live gates in `HookHandler` (new account, profile
+  update, order-path contact sync, consent change), `ContactAudience`, and
+  the wizard's hydration (`EnvDetector`). `SettingsEndpoint`'s own constant is
+  now defined AS `ContactSyncMode::OPTION_SYNC_ENABLED`, so the key has
+  exactly one spelling in the plugin. The dead `smly_plus_` constant is gone.
+- **`ContactAudience` carries the switch, so the backfill honours it too.**
+  Switched off, the audience is empty whatever the mode says — the mass walk
+  sends nothing, and the "about N of them will be synced" estimate says 0
+  instead of promising a sync that will not happen. This keeps the backfill,
+  the live hooks and the wizard's number on one decision, and matches what
+  the legacy daily cron did (it gated on this same option).
+- **An OFF answer is now storable.** `update_option( $key, false )` on an
+  option that has never been saved concludes "nothing changed" and writes
+  NOTHING — with a default of ON that silently discarded a merchant who
+  switched the sync off during the initial wizard. The save route writes
+  `'1'` / `''` instead, the same on-disk shape the legacy settings page left.
+  Every other flag on that tab defaults to off, where the lost write is
+  invisible; only this one needed it.
+- **Automations are NOT coupled to it.** Welcome / first-order / abandoned
+  cart keep their own toggles and their own consent basis, which is what the
+  merchant docs already promise ("existing contacts and Smaily automations
+  are unaffected") — turning contact sync off must not silently disable an
+  automation the merchant enabled separately.
+- **Known semantic, unchanged:** on the legacy page "never enabled" and
+  "never configured" are the same absent option, and absent reads as ON here.
+  A store only reaches the new sync path after finishing the wizard, which
+  asks the question again with the switch visible — so the wizard's answer,
+  not the legacy absence, is what governs.
+
+**Demonstration:** `tests/Integration/ContactSyncToggleTest.php` saves the
+switch through the REAL settings route on the running store, then drives the
+REAL account hooks and the REAL contact backfill with only the Smaily
+transport faked, asserting nothing reaches it when off and the same changes
+still do when on; the legacy fixture is written by `Support\LegacySettingsPage`
+(`rest_sanitize_boolean`, as that page registered it) rather than by hand.
+Confirmed to pin the change: 3 of the 5 cases fail against the pre-fix code.
+
+**Relationships:** same class of bug as PRO-1683 / PRO-1684 and the same
+read-side remedy (translate on read, never migrate the stored value); the
+audience gate is additive to F3-48's mode policy; the automation decoupling
+follows PRO-1682's reading of what each trigger's consent basis is.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

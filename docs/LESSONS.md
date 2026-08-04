@@ -786,6 +786,33 @@ had products iff it was old enough. Every gate was green throughout.
    resurrect the old cart in the next reminder. It is now pinned by a two-cart
    integration case, not just a comment.
 
+### 2.22 A gate that reads a key nothing writes always answers with its default — and a boolean OFF can't be stored with `update_option()` (PRO-1742 contact-sync switch, 2026-08-04)
+
+The "Sync contacts to Smaily" switch was written as
+`smaily_connect_subscriber_sync_enabled` and read as
+`smly_plus_subscriber_sync_enabled` — a key no version of this plugin has ever
+written. Both default to ON, so every store looked correct; only a merchant who
+switched the sync OFF was affected, and they got the opposite of what they asked
+for. Third settings-key drift found in one day (PRO-1683, PRO-1684, this).
+
+1. **Grep BOTH directions for every option, and let the writer win.** §2.21's
+   read-only option froze behaviour at history; this is the mirror — a reader with
+   no writer is permanently pinned to its default, which is invisible whenever the
+   default is what you'd expect anyway. The canonical key is the one the UI
+   actually writes; make every surface read it through **one accessor** rather
+   than repeating the string (the PRO-1683/1684 remedy, applied a third time).
+2. **A default-ON boolean can't be turned off by `update_option()` alone.** WP
+   compares the new value with `get_option( $option )`, which returns `false` for
+   an option that has never been saved — so `update_option( $key, false )` decides
+   nothing changed and writes NOTHING. With a default of ON that silently
+   discarded the merchant's "off" on a fresh store. Store such a flag as `'1'` /
+   `''` (WP's own on-disk shape for booleans), or add the row explicitly. Flags
+   that default to OFF hide this perfectly — which is why it survives review.
+3. **A default that is safe on a fresh install can be unsafe on an upgrade.**
+   "Never configured" and "explicitly switched off" are the same absent option;
+   decide which one an absence means, write it down, and make sure something
+   asks the merchant again when it matters.
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

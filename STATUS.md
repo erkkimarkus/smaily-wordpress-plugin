@@ -26,7 +26,45 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1682 — only a shopper's account triggers
+_Last updated: 2026-08-04 (**PRO-1742 — switching "Sync contacts to Smaily"
+off actually stops the sync.** The wizard/Settings switch has always been
+stored as `smaily_connect_subscriber_sync_enabled`, but the live sync gated on
+`smly_plus_subscriber_sync_enabled` — a key **no version of this plugin has
+ever written** (checked across the whole git history). Both default to on, so
+nothing looked wrong day to day; a merchant who switched contact sync off kept
+sending. **Reproduced first on the running store**: the switch saved off
+through the real REST settings route, then a new account + opt-in + profile
+edit still POSTed two contact rows, and the contact backfill POSTed too.
+**Fixed by making the legacy key canonical** — it is the one every version has
+written, so an upgraded store's stored choice is honoured with no migration —
+**read everywhere through one accessor**, `ContactSyncMode::sync_enabled()`:
+the four live `HookHandler` gates, `ContactAudience`, and the wizard's
+hydration; `SettingsEndpoint`'s constant is now defined AS
+`ContactSyncMode::OPTION_SYNC_ENABLED`, so the key has one spelling in the
+plugin, and the dead `smly_plus_` constant is gone. **The backfill honours it
+via `ContactAudience`** (switched off ⇒ empty audience whatever the mode says,
+so the mass walk sends nothing and the "about N will be synced" estimate says
+0) — which is also what the legacy daily cron did with this same option.
+**A second layer surfaced while fixing it:** `update_option( $key, false )` on
+a never-saved option concludes "nothing changed" and writes NOTHING, so a
+merchant switching the sync off during the initial wizard lost the answer
+entirely against a default of ON; the save route now stores `'1'`/`''`, the
+legacy on-disk shape. **Automations stay decoupled** (welcome / first-order /
+abandoned cart keep their own toggles) — exactly what the merchant docs
+already promise, so `docs/site/index.html` needed no change. **The
+demonstration** (`tests/Integration/ContactSyncToggleTest.php`) drives the REAL
+settings route, the REAL account hooks and the REAL backfill on the running
+store with only the Smaily transport faked, both ways, plus a legacy fixture
+written by `Support\LegacySettingsPage`; 3 of its 5 cases fail against the
+pre-fix code. Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
+`[OK] No errors`, PHPUnit unit **708/708**, eslint/tsc clean, vitest
+**261/261**); `sg docker -c "composer run test:integration"` **OK (222 tests,
+1294 assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily Connect
+test" restored post-run. Human acceptance still open: a merchant-visible pass
+on a real store (switch off, change a customer, confirm nothing arrives in
+Smaily). No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1682 — only a shopper's account triggers
 the welcome automation.** The trigger fired on ANY `user_register`: a staff
 account added in wp-admin, an account a membership/forum plugin created —
 all of them became opted-in marketing contacts, with no customer
