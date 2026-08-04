@@ -266,28 +266,48 @@ final class HookHandlerTest extends TestCase {
 		self::assertCount( 0, $this->enqueued );
 	}
 
-	public function test_user_register_fires_welcome_only_when_option_on(): void {
-		Functions\when( 'get_option' )->alias(
-			static function ( string $key, $default = null ) {
-				if ( $key === 'smly_plus_setup_completed' ) {
-					return true;
-				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
-					return true;
-				}
-				if ( $key === 'smly_plus_welcome_enabled' ) {
-					return true; // welcome enabled here
-				}
-				return $default;
-			}
-		);
+	public function test_bare_user_register_never_fires_welcome_even_when_option_on(): void {
+		// PRO-1682: a staff account created in wp-admin, or an account an
+		// unrelated plugin creates, arrives on user_register alone — no customer
+		// relationship, so no welcome enrolment.
+		$this->enable_welcome();
 		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'a@b.c', '', '' ) );
 
 		( new HookHandler( $this->queue ) )->on_user_register( 7 );
 
+		self::assertSame(
+			array( HookHandler::EVENT_CONTACT_SYNC ),
+			array_column( $this->enqueued, 'type' ),
+			'A bare registration syncs the contact (audience rules unchanged) but must not enrol them in the welcome automation.'
+		);
+	}
+
+	public function test_created_customer_does_not_fire_welcome_when_option_off(): void {
+		// setUp leaves smly_plus_welcome_enabled false — the merchant's toggle.
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'a@b.c', '', '' ) );
+
+		( new HookHandler( $this->queue ) )->on_woocommerce_created_customer( 7 );
+
+		self::assertSame( array( HookHandler::EVENT_CONTACT_SYNC ), array_column( $this->enqueued, 'type' ) );
+	}
+
+	public function test_created_customer_fires_welcome_once_when_option_on(): void {
+		$this->enable_welcome();
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'a@b.c', '', '' ) );
+
+		// WooCommerce created the account (checkout / My Account registration):
+		// user_register fires first from inside wp_insert_user, then this hook.
+		$handler = new HookHandler( $this->queue );
+		$handler->on_user_register( 7 );
+		$handler->on_woocommerce_created_customer( 7 );
+
 		$types = array_column( $this->enqueued, 'type' );
 		self::assertContains( HookHandler::EVENT_CONTACT_SYNC, $types );
-		self::assertContains( HookHandler::EVENT_AUTOMATION_WELCOME, $types );
+		self::assertSame(
+			1,
+			count( array_keys( $types, HookHandler::EVENT_AUTOMATION_WELCOME, true ) ),
+			'Both hooks fire for one checkout-created account — exactly one welcome may be enqueued.'
+		);
 
 		// PRO-1681: the welcome run marks the contact — and ONLY the plain
 		// contact sync stays unmarked, so a self-subscribed contact is
@@ -301,6 +321,23 @@ final class HookHandlerTest extends TestCase {
 			'welcome_automation_at',
 			$by_type[ HookHandler::EVENT_CONTACT_SYNC ]['fields'],
 			'A contact sync is not an automation run — it must carry no marker.'
+		);
+	}
+
+	public function test_welcome_eligibility_is_filterable_per_source(): void {
+		$this->enable_welcome();
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 7, 'a@b.c', '', '' ) );
+		Monkey\Filters\expectApplied( HookHandler::FILTER_WELCOME_ELIGIBLE )
+			->once()
+			->with( false, 7, 'user_register' )
+			->andReturn( true );
+
+		( new HookHandler( $this->queue ) )->on_user_register( 7 );
+
+		self::assertContains(
+			HookHandler::EVENT_AUTOMATION_WELCOME,
+			array_column( $this->enqueued, 'type' ),
+			'A store must be able to widen the trigger back to a non-WooCommerce registration flow.'
 		);
 	}
 
@@ -547,6 +584,21 @@ final class HookHandlerTest extends TestCase {
 		$contact = $this->find_enqueued( 'order:100' );
 		self::assertNotNull( $contact );
 		self::assertSame( 0, $contact['payload']['is_unsubscribed'], 'A checkout opt-in subscribes.' );
+	}
+
+	/** Wizard finished + subscriber sync + the welcome automation toggled on. */
+	private function enable_welcome(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' || $key === 'smly_plus_subscriber_sync_enabled' ) {
+					return true;
+				}
+				if ( $key === 'smly_plus_welcome_enabled' ) {
+					return true;
+				}
+				return $default;
+			}
+		);
 	}
 
 	/** Wizard finished + the first-order automation toggled on. */

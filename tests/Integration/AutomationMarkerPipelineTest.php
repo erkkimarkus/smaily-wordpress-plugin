@@ -97,8 +97,10 @@ final class AutomationMarkerPipelineTest extends TestCase {
 	public function test_welcome_marks_the_contact_and_a_plain_contact_sync_does_not(): void {
 		$this->configure_triggers( array( 'welcomeEnabled' => true ), 'welcome', '4242' );
 
-		// Real registration → the registrar's user_register callback.
-		$user_id = $this->make_user( 'welcome' );
+		// Real WooCommerce account creation → the registrar's
+		// woocommerce_created_customer callback (PRO-1682: a bare user_register
+		// is no longer a welcome trigger).
+		$user_id = $this->make_customer( 'welcome' );
 		// Opting the new customer in produces a REAL contact sync (consent
 		// change), and editing their profile another one — neither is an
 		// automation run, so neither may carry a marker.
@@ -328,6 +330,20 @@ final class AutomationMarkerPipelineTest extends TestCase {
 				'user_pass'  => wp_generate_password( 20 ),
 			)
 		);
+		self::assertIsInt( $user_id );
+		$this->created_users[] = $user_id;
+		return $user_id;
+	}
+
+	/** A shopper account the way WooCommerce creates one (checkout / My Account). */
+	private function make_customer( string $slug ): int {
+		add_filter( 'woocommerce_email_enabled_customer_new_account', '__return_false' );
+		try {
+			$user_id = wc_create_new_customer( $slug . '-' . wp_generate_password( 6, false ) . '@example.test' );
+		} finally {
+			remove_filter( 'woocommerce_email_enabled_customer_new_account', '__return_false' );
+		}
+
 		self::assertIsInt( $user_id );
 		$this->created_users[] = $user_id;
 		return $user_id;
