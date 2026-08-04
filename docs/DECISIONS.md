@@ -4462,6 +4462,69 @@ acceptance.
 (`phone`/`gender`); the advisory follows F3-50's config-advisory pattern; the
 omit-vs-empty rule is F3-47's.
 
+### PRO-1682 — The welcome trigger keys on the WooCommerce account-creation FLOW, never on the role
+
+**Context:** the welcome automation fired on any `user_register` — a staff
+account added in wp-admin, an account a membership or forum plugin created,
+anything. Enrolment can't be suppressed once a trigger fires (accepted
+constraint), so every such account became a marketing contact of the merchant's
+with no customer relationship to rest a legitimate-interest basis on.
+Controlling WHO triggers is the only lever.
+
+**Decision:** the welcome fires from **`woocommerce_created_customer`** and no
+longer from a bare `user_register`. That hook is WooCommerce's own "a shopper
+got an account" signal: `wc_create_new_customer()` fires it, and every shopper
+flow goes through that function — classic checkout
+(`WC_Checkout::process_customer`), block checkout
+(`StoreApi\Routes\V1\Checkout::create_customer_account`), My Account
+registration (`WC_Form_Handler::process_registration`), the order-confirmation
+"create an account" block, `WC_Customer::save()`. wp-admin's Add New User and a
+plain `wp_insert_user()` fire neither.
+
+- **The signal is the flow, not the role.** A role allowlist was rejected: just
+  `customer` drops a store's own shopper roles (wholesale, VIP), and widening
+  it to `subscriber` re-admits exactly the forum/membership accounts this is
+  about. `wc_create_new_customer()` lets a plugin swap the role through
+  `woocommerce_new_customer_data` and still fires the hook, so custom shopper
+  roles keep working **because the role is never consulted** — and no staff-role
+  denylist has to be maintained as new roles appear. This deliberately does NOT
+  transfer to F3-20's A-filter: that decision is about rec-engine training data
+  ("non-shopper accounts are harmless noise"), where the consequence of a false
+  positive is noise; here it is a staff address in a marketing list. The
+  rec-engine customer path is untouched.
+- **Exactly one trigger.** Both hooks fire in the same request for a
+  WooCommerce-created account (`user_register` from inside `wp_insert_user`,
+  then `woocommerce_created_customer`); the existing per-request `maybe_enqueue`
+  dedupe on `automation.welcome:{user_id}` collapses them, and the integration
+  case asserts a single enrolment.
+- **Contact sync is unchanged.** Who is synced as a contact is still
+  `ContactAudience`'s mode-aware decision (F3-48) on both hooks — only the
+  welcome ENROLMENT narrowed.
+- **Filter `smaily_connect_welcome_eligible`** ( bool $eligible, int $user_id,
+  string $source ) is the documented escape hatch: default `true` for
+  `woocommerce_created_customer`, `false` for `user_register`. A store whose
+  shopper accounts are created outside WooCommerce's flows widens it on
+  `user_register`; a store that wants even less narrows it. The filter is
+  consulted only when the welcome toggle is on.
+- **Known limit, stated rather than engineered around:** an unrelated plugin
+  that creates accounts THROUGH `wc_create_new_customer()` is indistinguishable
+  from a shopper registering, and still triggers. The criteria are met by
+  flow distinction, not omniscience.
+
+**Demonstration:** `tests/Integration/WelcomeTriggerAudienceTest.php` creates
+REAL users through the REAL paths on the running store — `wc_create_new_customer()`
+plain, with checkout's argument shape, and with a custom `wholesale` role
+swapped in through `woocommerce_new_customer_data`; `wp_insert_user()` with
+`administrator` / `editor`; `wp_insert_user()` with the default role — and
+asserts which of them reach the Smaily transport on the welcome workflow, with
+only the transport faked. Confirmed to pin the change by restoring the
+`user_register` default to eligible (2/6 fail; 2 more in the unit gate).
+
+**Relationships:** narrows the trigger PRO-1681 marks (`welcome_automation_at`,
+unchanged); deliberately does NOT change F3-20's rec-engine A-filter or F3-48's
+contact-sync audience; the wizard's trigger description and the merchant docs'
+Welcome bullet were corrected in the same commit (both languages).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

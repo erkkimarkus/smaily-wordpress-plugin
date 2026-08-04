@@ -26,7 +26,49 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1684 — a store upgraded from an older
+_Last updated: 2026-08-04 (**PRO-1682 — only a shopper's account triggers
+the welcome automation.** The trigger fired on ANY `user_register`: a staff
+account added in wp-admin, an account a membership/forum plugin created —
+all of them became opted-in marketing contacts, with no customer
+relationship for a legitimate-interest basis to rest on, and enrolment
+can't be undone once a trigger fires. **The welcome now fires from
+`woocommerce_created_customer` only** — WooCommerce's own "a shopper got an
+account" signal, which every shopper flow raises (classic checkout, block
+checkout, My Account registration, the order-confirmation create-account
+block all go through `wc_create_new_customer()`), and which wp-admin's Add
+New User and a plain `wp_insert_user()` never raise. **The signal is the
+FLOW, not the role:** a role allowlist was rejected — `customer`-only drops
+a store's wholesale/VIP roles and widening it to `subscriber` re-admits the
+very accounts this is about — and because `woocommerce_new_customer_data`
+lets a plugin swap the role while still firing the hook, custom shopper
+roles keep working precisely because no role is ever consulted. Both hooks
+fire in one request for a WooCommerce-created account; the existing
+per-request dedupe collapses them to exactly one enrolment. Contact sync is
+UNCHANGED (still `ContactAudience`'s mode-aware decision, F3-48), and
+F3-20's rec-engine A-filter is deliberately untouched — that decision is
+about training-data noise, not marketing lists. Documented escape hatch
+`smaily_connect_welcome_eligible` ( $eligible, $user_id, $source ) widens or
+narrows it per store. Known limit, stated not engineered around: a plugin
+that creates accounts THROUGH `wc_create_new_customer()` is
+indistinguishable from a shopper and still triggers. **The demonstration**
+(`tests/Integration/WelcomeTriggerAudienceTest.php`) creates REAL users
+through the REAL paths on the running store — `wc_create_new_customer()`
+plain, with checkout's argument shape, and with a custom `wholesale` role
+swapped in; `wp_insert_user()` as `administrator`/`editor`; `wp_insert_user()`
+with the default role — and asserts which reach the Smaily transport on the
+welcome workflow, with only the transport faked. Confirmed to pin the change
+by restoring the `user_register` default to eligible (2/6 integration + 2
+unit fail). Wizard trigger description + merchant docs `docs/site/index.html`
+corrected in BOTH languages (the Welcome bullet said "a new customer opts
+in"). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No
+errors`, PHPUnit unit **705/705**, eslint/tsc clean, vitest **261/261**);
+`sg docker -c "composer run test:integration"` **OK (217 tests, 1275
+assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily Connect
+test" restored post-run. Human acceptance still open: a non-shopper account
+type demonstrated on a real running store. No version bump — ships with the
+next release cut._
+
+Prior: 2026-08-04 (**PRO-1684 — a store upgraded from an older
 Connect version syncs the fields it always did, and the wizard shows them.**
 The legacy settings page stored the merchant's selection as a MAP
 (`Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS` keys → bool, written by

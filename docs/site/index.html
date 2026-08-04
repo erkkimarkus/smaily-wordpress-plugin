@@ -507,7 +507,7 @@ td code{white-space:nowrap}
     <div data-lang="en">
       <p>Map store events to your Smaily automation workflows. Turn on the ones you want and pick the Smaily workflow each should trigger:</p>
       <ul>
-        <li><strong>Welcome</strong> — a new customer opts in.</li>
+        <li><strong>Welcome</strong> — a shopper creates an account in your store: at checkout, or on the My Account registration form. Accounts you add in WordPress admin, or that another plugin creates, don't trigger it.</li>
         <li><strong>First order</strong> — a customer's first order.</li>
         <li><strong>Abandoned cart</strong> — a cart started but not completed. You set a <strong>delay</strong> (minutes of inactivity before the cart counts as abandoned).</li>
       </ul>
@@ -516,7 +516,7 @@ td code{white-space:nowrap}
     <div data-lang="et">
       <p>Seo poe sündmused oma Smaily automaatika‑töövoogudega. Lülita sisse need, mida soovid, ja vali Smaily töövoog, mida iga sündmus käivitab:</p>
       <ul>
-        <li><strong>Welcome</strong> — uus klient annab nõusoleku.</li>
+        <li><strong>Welcome</strong> — ostleja loob su poes konto: kassas või „Minu konto“ registreerimisvormil. Kontod, mille lisad WordPressi haldusliideses või mille loob mõni muu plugin, seda ei käivita.</li>
         <li><strong>First order</strong> — kliendi esimene tellimus.</li>
         <li><strong>Abandoned cart</strong> — ostukorv alustatud, aga lõpetamata. Sead <strong>viivituse</strong> (tegevusetuse minutid, enne kui korv loetakse hüljatuks).</li>
       </ul>
@@ -689,7 +689,7 @@ td code{white-space:nowrap}
         </ul>
       </div>
       <h3>Store‑run triggers</h3>
-      <p>Map a store event to a Smaily workflow: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Abandoned cart has a delay (minutes of inactivity before a cart counts as abandoned). If no workflows appear, none were found on your Smaily account (or Smaily couldn't be reached) — create them in Smaily first.</p>
+      <p>Map a store event to a Smaily workflow: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Welcome fires when a shopper creates an account in your store (checkout or the My Account registration form) — not for accounts added in WordPress admin or created by another plugin. Abandoned cart has a delay (minutes of inactivity before a cart counts as abandoned). If no workflows appear, none were found on your Smaily account (or Smaily couldn't be reached) — create them in Smaily first.</p>
       <div class="note">
         <span class="k">Each trigger marks the contact — build segments on it</span>
         <p>Every time one of these fires, it writes the moment it ran onto the contact in Smaily, so you can tell an automation‑enrolled contact from someone who subscribed themselves:</p>
@@ -725,7 +725,7 @@ td code{white-space:nowrap}
         </ul>
       </div>
       <h3>Poe‑käivitatavad</h3>
-      <p>Seo poe sündmus Smaily töövooga: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Pooleli jäänud korval on viivitus (tegevusetuse minutid, enne kui korv loetakse hüljatuks). Kui ühtegi töövoogu ei kuva, ei leitud su Smaily kontolt ühtegi (või Smailyni ei jõutud) — loo need enne Smailys.</p>
+      <p>Seo poe sündmus Smaily töövooga: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Welcome käivitub, kui ostleja loob su poes konto (kassas või „Minu konto“ registreerimisvormil) — mitte kontode puhul, mille lisad WordPressi haldusliideses või mille loob mõni muu plugin. Pooleli jäänud korval on viivitus (tegevusetuse minutid, enne kui korv loetakse hüljatuks). Kui ühtegi töövoogu ei kuva, ei leitud su Smaily kontolt ühtegi (või Smailyni ei jõutud) — loo need enne Smailys.</p>
       <div class="note">
         <span class="k">Iga päästik märgistab kontakti — ehita selle peale segmente</span>
         <p>Iga kord, kui mõni neist käivitub, kirjutab see kontaktile Smailys käivitumise hetke, nii et eristad automaatika kaudu lisatud kontakti sellest, kes ise tellijaks hakkas:</p>
