@@ -117,7 +117,8 @@ final class BackfillJobTest extends TestCase {
 				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '2',
-			)
+			),
+			array( 1, 2 )
 		);
 		$GLOBALS['wpdb'] = $wpdb;
 
@@ -164,7 +165,8 @@ final class BackfillJobTest extends TestCase {
 				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
-			)
+			),
+			array( 1 )
 		);
 		$GLOBALS['wpdb'] = $wpdb;
 
@@ -215,7 +217,8 @@ final class BackfillJobTest extends TestCase {
 				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
-			)
+			),
+			array( 1 )
 		);
 		$GLOBALS['wpdb'] = $wpdb;
 
@@ -240,7 +243,8 @@ final class BackfillJobTest extends TestCase {
 				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
-			)
+			),
+			array( 1 )
 		);
 		$GLOBALS['wpdb'] = $wpdb;
 
@@ -298,7 +302,8 @@ final class BackfillJobTest extends TestCase {
 				'cursor_value'    => '0',
 				'processed_count' => '0',
 				'total_count'     => '1',
-			)
+			),
+			array( 1 )
 		);
 		$GLOBALS['wpdb'] = $wpdb;
 
@@ -312,6 +317,46 @@ final class BackfillJobTest extends TestCase {
 		$result = ( new BackfillJob( $client ) )->process_batch();
 
 		self::assertSame( 0, $result['processed'], 'Consent mode must skip users without user_newsletter=1.' );
+	}
+
+	/**
+	 * PRO-1769: the cursor has to reach the QUERY. It used to be applied in PHP
+	 * to a page that always started at the first user, so every tick after the
+	 * first re-read page one, filtered it empty, and closed the job as done.
+	 */
+	public function test_process_batch_asks_the_database_for_the_page_after_the_cursor(): void {
+		$wpdb            = $this->fake_wpdb_for_process_batch(
+			array(
+				'id'              => 77,
+				'cursor_value'    => '4706',
+				'processed_count' => '100',
+				'total_count'     => '151',
+			),
+			array( 4707, 4708 )
+		);
+		$GLOBALS['wpdb'] = $wpdb;
+
+		Functions\when( 'get_users' )->justReturn(
+			array(
+				$this->fake_user( 4707, 'c@x.test' ),
+				$this->fake_user( 4708, 'd@x.test' ),
+			)
+		);
+
+		( new BackfillJob( $this->createMock( Client::class ) ) )->process_batch( 2 );
+
+		$page_query = null;
+		foreach ( $wpdb->prepare_calls as $call ) {
+			if ( strpos( $call['sql'], 'FROM wp_users' ) !== false ) {
+				$page_query = $call;
+			}
+		}
+
+		self::assertNotNull( $page_query, 'The user page is read with a WHERE ID > cursor query.' );
+		self::assertStringContainsString( 'WHERE ID > %d', $page_query['sql'] );
+		self::assertSame( 4706, $page_query['args'][0], 'The stored cursor is what the query pages after.' );
+		self::assertSame( 2, $page_query['args'][1], 'The batch size is the LIMIT.' );
+		self::assertSame( '4708', $wpdb->updates[0]['data']['cursor_value'], 'The cursor advances to the last id of the page.' );
 	}
 
 	/**
@@ -387,17 +432,32 @@ final class BackfillJobTest extends TestCase {
 
 	/**
 	 * @param array<string, mixed>|null $state_row
+	 * @param int[]                     $user_ids  The page the cursor query
+	 *                                             (`WHERE ID > cursor`) returns.
 	 */
-	private function fake_wpdb_for_process_batch( ?array $state_row ): object {
-		return new class( $state_row ) {
+	private function fake_wpdb_for_process_batch( ?array $state_row, array $user_ids = array() ): object {
+		return new class( $state_row, $user_ids ) {
 			public string $prefix         = 'wp_';
+			public string $users          = 'wp_users';
 			public array $prepare_calls   = array();
 			public array $updates         = array();
 			public array $queries         = array();
 			private ?array $state_row     = null;
+			/** @var int[] */
+			private array $user_ids       = array();
 
-			public function __construct( ?array $row ) {
+			/**
+			 * @param array<string, mixed>|null $row
+			 * @param int[]                     $user_ids
+			 */
+			public function __construct( ?array $row, array $user_ids ) {
 				$this->state_row = $row;
+				$this->user_ids  = $user_ids;
+			}
+
+			/** @return int[] */
+			public function get_col( string $sql ): array {
+				return $this->user_ids;
 			}
 
 			public function prepare( string $sql, ...$args ): string {

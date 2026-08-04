@@ -206,6 +206,100 @@ final class ContactBackfillAudienceTest extends TestCase {
 		self::assertNotNull( $data['completed_at'] );
 	}
 
+	/**
+	 * PRO-1769: the walk paged only on the FIRST tick. It asked for the first
+	 * $batch_size users every time and pruned `ID > cursor` in PHP, so the second
+	 * tick re-read page one, filtered every row away, and the empty page marked
+	 * the job 'completed' — a store with more than one page of users imported
+	 * only its first page and reported success (reproduced on the dev store:
+	 * 151 users, 99 of 150 opt-ins synced, status 'completed' at 66%).
+	 *
+	 * Driven here with a batch size smaller than the store so the walk MUST span
+	 * several pages: every audience member has to be POSTed, and the counts have
+	 * to add up to the whole user table.
+	 */
+	public function test_a_store_with_several_pages_of_users_syncs_every_audience_member(): void {
+		update_option( ContactSyncMode::OPTION_MODE, ContactSyncMode::MODE_CONSENT );
+
+		$seeded = array();
+		for ( $i = 0; $i < 5; $i++ ) {
+			$user_id  = $this->make_user( 'bf-page-' . $i, '1' );
+			$seeded[] = strtolower( (string) get_userdata( $user_id )->user_email );
+		}
+
+		$audience        = new ContactAudience();
+		$all_users       = get_users( array( 'fields' => 'all' ) );
+		$expected_walked = count( $all_users );
+		$expected_synced = 0;
+		foreach ( $all_users as $user ) {
+			if ( $audience->should_sync_user( $user ) ) {
+				++$expected_synced;
+			}
+		}
+		self::assertGreaterThan( 2, $expected_walked, 'The store needs more users than the batch size below.' );
+
+		// Fake Smaily transport that records which contacts were actually POSTed.
+		$posted = array();
+		$fake   = static function ( $pre, $args ) use ( &$posted ) {
+			foreach ( (array) ( $args['body'] ?? array() ) as $subscriber ) {
+				if ( is_array( $subscriber ) && isset( $subscriber['email'] ) ) {
+					$posted[] = strtolower( (string) $subscriber['email'] );
+				}
+			}
+
+			return array(
+				'headers'  => array(),
+				'body'     => '{}',
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+				'filename' => '',
+			);
+		};
+
+		$job = new BackfillJob( new Client( 'testsub', 'tester', 'pw' ) );
+
+		add_filter( 'pre_http_request', $fake, 10, 2 );
+		try {
+			$job->start();
+			$batches = 0;
+			do {
+				$result = $job->process_batch( 2 );
+			} while ( ! $result['completed'] && ++$batches < 100 );
+		} finally {
+			remove_filter( 'pre_http_request', $fake, 10 );
+		}
+
+		self::assertTrue( $result['completed'], 'Backfill did not complete within the batch guard.' );
+
+		foreach ( $seeded as $email ) {
+			self::assertContains(
+				$email,
+				$posted,
+				'Every audience member must reach Smaily — a user past the first page was never POSTed.'
+			);
+		}
+
+		self::assertGreaterThan( 1, $batches, 'With a batch size of 2 this store must take several ticks.' );
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT status, processed_count, synced_count FROM {$wpdb->prefix}smly_plus_backfill_job WHERE job_type = %s AND target = %s",
+				BackfillJob::BACKFILL_TYPE,
+				BackfillJob::BACKFILL_TARGET
+			),
+			ARRAY_A
+		);
+
+		self::assertSame( 'completed', $row['status'] );
+		self::assertSame( $expected_walked, (int) $row['processed_count'], 'A completed walk has walked the whole user table.' );
+		self::assertSame( $expected_synced, (int) $row['synced_count'], 'Every audience member is counted as synced.' );
+	}
+
 	// --- helpers -------------------------------------------------------------
 
 	/**
