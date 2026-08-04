@@ -1,5 +1,5 @@
 import { type WizardState } from '../../state/types';
-import { Banner, Button, Card } from '../primitives';
+import { Button, Card } from '../primitives';
 import { __, _n, sprintf } from '@admin/lib/i18n';
 
 export interface Step6DoneProps {
@@ -80,15 +80,6 @@ export function Step6Done({
           ))}
         </ul>
       </Card>
-
-      <Banner tone="info">
-        {__('All sync events appear in the', 'smaily-connect')}{' '}
-        <strong>{__('Event Log', 'smaily-connect')}</strong>{' '}
-        {__(
-          'tab (Settings → Event Log). Use it to diagnose any unexpected behaviour during the first days of operation.',
-          'smaily-connect',
-        )}
-      </Banner>
 
       {state.recEngineConnection.kind === 'success' && (
         <Card title={__('Open dashboards', 'smaily-connect')}>

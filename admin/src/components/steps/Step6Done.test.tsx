@@ -65,6 +65,12 @@ describe('Step6Done', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not advertise the Event Log (PRO-1720)', () => {
+    render(<Step6Done state={wizardInitialState} />);
+
+    expect(screen.queryByText(/event log/i)).not.toBeInTheDocument();
+  });
+
   it('leaves the Smaily account link to step 1 (PRO-1718)', () => {
     const seeded = {
       ...wizardInitialState,
