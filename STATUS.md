@@ -26,7 +26,53 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1685 — a Smaily refusal that can never
+_Last updated: 2026-08-04 (**PRO-1681 — every automation trigger now marks
+the contact it enrols.** A contact Smaily holds only because a store
+automation enrolled them was indistinguishable from someone who subscribed
+themselves: of the three store-run triggers only abandoned cart sent anything
+(`is_abandoned_cart` — a legacy TEMPLATE flag, not a record that the
+automation ran), welcome and first order sent nothing, so a merchant could
+neither target nor exclude the automation-touched group in a Smaily segment.
+**Decided by Erkki (2026-08-04) and built exactly so:** each trigger writes
+its OWN contact field carrying WHEN that automation last ran —
+`welcome_automation_at`, `first_order_automation_at`,
+`abandoned_cart_automation_at` — value `Y-m-d H:i:s` in **UTC**, from the one
+place that decides it, new `Smaily\AutomationMarker`. Format chosen to match
+the only other date+time already on the Smaily contact wire
+(`first_registered`, raw `user_registered`) and because it sorts
+lexicographically, which is what lets a Smaily segment compare it to a date —
+deliberately NOT the rec-engine's `IsoDate` Z-form (a different wire, F3-21).
+**Written on EVERY run, last-writer-wins** — the semantics are "this
+automation ran, most recently at T", NOT entry origin; an already-subscribed
+contact gets it too (accepted, the issue's entry-origin wording was waived).
+Stamped when the trigger FIRES (payloads build at enqueue), so a retry
+resends the moment the store event happened. **Nothing existing changed:**
+`is_abandoned_cart` keeps its exact name/meaning and the marker rides
+alongside it in the same payload; the `product_<field>_1..10` matrix is
+untouched; a trigger writes only its own field and an automation that didn't
+fire sends nothing at all (absent preserves whatever Smaily holds, `''` would
+wipe — F3-47 rule 2). A plain `contact.sync` carries no marker. The
+transactional triggers deliberately have none (a receipt, not an enrolment).
+**The demonstration** (`tests/Integration/AutomationMarkerPipelineTest.php`)
+drives the three REAL pipelines on the running store — `user_register` →
+welcome, `woocommerce_store_api_checkout_order_processed` → first order, cart
+tracker → sweep → `CartFlusher` → abandoned cart — with only the Smaily
+transport faked, asserting each marker's exact name and UTC format ON THE
+WIRE, that `is_abandoned_cart` + the product matrix are unchanged, and that
+the contact syncs in the same flush carry NO marker. Confirmed to pin the
+change by reverting the three call sites (3/3 fail). `AutomationMarkerTest`
+asserts the three names literally, so a rename is a failing test rather than
+a merchant's silently broken segment. Merchant docs `docs/site/index.html`
+updated in BOTH languages (the field names + "last run, UTC" semantics under
+Settings → Automations → store-run triggers). Gates: `npm run ci:strict`
+**exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit
+**686/686**, eslint/tsc clean, vitest **258/258**); `sg docker -c "composer
+run test:integration"` **OK (200 tests, 1189 assertions)** with 1 pre-existing
+skip, dev sandbox tenant "Smaily Connect test" restored post-run. Human
+acceptance still open: building an actual segment on these fields in a real
+Smaily account. No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1685 — a Smaily refusal that can never
 succeed now stops being retried, and the merchant is told.** `Flusher` /
 `CartFlusher` caught EVERY `ApiException` as transient and called
 `record_attempt()` on a counter nobody read, so a permanent refusal (401

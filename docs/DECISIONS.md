@@ -4315,6 +4315,79 @@ become an eternal retry loop" from Throwables to HTTP refusals; leaves
 PRO-1519 (transactional time ceiling) and PRO-1195 (cart flusher ownership)
 intact.
 
+---
+
+### PRO-1681 — Each automation trigger marks the contact with its last run time
+
+**Context:** a contact Smaily holds only because a store automation enrolled
+them was indistinguishable from someone who subscribed themselves. Of the
+three store-run triggers only abandoned cart sent anything at all
+(`is_abandoned_cart`), and that is a legacy TEMPLATE flag, not a record that
+the automation ran; welcome and first order sent nothing. A merchant could
+neither target nor exclude the automation-touched group when building a
+Smaily segment.
+
+**Decision (Erkki, 2026-08-04):** each trigger writes its OWN contact field
+whose VALUE is when that automation last ran for the contact:
+
+| trigger | field |
+| --- | --- |
+| `welcome` | `welcome_automation_at` |
+| `first_order` | `first_order_automation_at` |
+| `abandoned_cart` | `abandoned_cart_automation_at` |
+
+- **Written on EVERY run, last-writer-wins.** The semantics are "this
+  automation ran, most recently at T" — deliberately NOT entry origin, so an
+  already-subscribed contact gets it too. Accepted with eyes open: "when did
+  welcome last touch this contact" is the question a segment can actually be
+  built on, and an origin flag would need a state the plugin doesn't hold
+  (whether the contact existed in Smaily before the trigger). The value is
+  stamped when the trigger FIRES (payloads are built at enqueue), not when
+  the row is POSTed — so a retried or delayed send still carries the moment
+  the store event happened.
+- **Format `Y-m-d H:i:s` in UTC**, from the one place that decides it,
+  `Smaily\AutomationMarker`. That is the shape of the only other date+time
+  value already on the Smaily contact wire (`first_registered`, passed
+  through raw from `user_registered`), and it sorts lexicographically, which
+  is what lets a Smaily segment compare it against a date. Deliberately NOT
+  the rec-engine's `IsoDate` Z-form — that is the engine's strict Zod
+  contract (F3-21), a different wire.
+- **Omit, never empty.** A trigger writes only its own field; nothing is sent
+  for an automation that didn't fire, so Smaily keeps whatever it holds
+  (F3-47 rule 2). A plain `contact.sync` carries no marker at all.
+- **Additive only.** `is_abandoned_cart` keeps its exact name and meaning
+  (PRO-1195 legacy template parity) and the abandoned-cart marker rides
+  alongside it in the same payload; no existing field changed.
+
+**Rationale for the names:** they are permanent, merchant-visible
+segment/template identifiers — a merchant builds a Smaily segment on
+`welcome_automation_at` and a rename silently breaks it, with no error
+anywhere. They follow the wire's existing snake_case, carry the trigger slug
+the Settings/router vocabulary already uses (`welcome`, `first_order`,
+`abandoned_cart`), and the `_at` suffix says the value is a time, not a flag.
+`AutomationMarkerTest` asserts each name literally so a rename is a failing
+test, not a support ticket.
+
+**Scope:** the three STORE-run triggers only. The transactional triggers
+(`order_confirmation`, `shipping_confirmation`) deliberately have no marker —
+they are a receipt for an order, not an enrolment into marketing;
+`AutomationMarker::stamp()` returns an empty array for them, which is the
+omit path. Whether enrolment should happen at all, and what the merchant may
+send to the enrolled group, are out of scope (accepted constraints).
+
+**Demonstration:** `tests/Integration/AutomationMarkerPipelineTest.php`
+drives the three REAL pipelines on the running store (`user_register` →
+welcome; `woocommerce_store_api_checkout_order_processed` → first order;
+cart tracker → sweep → `CartFlusher` → abandoned cart) with only the Smaily
+transport faked, asserting each marker's name and UTC format on the wire,
+that `is_abandoned_cart` and the product matrix are untouched, and that the
+contact syncs in the same flush carry NO marker. Confirmed to pin the change
+by reverting the three call sites (3/3 fail).
+
+**Relationships:** additive to PRO-1195 (cart wire parity) and PRO-1680
+(product matrix); follows F3-47's omit-vs-empty rule; parallel to but
+separate from F3-21's `IsoDate` (rec-engine wire).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

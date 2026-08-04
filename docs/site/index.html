@@ -688,6 +688,16 @@ td code{white-space:nowrap}
       </div>
       <h3>Store‑run triggers</h3>
       <p>Map a store event to a Smaily workflow: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Abandoned cart has a delay (minutes of inactivity before a cart counts as abandoned). If no workflows appear, none were found on your Smaily account (or Smaily couldn't be reached) — create them in Smaily first.</p>
+      <div class="note">
+        <span class="k">Each trigger marks the contact — build segments on it</span>
+        <p>Every time one of these fires, it writes the moment it ran onto the contact in Smaily, so you can tell an automation‑enrolled contact from someone who subscribed themselves:</p>
+        <ul>
+          <li><code>welcome_automation_at</code></li>
+          <li><code>first_order_automation_at</code></li>
+          <li><code>abandoned_cart_automation_at</code></li>
+        </ul>
+        <p>The value is the <strong>last</strong> run's date and time in UTC (<code>2026-08-04 14:30:00</code>) — it's overwritten on each run, and a trigger that has never fired for a contact leaves its field untouched. Use these in Smaily to include or exclude automation‑touched contacts. The abandoned‑cart template field <code>is_abandoned_cart</code> is unchanged and still sent alongside.</p>
+      </div>
       <h3>Engine‑run recommendation automations</h3>
       <p>These are triggered by Campaign Intelligence, not by a store event — the engine enrols each contact into the Smaily workflow you pick at the moment it predicts (a replenishment running out, a customer at risk of churning). Per automation you set:</p>
       <ul>
@@ -714,6 +724,16 @@ td code{white-space:nowrap}
       </div>
       <h3>Poe‑käivitatavad</h3>
       <p>Seo poe sündmus Smaily töövooga: <strong>Welcome</strong>, <strong>First order</strong>, <strong>Abandoned cart</strong>. Pooleli jäänud korval on viivitus (tegevusetuse minutid, enne kui korv loetakse hüljatuks). Kui ühtegi töövoogu ei kuva, ei leitud su Smaily kontolt ühtegi (või Smailyni ei jõutud) — loo need enne Smailys.</p>
+      <div class="note">
+        <span class="k">Iga päästik märgistab kontakti — ehita selle peale segmente</span>
+        <p>Iga kord, kui mõni neist käivitub, kirjutab see kontaktile Smailys käivitumise hetke, nii et eristad automaatika kaudu lisatud kontakti sellest, kes ise tellijaks hakkas:</p>
+        <ul>
+          <li><code>welcome_automation_at</code></li>
+          <li><code>first_order_automation_at</code></li>
+          <li><code>abandoned_cart_automation_at</code></li>
+        </ul>
+        <p>Väärtus on <strong>viimase</strong> käivituse kuupäev ja kellaaeg UTC‑s (<code>2026-08-04 14:30:00</code>) — see kirjutatakse igal käivitusel üle ja päästik, mis pole selle kontakti jaoks kunagi käivitunud, jätab oma välja puutumata. Kasuta neid Smailys automaatikaga puudutatud kontaktide kaasamiseks või välistamiseks. Pooleli jäänud korvi malli‑väli <code>is_abandoned_cart</code> on muutmata ja saadetakse endiselt kõrvuti.</p>
+      </div>
       <h3>Mootori‑käivitatavad soovitus‑automaatikad</h3>
       <p>Neid käivitab Campaign Intelligence, mitte poe sündmus — mootor lisab iga kontakti sinu valitud Smaily töövoogu hetkel, mil ta ennustab (varu saab otsa, klient ohus lahkuda). Automaatika kohta sead:</p>
       <ul>
