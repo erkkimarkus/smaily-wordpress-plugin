@@ -47,8 +47,9 @@ final class Hooks {
 		// Block checkout carries the opt-in in the Store API request, not POST.
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( $handler, 'on_checkout_block_optin' ), 10, 2 );
 		// Block checkout never fires woocommerce_checkout_order_processed, so the
-		// rec-attribution cookie→order-meta stamping needs its Store-API twin
-		// (F3-46 gap → MiuMjau smaily_rec_id regression).
+		// rec-attribution cookie→order-meta stamping (F3-46 gap → MiuMjau
+		// smaily_rec_id regression) and the first-order automation (PRO-1679)
+		// both need its Store-API twin.
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( $handler, 'on_block_checkout_order_processed' ), 10, 1 );
 
 		// F3-48.6: propagate a WP marketing opt-in/opt-out to Smaily (consent

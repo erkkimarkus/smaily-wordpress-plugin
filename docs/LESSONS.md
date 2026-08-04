@@ -444,6 +444,15 @@ made the whole rec-engine look unmeasurable) was not.
 Companion: `docs/EDGE_CASES_REC_ATTRIBUTION_CONTACT_SYNC.md` (the full order-path +
 capture-gate sweep this triggered); DECISIONS F3-46 (the gap, now fixed `e55514d`).
 
+**This class has now recurred twice more, each time as a LEFTOVER of the previous
+fix** — PRO-1518 (order confirmation, 2026-07-22) and PRO-1679 (the first-order
+automation, 2026-08-04). Both were carried across one behaviour at a time, so each fix
+left the NEXT classic-only behaviour behind. **Fourth part of the lesson: when you add
+the Store-API twin for one behaviour, sweep every OTHER callback on the classic hook in
+the same pass** — `grep -n "woocommerce_checkout_order_processed"` across the plugin and
+ask, per registration, whether the block checkout needs it too. A per-behaviour carry is
+how a known bug class survives three separate fixes.
+
 ---
 
 ### 2.14 A live-walk failure can be the TEST's fault, not the code's — isolate one variable before "fixing" the implementation

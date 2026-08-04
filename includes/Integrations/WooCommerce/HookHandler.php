@@ -211,34 +211,7 @@ class HookHandler {
 		$opted_in = isset( $posted_data['user_newsletter'] ) && (int) $posted_data['user_newsletter'] === 1;
 		$this->sync_order_contact( $order, $opted_in );
 
-		$email = $order->get_billing_email();
-		if ( $email === '' ) {
-			return;
-		}
-
-		if ( ! $this->is_enabled( self::OPTION_FIRST_ORDER_ENABLED, false ) ) {
-			return;
-		}
-
-		if ( ! $this->is_first_order( $order ) ) {
-			return;
-		}
-
-		$payload = array(
-			'email'  => $email,
-			'fields' => array(
-				'order_id'       => (string) $order_id,
-				'order_total'    => (string) $order->get_total(),
-				'order_currency' => $order->get_currency(),
-			),
-		);
-
-		$language = $this->detect_language_for_order( $order );
-		if ( $language !== '' ) {
-			$payload['language'] = $language;
-		}
-
-		$this->maybe_enqueue( self::EVENT_AUTOMATION_FIRST_ORDER, (string) $order_id, $payload );
+		$this->maybe_enqueue_first_order( $order );
 	}
 
 	/**
@@ -263,9 +236,60 @@ class HookHandler {
 	 * order payload (the F3-46 "classic checkout only" gap; MiuMjau field
 	 * regression 2026-06-30). Attribution is rec-engine, not contact sync, so it
 	 * runs ungated — exactly like the classic path.
+	 *
+	 * The first-order automation rides the same twin (PRO-1679): it was left on
+	 * the classic hook when F3-46 carried attribution across, so on a
+	 * block-checkout store — the WooCommerce default — it never fired for
+	 * anyone. Contact sync is NOT repeated here; block checkout syncs the
+	 * contact from `on_checkout_block_optin`, which is the only place the
+	 * Store-API opt-in flag is readable.
 	 */
 	public function on_block_checkout_order_processed( \WC_Order $order ): void {
 		$this->save_attribution_cookies_to_order( $order );
+		$this->maybe_enqueue_first_order( $order );
+	}
+
+	/**
+	 * Enqueue the first-order automation for an order, if enabled and this is
+	 * the customer's first one. Shared by the classic and block checkout hooks;
+	 * a store where both fire for one order still enqueues once — the hooks fire
+	 * in the same request and maybe_enqueue() dedupes on
+	 * "automation.first_order:{order_id}".
+	 */
+	private function maybe_enqueue_first_order( \WC_Order $order ): void {
+		if ( $this->gate_closed() ) {
+			return;
+		}
+
+		$email = $order->get_billing_email();
+		if ( $email === '' ) {
+			return;
+		}
+
+		if ( ! $this->is_enabled( self::OPTION_FIRST_ORDER_ENABLED, false ) ) {
+			return;
+		}
+
+		if ( ! $this->is_first_order( $order ) ) {
+			return;
+		}
+
+		$order_id = (string) $order->get_id();
+		$payload  = array(
+			'email'  => $email,
+			'fields' => array(
+				'order_id'       => $order_id,
+				'order_total'    => (string) $order->get_total(),
+				'order_currency' => $order->get_currency(),
+			),
+		);
+
+		$language = $this->detect_language_for_order( $order );
+		if ( $language !== '' ) {
+			$payload['language'] = $language;
+		}
+
+		$this->maybe_enqueue( self::EVENT_AUTOMATION_FIRST_ORDER, $order_id, $payload );
 	}
 
 	/**

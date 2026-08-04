@@ -2506,6 +2506,25 @@ but the real click→land→buy→attribute round-trip is pilot-verified.
 server-side); the contract §"Cookie names"; F3-42/F3-43 (the order ingest this feeds);
 `PLUGIN_BRIEF_order_sync_reliability.md` (the order-side receiver).
 
+**Addendum — PRO-1679 (2026-08-04): the first-order automation needed the same twin.**
+The Store-API callback this section added carried attribution ONLY; PRO-1518 later
+carried order-confirmation across on the same hook — but the first-order automation
+trigger was left on `woocommerce_checkout_order_processed` alone, so on a block-checkout
+store (the WooCommerce default) it never fired for anyone. Fixed by extracting the
+enqueue into a shared private `HookHandler::maybe_enqueue_first_order( \WC_Order )` that
+both `on_checkout_order_processed()` and `on_block_checkout_order_processed()` call —
+same gate, same `smly_plus_first_order_enabled` toggle, same `is_first_order()`
+registered-customer-only rule, so guests and second orders behave exactly as before.
+**Contact sync is deliberately NOT repeated on the block path**: block checkout syncs the
+contact from `on_checkout_block_optin`
+(`woocommerce_store_api_checkout_update_order_from_request`), the only place the
+Store-API opt-in flag is readable — folding it in here would be a second producer of the
+same `contact.sync` row. **No new double-fire guard was needed** (the PRO-1518 shape):
+both hooks fire in the SAME request, so the existing per-request `maybe_enqueue()` dedupe
+on `automation.first_order:{order_id}` already caps a store where both run at one row.
+Out of scope and untouched: guests ever receiving first-order, miscounted first orders,
+and consent (automation triggers run on the legitimate-interest basis — settled).
+
 ### F3-47 — Contact-sync language goes through `ContactLanguageResolver` (Prike `en`-leak)
 
 **Context:** a managed (non-pilot) client store (Prike) runs the upstream Smaily WP plugin
