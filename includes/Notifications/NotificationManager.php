@@ -22,6 +22,7 @@ use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 
 /**
  * Two `error`-severity signals (§13a), both from the health-check cron:
@@ -57,6 +58,9 @@ final class NotificationManager {
 
 	/** Advisory key: browse tracking on + connected, but no WP Consent API present. */
 	public const CONSENT_ADVISORY_KEY = 'consent_api_missing';
+
+	/** Advisory key: the saved contact-field selection is in a shape we can't read. */
+	public const SYNC_FIELDS_ADVISORY_KEY = 'sync_fields_unreadable';
 
 	private RecEngineSettings $settings;
 
@@ -290,6 +294,10 @@ final class NotificationManager {
 		// no WP Consent API ⇒ the beacon is fail-closed and sends nothing. Not an
 		// error — a setup advisory (notice-warning), same 24h dismiss cooldown.
 		$this->render_consent_advisory( $dismissed, $now );
+
+		// Same kind of advisory: the saved contact-field selection is in a shape
+		// this version can't read, so which fields the merchant chose is unknown.
+		$this->render_sync_fields_advisory( $dismissed, $now );
 	}
 
 	/**
@@ -319,6 +327,45 @@ final class NotificationManager {
 			),
 			wp_kses_post( $this->consent_api_install_link() ),
 			wp_kses_post( $this->dismiss_link( $key ) )
+		);
+	}
+
+	/**
+	 * Config advisory: the saved contact-field selection is in a shape this
+	 * version can't read (PRO-1684), so the sync falls back to every supported
+	 * field and the merchant's real choice is unknown. Telling them beats both
+	 * silent alternatives — syncing the bare minimum (the upgrade bug) or
+	 * guessing at a selection they can't see.
+	 *
+	 * @param array<string, int> $dismissed
+	 */
+	private function render_sync_fields_advisory( array $dismissed, int $now ): void {
+		if ( ! SubscriberPayloadBuilder::selection_unreadable() ) {
+			return;
+		}
+
+		$key          = self::SYNC_FIELDS_ADVISORY_KEY;
+		$dismissed_at = isset( $dismissed[ $key ] ) ? (int) $dismissed[ $key ] : 0;
+		if ( $dismissed_at > 0 && ( $now - $dismissed_at ) < self::DISMISS_COOLDOWN ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p>%1$s %2$s %3$s</p></div>',
+			esc_html__(
+				'Smaily Connect: your saved list of contact fields to sync could not be read, so every supported field is being synced. Open the Subscribers settings, tick the fields you want and save to fix it.',
+				'smaily-connect'
+			),
+			wp_kses_post( $this->subscriber_settings_link() ),
+			wp_kses_post( $this->dismiss_link( $key ) )
+		);
+	}
+
+	private function subscriber_settings_link(): string {
+		return sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'admin.php?page=smaily-connect-settings#subscribers' ) ),
+			esc_html__( 'Open Subscribers settings', 'smaily-connect' )
 		);
 	}
 
