@@ -24,6 +24,16 @@ use Smaily\Connect\Smaily\RecEngine\CatalogPayloadBuilder;
  * WooCommerce is active — same condition the beacon proxy (BeaconEndpoint)
  * hard-gates on, so a disabled beacon is never even loaded.
  *
+ * A CONNECTED store with browse-tracking OFF gets a different, much smaller
+ * script instead: `sc-landing.js`, which only writes the attribution cookies a
+ * campaign landing carries (PRO-1767). Without it such a store loses every
+ * campaign click that lands on a full-page-cached page — the cached response
+ * never executes PHP, so `LandingCapture` (the server-side twin) never runs,
+ * and the browser had no writer at all because the runtime was not loaded. The
+ * two are mutually exclusive: when the runtime IS loaded it does the same
+ * capture itself (`RecEngineClient.captureUrlParams`, shared code), so the
+ * cookies are never written twice.
+ *
  * The cookie names, URL-param names and TTLs come from the engine setup-exchange
  * config (per-tenant overrides); the page context comes from WooCommerce
  * conditional tags. The beacon JS decides which §6 event to fire from `pageType`.
@@ -47,8 +57,20 @@ class StorefrontBeacon {
 	 */
 	public const HANDLE = 'smaily-connect-runtime';
 
+	/**
+	 * The attribution-only writer loaded instead of the runtime on a connected
+	 * store with browse-tracking off. Same neutral-naming rule (F3-41).
+	 */
+	public const HANDLE_LANDING = 'smaily-connect-landing';
+
 	/** Shipped bundle basename (vite entry key `public/js/sc-runtime`). */
 	private const SCRIPT_FILE = 'sc-runtime.js';
+
+	/** Shipped bundle basename (vite entry key `public/js/sc-landing`). */
+	private const SCRIPT_FILE_LANDING = 'sc-landing.js';
+
+	/** Directory of the storefront bundles, relative to the plugin root. */
+	private const SCRIPT_DIR = 'dist/public/js';
 
 	private RecEngineSettings $settings;
 
@@ -73,21 +95,45 @@ class StorefrontBeacon {
 		return function_exists( 'is_woocommerce' );
 	}
 
+	/**
+	 * Whether the attribution-only writer should load: the engine is connected
+	 * but the full runtime is not enqueued (browse-tracking off), so nothing
+	 * else would write the cookies on a cached landing page.
+	 *
+	 * Deliberately NOT gated on the browse toggle or consent — attribution is a
+	 * first-party functional signal (F3-46), and this is the browser-side twin
+	 * of LandingCapture, so it takes that class's gate rather than the beacon's:
+	 * the engine connection plus the same master switch (a merchant who turned
+	 * server-side capture off with `smaily_connect_capture_attribution` does not
+	 * get a new writer handed to them by an update), and no WooCommerce check —
+	 * a campaign link can land on any page of the site.
+	 */
+	public function is_attribution_only_enabled(): bool {
+		if ( $this->is_enabled() ) {
+			// The runtime captures the same params itself — never both.
+			return false;
+		}
+		if ( ! $this->settings->is_connected() ) {
+			return false;
+		}
+		/** Documented in LandingCapture::capture(). */
+		return (bool) apply_filters( 'smaily_connect_capture_attribution', true );
+	}
+
 	public function enqueue(): void {
-		if ( ! $this->is_enabled() ) {
+		if ( $this->is_enabled() ) {
+			$this->enqueue_runtime();
 			return;
 		}
+		if ( $this->is_attribution_only_enabled() ) {
+			$this->enqueue_attribution_writer();
+		}
+	}
 
-		$rel_dir = 'dist/public/js';
-		$file    = SMAILY_CONNECT_PLUGIN_PATH . $rel_dir . '/' . self::SCRIPT_FILE;
-		if ( ! file_exists( $file ) ) {
+	private function enqueue_runtime(): void {
+		if ( ! $this->enqueue_bundle( self::HANDLE, self::SCRIPT_FILE ) ) {
 			return;
 		}
-
-		$src     = plugins_url( $rel_dir . '/' . self::SCRIPT_FILE, SMAILY_CONNECT_PLUGIN_FILE );
-		$version = (string) filemtime( $file );
-
-		wp_enqueue_script( self::HANDLE, $src, array(), $version, true );
 
 		$boot = array(
 			'config'  => $this->beacon_config(),
@@ -105,34 +151,87 @@ class StorefrontBeacon {
 		);
 	}
 
+	private function enqueue_attribution_writer(): void {
+		if ( ! $this->enqueue_bundle( self::HANDLE_LANDING, self::SCRIPT_FILE_LANDING ) ) {
+			return;
+		}
+
+		wp_add_inline_script(
+			self::HANDLE_LANDING,
+			'window.smailyConnectLanding = ' . wp_json_encode( $this->attribution_config() ) . ';',
+			'before'
+		);
+	}
+
+	/** Registers one storefront bundle; false when it isn't built (dist/). */
+	private function enqueue_bundle( string $handle, string $file ): bool {
+		$path = SMAILY_CONNECT_PLUGIN_PATH . self::SCRIPT_DIR . '/' . $file;
+		if ( ! file_exists( $path ) ) {
+			return false;
+		}
+
+		wp_enqueue_script(
+			$handle,
+			plugins_url( self::SCRIPT_DIR . '/' . $file, SMAILY_CONNECT_PLUGIN_FILE ),
+			array(),
+			(string) filemtime( $path ),
+			true
+		);
+		return true;
+	}
+
 	/**
-	 * The RecEngineClientConfig the JS expects — cookie names, URL-param names
-	 * and TTLs from the engine config (with the §6 defaults as fallback).
-	 * Public so the enqueue can build the boot blob and tests can assert it.
+	 * The AttributionConfig the attribution-only bundle expects — everything
+	 * needed to read the campaign params and write the three first-party
+	 * cookies, and nothing else (no proxy URL, no session cookie, no page
+	 * context). The browse runtime's config is this plus its own fields.
+	 * Public so tests can assert it.
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function beacon_config(): array {
+	public function attribution_config(): array {
 		$config = $this->settings->config();
 
 		return array(
-			'beaconUrl'      => esc_url_raw( rest_url( 'smaily-connect/v1/relay' ) ),
-			'cookieNames'    => array(
+			'cookieNames'   => array(
 				'visitor' => $this->config_string( $config, 'tracking_cookie_name', 'smaily_rec_uid' ),
-				'session' => $this->config_string( $config, 'session_cookie_name', 'smaily_anon_sid' ),
 				'recId'   => $this->config_string( $config, 'rec_id_cookie_name', 'smaily_rec_id' ),
 				'context' => $this->config_string( $config, 'context_cookie_name', 'smaily_rec_ctx' ),
 			),
-			'urlParams'      => array(
+			'urlParams'     => array(
 				'visitorToken' => $this->config_string( $config, 'url_param_visitor_token', 'smaily_vt' ),
 				'recId'        => $this->config_string( $config, 'url_param_rec_id', 'smaily_rec' ),
 				'context'      => $this->config_string( $config, 'url_param_context', 'smaily_ctx' ),
 			),
-			'cookieTtlDays'  => array(
+			'cookieTtlDays' => array(
 				'visitor' => $this->config_int( $config, 'cookie_ttl_days', 365 ),
 				'recId'   => $this->config_int( $config, 'rec_id_ttl_days', 30 ),
 				'context' => $this->config_int( $config, 'context_ttl_days', 30 ),
 			),
+		);
+	}
+
+	/**
+	 * The RecEngineClientConfig the JS expects — the attribution config (cookie
+	 * names, URL-param names and TTLs from the engine config, with the §6
+	 * defaults as fallback) plus the browse-only fields. Public so the enqueue
+	 * can build the boot blob and tests can assert it.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function beacon_config(): array {
+		$config      = $this->settings->config();
+		$attribution = $this->attribution_config();
+
+		/** @var array<string, string> $cookie_names */
+		$cookie_names            = $attribution['cookieNames'];
+		$cookie_names['session'] = $this->config_string( $config, 'session_cookie_name', 'smaily_anon_sid' );
+
+		return array(
+			'beaconUrl'      => esc_url_raw( rest_url( 'smaily-connect/v1/relay' ) ),
+			'cookieNames'    => $cookie_names,
+			'urlParams'      => $attribution['urlParams'],
+			'cookieTtlDays'  => $attribution['cookieTtlDays'],
 			'sessionTtlDays' => $this->config_int( $config, 'session_ttl_days', 30 ),
 		);
 	}

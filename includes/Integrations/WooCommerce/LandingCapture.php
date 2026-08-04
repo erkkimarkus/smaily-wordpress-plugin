@@ -22,13 +22,17 @@ use Smaily\Connect\Support\DebugLog;
  * landing — SERVER-SIDE, so attribution works even when the JS browse-beacon
  * is disabled, ad-blocked, or the visitor hasn't decided cookie consent yet.
  *
- * Why this is needed even though StorefrontBeacon already captures the same
- * params client-side: the beacon only loads when browse-tracking is enabled AND
- * marketing consent is granted AND `sc-runtime.js` isn't ad-blocked.
- * Recommendation ATTRIBUTION must not depend on any of those — the rec link
- * already landed on the merchant's own product page, the rec_id is right there
- * in the URL, and nothing read it (pilot: 374 orders / 0 `smaily_rec_id`). This
- * class is the missing producer of that cookie.
+ * Why this is needed even though the storefront JS captures the same params
+ * client-side: that capture rides a script which can be ad-blocked. And the
+ * mirror image is why the JS capture is needed even though this class exists —
+ * a full-page cache serves the landing hit without ever executing PHP, so this
+ * never runs on it. Recommendation ATTRIBUTION must not depend on either path
+ * alone: the rec link already landed on the merchant's own product page, the
+ * rec_id is right there in the URL, and nothing read it (pilot: 374 orders /
+ * 0 `smaily_rec_id`). The two producers are deliberately redundant — since
+ * PRO-1767 a connected store carries a browser-side writer whether or not
+ * browse tracking is on (`sc-runtime.js` when it is, the attribution-only
+ * `sc-landing.js` when it isn't; StorefrontBeacon picks one).
  *
  * The cookies written here are exactly the ones
  * HookHandler::save_attribution_cookies_to_order() already stamps onto the

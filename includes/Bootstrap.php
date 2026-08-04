@@ -201,7 +201,10 @@ final class Bootstrap {
 
 		// Storefront browse-beacon enqueue (3.4.3). wp_enqueue_scripts is a
 		// front-end-only hook; StorefrontBeacon::enqueue() self-gates on
-		// connected + browse-tracking + WooCommerce active.
+		// connected + browse-tracking + WooCommerce active — and when browse
+		// tracking is off, loads the attribution-only writer instead so a
+		// campaign landing is still captured behind a full-page cache
+		// (PRO-1767).
 		( new StorefrontBeacon( new RecEngineSettings() ) )->register();
 
 		// Server-side recommendation-attribution capture (Layer 1). On

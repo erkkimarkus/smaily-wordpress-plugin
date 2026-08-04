@@ -24,13 +24,45 @@ import { resolve } from 'node:path';
  * later. Mailstone 2 extracts this file unchanged into
  * @smaily/recengine-client; the WP-wrapper (public/js/beacon.ts, shipped as
  * dist/public/js/sc-runtime.js) stays in the plugin.
+ *
+ * A THIRD entry — the attribution-only storefront bundle (public/js/landing.ts
+ * → dist/public/js/sc-landing.js, PRO-1767) — is built in its OWN pass
+ * (`--mode landing`, appending to the dist the main pass just wrote). It shares
+ * public/js/lib/attribution.ts with the browse runtime on purpose (one capture
+ * implementation for both), and Rollup moves a module used by two entries of
+ * the SAME build into a shared chunk — which gives both bundles a top-level
+ * `import`, and neither then loads as the classic <script> StorefrontBeacon
+ * enqueues. Separate passes keep the shared code inlined in both. Every build
+ * script chains the landing pass, because the main pass runs with emptyOutDir
+ * and would otherwise leave dist without it.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const input: Record<string, string> = mode === 'landing'
+    ? {
+      // The attribution-only writer — URL params in, cookies out, nothing
+      // else. Neutral shipped name, same rule as sc-runtime.js (F3-41).
+      'public/js/sc-landing': resolve(__dirname, 'public/js/landing.ts'),
+    }
+    : {
+      'admin/admin': resolve(__dirname, 'admin/src/index.tsx'),
+      // beacon.ts inlines RecEngineClient (rec-engine-client.ts is NOT a
+      // separate entry, so there is no shared chunk and the bundle has no
+      // top-level `import`). The lib stays as source for the Milestone-2
+      // npm extraction. The OUTPUT is deliberately named `sc-runtime.js` (not
+      // `beacon.js`): the source name `beacon` matches EasyPrivacy ad-block
+      // filter lists, which blocked the storefront request for real users
+      // (the route is renamed off `/beacon` → `/relay` for the same reason).
+      // The entry-key IS the output basename (`[name].js`), so the source file
+      // keeps its name and only the shipped filename changes (F3-41).
+      'public/js/sc-runtime': resolve(__dirname, 'public/js/beacon.ts'),
+    };
+
+  return {
   plugins: [react()],
 
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: mode !== 'landing',
     sourcemap: true,
 
     rollupOptions: {
@@ -41,19 +73,7 @@ export default defineConfig({
       // (StorefrontBeacon enqueues it without type="module").
       preserveEntrySignatures: false,
 
-      input: {
-        'admin/admin': resolve(__dirname, 'admin/src/index.tsx'),
-        // beacon.ts inlines RecEngineClient (rec-engine-client.ts is NOT a
-        // separate entry, so there is no shared chunk and the bundle has no
-        // top-level `import`). The lib stays as source for the Milestone-2
-        // npm extraction. The OUTPUT is deliberately named `sc-runtime.js` (not
-        // `beacon.js`): the source name `beacon` matches EasyPrivacy ad-block
-        // filter lists, which blocked the storefront request for real users
-        // (the route is renamed off `/beacon` → `/relay` for the same reason).
-        // The entry-key IS the output basename (`[name].js`), so the source file
-        // keeps its name and only the shipped filename changes (F3-41).
-        'public/js/sc-runtime': resolve(__dirname, 'public/js/beacon.ts'),
-      },
+      input,
       output: {
         entryFileNames: '[name].js',
         // Chunks shared between the two entries land in a neutral folder
@@ -82,4 +102,5 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
   },
+  };
 });
