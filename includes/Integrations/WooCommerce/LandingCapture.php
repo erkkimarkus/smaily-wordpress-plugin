@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\RecEngine\Support\RecId;
 use Smaily\Connect\Support\DebugLog;
 
 /**
@@ -181,19 +182,21 @@ class LandingCapture {
 	 * @param array<string, mixed> $get
 	 */
 	private function rec_id_from( array $get ): string {
-		// Primary: the engine's own param (contract §"Cookie names"). Authoritative
-		// and unambiguous, so it takes any bounded id token.
+		// Primary: the engine's own param (contract §"Cookie names"). It must be
+		// a UUID — the engine validates `smaily_rec_id` per ORDER (D6), so a junk
+		// value here costs the whole order, permanently (PRO-1710). A landing
+		// that carries something else is treated as no attribution at all.
 		$rec = $this->clean( $get, self::URL_PARAM_REC_ID );
-		if ( $this->is_rec_id( $rec ) ) {
+		if ( RecId::is_valid( $rec ) ) {
 			return $rec;
 		}
 
 		// Fallback: utm_content carries the same rec_id, but it is a shared
-		// marketing param (Google Ads / GA), so require the source guard + a
-		// strict uuid shape before crediting it.
+		// marketing param (Google Ads / GA), so require the source guard on top
+		// of the same uuid shape before crediting it.
 		if ( self::UTM_SOURCE_SMAILY === strtolower( $this->clean( $get, self::UTM_SOURCE ) ) ) {
 			$utm = $this->clean( $get, self::UTM_CONTENT );
-			if ( $this->is_uuid( $utm ) ) {
+			if ( RecId::is_valid( $utm ) ) {
 				return $utm;
 			}
 		}
@@ -218,22 +221,6 @@ class LandingCapture {
 			return '';
 		}
 		return trim( sanitize_text_field( wp_unslash( (string) $get[ $key ] ) ) );
-	}
-
-	/**
-	 * `smaily_rec` is the engine's authoritative param: accept any bounded
-	 * id-token (a uuid today, but don't hard-fail if the engine's rec_id shape
-	 * ever changes). The same-customer check engine-side is the real safety net.
-	 */
-	private function is_rec_id( string $value ): bool {
-		return '' !== $value && 1 === preg_match( '/^[A-Za-z0-9._-]{1,64}$/', $value );
-	}
-
-	private function is_uuid( string $value ): bool {
-		return 1 === preg_match(
-			'/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/',
-			$value
-		);
 	}
 
 	/** Engine visitor-token format: `vt_` + alphanumerics (re: visitor-tokens/manager.ts). */

@@ -119,6 +119,16 @@ export type MergeReason =
 /** Default batch window before the buffer auto-flushes (ms). */
 const DEFAULT_BATCH_WINDOW_MS = 30_000;
 
+/**
+ * The shape the engine enforces for a recommendation id (`z.string().uuid()`
+ * on the orders route — 8-4-4-4-12 hex, no version/variant constraint). The
+ * PHP side has the same definition in `Smaily\Connect\Smaily\RecEngine\
+ * Support\RecId`; both write the SAME rec-id cookie, so both must agree
+ * (PRO-1710 — a non-UUID cookied here would ride the order to the engine and
+ * get that one order permanently D6-rejected).
+ */
+const REC_ID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 /** The wire shape of a single browse event (§6). */
 interface WireEvent {
   event_id: string;
@@ -257,18 +267,26 @@ export class RecEngineClient {
     const url = new URL(window.location.href);
     const params = url.searchParams;
     const names = this.urlParamNames();
-    const mapping: Array<{ param: string; cookie: string; ttl: number }> = [
+    const mapping: Array<{ param: string; cookie: string; ttl: number; isValid?: (v: string) => boolean }> = [
       { param: names.visitorToken, cookie: this.config.cookieNames.visitor, ttl: this.cookieTtl('visitor') },
-      { param: names.recId, cookie: this.config.cookieNames.recId, ttl: this.cookieTtl('recId') },
+      {
+        param: names.recId,
+        cookie: this.config.cookieNames.recId,
+        ttl: this.cookieTtl('recId'),
+        // A rec id that isn't a UUID is not one the engine will accept on the
+        // order (PRO-1710) — never cookie it. The param is still stripped from
+        // the URL below; it's the cookie write that is refused.
+        isValid: (v) => REC_ID_PATTERN.test(v),
+      },
       { param: names.context, cookie: this.config.cookieNames.context, ttl: this.cookieTtl('context') },
     ];
 
     let captured = false;
     let present = false;
     // 1) SAVE every present value to its cookie first.
-    for (const { param, cookie, ttl } of mapping) {
+    for (const { param, cookie, ttl, isValid } of mapping) {
       const value = params.get(param);
-      if (value !== null && value !== '') {
+      if (value !== null && value !== '' && (isValid === undefined || isValid(value))) {
         this.setCookie(cookie, value, ttl);
         captured = true;
       }

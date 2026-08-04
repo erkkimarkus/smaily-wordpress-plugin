@@ -12,7 +12,9 @@ namespace Smaily\Connect\Smaily\RecEngine;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
+use Smaily\Connect\Smaily\RecEngine\Support\RecId;
 use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
+use Smaily\Connect\Support\DebugLog;
 
 /**
  * Translates a WC_Order into one entry of the `POST /api/v1/ingest/orders`
@@ -56,6 +58,10 @@ use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
  * stored attribution signals (smaily_rec_id / smaily_visitor_token /
  * smaily_rec_ctx / session_id), stamped onto order meta at checkout by the
  * email HookHandler. The ingest response carries no attribution counts.
+ * `smaily_rec_id` is the one attribution signal with a SHAPE the engine
+ * enforces (`z.string().uuid()`, per-order D6) — a stored non-UUID value is
+ * dropped here rather than sent, so one junk cookie can't cost the order
+ * (PRO-1710, Support\RecId).
  *
  * Not final: tests subclass to stub WC reads. Same rationale as the other
  * PayloadBuilders.
@@ -148,8 +154,21 @@ class OrderPayloadBuilder {
 		// Attribution signals stamped onto order meta at checkout — omitted
 		// when absent (F2-10). The engine stores them; matching is async.
 		$rec_id = $this->meta( $order, self::META_REC_ID );
-		if ( $rec_id !== '' ) {
+		if ( RecId::is_valid( $rec_id ) ) {
 			$payload['smaily_rec_id'] = $rec_id;
+		} elseif ( $rec_id !== '' ) {
+			// PRO-1710: the engine validates smaily_rec_id as a UUID per ORDER
+			// (D6), so a non-UUID value rejects the whole order permanently.
+			// The order matters more than the attribution: drop the field and
+			// let the order ingest un-attributed. The meta stays on the order
+			// (merchant data isn't rewritten), and the send-time exchange
+			// stored on the queue row (F3-44) shows exactly what went out.
+			DebugLog::write(
+				sprintf(
+					'[smaily-connect orders] order %d: dropped a non-uuid _smaily_rec_id from the payload — the order ingests without attribution',
+					$order->get_id()
+				)
+			);
 		}
 		$visitor_token = $this->meta( $order, self::META_VISITOR_TOKEN );
 		if ( $visitor_token !== '' ) {
