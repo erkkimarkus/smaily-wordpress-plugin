@@ -20,20 +20,27 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  * SAME merchant-built Smaily autoresponder templates the legacy pass fed
  * (`is_abandoned_cart`, `store`, `first_name`/`last_name`, and the
  * `product_<field>_1..10` matrix with all slots prefilled empty + the
- * `over_10_products` flag). The address-field selection comes from the same
- * `smaily_connect_abandoned_cart_fields` option, so an upgrading store's
+ * `over_10_products` flag). The `store`/`language` selection comes from the
+ * same `smaily_connect_abandoned_cart_fields` option, so an upgrading store's
  * templates keep rendering without reconfiguration. PRO-1681 adds the
  * `abandoned_cart_automation_at` run marker on top — purely additive, the
  * legacy field names and meanings are unchanged.
  *
- * PRODUCT details are NOT selectable (PRO-1680): every `product_<field>` is
- * always sent, whatever that option holds. The option's product_* keys were
- * unreachable from any UI and default to false, so a fresh install sent a
- * reminder with no product detail at all; a stored selection (from a version
- * that had the UI) is ignored the same way. Templates decide what to RENDER —
- * the wire always carries the full matrix, which is also what CLEARS the
- * previous cart's details from the contact (every slot is overwritten, unused
- * ones with '').
+ * PRODUCT details are NOT selectable (PRO-1680) and neither are the NAMES
+ * (PRO-1729): every `product_<field>` and both name fields are always sent,
+ * whatever that option holds. Its `product_*`/`first_name`/`last_name` keys
+ * were unreachable from any UI and default to false, so a fresh install sent a
+ * reminder with no product detail and no name at all; a stored selection (from
+ * a version that had the UI) is ignored the same way. Templates decide what to
+ * RENDER — the wire always carries the full matrix, which is also what CLEARS
+ * the previous cart's details from the contact (every slot is overwritten,
+ * unused ones with '').
+ *
+ * The names differ from the products in ONE respect: they are CONTACT-level
+ * fields, so the F3-47 omit rule applies — a name we don't know is OMITTED,
+ * never sent empty, or the reminder would wipe a name the Smaily contact
+ * already has. (A product slot is the opposite on purpose: sending it empty
+ * IS the mechanism that clears the previous cart.)
  *
  * Differences from the legacy `Cron::prepare_*` pair, by design:
  *   - input is the tracker row's own JSON shape (scalars), never a
@@ -134,7 +141,8 @@ class CartPayloadBuilder {
 
 	/**
 	 * The non-product address fields, mirroring the legacy
-	 * `Cron::prepare_user_data()` selection semantics.
+	 * `Cron::prepare_user_data()` selection semantics for `store`/`language`;
+	 * the names are unconditional (PRO-1729).
 	 *
 	 * @param array<string, mixed> $row
 	 * @param array<string, mixed> $sync_fields
@@ -158,6 +166,19 @@ class CartPayloadBuilder {
 			? (string) $user->last_name
 			: ( isset( $row['last_name'] ) ? (string) $row['last_name'] : '' );
 
+		// The shopper's name always rides the reminder (PRO-1729) — the
+		// selection's first_name/last_name keys default to false and no UI
+		// writes them, so a fresh install sent a reminder a template's
+		// first-name merge tag rendered nothing from. Omitted when we don't
+		// know it: Smaily leaves an absent field intact and WIPES an empty one
+		// (F3-47), so a nameless shopper must not clear the contact's name.
+		if ( $first !== '' ) {
+			$fields['first_name'] = $first;
+		}
+		if ( $last !== '' ) {
+			$fields['last_name'] = $last;
+		}
+
 		foreach ( $sync_fields as $field => $enabled ) {
 			if ( ! $enabled ) {
 				continue;
@@ -174,16 +195,11 @@ class CartPayloadBuilder {
 						$fields['language'] = $language;
 					}
 					break;
-				case 'first_name':
-					$fields['first_name'] = $first;
-					break;
-				case 'last_name':
-					$fields['last_name'] = $last;
-					break;
 				default:
 					// user_email rides the payload's top-level email; the
 					// option's product_* keys are ignored — product details are
-					// always sent (PRO-1680).
+					// always sent (PRO-1680) — and so are its first_name /
+					// last_name keys, handled above (PRO-1729).
 					break;
 			}
 		}
