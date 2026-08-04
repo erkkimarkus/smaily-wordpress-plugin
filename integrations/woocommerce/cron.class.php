@@ -110,20 +110,23 @@ class Cron {
 		$request  = new Smaily_Client( $this->options );
 		$response = $request->list_unsubscribers();
 		if ( empty( $response ) ) {
-			return $this->logger->error( 'Failed to get unsubscribers - received an empty response' );
+			$this->logger->error( 'Failed to get unsubscribers - received an empty response' );
+			return;
 		}
 
 		if ( isset( $response['error'] ) ) {
-			return $this->logger->error( sprintf( 'Receiving unsusbsribers failed with an error: %s', $response['error'] ) );
+			$this->logger->error( sprintf( 'Receiving unsusbsribers failed with an error: %s', $response['error'] ) );
+			return;
 		}
 
 		if ( isset( $response['code'] ) && $response['code'] !== 200 ) {
-			return $this->logger->error( sprintf( 'Unable to retrieve unsubscribed users: %s', wp_json_encode( $response ) ) );
+			$this->logger->error( sprintf( 'Unable to retrieve unsubscribed users: %s', wp_json_encode( $response ) ) );
+			return;
 		}
 
 		$unsubscribers_emails = array();
 		foreach ( $response['body'] as $value ) {
-			array_push( $unsubscribers_emails, $value['email'] );
+			$unsubscribers_emails[] = $value['email'];
 		}
 
 		// Change WooCommerce subscriber status based on Smaily unsubscribers.
@@ -138,12 +141,13 @@ class Cron {
 		$users = get_users(
 			array(
 				'meta_key'   => 'user_newsletter', // phpcs:ignore WordPress.DB.SlowDBQuery
-				'meta_value' => 1, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value' => '1', // phpcs:ignore WordPress.DB.SlowDBQuery
 			)
 		);
 
 		if ( empty( $users ) ) {
-			return $this->logger->info( 'No subscribers for synchronization!' );
+			$this->logger->info( 'No subscribers for synchronization!' );
+			return;
 		}
 
 		$list = array();
@@ -154,15 +158,18 @@ class Cron {
 
 		$response = $request->update_subscribers( $list );
 		if ( empty( $response ) ) {
-			return $this->logger->error( 'Failed to send subscribers to Smaily - received an empty response' );
+			$this->logger->error( 'Failed to send subscribers to Smaily - received an empty response' );
+			return;
 		}
 
 		if ( isset( $response['error'] ) ) {
-			return $this->logger->error( sprintf( 'Failed to send subscribers to Smaily with an error: %s', $response['error'] ) );
+			$this->logger->error( sprintf( 'Failed to send subscribers to Smaily with an error: %s', $response['error'] ) );
+			return;
 		}
 
 		if ( isset( $response['body']['code'] ) && $response['body']['code'] !== 101 ) {
-			return $this->logger->error( sprintf( 'Unable to send subscribers to Smaily: %s', wp_json_encode( $response ) ) );
+			$this->logger->error( sprintf( 'Unable to send subscribers to Smaily: %s', wp_json_encode( $response ) ) );
+			return;
 		}
 	}
 
@@ -385,11 +392,7 @@ class Cron {
 	 * @return string
 	 */
 	public function get_sale_price_with_tax( $product ) {
-		$price = wc_price(
-			Helper::get_current_price_with_tax( $product )
-		);
-
-		return wp_strip_all_tags( html_entity_decode( $price, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 ) );
+		return $this->format_price( Helper::get_current_price_with_tax( $product ) );
 	}
 
 	/**
@@ -399,11 +402,17 @@ class Cron {
 	 * @return string
 	 */
 	public function get_base_price_with_tax( $product ) {
-		$price = wc_price(
-			Helper::get_regular_price_with_tax( $product )
-		);
+		return $this->format_price( Helper::get_regular_price_with_tax( $product ) );
+	}
 
-		return wp_strip_all_tags( html_entity_decode( $price, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 ) );
+	/**
+	 * Format a numeric price into a plain-text string using WooCommerce formatting.
+	 *
+	 * @param float|string $amount
+	 * @return string
+	 */
+	private function format_price( $amount ) {
+		return wp_strip_all_tags( html_entity_decode( wc_price( $amount ), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401 ) );
 	}
 
 	/**
@@ -416,7 +425,7 @@ class Cron {
 		global $wpdb;
 
 		$table = $wpdb->prefix . Cart::ABANDONED_CART_TABLE_NAME;
-		$wpdb->update(
+		$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$table,
 			array(
 				'mail_sent'      => 1,
@@ -435,10 +444,9 @@ class Cron {
 	 */
 	public function get_abandoned_carts() {
 		global $wpdb;
-		return $wpdb->get_results(
+		return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
-				'SELECT * FROM `%1$s` WHERE cart_status = \'%2$s\' AND mail_sent IS NULL',
-				$wpdb->prefix . Cart::ABANDONED_CART_TABLE_NAME,
+				'SELECT * FROM `' . $wpdb->prefix . Cart::ABANDONED_CART_TABLE_NAME . '` WHERE cart_status = %s AND mail_sent IS NULL', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name is a plugin constant
 				'abandoned'
 			),
 			'ARRAY_A'
@@ -465,10 +473,9 @@ class Cron {
 			$time  = gmdate( 'Y-m-d\TH:i:s\Z', $limit );
 
 			// Select all carts before cutoff time.
-			$carts = $wpdb->get_results(
+			$carts = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 				$wpdb->prepare(
-					'SELECT * FROM `%1$s` WHERE cart_status = \'%2$s\' AND mail_sent IS NULL AND cart_updated < \'%3$s\'',
-					$table,
+					'SELECT * FROM `' . $table . '` WHERE cart_status = %s AND mail_sent IS NULL AND cart_updated < %s', // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name is a plugin constant
 					'open',
 					$time
 				),
@@ -478,7 +485,7 @@ class Cron {
 			foreach ( $carts as $cart ) {
 				// Update abandoned status and time.
 				$customer_id = $cart['customer_id'];
-				$wpdb->update(
+				$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 					$table,
 					array(
 						'cart_status'         => 'abandoned',
@@ -655,7 +662,7 @@ class Cron {
 		$image_url = '';
 
 		if ( $product->get_image_id() ) {
-			$image_url = wp_get_attachment_url( $product->get_image_id() );
+			$image_url = wp_get_attachment_url( (int) $product->get_image_id() );
 		}
 
 		// Default to featured image.

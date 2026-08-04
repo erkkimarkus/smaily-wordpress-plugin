@@ -114,7 +114,7 @@ class Admin {
 	 * @since 1.3.0
 	 */
 	private function save_form_settings( $form_id, $is_enabled, $autoresponder_id ) {
-		$settings = $this->options->get_settings()['cf7'];
+		$settings = $this->options->get_settings()['cf7'] ?? array();
 
 		$settings[ $form_id ] = array(
 			'is_enabled'       => $is_enabled,
@@ -148,7 +148,7 @@ class Admin {
 	 * @param WPCF7_ContactForm $args Contact Form 7 tab arguments.
 	 */
 	public function panel_content( $args ) {
-		$smaily_cf7_settings = $this->options->get_settings()['cf7'];
+		$smaily_cf7_settings = $this->options->get_settings()['cf7'] ?? array();
 		$form_id             = $args->id();
 
 		$template_variables = array(

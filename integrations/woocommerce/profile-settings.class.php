@@ -12,7 +12,7 @@ class Profile_Settings {
 	 *
 	 * @var array
 	 */
-	private $fields;
+	private ?array $fields = null;
 
 	public function __construct() {}
 

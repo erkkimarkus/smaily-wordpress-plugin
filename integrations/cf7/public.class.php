@@ -64,7 +64,7 @@ class Public_Base {
 
 		// Don't continue if no posted data or no saved credentials.
 		$posted_data  = $submission_instance->get_posted_data();
-		$cf7_settings = $this->options->get_settings()['cf7'];
+		$cf7_settings = $this->options->get_settings()['cf7'] ?? array();
 		$form_id      = $instance->id();
 
 		$form_settings = isset( $cf7_settings[ $form_id ] ) ? $cf7_settings[ $form_id ] : null;

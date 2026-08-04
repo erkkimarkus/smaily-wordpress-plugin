@@ -77,7 +77,7 @@ class API {
 			$configuration,
 			array(
 				'subdomain'    => $credentials['subdomain'],
-				'settings_url' => menu_page_url( $this->plugin_name, false ),
+				'settings_url' => admin_url( 'admin.php?page=' . $this->plugin_name ),
 			)
 		);
 	}
@@ -85,7 +85,7 @@ class API {
 	/**
 	 * List available autoresponders to be used as block options.
 	 *
-	 * @return array{label: string, value: string}
+	 * @return list<array{label: string, value: string}>
 	 */
 	public function list_autoresponders() {
 		$autoresponders = Helper::get_autoresponders_list( $this->options );

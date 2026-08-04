@@ -249,6 +249,26 @@ Major update, built alongside the existing 1.x feature set (existing installs up
 * Privacy: WordPress personal-data export/erasure cover recommendation-engine data; shoppers can opt out of recommendation profiling from My Account; stored API credentials re-encrypted with authenticated encryption (AES-256-GCM).
 * Multilingual-aware subscriber routing (Polylang, WPML, TranslatePress).
 
+= 2.0.0 =
+
+Upgrades the minimum required WordPress version to 6.5 and minimum required PHP version to 7.4. This change also improves the support for WordPress version 7.0.
+
+= 1.6.2 =
+
+Fixed a bug in the Elementor newsletter widget where the failure redirect URL was incorrectly using the success URL value, causing subscribers to be redirected to the wrong page after a failed subscription attempt.
+
+Fixed a bug where changes made to user profile fields (first name, last name, phone, date of birth, gender) on the WooCommerce account page were silently discarded and never saved.
+
+Fixed a bug where the WooCommerce abandoned cart cron job would skip carts with items, treating them as empty due to checking the wrong variable.
+
+Fixed a bug where the WooCommerce subscriber sync would send incorrect gender values to Smaily, causing gender data to not match the subscriber profile.
+
+Fixed a bug where malformed or unparseable date of birth values would cause a PHP warning during WooCommerce subscriber sync. Invalid dates are now silently skipped.
+
+Fixed the checkout opt-in block not loading its frontend script correctly due to a wrong asset manifest filename.
+
+Fixed the admin credentials page where an untranslated error message was shown when disconnecting the API.
+
 = 1.6.1 =
 
 Fixed an issue where the discounted price was not correctly calculated in the RSS feed when using the tax rate parameter. The discounted price is now calculated correctly regardless of the tax rate used in the feed.

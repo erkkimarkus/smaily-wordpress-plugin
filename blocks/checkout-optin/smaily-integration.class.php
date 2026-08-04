@@ -80,7 +80,10 @@ class Integration implements IntegrationInterface {
 			$script_url,
 			$script_asset['dependencies'],
 			$script_asset['version'],
-			true
+			array(
+				'in_footer' => true,
+				'strategy'  => 'defer',
+			)
 		);
 
 		wp_set_script_translations(
@@ -106,7 +109,10 @@ class Integration implements IntegrationInterface {
 			$script_url,
 			$script_asset['dependencies'],
 			$script_asset['version'],
-			true
+			array(
+				'in_footer' => true,
+				'strategy'  => 'defer',
+			)
 		);
 		wp_set_script_translations(
 			'smaily-checkout-optin-block-frontend', // script handle
@@ -123,7 +129,7 @@ class Integration implements IntegrationInterface {
 	 */
 	protected function get_file_version( $file ) {
 		if ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG && file_exists( $file ) ) {
-			return filemtime( $file );
+			return (string) filemtime( $file );
 		}
 		return SMAILY_CHECKOUT_OPTIN_VERSION;
 	}

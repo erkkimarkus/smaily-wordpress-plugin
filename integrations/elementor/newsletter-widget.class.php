@@ -18,7 +18,7 @@ class Newsletter_Widget extends Widget_Base {
 	 *
 	 * @var Options
 	 */
-	private $options;
+	private ?Options $options = null;
 
 	/**
 	 * List of autoresponders as [key => value] pairs where key is the autoresponder ID
@@ -287,7 +287,7 @@ class Newsletter_Widget extends Widget_Base {
 				</div>
 				<# } #>
 			</div>
-			<form class="smaily-connect-elementor-newsletter-form"">
+			<form class="smaily-connect-elementor-newsletter-form">
 				<div class="smaily-connect-elementor-newsletter-form-visible-fields">
 					<div class="smaily-connect-elementor-newsletter-form-input-container">
 						<label for="smaily-connect-elementor-newsletter-form-email">
@@ -330,7 +330,7 @@ class Newsletter_Widget extends Widget_Base {
 	 * @return Options The Smaily Connect plugin options.
 	 */
 	private function get_options() {
-		if ( ! $this->options ) {
+		if ( $this->options === null ) {
 			$this->options = new Options();
 		}
 

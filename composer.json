@@ -42,6 +42,9 @@
         }
     },
     "scripts": {
+        "start": "npx @wordpress/env start --update",
+        "start:min": "npx @wordpress/env start --config .wp-env.min.json --update",
+        "stop": "npx @wordpress/env stop && npx @wordpress/env stop --config .wp-env.min.json",
         "install-block-modules": "npm run ci --prefix blocks",
         "lint": "phpcs -n . && npm run lint --prefix blocks",
         "lint:php": "phpcs -n .",
