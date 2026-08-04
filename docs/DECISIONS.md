@@ -4844,6 +4844,70 @@ get_user_data()` still reads the option as a map for the registered-user opt-in
 path; same class of bug, same pre-wizard-only window, left as a follow-up rather
 than folded in.
 
+### PRO-1686 — A refusal is reported under the cause Smaily gave: the package, the credentials, or an outage
+
+**Context:** when a Smaily account moves to a freemium package, everything the
+plugin does stops being permitted — and the plugin reported it as two things it
+was not. After an hour the health notice said *"the Smaily API has been
+unreachable … until the connection recovers"* (it was reachable, and nothing
+recovers by waiting) and the connection test said *"Smaily did not accept those
+credentials"* (they were never wrong). Both surfaces knew only a boolean:
+`Client::test_connection()` returned false for every kind of failure.
+
+**Probe (live, 2026-08-04, a real freemium account).** Every endpoint the plugin
+uses — `autoresponder.php`, `contact.php` (read and `list=1`), `history.php` —
+answers `HTTP 403 {"code":227,"message":"A paid package is required."}`. `227` is
+Smaily's documented *Paid Plan Required* code
+(https://smaily.com/help/api/general/response-codes/) and nothing else produces
+it, so it is a POSITIVE plan signal, not an inference. It is returned identically
+for the correct credentials, a wrong password, a wrong username and NO
+`Authorization` header at all — the package check runs BEFORE authentication.
+Two neighbouring shapes for contrast: a subdomain that does not exist answers
+`404` with an empty body; there is no `WWW-Authenticate` header anywhere.
+
+**Decision:** one classifier, `Smaily\RefusalReason::classify()`, reads a failed
+request and names the cause — `PLAN_BLOCKED` (Smaily code 227, whatever HTTP
+status carries it), `CREDENTIALS_REJECTED` (any other 4xx bar 429, including the
+404 a wrong subdomain gives — the subdomain is part of the credential triple the
+merchant typed), `UNREACHABLE` (429, 5xx, transport error). `ApiException` now
+carries Smaily's own body code alongside the HTTP status, `Client::
+test_connection(): bool` became `check_connection(): string`, and both merchant
+surfaces phrase their own message per cause: the connection test's `error`
+string and the health notice's key (`smaily_plan_blocked` /
+`smaily_credentials_rejected` / `smaily_down`). A stated refusal is raised at the
+NEXT health check instead of after the hour's grace — Smaily already gave the
+answer and it reads the same in an hour; only the "might be a blip" case still
+waits. Nothing is stored: the cause is recomputed each run, so the moment Smaily
+answers again the stamp and the notice go, with nothing to re-enter.
+
+**Rationale:** the plan case is not indistinguishable from bad credentials, so
+the honest-but-vague "one message naming both causes" fallback was not needed —
+but the ORDER matters and is stated in the message: while a package blocks the
+account the credentials cannot be checked at all, so the plan message never
+implies the credentials are known good.
+
+**Alternatives:** teaching RetryPolicy about plan blocks (rejected — a 403 is
+already correctly permanent there; this is a messaging layer, and duplicating
+the classification into the retry decision would give one fact two owners);
+keeping `test_connection(): bool` alongside the new method (rejected — it would
+have had no callers left); an extra "wrong subdomain" message for the 404
+(rejected — the merchant typed the subdomain in the same credential form).
+
+**Demonstration:** live against the freemium account through the REAL plugin
+path (`bin/walk-pro1686-plan-block.php`, run inside wp-env with the credentials
+piped over STDIN): `connection_check: plan_blocked`, the Test-connection button's
+answer, and the rendered admin notice naming the package.
+`tests/Integration/SmailyPlanBlockedNoticeTest.php` replays that exact 403/227
+answer through the real health check plus the credentials and outage cases, and
+covers the restore half with the transport answering normally again (3 of its 4
+cases fail against the pre-fix code). Restoring the plan on the live account is
+human acceptance — the plugin half is proven by the restore test.
+
+**Relationships:** sits on top of PRO-1685 (a plan-blocked 4xx lands in that
+policy's permanent branch, which stays correct and untouched); the Event Log
+reason a failed row carries now includes `(Smaily code 227)` so the same
+refusal reads the same way in the log.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

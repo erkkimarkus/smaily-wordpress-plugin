@@ -26,7 +26,47 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1743 — a wizard-configured store can COLLECT
+_Last updated: 2026-08-04 (**PRO-1686 — a freemium Smaily account is now told
+that the PACKAGE is the cause, instead of being told two things it is not.**
+When an account moves to a package without API access, the health notice used to
+say *"the Smaily API has been unreachable for over an hour — … paused until the
+connection recovers"* and the connection test said *"Smaily did not accept those
+credentials"*. Both false: Smaily is up, the credentials are fine, waiting
+changes nothing. **Probed live on a real freemium account (2026-08-04):** every
+endpoint the plugin uses (`autoresponder.php`, `contact.php` read + `list=1`,
+`history.php`) answers `HTTP 403 {"code":227,"message":"A paid package is
+required."}` — Smaily's documented *Paid Plan Required* code, a POSITIVE signal
+nothing else produces — and answers it identically for the correct credentials, a
+wrong password, a wrong username and no `Authorization` header at all, because
+the package check runs BEFORE authentication (so while the package blocks, the
+credentials cannot be checked at all — the message says so). A wrong subdomain
+answers `404` with an empty body. **Fix:** one classifier
+(`Smaily\RefusalReason`) reads a failed request and names the cause —
+`plan_blocked` (code 227) / `credentials_rejected` (any other 4xx bar 429,
+incl. the 404) / `unreachable` (429, 5xx, transport); `ApiException` carries
+Smaily's own body code, `Client::test_connection(): bool` became
+`check_connection(): string`, and both merchant surfaces phrase per cause: the
+Test-connection error string and the notice keys `smaily_plan_blocked` /
+`smaily_credentials_rejected` / `smaily_down`. A refusal Smaily states outright
+is raised at the NEXT health check rather than after the hour's grace; only the
+"might be a blip" case still waits. Nothing is stored — the cause is recomputed
+every run, so a restored package clears the notice by itself with nothing
+re-entered. RetryPolicy (PRO-1685) is untouched: a plan-blocked 403 is already
+correctly permanent there. **Demonstrated LIVE** through the real plugin path
+(`bin/walk-pro1686-plan-block.php`, credentials piped over STDIN inside wp-env):
+`connection_check: plan_blocked`, the Test-connection answer, and the rendered
+admin notice naming the package. Gates: `npm run ci:strict` **exit=0** (PHPCS 0
+errors, PHPStan `[OK] No errors`, PHPUnit unit **725/725**, eslint/tsc clean,
+vitest **270/270**); new `tests/Integration/SmailyPlanBlockedNoticeTest.php`
+**OK, 4 tests** — **3 of its 4 cases fail against the pre-fix code**. Merchant
+docs `docs/site/index.html` updated in BOTH languages (a package bullet in the
+Smaily connection errors list + the proactive-health-notices note). `.pot` /
+`-et.po` rebuilt via `bin/build-i18n.sh` with Estonian translations for the four
+new strings. DECISIONS PRO-1686. **Open: human acceptance** — restoring the plan
+on the live account and re-running the walk (the plugin half is proven by the
+restore test). No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1743 — a wizard-configured store can COLLECT
 the contact fields it ticked again.** PRO-1683/PRO-1684 taught the sync to read
 the merchant's field selection in both stored shapes; two readers in the legacy
 tree were left doing `array_keys( array_filter( $option ) )`, which on a

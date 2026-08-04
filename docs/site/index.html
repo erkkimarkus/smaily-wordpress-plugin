@@ -975,6 +975,7 @@ td code{white-space:nowrap}
     <div data-lang="en">
       <ul>
         <li><strong>Smaily rejected these credentials (401)</strong> — the subdomain, username or password is wrong. Double‑check them in Smaily under <span class="path">Settings → API</span>.</li>
+        <li><strong>This account's package does not include API access (403)</strong> — the Smaily account is on a package without the API, so every request is refused whatever the credentials are. Upgrade the package in Smaily; the plugin picks the connection back up on its own, with nothing to re‑enter. Waiting does not help — this is not an outage.</li>
         <li><strong>Could not reach Smaily</strong> — a temporary network issue, or your server can't reach Smaily over HTTPS. Try again.</li>
         <li><strong>All three fields are required</strong> / <strong>Subdomain may contain only letters, numbers and dashes</strong> — fix the input and retry.</li>
       </ul>
@@ -982,6 +983,7 @@ td code{white-space:nowrap}
     <div data-lang="et">
       <ul>
         <li><strong>Smaily rejected these credentials (401)</strong> — alamdomeen, kasutajanimi või parool on vale. Kontrolli üle Smailys jaotises <span class="path">Settings → API</span>.</li>
+        <li><strong>This account's package does not include API access (403)</strong> — Smaily konto pakett ei sisalda API‑t, seega keeldutakse igast päringust olenemata sellest, kas kontoandmed on õiged. Uuenda Smailys paketti; plugin taastab ühenduse ise ja midagi pole vaja uuesti sisestada. Ootamine ei aita — tegemist pole katkestusega.</li>
         <li><strong>Could not reach Smaily</strong> — ajutine võrgutõrge või su server ei jõua Smailyni HTTPS kaudu. Proovi uuesti.</li>
         <li><strong>All three fields are required</strong> / <strong>Subdomain may contain only letters, numbers and dashes</strong> — paranda sisend ja proovi uuesti.</li>
       </ul>
@@ -1047,7 +1049,7 @@ td code{white-space:nowrap}
       </ol>
       <div class="note">
         <span class="k">Proactive health notices</span>
-        <p>A periodic health check raises a red admin notice when something needs attention — e.g. <em>"N sync events failed in the last 24 hours"</em>, or that the recommendation engine or the Smaily API has been unreachable for over an hour. Each notice links to the Event Log and clears itself once the problem is gone.</p>
+        <p>A periodic health check raises a red admin notice when something needs attention — e.g. <em>"N sync events failed in the last 24 hours"</em>, or that the recommendation engine or the Smaily API has been unreachable for over an hour. When Smaily refuses for a reason it states outright — the account's package does not include the API, or the saved credentials are rejected — the notice says so instead, and appears at the next check rather than after an hour, because waiting cannot change that answer. Each notice links to the Event Log and clears itself once the problem is gone.</p>
       </div>
       <p><em>Note:</em> a failed row stays retryable for 90 days, so there is no rush — and a Smaily contact send that keeps failing is retried a few times with growing gaps before it lands in <span class="pill failed">failed</span>, rather than being repeated every minute forever.</p>
     </div>
@@ -1060,7 +1062,7 @@ td code{white-space:nowrap}
       </ol>
       <div class="note">
         <span class="k">Ennetavad terviseteated</span>
-        <p>Perioodiline tervisekontroll tõstab punase haldusteate, kui miski vajab tähelepanu — nt <em>"N sync events failed in the last 24 hours"</em> või et soovitusmootor või Smaily API on olnud üle tunni kättesaamatu. Iga teade viitab Event Logile ja kaob ise, kui probleem on möödas.</p>
+        <p>Perioodiline tervisekontroll tõstab punase haldusteate, kui miski vajab tähelepanu — nt <em>"N sync events failed in the last 24 hours"</em> või et soovitusmootor või Smaily API on olnud üle tunni kättesaamatu. Kui Smaily keeldub põhjusel, mille ta ise välja ütleb — konto pakett ei sisalda API‑t või salvestatud kontoandmed lükatakse tagasi — ütleb teade seda ja ilmub juba järgmisel kontrollil, mitte tunni pärast, sest ootamine seda vastust ei muuda. Iga teade viitab Event Logile ja kaob ise, kui probleem on möödas.</p>
       </div>
       <p><em>Märkus:</em> ebaõnnestunud rida jääb korratavaks 90 päevaks, nii et kiiret pole — ja pidevalt ebaõnnestuvat Smaily kontakti‑saadetist proovitakse mõned korrad üha pikemate vahedega, enne kui see jõuab olekusse <span class="pill failed">failed</span>, selle asemel et seda iga minut lõputult korrata.</p>
     </div>
