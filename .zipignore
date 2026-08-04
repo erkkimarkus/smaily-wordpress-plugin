@@ -6,11 +6,8 @@
 /*.sh
 /*.zip
 /assets
-/compose.min.yaml
-/compose.yaml
 /composer.lock
 /contributing.md
-/Dockerfile
 /phpcs.xml
 /readme.md
 # /vendor was excluded by upstream because their release CI runs
@@ -42,6 +39,7 @@
 /.claude*
 /.github*
 /.wp-env.json
+/.wp-env.min.json
 /TESTING.md
 /phpstan.neon.dist
 /phpunit.xml.dist
