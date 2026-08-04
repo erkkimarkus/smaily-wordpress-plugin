@@ -70,6 +70,12 @@ final class CartPayloadBuilderTest extends TestCase {
 		// Default fields: store_url + user_email + language on.
 		self::assertSame( 'https://shop.example.test', $payload['fields']['store'] );
 		self::assertSame( 'true', $payload['fields']['is_abandoned_cart'], 'The is_abandoned_cart discriminator is a carried-over business requirement.' );
+		// PRO-1681: the run marker is additive — is_abandoned_cart above keeps
+		// its exact name and meaning.
+		self::assertMatchesRegularExpression(
+			'/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+			$payload['fields']['abandoned_cart_automation_at']
+		);
 		// The resolver's site default ('et_EE' → 'et') rides both levels:
 		// fields (legacy address parity) + top level (router language lookup).
 		self::assertSame( 'et', $payload['fields']['language'] );

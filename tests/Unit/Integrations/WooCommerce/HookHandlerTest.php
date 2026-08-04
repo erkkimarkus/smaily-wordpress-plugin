@@ -288,6 +288,20 @@ final class HookHandlerTest extends TestCase {
 		$types = array_column( $this->enqueued, 'type' );
 		self::assertContains( HookHandler::EVENT_CONTACT_SYNC, $types );
 		self::assertContains( HookHandler::EVENT_AUTOMATION_WELCOME, $types );
+
+		// PRO-1681: the welcome run marks the contact — and ONLY the plain
+		// contact sync stays unmarked, so a self-subscribed contact is
+		// distinguishable from an automation-enrolled one.
+		$by_type = array_combine( $types, array_column( $this->enqueued, 'payload' ) );
+		self::assertMatchesRegularExpression(
+			'/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+			$by_type[ HookHandler::EVENT_AUTOMATION_WELCOME ]['fields']['welcome_automation_at']
+		);
+		self::assertArrayNotHasKey(
+			'welcome_automation_at',
+			$by_type[ HookHandler::EVENT_CONTACT_SYNC ]['fields'],
+			'A contact sync is not an automation run — it must carry no marker.'
+		);
 	}
 
 	public function test_user_register_ignores_unknown_user(): void {
@@ -353,6 +367,13 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( HookHandler::EVENT_AUTOMATION_FIRST_ORDER, $this->enqueued[0]['type'] );
 		self::assertSame( 'buyer@example.test', $this->enqueued[0]['payload']['email'] );
 		self::assertSame( '100', $this->enqueued[0]['payload']['fields']['order_id'] );
+		// PRO-1681: the run marker rides alongside the order fields, and a
+		// trigger only ever marks its own field.
+		self::assertMatchesRegularExpression(
+			'/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+			$this->enqueued[0]['payload']['fields']['first_order_automation_at']
+		);
+		self::assertArrayNotHasKey( 'welcome_automation_at', $this->enqueued[0]['payload']['fields'] );
 	}
 
 	public function test_checkout_order_processed_skips_on_second_order(): void {
