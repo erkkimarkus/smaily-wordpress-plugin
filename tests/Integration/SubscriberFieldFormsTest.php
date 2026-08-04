@@ -11,7 +11,10 @@
  *     profile, the WooCommerce account form or the checkout, leaving the store
  *     unable to collect the very meta the sync now sends;
  *   - a guest ticking the checkout newsletter box was sent to Smaily without
- *     even an email address.
+ *     even an email address;
+ *   - a registered customer's contact update — profile save, account details,
+ *     customer created, or the registered branch of the same checkout opt-in —
+ *     was sent with no email address and no fields at all (PRO-1772).
  *
  * These cases drive the real render/opt-in paths on a real WooCommerce install
  * with only the Smaily transport faked, against BOTH stored shapes.
@@ -36,6 +39,9 @@ final class SubscriberFieldFormsTest extends TestCase {
 
 	/** @var array<int, int> */
 	private array $created_orders = array();
+
+	/** @var array<int, int> */
+	private array $created_users = array();
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -69,6 +75,14 @@ final class SubscriberFieldFormsTest extends TestCase {
 			}
 		}
 		$this->created_orders = array();
+
+		if ( ! function_exists( 'wp_delete_user' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
+		foreach ( $this->created_users as $user_id ) {
+			wp_delete_user( $user_id );
+		}
+		$this->created_users = array();
 
 		wp_set_current_user( 0 );
 		parent::tearDown();
@@ -149,6 +163,55 @@ final class SubscriberFieldFormsTest extends TestCase {
 		self::assertSame( 'Mari', $posted['first_name'] );
 		self::assertArrayHasKey( 'site_title', $posted );
 		self::assertArrayNotHasKey( 'last_name', $posted, 'A legacy false is a real "do not send this".' );
+	}
+
+	public function test_a_registered_customers_update_sends_the_wizard_selection(): void {
+		$this->save_wizard_selection( array( 'first_name', 'user_phone', 'birthday' ) );
+
+		$user_id = $this->make_customer(
+			array(
+				'user_phone' => '+372 5555 1234',
+				'user_dob'   => '1985-03-28',
+				'nickname'   => 'Mari M',
+			)
+		);
+
+		$posted = $this->registered_checkout_optin( $user_id );
+
+		$user = get_userdata( $user_id );
+		self::assertSame( $user->user_email, $posted['email'], 'Without an email address there is no contact to update at all.' );
+		self::assertArrayHasKey( 'store', $posted );
+		self::assertSame( 'Mari', $posted['first_name'] );
+		self::assertSame( '+372 5555 1234', $posted['user_phone'] );
+		self::assertSame( '1985-03-28', $posted['birthday'], 'The form field is `user_dob`; the contact field is `birthday`.' );
+		self::assertArrayNotHasKey( 'nickname', $posted, 'An unticked field is not sent, even when the store holds a value for it.' );
+	}
+
+	public function test_a_registered_customers_update_on_a_store_configured_before_the_wizard_is_unchanged(): void {
+		LegacySettingsPage::save_subscriber_sync_fields(
+			array(
+				'user_phone' => 'on',
+				'nickname'   => 'on',
+			)
+		);
+
+		$user_id = $this->make_customer(
+			array(
+				'user_phone' => '+372 5555 1234',
+				'user_dob'   => '1985-03-28',
+				'nickname'   => 'Mari M',
+			)
+		);
+
+		$posted = $this->registered_checkout_optin( $user_id );
+
+		$user = get_userdata( $user_id );
+		self::assertSame( $user->user_email, $posted['email'] );
+		self::assertArrayHasKey( 'store', $posted );
+		self::assertSame( '+372 5555 1234', $posted['user_phone'] );
+		self::assertSame( 'Mari M', $posted['nickname'] );
+		self::assertArrayNotHasKey( 'birthday', $posted, 'A legacy false is a real "do not send this".' );
+		self::assertArrayNotHasKey( 'first_name', $posted );
 	}
 
 	// --- helpers -------------------------------------------------------------
@@ -256,13 +319,64 @@ final class SubscriberFieldFormsTest extends TestCase {
 	 * @return array<string, mixed> What the Smaily transport was handed.
 	 */
 	private function guest_checkout_optin(): array {
-		update_option( Options::CHECKOUT_SUBSCRIPTION_ENABLED_OPTION, true );
-
 		$order = wc_create_order();
 		$order->set_billing_email( 'guest@example.test' );
 		$order->set_billing_first_name( 'Mari' );
 		$order->set_billing_last_name( 'Maasikas' );
 		$order->save();
+
+		return $this->checkout_optin( $order );
+	}
+
+	/**
+	 * A registered customer ticking the same box, which takes the other branch
+	 * of the same opt-in: the contact is built from the user's profile
+	 * (`Data_Handler::get_user_data()`) rather than the billing address.
+	 *
+	 * @return array<string, mixed> What the Smaily transport was handed.
+	 */
+	private function registered_checkout_optin( int $user_id ): array {
+		$order = wc_create_order();
+		$order->set_customer_id( $user_id );
+		$order->set_billing_email( 'billing@example.test' );
+		$order->save();
+
+		return $this->checkout_optin( $order );
+	}
+
+	/**
+	 * A registered, newsletter-ticking customer whose profile the store filled.
+	 *
+	 * @param array<string, string> $meta Profile meta the store collected.
+	 */
+	private function make_customer( array $meta ): int {
+		$slug    = wp_generate_password( 6, false );
+		$user_id = wp_insert_user(
+			array(
+				'user_login' => 'smly_forms_' . $slug,
+				'user_email' => 'forms-' . $slug . '@example.test',
+				'user_pass'  => wp_generate_password( 20 ),
+				'first_name' => 'Mari',
+			)
+		);
+		self::assertIsInt( $user_id );
+		$this->created_users[] = $user_id;
+
+		foreach ( $meta as $key => $value ) {
+			update_user_meta( $user_id, $key, $value );
+		}
+
+		return $user_id;
+	}
+
+	/**
+	 * Drive the real checkout opt-in for an order, with only the Smaily
+	 * transport faked.
+	 *
+	 * @return array<string, mixed> What the Smaily transport was handed.
+	 */
+	private function checkout_optin( \WC_Order $order ): array {
+		update_option( Options::CHECKOUT_SUBSCRIPTION_ENABLED_OPTION, true );
 		$this->created_orders[] = $order->get_id();
 
 		$posted = array();
