@@ -18,20 +18,26 @@
  * Public surface follows ROADMAP.md §3.2.
  */
 
+import {
+  captureAttributionParams,
+  writeCookie,
+  DEFAULT_TTL_DAYS,
+  DEFAULT_URL_PARAMS,
+  type AttributionCookieNames,
+  type AttributionTtlDays,
+  type AttributionUrlParams,
+} from './attribution';
+
 /**
  * Cookie names — supplied per request from the setup-exchange config
  * (the rec-engine's tenants control these so the same client code works
- * across multi-tenant deployments).
+ * across multi-tenant deployments). The three attribution slots come from
+ * `attribution.ts`, which the attribution-only bundle shares (PRO-1767);
+ * the anonymous session cookie is this client's alone.
  */
-export interface CookieNames {
-  /** Visitor token issued on first email-link click. ~365-day TTL. */
-  visitor: string;
+export interface CookieNames extends AttributionCookieNames {
   /** Anonymous browser session ID (UUID v4). ~30-day TTL. */
   session: string;
-  /** Last-touch recommendation id from a campaign click. ~30-day TTL. */
-  recId: string;
-  /** Last-touch campaign context label (welcome / cart_abandoned / ...). */
-  context: string;
 }
 
 /**
@@ -53,13 +59,13 @@ export interface RecEngineClientConfig {
    * URL-param names a campaign click leaves (engine config `url_param_*`).
    * Defaults to smaily_vt / smaily_rec / smaily_ctx.
    */
-  urlParams?: { visitorToken: string; recId: string; context: string };
+  urlParams?: AttributionUrlParams;
 
   /**
    * Per-cookie TTLs in days (engine config `*_ttl_days`). The session cookie
    * uses `sessionTtlDays`. Defaults: visitor 365, recId 30, context 30.
    */
-  cookieTtlDays?: { visitor: number; recId: number; context: number };
+  cookieTtlDays?: AttributionTtlDays;
 
   /** Batch window in milliseconds before the buffer flushes. Defaults to 30_000. */
   batchWindowMs?: number;
@@ -118,16 +124,6 @@ export type MergeReason =
 
 /** Default batch window before the buffer auto-flushes (ms). */
 const DEFAULT_BATCH_WINDOW_MS = 30_000;
-
-/**
- * The shape the engine enforces for a recommendation id (`z.string().uuid()`
- * on the orders route — 8-4-4-4-12 hex, no version/variant constraint). The
- * PHP side has the same definition in `Smaily\Connect\Smaily\RecEngine\
- * Support\RecId`; both write the SAME rec-id cookie, so both must agree
- * (PRO-1710 — a non-UUID cookied here would ride the order to the engine and
- * get that one order permanently D6-rejected).
- */
-const REC_ID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /** The wire shape of a single browse event (§6). */
 interface WireEvent {
@@ -258,50 +254,22 @@ export class RecEngineClient {
    * method writes ONLY the attribution cookies (visitor/rec/ctx) — it creates
    * no session cookie and sends nothing; the anonymous session and every
    * event send stay fully consent-gated (see ensureSession / track / flush).
+   *
+   * The capture itself lives in `attribution.ts`, shared with the
+   * attribution-only bundle a browse-tracking-off store loads instead of this
+   * client (PRO-1767) — one implementation, so the two writers of the same
+   * cookies cannot drift.
    */
   public captureUrlParams(): boolean {
-    if (typeof window === 'undefined' || typeof document === 'undefined' || !window.location) {
-      return false;
-    }
-
-    const url = new URL(window.location.href);
-    const params = url.searchParams;
-    const names = this.urlParamNames();
-    const mapping: Array<{ param: string; cookie: string; ttl: number; isValid?: (v: string) => boolean }> = [
-      { param: names.visitorToken, cookie: this.config.cookieNames.visitor, ttl: this.cookieTtl('visitor') },
-      {
-        param: names.recId,
-        cookie: this.config.cookieNames.recId,
-        ttl: this.cookieTtl('recId'),
-        // A rec id that isn't a UUID is not one the engine will accept on the
-        // order (PRO-1710) — never cookie it. The param is still stripped from
-        // the URL below; it's the cookie write that is refused.
-        isValid: (v) => REC_ID_PATTERN.test(v),
+    return captureAttributionParams({
+      cookieNames: this.config.cookieNames,
+      urlParams: this.urlParamNames(),
+      cookieTtlDays: {
+        visitor: this.cookieTtl('visitor'),
+        recId: this.cookieTtl('recId'),
+        context: this.cookieTtl('context'),
       },
-      { param: names.context, cookie: this.config.cookieNames.context, ttl: this.cookieTtl('context') },
-    ];
-
-    let captured = false;
-    let present = false;
-    // 1) SAVE every present value to its cookie first.
-    for (const { param, cookie, ttl, isValid } of mapping) {
-      const value = params.get(param);
-      if (value !== null && value !== '' && (isValid === undefined || isValid(value))) {
-        this.setCookie(cookie, value, ttl);
-        captured = true;
-      }
-      if (params.has(param)) {
-        params.delete(param);
-        present = true;
-      }
-    }
-    // 2) Only now strip the params from the visible URL.
-    if (present) {
-      const search = params.toString();
-      const newUrl = url.pathname + (search ? '?' + search : '') + url.hash;
-      window.history.replaceState(window.history.state, '', newUrl);
-    }
-    return captured;
+    });
   }
 
   /**
@@ -465,27 +433,17 @@ export class RecEngineClient {
     return value !== undefined ? decodeURIComponent(value) : '';
   }
 
-  /**
-   * First-party cookie write. SameSite=Lax so a campaign param survives the
-   * top-level email-link → shop navigation (Lax allows cookies on top-level
-   * GET); Secure only on https. Path=/ so the whole storefront sees it.
-   */
+  /** First-party cookie write — shared with the attribution-only bundle. */
   private setCookie(name: string, value: string, ttlDays: number): void {
-    if (typeof document === 'undefined') {
-      return;
-    }
-    const maxAge = Math.max(0, Math.floor(ttlDays * 86400));
-    const secure = typeof window !== 'undefined' && window.location?.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = name + '=' + encodeURIComponent(value) + '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+    writeCookie(name, value, ttlDays);
   }
 
-  private urlParamNames(): { visitorToken: string; recId: string; context: string } {
-    return this.config.urlParams ?? { visitorToken: 'smaily_vt', recId: 'smaily_rec', context: 'smaily_ctx' };
+  private urlParamNames(): AttributionUrlParams {
+    return this.config.urlParams ?? DEFAULT_URL_PARAMS;
   }
 
   private cookieTtl(key: 'visitor' | 'recId' | 'context'): number {
-    const defaults = { visitor: 365, recId: 30, context: 30 };
-    return this.config.cookieTtlDays?.[key] ?? defaults[key];
+    return this.config.cookieTtlDays?.[key] ?? DEFAULT_TTL_DAYS[key];
   }
 
   private hasConsent(): boolean {
