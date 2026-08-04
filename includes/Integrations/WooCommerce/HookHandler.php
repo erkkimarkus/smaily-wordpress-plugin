@@ -42,8 +42,8 @@ use Smaily\Connect\Support\ContactLanguageResolver;
  * so a fresh install doesn't fire workflows until the Settings UI in
  * sub-PR 6 turns them on):
  *
- *   - smly_plus_subscriber_sync_enabled — on by default (PLUGIN.md §5
- *     step 2 "Sync contacts to Smaily" linnuke vaikimisi sees)
+ *   - the "Sync contacts to Smaily" switch — on by default (PLUGIN.md §5
+ *     step 2), read through ContactSyncMode::sync_enabled()
  *   - smly_plus_welcome_enabled         — off (opt-in via Settings UI)
  *   - smly_plus_first_order_enabled     — off (opt-in via Settings UI)
  */
@@ -74,9 +74,8 @@ class HookHandler {
 	 */
 	private const OPTION_SETUP_COMPLETED = 'smly_plus_setup_completed';
 
-	private const OPTION_SUBSCRIBER_SYNC_ENABLED = 'smly_plus_subscriber_sync_enabled';
-	private const OPTION_WELCOME_ENABLED         = 'smly_plus_welcome_enabled';
-	private const OPTION_FIRST_ORDER_ENABLED     = 'smly_plus_first_order_enabled';
+	private const OPTION_WELCOME_ENABLED     = 'smly_plus_welcome_enabled';
+	private const OPTION_FIRST_ORDER_ENABLED = 'smly_plus_first_order_enabled';
 
 	private const ORDER_META_KEYS = array(
 		'_smaily_anon_session_id' => 'smaily_anon_sid',
@@ -115,7 +114,7 @@ class HookHandler {
 			return;
 		}
 
-		if ( $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) && $this->audience()->should_sync_user( $user ) ) {
+		if ( ContactSyncMode::sync_enabled() && $this->audience()->should_sync_user( $user ) ) {
 			$this->maybe_enqueue(
 				self::EVENT_CONTACT_SYNC,
 				(string) $user_id,
@@ -132,7 +131,7 @@ class HookHandler {
 			return;
 		}
 
-		if ( ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+		if ( ! ContactSyncMode::sync_enabled() ) {
 			return;
 		}
 
@@ -360,7 +359,7 @@ class HookHandler {
 	 * are handled by the account hooks; checkout-only routes everyone here.
 	 */
 	private function sync_order_contact( \WC_Order $order, bool $opted_in ): void {
-		if ( $this->gate_closed() || ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+		if ( $this->gate_closed() || ! ContactSyncMode::sync_enabled() ) {
 			return;
 		}
 
@@ -542,7 +541,7 @@ class HookHandler {
 		if ( $old_value === $new_value || $this->gate_closed() ) {
 			return;
 		}
-		if ( ! $this->is_enabled( self::OPTION_SUBSCRIBER_SYNC_ENABLED, true ) ) {
+		if ( ! ContactSyncMode::sync_enabled() ) {
 			return;
 		}
 		if ( $this->mode()->mode() !== ContactSyncMode::MODE_CONSENT ) {

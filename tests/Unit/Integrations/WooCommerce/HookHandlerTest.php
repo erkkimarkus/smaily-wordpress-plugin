@@ -76,7 +76,7 @@ final class HookHandlerTest extends TestCase {
 				if ( $key === 'smly_plus_setup_completed' ) {
 					return true;
 				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === 'smly_plus_welcome_enabled' ) {
@@ -104,7 +104,7 @@ final class HookHandlerTest extends TestCase {
 				if ( $key === 'smly_plus_setup_completed' ) {
 					return false;
 				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				return $default;
@@ -160,7 +160,7 @@ final class HookHandlerTest extends TestCase {
 				if ( $key === 'smly_plus_setup_completed' ) {
 					return true;
 				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === ContactSyncMode::OPTION_MODE ) {
@@ -241,7 +241,7 @@ final class HookHandlerTest extends TestCase {
 				if ( $key === 'smly_plus_setup_completed' ) {
 					return true;
 				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === ContactSyncMode::OPTION_MODE ) {
@@ -528,7 +528,7 @@ final class HookHandlerTest extends TestCase {
 				if ( $key === 'smly_plus_setup_completed' ) {
 					return true;
 				}
-				if ( $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === ContactSyncMode::OPTION_MODE ) {
@@ -566,7 +566,7 @@ final class HookHandlerTest extends TestCase {
 	public function test_block_checkout_optin_syncs_with_subscribe_in_checkout_mode(): void {
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = null ) {
-				if ( $key === 'smly_plus_setup_completed' || $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === 'smly_plus_setup_completed' || $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === ContactSyncMode::OPTION_MODE ) {
@@ -590,7 +590,7 @@ final class HookHandlerTest extends TestCase {
 	private function enable_welcome(): void {
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = null ) {
-				if ( $key === 'smly_plus_setup_completed' || $key === 'smly_plus_subscriber_sync_enabled' ) {
+				if ( $key === 'smly_plus_setup_completed' || $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
 					return true;
 				}
 				if ( $key === 'smly_plus_welcome_enabled' ) {

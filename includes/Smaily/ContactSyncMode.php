@@ -31,6 +31,15 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ContactSyncMode {
 
+	/**
+	 * The master "Sync contacts to Smaily" switch (wizard step 2 / Settings →
+	 * Subscribers). It keeps the legacy option name because that is the one
+	 * every version of this plugin has ever written — the wizard's save route
+	 * today, the pre-wizard settings page before it — so a store that switched
+	 * contact sync off keeps its answer without any migration (PRO-1742).
+	 */
+	public const OPTION_SYNC_ENABLED = 'smaily_connect_subscriber_sync_enabled';
+
 	public const OPTION_MODE                    = 'smly_plus_contact_sync_mode';
 	public const OPTION_INCLUDE_GUESTS          = 'smly_plus_contact_sync_include_guests';
 	public const OPTION_AUTOMATION_FORCE_OPT_IN = 'smly_plus_contact_sync_automation_force_opt_in';
@@ -49,6 +58,27 @@ final class ContactSyncMode {
 	);
 
 	private ?string $mode = null;
+
+	/**
+	 * Is contact sync switched on at all? Read straight from the option on
+	 * every call — the merchant's change lands on the next contact, not the
+	 * next request — and never memoised, so this is the one answer the live
+	 * hooks, the backfill audience and the wizard all get.
+	 *
+	 * Default on: that is the wizard's own default, and a store that never
+	 * saved the setting is a fresh install rather than an opt-out. Off is
+	 * whatever the switch stores for "off" — a bool false, or the empty string
+	 * WordPress writes for it.
+	 */
+	public static function sync_enabled(): bool {
+		$value = get_option( self::OPTION_SYNC_ENABLED, true );
+
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+
+		return $value === 1 || $value === '1' || $value === 'yes' || $value === 'true';
+	}
 
 	/** True when $mode is one of the three presets — used to validate writes. */
 	public static function is_valid_mode( string $mode ): bool {

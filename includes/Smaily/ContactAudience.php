@@ -16,6 +16,10 @@ defined( 'ABSPATH' ) || exit;
  * used by the live HookHandler, the BackfillJob mass walk, and the reconciler,
  * so live-sync and backfill never disagree on the audience.
  *
+ * With the "Sync contacts to Smaily" switch off the audience is empty, whatever
+ * the mode says (PRO-1742) — so the backfill walk and the "about N will be
+ * synced" estimate honour the switch exactly like the live hooks do.
+ *
  * Opt-in is read from the legacy `user_newsletter` user meta — the WP-side
  * consent record the registration / account / checkout checkboxes write
  * (profile-settings.class.php).
@@ -33,11 +37,16 @@ final class ContactAudience {
 	/**
 	 * Should this registered user be synced as a Smaily contact?
 	 *
+	 *   - sync switched off   → no-one (PRO-1742)
 	 *   - checkout_optin      → no (no account-based sync)
 	 *   - legitimate_interest → yes (all registered customers)
 	 *   - consent             → only when opted in (user_newsletter=1)
 	 */
 	public function should_sync_user( \WP_User $user ): bool {
+		if ( ! ContactSyncMode::sync_enabled() ) {
+			return false;
+		}
+
 		if ( ! $this->mode->syncs_accounts() ) {
 			return false;
 		}
@@ -63,6 +72,10 @@ final class ContactAudience {
 	 * @param bool $opted_in    Whether the checkout subscription checkbox was ticked.
 	 */
 	public function should_sync_order_email( int $customer_id, bool $opted_in ): bool {
+		if ( ! ContactSyncMode::sync_enabled() ) {
+			return false;
+		}
+
 		if ( $this->mode->mode() === ContactSyncMode::MODE_CHECKOUT_OPTIN ) {
 			return $opted_in;
 		}
@@ -89,6 +102,10 @@ final class ContactAudience {
 	 *   - consent             → users with user_newsletter=1
 	 */
 	public function count_audience(): int {
+		if ( ! ContactSyncMode::sync_enabled() ) {
+			return 0;
+		}
+
 		if ( ! $this->mode->syncs_accounts() ) {
 			return 0;
 		}

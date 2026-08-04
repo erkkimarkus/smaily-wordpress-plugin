@@ -435,7 +435,9 @@ class EnvDetector {
 			'defaultFallbackAccountKey'     => (string) get_option( 'smly_plus_default_fallback_account', 'default' ),
 
 			// Step 2: subscribers.
-			'subscriberSyncEnabled'         => (bool) get_option( 'smaily_connect_subscriber_sync_enabled', true ),
+			// Read through the same accessor the sync itself gates on, so the
+			// switch the merchant sees is the switch the sync obeys.
+			'subscriberSyncEnabled'         => ContactSyncMode::sync_enabled(),
 			// The selection the sync is REALLY using, read through the same
 			// interpreter — so a store that saved under the pre-PRO-1683
 			// wizard names (`phone`/`gender`) or under the legacy settings

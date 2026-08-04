@@ -18,6 +18,7 @@ use Smaily\Connect\Multilingual\DetectorFactory;
 use Smaily\Connect\Smaily\ApiException;
 use Smaily\Connect\Smaily\BackfillJob;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\ContactSyncMode;
 
 final class BackfillJobTest extends TestCase {
 
@@ -50,8 +51,14 @@ final class BackfillJobTest extends TestCase {
 
 		// Sub-PR 2.H.15 — SubscriberPayloadBuilder reads sync-toggle
 		// opt-ins from this option. null falls back to the documented
-		// "every cross-channel field enabled" default.
-		Functions\when( 'get_option' )->justReturn( null );
+		// "every cross-channel field enabled" default. The contact-sync
+		// switch is the one option that defaults to ON, so it has to answer
+		// with its default the way a real get_option() would.
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				return $key === ContactSyncMode::OPTION_SYNC_ENABLED ? $default : null;
+			}
+		);
 		Functions\when( 'get_site_url' )->justReturn( 'http://example.test' );
 		Functions\when( 'get_bloginfo' )->justReturn( 'Example Shop' );
 	}

@@ -323,6 +323,26 @@ engine rejects it. This bug shipped twice (customer `first_seen_at`, catalog
 `IsoDate` helper (F3-21) — every builder uses it so the bug can't recur. Any new
 datetime field goes through IsoDate.
 
+### The "Sync contacts to Smaily" switch is `ContactSyncMode::sync_enabled()` — one accessor, one key (PRO-1742)
+The master contact-sync switch lives in `smaily_connect_subscriber_sync_enabled`
+(the legacy name — the wizard's save route writes it, and the pre-wizard
+settings page wrote it before that) and is read ONLY through
+`ContactSyncMode::sync_enabled()` (default ON): the four live `HookHandler`
+gates, `ContactAudience` (which is how the backfill and the "about N will be
+synced" estimate honour it), and `EnvDetector`'s hydration.
+`SettingsEndpoint::LEGACY_OPTION_SYNC_ENABLED` is defined AS
+`ContactSyncMode::OPTION_SYNC_ENABLED`, so the key has one spelling in the
+plugin. The scar: the sync used to gate on `smly_plus_subscriber_sync_enabled`,
+which nothing has ever written — both default ON, so it only bit the merchant
+who switched contact sync OFF and kept syncing anyway. Automations (welcome /
+first-order / abandoned cart) are deliberately NOT gated by it — they have
+their own toggles and consent basis, and the merchant docs promise exactly that.
+**Related WP trap, same fix:** `update_option( $key, false )` on an option that
+was never saved writes NOTHING (WP compares against `get_option()`'s `false` and
+concludes nothing changed) — harmless for a flag that defaults to off, silent
+data loss for one that defaults to ON. This switch is therefore stored as
+`'1'`/`''`. Check this before adding any new default-ON boolean setting.
+
 ### Contact-sync language goes through ContactLanguageResolver — never get_user_locale / get_current_language_code (F3-47)
 The Smaily contact `language` code is resolved ONLY by `Support\
 ContactLanguageResolver` (`for_user` / `for_order`). It is context-independent

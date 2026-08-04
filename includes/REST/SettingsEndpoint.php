@@ -60,7 +60,7 @@ class SettingsEndpoint {
 	private const VALID_TABS = array( 'connection', 'subscribers', 'woocommerce', 'recommendations', 'finish' );
 
 	private const LEGACY_OPTION_API_CREDENTIALS = 'smaily_connect_api_credentials';
-	private const LEGACY_OPTION_SYNC_ENABLED    = 'smaily_connect_subscriber_sync_enabled';
+	private const LEGACY_OPTION_SYNC_ENABLED    = ContactSyncMode::OPTION_SYNC_ENABLED;
 	private const LEGACY_OPTION_SYNC_FIELDS     = 'smaily_connect_subscriber_sync_fields';
 	private const LEGACY_OPTION_CHECKOUT_OPTIN  = 'smaily_connect_checkout_subscription_enabled';
 	private const LEGACY_OPTION_CART_CUTOFF     = 'smaily_connect_abandoned_cart_cutoff';
@@ -293,7 +293,15 @@ class SettingsEndpoint {
 		$include_guests = ! empty( $data['includeGuests'] );
 		$force_opt_in   = ! empty( $data['automationForceOptIn'] );
 
-		update_option( self::LEGACY_OPTION_SYNC_ENABLED, $sync_enabled );
+		/*
+		 * Stored as '1' / '' — the on-disk shape the legacy settings page left
+		 * behind, and the only one that survives being saved OFF on a store
+		 * that never saved it before: a missing option reads as false, so
+		 * update_option( …, false ) concludes nothing changed and writes
+		 * nothing at all, while this switch defaults to ON (PRO-1742). Every
+		 * other flag here defaults to off, where losing the write is harmless.
+		 */
+		update_option( self::LEGACY_OPTION_SYNC_ENABLED, $sync_enabled ? '1' : '' );
 		update_option( self::LEGACY_OPTION_SYNC_FIELDS, $fields );
 		update_option( 'smly_plus_wordpress_subscription_checkbox', $wp_optin );
 		update_option( self::LEGACY_OPTION_CHECKOUT_OPTIN, $checkout_optin );
