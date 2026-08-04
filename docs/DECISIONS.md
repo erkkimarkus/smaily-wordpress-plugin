@@ -4633,6 +4633,64 @@ keeps F3-48's other sub-option (`include_guests`) untouched; follows the
 PRO-1678 ground rules and Jane's PRO-1645 point 3. The merchant docs site never
 documented the setting, so it needed no change.
 
+### PRO-1715 — A contact import with nothing to sync finishes at start(), it does not wait for a tick
+
+**Context:** on a store where nobody is in the contact-sync audience — a fresh
+install whose only user is the administrator, a consent-mode store with no
+opt-ins, or (since PRO-1742) a store whose "Sync contacts to Smaily" switch is
+off — pressing **Start import** left the panel spinning until the merchant
+cancelled by hand (Jane's PRO-1645 point 1). The job itself was never the
+problem: it completes the moment a batch runs. The problem was the *only* way
+out of the `running` state being an Action Scheduler tick. `/backfill/start`
+seeded the row as `running` and enqueued an async tick; on a quiet store that
+tick can be minutes away (reproduced on the dev store: five ticks queued and
+unprocessed), and the panel has nothing to show in the meantime — 0 walked, 0
+synced, a spinner that never moves. A store WITH contacts hides this, because
+the first tick that does run produces visible progress.
+
+**Decision:** decide "there is nothing to sync" up front and close the run
+synchronously, so no store depends on a background tick to be told nothing
+happened.
+
+- **`BackfillJob::start()`** asks `has_empty_audience()` (the existing
+  `ContactAudience::count_audience()`, the same definition the walk filters
+  on) and, when it is empty, marks the freshly-seeded row `completed` right
+  away — `processed_count = total_count` (with an empty audience every user
+  would have been audience-skipped, so the walk is genuinely finished),
+  `synced_count = 0`, `completed_at` now. It also leaves the `_smaily_synced_at`
+  freshness markers alone: a run that syncs no-one has nothing to re-sync.
+- **`BackfillEndpoint::start()`** reads the row before scheduling and enqueues
+  the first tick **only while the row is still `running`** — a tick on a
+  finished job would flip it back to `running` and put the merchant in front of
+  the same spinner. `Bootstrap::maybe_start_contact_refresh()` (the daily
+  refresh) gets the same guard.
+- **The admin panel** stops assuming a start means "running": the hook adopts
+  the response's status and, when it is already terminal, pulls the real status
+  payload. Step 2 then names the outcome — *"Nothing to import — no contacts
+  match your synchronization settings."* — instead of "Done — 0 contacts
+  synced", which reads like a failure.
+
+**Why not just disable the button at an audience of 0:** the estimate is a
+snapshot the panel fetched on mount, and the daily refresh starts runs with no
+button involved. Deciding it server-side at start() covers every caller;
+the copy change is what the merchant reads.
+
+**Demonstration:** on the running dev store (1 user, consent mode, audience 0)
+`/backfill/start` answers `{"status":"completed"}` in ~5 ms with zero ticks
+scheduled, and `/backfill/status` carries `audience_estimate: 0`; with one
+opted-in user present the same route answers `running` with one tick scheduled
+(behaviour unchanged). Pinned by
+`ContactBackfillAudienceTest::test_starting_with_an_empty_audience_finishes_the_run_without_a_tick`
+(real REST route + real Action Scheduler — fails on the pre-fix code with
+`running`), `BackfillJobTest` / `BackfillEndpointTest` at the unit seam, and
+`useBackfillProgress` + `Step2Subscribers.backfillCopy` on the JS side.
+
+**Relationships:** completes PRO-1742 (an OFF switch yields an empty audience —
+this is what that case now looks like to the merchant); reuses F3-55's audience
+estimate as the UI's "nothing to sync" signal; does not touch the rec-engine
+backfills, whose `start()` never returns a terminal status. Merchant docs: the
+import status table gains the new outcome line in both languages.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

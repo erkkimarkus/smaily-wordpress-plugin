@@ -26,7 +26,38 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1716 — the "Force opt-in on automation
+_Last updated: 2026-08-04 (**PRO-1715 — a contact import with nothing to sync
+finishes on its own instead of spinning.** On a store where nobody is in the
+sync audience (fresh install with only the administrator, consent mode with no
+opt-ins, or the PRO-1742 "Sync contacts to Smaily" switch off), **Start import**
+left the progress panel loading until the merchant cancelled by hand — Jane's
+PRO-1645 point 1. **Reproduced on the running dev store first**: the job is fine
+(it completes as soon as a batch runs), but the only exit from `running` was an
+Action Scheduler tick, and on a quiet store that tick is minutes away (five were
+queued unprocessed) with nothing to show meanwhile. **Fixed by deciding it up
+front**: `BackfillJob::start()` asks `has_empty_audience()` (the existing
+`ContactAudience::count_audience()`, the same definition the walk filters on)
+and closes the row as `completed` immediately — `processed_count = total_count`
+(with an empty audience every user would have been skipped anyway),
+`synced_count = 0` — and leaves the freshness markers alone; the REST
+`/backfill/start` and the daily refresh schedule the first tick **only while the
+row is still running**, so nothing reopens a finished job. The admin panel stops
+assuming a start means "running" (it adopts the response status and pulls the
+real payload when terminal) and Step 2 names the outcome: *"Nothing to import —
+no contacts match your synchronization settings."* (ET *"Pole midagi importida —
+…"*, `.pot`/`-et.po` rebuilt via `bin/build-i18n.sh`). **A store with contacts is
+untouched** — verified live on the same store: with one opted-in user the route
+still answers `running` with one tick scheduled. Gates: `npm run ci:strict`
+**exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit **710/710**,
+eslint/tsc clean, vitest **264/264**); integration **OK (227 tests, 1318
+assertions)**, incl. the new
+`ContactBackfillAudienceTest::test_starting_with_an_empty_audience_finishes_the_run_without_a_tick`
+(fails on the pre-fix code). Merchant docs `docs/site/index.html`: the import
+status table gains the new outcome line in BOTH languages — **needs an ET
+proofread + re-publish over FTPS by the orchestrator**. DECISIONS PRO-1715. No
+version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1716 — the "Force opt-in on automation
 triggers" setting is retired; automation triggers behave uniformly.** The
 advanced Step-2 toggle (F3-48.4, visible only under the legitimate-interest
 preset, default OFF) let a store send `force_opt_in=true`, so a welcome /
