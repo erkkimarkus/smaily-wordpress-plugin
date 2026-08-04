@@ -26,7 +26,49 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**Contract re-synced byte-identical to engine
+_Last updated: 2026-08-04 (**PRO-1679 — the first-order automation now also
+fires on the BLOCK checkout.** The trigger hung off
+`woocommerce_checkout_order_processed` alone, so on a block/Store-API checkout
+store — the WooCommerce default — it never fired for anyone; attribution
+capture (F3-46) and order-confirmation (PRO-1518) had already been carried
+across to `woocommerce_store_api_checkout_order_processed`, first-order was
+missed. **Fix:** the first-order enqueue moved out of
+`HookHandler::on_checkout_order_processed()` into a shared private
+`maybe_enqueue_first_order( \WC_Order )` that BOTH callbacks call;
+`on_block_checkout_order_processed()` now stamps attribution AND enqueues the
+automation. **Contact sync is deliberately NOT repeated on the block path** —
+block checkout syncs the contact from `on_checkout_block_optin`
+(`woocommerce_store_api_checkout_update_order_from_request`), the only place
+the Store-API opt-in flag is readable. **Double-fire guard:** both hooks fire
+in the SAME request, so the existing per-request `maybe_enqueue()` dedupe on
+`automation.first_order:{order_id}` caps a store where both run at one row
+(pinned by a unit case AND an integration case). No gating change — the wizard
+gate, the `smly_plus_first_order_enabled` toggle, the `is_first_order()`
+(registered-customer-only) rule and the workflow mapping are evaluated exactly
+as on the classic path: guests still never trigger, a second order still never
+triggers, and a disabled/unmapped automation still sends nothing with no
+shopper-visible error. Out of scope per the issue and untouched: guests ever
+receiving first-order, miscounted first orders, consent logic (automation
+triggers run on legitimate-interest basis). **The "running store"
+demonstration** is the new integration suite
+`tests/Integration/FirstOrderAutomationPipelineTest.php` (7 cases): it fires
+the REAL Store-API hook with WC's own 1-arg tuple (`$order`) — the exact shape
+`StoreApi\Routes\V1\Checkout::process_order_and_payment()` fires, verified
+against the WooCommerce source installed in wp-env, not from memory — plus the
+real 3-arg classic hook, against real WP + WC + HPOS orders, and drains the
+real queue/`Flusher` into a mocked Smaily transport asserting the mapped
+workflow id and the order fields on the wire. The tests were confirmed to
+actually pin the fix by temporarily reverting it (2 failures, both on the block
+path). Merchant docs unchanged — `docs/site/index.html` describes First order
+generically ("a customer's first order"), never checkout-type-scoped, so
+nothing there became false. Gates: `npm run ci:strict` **exit=0** (PHPCS 0
+errors, PHPStan `[OK] No errors`, PHPUnit unit **658/658**, eslint/tsc clean,
+vitest **258/258**); `sg docker -c "composer run test:integration"` **OK (188
+tests, 950 assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily
+Connect test" restored post-run. No version bump — ships with the next release
+cut._
+
+Prior: 2026-08-04 (**Contract re-synced byte-identical to engine
 `547ad4d6` (md5 `3cebdcae…`) — v1.6.0 → v1.8.0, CC-8 pass.** The daily
 `Contract staleness` workflow went red ~2026-08-01; three engine doc commits
 had landed since our last sync (`21d5c0c`): `42b5386` (§2 URL example errata),
@@ -95,7 +137,7 @@ commit 547ad4d6…`); `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
 `[OK] No errors`, PHPUnit unit **653/653**, eslint/tsc clean, vitest
 **258/258**). Integration suite deliberately NOT re-run — the delta is
 `.md`-only (contract + this file + the divergence register), no mock or plugin
-code touched; judgement recorded here per the 3.3.x lesson._
+code touched; judgement recorded here per the 3.3.x lesson.
 
 Prior: 2026-08-04 (**Upstream PR #135 unblocked — `sendsmaily/main`
 merged into our `main`.** The sendsmaily maintainer (kaittodesk, 2026-07-27)

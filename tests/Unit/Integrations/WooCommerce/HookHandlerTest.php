@@ -396,6 +396,73 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( 'rec-uuid-123', $order->get_meta( '_smaily_rec_id' ) );
 	}
 
+	public function test_block_checkout_fires_automation_first_order_on_first_paid_order(): void {
+		// PRO-1679: first-order was left on the classic hook when F3-46 carried
+		// attribution across, so it never fired on a block-checkout store.
+		$this->enable_first_order();
+		Functions\when( 'wc_get_customer_order_count' )->justReturn( 1 );
+
+		( new HookHandler( $this->queue ) )->on_block_checkout_order_processed(
+			$this->fake_order( 100, 'buyer@example.test', 9, 1 )
+		);
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( HookHandler::EVENT_AUTOMATION_FIRST_ORDER, $this->enqueued[0]['type'] );
+		self::assertSame( 'buyer@example.test', $this->enqueued[0]['payload']['email'] );
+		self::assertSame( '100', $this->enqueued[0]['payload']['fields']['order_id'] );
+	}
+
+	public function test_block_checkout_skips_automation_first_order_on_second_order(): void {
+		$this->enable_first_order();
+		Functions\when( 'wc_get_customer_order_count' )->justReturn( 2 );
+
+		( new HookHandler( $this->queue ) )->on_block_checkout_order_processed(
+			$this->fake_order( 100, 'buyer@example.test', 9, 1 )
+		);
+
+		self::assertSame( array(), $this->enqueued );
+	}
+
+	public function test_block_checkout_skips_automation_first_order_for_a_guest(): void {
+		// Guests have no order history to compare against — unchanged from the
+		// classic path (is_first_order() bails on customer_id 0).
+		$this->enable_first_order();
+
+		( new HookHandler( $this->queue ) )->on_block_checkout_order_processed(
+			$this->fake_order( 100, 'guest@example.test', 0, 1 )
+		);
+
+		self::assertSame( array(), $this->enqueued );
+	}
+
+	public function test_block_checkout_skips_automation_first_order_when_disabled(): void {
+		// Default get_option stub: smly_plus_first_order_enabled = false.
+		Functions\when( 'wc_get_customer_order_count' )->justReturn( 1 );
+
+		( new HookHandler( $this->queue ) )->on_block_checkout_order_processed(
+			$this->fake_order( 100, 'buyer@example.test', 9, 1 )
+		);
+
+		self::assertSame( array(), $this->enqueued );
+	}
+
+	public function test_first_order_enqueues_once_when_both_checkout_hooks_fire(): void {
+		// A store where both the classic and the Store-API hook run for one
+		// order must still enqueue a single automation row — both fire in the
+		// same request, so the per-request dedupe caps it.
+		$this->enable_first_order();
+		$order = $this->fake_order( 100, 'buyer@example.test', 9, 1 );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		Functions\when( 'wc_get_customer_order_count' )->justReturn( 1 );
+
+		$handler = new HookHandler( $this->queue );
+		$handler->on_checkout_order_processed( 100 );
+		$handler->on_block_checkout_order_processed( $order );
+
+		self::assertCount( 1, $this->enqueued );
+		self::assertSame( HookHandler::EVENT_AUTOMATION_FIRST_ORDER, $this->enqueued[0]['type'] );
+	}
+
 	public function test_checkout_order_syncs_guest_email_in_legitimate_interest(): void {
 		// F3-48 F1: the order path is what makes guests + checkout-opt-in work.
 		Functions\when( 'get_option' )->alias(
@@ -459,6 +526,16 @@ final class HookHandlerTest extends TestCase {
 		$contact = $this->find_enqueued( 'order:100' );
 		self::assertNotNull( $contact );
 		self::assertSame( 0, $contact['payload']['is_unsubscribed'], 'A checkout opt-in subscribes.' );
+	}
+
+	/** Wizard finished + the first-order automation toggled on. */
+	private function enable_first_order(): void {
+		Functions\when( 'get_option' )->alias(
+			static fn ( string $key, $default = null ) =>
+				$key === 'smly_plus_setup_completed'
+					? true
+					: ( $key === 'smly_plus_first_order_enabled' ? true : $default )
+		);
 	}
 
 	/**
