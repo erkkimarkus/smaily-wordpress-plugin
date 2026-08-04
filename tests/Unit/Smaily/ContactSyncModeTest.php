@@ -37,6 +37,22 @@ final class ContactSyncModeTest extends TestCase {
 		$this->options = array();
 	}
 
+	public function test_contact_sync_is_on_until_the_merchant_switches_it_off(): void {
+		self::assertTrue( ContactSyncMode::sync_enabled(), 'Never saved is a fresh install, not an opt-out.' );
+
+		// Every shape the switch has been stored in — the wizard's save route,
+		// and the pre-wizard settings page's boolean before it.
+		foreach ( array( '1', 1, true, 'yes', 'true' ) as $on ) {
+			$this->options[ ContactSyncMode::OPTION_SYNC_ENABLED ] = $on;
+			self::assertTrue( ContactSyncMode::sync_enabled(), 'Stored on: ' . var_export( $on, true ) );
+		}
+
+		foreach ( array( '', '0', 0, false ) as $off ) {
+			$this->options[ ContactSyncMode::OPTION_SYNC_ENABLED ] = $off;
+			self::assertFalse( ContactSyncMode::sync_enabled(), 'Stored off: ' . var_export( $off, true ) );
+		}
+	}
+
 	public function test_default_mode_is_consent(): void {
 		self::assertSame( ContactSyncMode::MODE_CONSENT, ( new ContactSyncMode() )->mode() );
 	}

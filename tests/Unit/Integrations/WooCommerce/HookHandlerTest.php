@@ -266,6 +266,39 @@ final class HookHandlerTest extends TestCase {
 		self::assertCount( 0, $this->enqueued );
 	}
 
+	public function test_switching_contact_sync_off_stops_every_contact_path(): void {
+		// PRO-1742: the switch the merchant sees, off — the wizard is finished
+		// and the store is otherwise a normal legitimate-interest store that
+		// also syncs guests, so only the switch can stop these.
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === 'smly_plus_setup_completed' ) {
+					return true;
+				}
+				if ( $key === ContactSyncMode::OPTION_SYNC_ENABLED ) {
+					return '';
+				}
+				if ( $key === ContactSyncMode::OPTION_MODE ) {
+					return ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+				}
+				if ( $key === ContactSyncMode::OPTION_INCLUDE_GUESTS ) {
+					return '1';
+				}
+				return $default;
+			}
+		);
+		Functions\when( 'get_userdata' )->justReturn( $this->fake_user( 42, 'a@b.c', 'A', 'B' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $this->fake_order( 100, 'guest@example.test', 0, 1 ) );
+
+		$handler = new HookHandler( $this->queue );
+		$handler->on_user_register( 42 );
+		$handler->on_profile_update( 42 );
+		$handler->on_user_newsletter_meta_update( 0, 42, 'user_newsletter', 1 );
+		$handler->on_checkout_order_processed( 100, array( 'user_newsletter' => 1 ) );
+
+		self::assertSame( array(), $this->enqueued, 'Contact sync switched off means no contact reaches Smaily, from any path.' );
+	}
+
 	public function test_bare_user_register_never_fires_welcome_even_when_option_on(): void {
 		// PRO-1682: a staff account created in wp-admin, or an account an
 		// unrelated plugin creates, arrives on user_register alone — no customer

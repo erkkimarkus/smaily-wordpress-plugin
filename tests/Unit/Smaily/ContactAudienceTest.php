@@ -103,6 +103,16 @@ final class ContactAudienceTest extends TestCase {
 		self::assertFalse( $this->audience()->should_sync_order_email( 9, false ) );
 	}
 
+	public function test_the_switch_off_empties_the_audience_whatever_the_mode_says(): void {
+		$this->options[ ContactSyncMode::OPTION_SYNC_ENABLED ]   = '';
+		$this->options[ ContactSyncMode::OPTION_MODE ]           = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
+		$this->options[ ContactSyncMode::OPTION_INCLUDE_GUESTS ] = '1';
+
+		self::assertFalse( $this->audience()->should_sync_user( $this->user( 5 ) ), 'Contact sync is switched off — nobody is a contact we sync.' );
+		self::assertFalse( $this->audience()->should_sync_order_email( 0, true ) );
+		self::assertSame( 0, $this->audience()->count_audience(), 'And the backfill estimate must say so rather than promising a sync that will not happen.' );
+	}
+
 	private function audience(): ContactAudience {
 		return new ContactAudience( new ContactSyncMode() );
 	}
