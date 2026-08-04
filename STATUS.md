@@ -56,10 +56,14 @@ errors`, PHPUnit unit **708/708**, eslint/tsc clean, vitest **261/261**);
 integration suite not re-run — the only PHP touched is the two menu-label
 strings in `admin/wizard.php`. Verified on the running store: the built ET
 catalog resolves all six step titles + the Settings heading, and the rebuilt
-`.mo` resolves the menu item to *Algseadistus*. **Human acceptance still open:
-the Estonian proofread of the changed copy** (the PRO-1520 gate) — and the
-merchant docs site must not be re-published over FTPS until it passes. No
-version bump — ships with the next release cut._
+`.mo` resolves the menu item to *Algseadistus*. **Estonian proofread gate
+PASSED (Erkki accepted the copy as-is, 2026-08-04)** and the merchant docs
+site was **published over FTPS the same day** (live at
+`https://smaily.com/connect-woo/`, verified carrying the day's changes —
+marker field names + new terminology; FTPS credentials now live durably at
+`~/.local/state/smaily-connect/ftp-smaily-connect-woo`, mode 600, so the
+`/tmp` hand-off is only a fallback). No version bump — the plugin-side
+strings ship with the next release cut._
 
 Prior: 2026-08-04 (**PRO-1742 — switching "Sync contacts to Smaily"
 off actually stops the sync.** The wizard/Settings switch has always been
