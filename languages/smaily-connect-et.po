@@ -1190,7 +1190,7 @@ msgid "Rec"
 msgstr "Mootor"
 
 #: admin/src/components/settings/EventLog.tsx:225
-#: admin/src/components/steps/EngineAutomationsSection.tsx:175
+#: admin/src/components/steps/EngineAutomationsSection.tsx:178
 msgid "Retry"
 msgstr "Proovi uuesti"
 
@@ -1262,7 +1262,7 @@ msgstr "WooCommerce"
 
 #: admin/src/components/settings/Settings.tsx:31
 #: admin/src/components/steps/Step4Recommendations.tsx:20
-#: admin/src/components/steps/Step6Done.tsx:135
+#: admin/src/components/steps/Step6Done.tsx:112
 #: admin/src/components/wizard/Wizard.tsx:33
 msgid "Campaign Intelligence"
 msgstr "Campaign Intelligence"
@@ -1272,7 +1272,6 @@ msgid "Integrations"
 msgstr "Lõimingud"
 
 #: admin/src/components/settings/Settings.tsx:33
-#: admin/src/components/steps/Step6Done.tsx:43
 msgid "Event Log"
 msgstr "Sündmuste logi"
 
@@ -1323,59 +1322,59 @@ msgid "Save changes"
 msgstr "Salvesta muudatused"
 
 #: admin/src/components/steps/AutomationSection.tsx:25
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Active"
 msgstr "Aktiivne"
 
 #: admin/src/components/steps/AutomationSection.tsx:25
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Off"
 msgstr "Väljas"
 
 #. translators: %s is the automation name, e.g. "welcome email".
 #. translators: %s is the automation name, e.g. "Replenishment due".
 #: admin/src/components/steps/AutomationSection.tsx:35
-#: admin/src/components/steps/EngineAutomationsSection.tsx:218
+#: admin/src/components/steps/EngineAutomationsSection.tsx:221
 #, js-format
 msgid "Enable %s"
 msgstr "Luba %s"
 
 #: admin/src/components/steps/AutomationSection.tsx:73
-#: admin/src/components/steps/EngineAutomationsSection.tsx:309
+#: admin/src/components/steps/EngineAutomationsSection.tsx:312
 msgid "Language"
 msgstr "Keel"
 
 #: admin/src/components/steps/AutomationSection.tsx:74
-#: admin/src/components/steps/EngineAutomationsSection.tsx:310
+#: admin/src/components/steps/EngineAutomationsSection.tsx:313
 msgid "Workflow"
 msgstr "Töövoog"
 
 #: admin/src/components/steps/AutomationSection.tsx:75
-#: admin/src/components/steps/EngineAutomationsSection.tsx:311
+#: admin/src/components/steps/EngineAutomationsSection.tsx:314
 msgid "Default fallback"
 msgstr "Vaikimisi varuvalik"
 
 #: admin/src/components/steps/AutomationSection.tsx:131
-#: admin/src/components/steps/EngineAutomationsSection.tsx:386
+#: admin/src/components/steps/EngineAutomationsSection.tsx:389
 msgid "inactive"
 msgstr "mitteaktiivne"
 
 #. translators: %s is the error message.
 #: admin/src/components/steps/AutomationSection.tsx:165
-#: admin/src/components/steps/EngineAutomationsSection.tsx:360
+#: admin/src/components/steps/EngineAutomationsSection.tsx:363
 #, js-format
 msgid "Couldn't load workflows: %s"
 msgstr "Töövooge ei õnnestunud laadida: %s"
 
 #: admin/src/components/steps/AutomationSection.tsx:171
 #: admin/src/components/steps/AutomationSection.tsx:188
-#: admin/src/components/steps/EngineAutomationsSection.tsx:394
+#: admin/src/components/steps/EngineAutomationsSection.tsx:397
 msgid "Loading workflows…"
 msgstr "Töövoogude laadimine…"
 
 #: admin/src/components/steps/AutomationSection.tsx:171
 #: admin/src/components/steps/AutomationSection.tsx:188
-#: admin/src/components/steps/EngineAutomationsSection.tsx:394
+#: admin/src/components/steps/EngineAutomationsSection.tsx:397
 msgid "— pick a workflow —"
 msgstr "— vali töövoog —"
 
@@ -1387,7 +1386,7 @@ msgstr "Ei õnnestunud laadida: %s"
 
 #. translators: %s is a locale code, e.g. en-US.
 #: admin/src/components/steps/AutomationSection.tsx:202
-#: admin/src/components/steps/EngineAutomationsSection.tsx:338
+#: admin/src/components/steps/EngineAutomationsSection.tsx:341
 #, js-format
 msgid "Mark %s as default fallback"
 msgstr "Märgi %s vaikimisi varuvalikuks"
@@ -1514,26 +1513,26 @@ msgstr "1. samm 6-st"
 msgid "Connect your Smaily account"
 msgstr "Loo ühendus oma Smaily kontoga"
 
-#: admin/src/components/steps/Step1Connect.tsx:72
+#: admin/src/components/steps/Step1Connect.tsx:81
 msgid "Smaily API credentials"
 msgstr "Smaily API kasutaja andmed"
 
-#: admin/src/components/steps/Step1Connect.tsx:95
+#: admin/src/components/steps/Step1Connect.tsx:104
 msgid "Default fallback account"
 msgstr "Vaikimisi varukonto"
 
-#: admin/src/components/steps/Step1Connect.tsx:96
+#: admin/src/components/steps/Step1Connect.tsx:105
 msgid "Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
 msgstr "Kasutatakse, kui kontakti keelt ei õnnestu tuvastada (külastajad, kes registreeruvad enne, kui WPML/Polylang lokaadi valib)."
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:121
+#: admin/src/components/steps/Step1Connect.tsx:130
 #, js-format
 msgid "Account for %s"
 msgstr "%s konto"
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:126
+#: admin/src/components/steps/Step1Connect.tsx:135
 #, js-format
 msgid "Contacts with the %s locale will sync to this Smaily account."
 msgstr "%s lokaadiga kontaktid sünkroonitakse sellesse Smaily kontosse."
@@ -1599,7 +1598,7 @@ msgid "Step 3 of 6"
 msgstr "3. samm 6-st"
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:49
-#: admin/src/components/steps/Step6Done.tsx:107
+#: admin/src/components/steps/Step6Done.tsx:84
 msgid "Welcome email"
 msgstr "Tervituskiri"
 
@@ -1608,12 +1607,12 @@ msgid "Sent when a shopper creates an account in your store (checkout or My Acco
 msgstr "Saadetakse, kui ostleja loob su poes konto (kassas või „Minu konto“ registreerimisel) — mitte kontode puhul, mille lisad WordPressi haldusliideses või mille loob mõni muu plugin."
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:61
-#: admin/src/components/steps/Step6Done.tsx:116
+#: admin/src/components/steps/Step6Done.tsx:93
 msgid "First-order email"
 msgstr "Esimese tellimuse kiri"
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:73
-#: admin/src/components/steps/Step6Done.tsx:125
+#: admin/src/components/steps/Step6Done.tsx:102
 msgid "Abandoned-cart reminder"
 msgstr "Hüljatud ostukorvi meeldetuletus"
 
@@ -1864,52 +1863,44 @@ msgstr "Liigu menüüs Kontakt → Kontaktivormid ja vali vorm, millele soovid S
 msgid "Contact Form 7 is not installed on this site."
 msgstr "Contact Form 7 ei ole sellel saidil paigaldatud."
 
-#: admin/src/components/steps/Step6Done.tsx:13
+#: admin/src/components/steps/Step6Done.tsx:12
 msgid "Step 6 of 6"
 msgstr "6. samm 6-st"
 
-#: admin/src/components/steps/Step6Done.tsx:20
+#: admin/src/components/steps/Step6Done.tsx:19
 msgid "What's active"
 msgstr "Mis on aktiivne"
 
-#: admin/src/components/steps/Step6Done.tsx:41
-msgid "All sync events appear in the"
-msgstr "Kõik sünkroonimissündmused ilmuvad"
-
-#: admin/src/components/steps/Step6Done.tsx:45
-msgid "tab (Settings → Event Log). Use it to diagnose any unexpected behaviour during the first days of operation."
-msgstr "vahekaardil (Sätted → Sündmuste logi). Kasuta seda ootamatu käitumise diagnoosimiseks töö esimestel päevadel."
-
-#: admin/src/components/steps/Step6Done.tsx:50
+#: admin/src/components/steps/Step6Done.tsx:39
 msgid "Open dashboards"
 msgstr "Ava töölauad"
 
-#: admin/src/components/steps/Step6Done.tsx:58
+#: admin/src/components/steps/Step1Connect.tsx:66
 msgid "Open Smaily dashboard →"
 msgstr "Ava oma Smaily konto →"
 
-#: admin/src/components/steps/Step6Done.tsx:61
+#: admin/src/components/steps/Step6Done.tsx:39
 msgid "Open Campaign Intelligence dashboard →"
 msgstr "Ava Campaign Intelligence'i töölaud →"
 
-#: admin/src/components/steps/Step6Done.tsx:69
+#: admin/src/components/steps/Step6Done.tsx:46
 msgid "Smaily connected"
 msgstr "Smaily ühendus loodud"
 
 #. translators: %d: number of configured accounts.
-#: admin/src/components/steps/Step6Done.tsx:73
+#: admin/src/components/steps/Step6Done.tsx:50
 #, js-format
 msgid "%d accounts configured (Mode A)"
 msgstr "%d kontot seadistatud (režiim A)"
 
 #. translators: %s: multilingual mode identifier.
-#: admin/src/components/steps/Step6Done.tsx:77
+#: admin/src/components/steps/Step6Done.tsx:54
 #, js-format
 msgid "Multilingual mode: %s"
 msgstr "Mitmekeelne leht: %s"
 
 #. translators: %d: number of synced fields.
-#: admin/src/components/steps/Step6Done.tsx:86
+#: admin/src/components/steps/Step6Done.tsx:63
 #, js-format
 msgid "%d field synced"
 msgid_plural "%d fields synced"
@@ -1917,7 +1908,7 @@ msgstr[0] "%d väli sünkroniseeritud"
 msgstr[1] "%d välja sünkroniseeritud"
 
 #. translators: %d: number of contacts synced.
-#: admin/src/components/steps/Step6Done.tsx:96
+#: admin/src/components/steps/Step6Done.tsx:73
 #, js-format
 msgid "%d contact synced."
 msgid_plural "%d contacts synced."
@@ -1925,8 +1916,8 @@ msgstr[0] "%d kontakt sünkroonitud."
 msgstr[1] "%d kontakti sünkroonitud."
 
 #. translators: %d: number of mapped workflows.
-#: admin/src/components/steps/Step6Done.tsx:111
-#: admin/src/components/steps/Step6Done.tsx:120
+#: admin/src/components/steps/Step6Done.tsx:88
+#: admin/src/components/steps/Step6Done.tsx:97
 #, js-format
 msgid "%d workflow mapped"
 msgid_plural "%d workflows mapped"
@@ -1934,18 +1925,18 @@ msgstr[0] "%d töövoog seotud"
 msgstr[1] "%d töövoogu seotud"
 
 #. translators: %d: cutoff in minutes.
-#: admin/src/components/steps/Step6Done.tsx:129
+#: admin/src/components/steps/Step6Done.tsx:106
 #, js-format
 msgid "%d-minute cutoff"
 msgstr "%d-minutiline ooteaeg"
 
 #. translators: %d: number of active features (out of 5).
-#: admin/src/components/steps/Step6Done.tsx:139
+#: admin/src/components/steps/Step6Done.tsx:116
 #, js-format
 msgid "%d of 5 features active"
 msgstr "%d / 5 funktsioonist aktiivne"
 
-#: admin/src/components/steps/Step6Done.tsx:141
+#: admin/src/components/steps/Step6Done.tsx:118
 msgid "Not connected (optional)"
 msgstr "Pole ühendatud (valikuline)"
 
@@ -2086,109 +2077,109 @@ msgstr "Smaily Campaign Intelligence ei ole ühendatud."
 msgid "The engine rejected the stored API key."
 msgstr "Mootor lükkas salvestatud API-võtme tagasi."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:52
+#: admin/src/components/steps/EngineAutomationsSection.tsx:55
 msgid "Connect Campaign Intelligence to unlock"
 msgstr "Aktiveeri Campaign Intelligence tööriist, et"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:62
+#: admin/src/components/steps/EngineAutomationsSection.tsx:65
 msgid "Open Campaign Intelligence"
 msgstr "Ava Campaign Intelligence"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:71
+#: admin/src/components/steps/EngineAutomationsSection.tsx:74
 msgid "Connect Smaily Campaign Intelligence on the Campaign Intelligence tab to set them up."
 msgstr "Seadistamiseks ühenda Smaily Campaign Intelligence samanimelisel vahekaardil."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:106
+#: admin/src/components/steps/EngineAutomationsSection.tsx:109
 msgid "No engine automations are available for your store yet. New triggers appear here automatically when the engine adds them."
 msgstr "Sinu poe jaoks pole veel ühtegi mootori-automaatikat saadaval. Uued trigerid ilmuvad siia automaatselt, kui mootor need lisab."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:118
+#: admin/src/components/steps/EngineAutomationsSection.tsx:121
 msgid "Engine automations not saved"
 msgstr "Mootori-automaatikad jäid salvestamata"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:125
+#: admin/src/components/steps/EngineAutomationsSection.tsx:128
 msgid "Engine automations saved."
 msgstr "Mootori-automaatikad salvestatud."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:156
+#: admin/src/components/steps/EngineAutomationsSection.tsx:159
 msgid "Loading engine automations…"
 msgstr "Laen mootori-automaatikaid…"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:168
+#: admin/src/components/steps/EngineAutomationsSection.tsx:171
 msgid "Campaign Intelligence rejected the stored API key"
 msgstr "Campaign Intelligence lükkas salvestatud API-võtme tagasi"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:168
+#: admin/src/components/steps/EngineAutomationsSection.tsx:171
 msgid "The key was revoked or rotated. Disconnect and reconnect with a fresh setup link on the Campaign Intelligence tab, then come back here."
 msgstr "Võti on tühistatud või vahetatud. Ühenda Campaign Intelligence'i vahekaardil lahti ja uuesti värske seadistuslingiga, seejärel tule siia tagasi."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:174
+#: admin/src/components/steps/EngineAutomationsSection.tsx:177
 msgid "Couldn't load engine automations"
 msgstr "Mootori-automaatikate laadimine ebaõnnestus"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Test mode"
 msgstr "Testrežiim"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:207
+#: admin/src/components/steps/EngineAutomationsSection.tsx:210
 msgid "Smaily templates guide"
 msgstr "Smaily mallide juhend"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:260
+#: admin/src/components/steps/EngineAutomationsSection.tsx:263
 msgid "Cooldown"
 msgstr "Puhkeaeg"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:268
+#: admin/src/components/steps/EngineAutomationsSection.tsx:271
 msgid "days"
 msgstr "päeva"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:274
+#: admin/src/components/steps/EngineAutomationsSection.tsx:277
 msgid "Minimum days between two fires of this automation for the same customer (1–365)."
 msgstr "Minimaalne päevade arv sama kliendi kahe käivituse vahel (1–365)."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:289
+#: admin/src/components/steps/EngineAutomationsSection.tsx:292
 msgid "Smaily workflow"
 msgstr "Smaily workflow"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:306
+#: admin/src/components/steps/EngineAutomationsSection.tsx:309
 msgid "Smaily workflow per language"
 msgstr "Smaily workflow keele kohta"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:373
+#: admin/src/components/steps/EngineAutomationsSection.tsx:376
 msgid "Workflow id, e.g. 123"
 msgstr "Workflow ID, nt 123"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:377
+#: admin/src/components/steps/EngineAutomationsSection.tsx:380
 msgid "No active workflows found in Smaily — enter the workflow id manually or create the workflow first."
 msgstr "Smailyst ei leitud ühtegi aktiivset workflow'd — sisesta workflow ID käsitsi või loo workflow enne."
 
 #. translators: %s is the automation name, e.g. "Replenishment due".
-#: admin/src/components/steps/EngineAutomationsSection.tsx:414
+#: admin/src/components/steps/EngineAutomationsSection.tsx:417
 #, js-format
 msgid "Turn off test mode for \"%s\"? Once you save, the engine will start sending this automation to real customers. You can switch back to test mode at any time."
 msgstr "Kas lülitada testrežiim välja automaatikal \"%s\"? Pärast salvestamist hakkab mootor saatma seda automaatikat päris klientidele. Saad testrežiimi igal ajal tagasi lülitada."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:431
+#: admin/src/components/steps/EngineAutomationsSection.tsx:434
 msgid "Live — real customers receive this automation once saved."
 msgstr "Aktiivne — pärast salvestamist saavad seda automaatikat päris kliendid."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:432
+#: admin/src/components/steps/EngineAutomationsSection.tsx:435
 msgid "Back to test mode"
 msgstr "Tagasi testrežiimi"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:437
+#: admin/src/components/steps/EngineAutomationsSection.tsx:440
 msgid "Test mode is on — emails go only to the test addresses below, never to customers."
 msgstr "Testrežiim on sees — kirjad lähevad ainult allolevatele test-aadressidele, mitte kunagi klientidele."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:439
+#: admin/src/components/steps/EngineAutomationsSection.tsx:442
 msgid "Test addresses"
 msgstr "Test-aadressid"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:453
+#: admin/src/components/steps/EngineAutomationsSection.tsx:456
 msgid "Comma-separated, up to 50 addresses."
 msgstr "Komadega eraldatult, kuni 50 aadressi."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:460
+#: admin/src/components/steps/EngineAutomationsSection.tsx:463
 msgid "Activate for real…"
 msgstr "Aktiveeri päriselt…"
 
@@ -2246,7 +2237,7 @@ msgstr "Ühendus Smaily Campaign Intelligence'iga ebaõnnestus (HTTP %d). Kontro
 msgid "Connecting to Smaily Campaign Intelligence failed. Check your network connection and try again."
 msgstr "Ühendus Smaily Campaign Intelligence'iga ebaõnnestus. Kontrolli võrguühendust ja proovi uuesti."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:454
+#: admin/src/components/steps/EngineAutomationsSection.tsx:457
 msgid "This automation is enabled in test mode without any test addresses — no emails will be sent to anyone until you add at least one address."
 msgstr "See automaatika on lubatud test-režiimis ilma test-aadressideta — kirju ei saadeta mitte kellelegi, kuni lisad vähemalt ühe aadressi."
 
@@ -2325,19 +2316,19 @@ msgstr "Kontaktid"
 msgid "Contacts, WooCommerce, and Campaign Intelligence are locked until your Smaily credentials authenticate. Fix the connection on the Connection tab to unlock them."
 msgstr "Kontaktid, WooCommerce ja Campaign Intelligence on lukus, kuni sinu Smaily mandaadid autendivad. Ühenduse parandamiseks mine vahekaardile Ühendus."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:38
+#: admin/src/components/steps/EngineAutomationsSection.tsx:41
 msgid "Campaign Intelligence automation workflows"
 msgstr "Campaign Intelligence automaatikad"
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:39
+#: admin/src/components/steps/EngineAutomationsSection.tsx:42
 msgid "Following automated emails are sent by Smaily’s Campaign Intelligence tool that triggers Smaily’s automation workflows at the predicted moment (a replenishment running out, a customer at risk of churning, etc.), based on customer’s previous purchase history and behaviour."
 msgstr "Järgnevad automaatika töövood on seotud Smaily Campaign Intelligence’ga. Campaign Intelligence tööriist käivitab automaatikad just sel hetkel, millal soovitud kirja saatmine võiks toimuda, põhinedes kliendi eelnevale ostuajaloole ning käitumisele."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:66
+#: admin/src/components/steps/EngineAutomationsSection.tsx:69
 msgid "Replenishment reminders, win-back campaigns and other engine-run automations sent at the right moment for each customer through Smaily workflows."
 msgstr "saata kordusostu meeldetuletusi, reaktiveerimiskirju ja teisi käitumispõhiseid automaatseid kirju Smaily automaatikate kaudu."
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:71
+#: admin/src/components/steps/EngineAutomationsSection.tsx:74
 msgid "You can connect Campaign Intelligence at the next setup step."
 msgstr "Campaign Intelligence’i tööriista saad aktiveerida järgmises sammus."
 
@@ -2505,20 +2496,20 @@ msgstr "Vormid ja RSS"
 msgid "Add a newsletter subscription form to any page, to collect new subscribers directly to your Smaily account. Choose the suitable form option for your page and follow the instructions to add the form."
 msgstr "Lisa uudiskirjaga liitumise Smaily vorm oma lehele. Vali all järgnevate variantide seast sobiv ning kliki „Ava …“ nupule vormi seadistamiseks."
 
-#: admin/src/components/steps/Step6Done.tsx:14
+#: admin/src/components/steps/Step6Done.tsx:13
 #: admin/src/components/wizard/Wizard.tsx:40
 msgid "Overview"
 msgstr "Ülevaade"
 
-#: admin/src/components/steps/Step6Done.tsx:15
+#: admin/src/components/steps/Step6Done.tsx:14
 msgid "Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save."
 msgstr "Smaily Connect on seadistatud ja valmis kasutamiseks. Veendu, et kõik seadistused on õiged ning kliki „Lõpeta“ nupul, et seadistused salvestada."
 
-#: admin/src/components/steps/Step6Done.tsx:82
+#: admin/src/components/steps/Step6Done.tsx:59
 msgid "Contact sync enabled"
 msgstr "Kontaktide sünkroniseerimine aktiveeritud"
 
-#: admin/src/components/steps/Step6Done.tsx:92
+#: admin/src/components/steps/Step6Done.tsx:69
 msgid "Initial import complete"
 msgstr "Esmane kontaktide importimine lõpetatud"
 

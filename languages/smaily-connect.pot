@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-04T19:02:02+00:00\n"
+"POT-Creation-Date: 2026-08-04T19:18:32+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: smaily-connect\n"
@@ -1189,7 +1189,7 @@ msgid "Rec"
 msgstr ""
 
 #: admin/src/components/settings/EventLog.tsx:225
-#: admin/src/components/steps/EngineAutomationsSection.tsx:175
+#: admin/src/components/steps/EngineAutomationsSection.tsx:178
 msgid "Retry"
 msgstr ""
 
@@ -1266,7 +1266,7 @@ msgstr ""
 
 #: admin/src/components/settings/Settings.tsx:31
 #: admin/src/components/steps/Step4Recommendations.tsx:20
-#: admin/src/components/steps/Step6Done.tsx:135
+#: admin/src/components/steps/Step6Done.tsx:112
 #: admin/src/components/wizard/Wizard.tsx:33
 msgid "Campaign Intelligence"
 msgstr ""
@@ -1276,7 +1276,6 @@ msgid "Integrations"
 msgstr ""
 
 #: admin/src/components/settings/Settings.tsx:33
-#: admin/src/components/steps/Step6Done.tsx:43
 msgid "Event Log"
 msgstr ""
 
@@ -1331,59 +1330,59 @@ msgid "Save changes"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:25
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Active"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:25
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Off"
 msgstr ""
 
 #. translators: %s is the automation name, e.g. "welcome email".
 #. translators: %s is the automation name, e.g. "Replenishment due".
 #: admin/src/components/steps/AutomationSection.tsx:35
-#: admin/src/components/steps/EngineAutomationsSection.tsx:218
+#: admin/src/components/steps/EngineAutomationsSection.tsx:221
 #, js-format
 msgid "Enable %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:73
-#: admin/src/components/steps/EngineAutomationsSection.tsx:309
+#: admin/src/components/steps/EngineAutomationsSection.tsx:312
 msgid "Language"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:74
-#: admin/src/components/steps/EngineAutomationsSection.tsx:310
+#: admin/src/components/steps/EngineAutomationsSection.tsx:313
 msgid "Workflow"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:75
-#: admin/src/components/steps/EngineAutomationsSection.tsx:311
+#: admin/src/components/steps/EngineAutomationsSection.tsx:314
 msgid "Default fallback"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:131
-#: admin/src/components/steps/EngineAutomationsSection.tsx:386
+#: admin/src/components/steps/EngineAutomationsSection.tsx:389
 msgid "inactive"
 msgstr ""
 
 #. translators: %s is the error message.
 #: admin/src/components/steps/AutomationSection.tsx:165
-#: admin/src/components/steps/EngineAutomationsSection.tsx:360
+#: admin/src/components/steps/EngineAutomationsSection.tsx:363
 #, js-format
 msgid "Couldn't load workflows: %s"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:171
 #: admin/src/components/steps/AutomationSection.tsx:188
-#: admin/src/components/steps/EngineAutomationsSection.tsx:394
+#: admin/src/components/steps/EngineAutomationsSection.tsx:397
 msgid "Loading workflows…"
 msgstr ""
 
 #: admin/src/components/steps/AutomationSection.tsx:171
 #: admin/src/components/steps/AutomationSection.tsx:188
-#: admin/src/components/steps/EngineAutomationsSection.tsx:394
+#: admin/src/components/steps/EngineAutomationsSection.tsx:397
 msgid "— pick a workflow —"
 msgstr ""
 
@@ -1395,7 +1394,7 @@ msgstr ""
 
 #. translators: %s is a locale code, e.g. en-US.
 #: admin/src/components/steps/AutomationSection.tsx:202
-#: admin/src/components/steps/EngineAutomationsSection.tsx:338
+#: admin/src/components/steps/EngineAutomationsSection.tsx:341
 #, js-format
 msgid "Mark %s as default fallback"
 msgstr ""
@@ -1448,129 +1447,129 @@ msgstr ""
 msgid "Connected to Smaily."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:38
+#: admin/src/components/steps/EngineAutomationsSection.tsx:41
 msgid "Campaign Intelligence automation workflows"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:39
+#: admin/src/components/steps/EngineAutomationsSection.tsx:42
 msgid "Following automated emails are sent by Smaily’s Campaign Intelligence tool that triggers Smaily’s automation workflows at the predicted moment (a replenishment running out, a customer at risk of churning, etc.), based on customer’s previous purchase history and behaviour."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:52
+#: admin/src/components/steps/EngineAutomationsSection.tsx:55
 msgid "Connect Campaign Intelligence to unlock"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:62
+#: admin/src/components/steps/EngineAutomationsSection.tsx:65
 msgid "Open Campaign Intelligence"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:66
+#: admin/src/components/steps/EngineAutomationsSection.tsx:69
 msgid "Replenishment reminders, win-back campaigns and other engine-run automations sent at the right moment for each customer through Smaily workflows."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:71
+#: admin/src/components/steps/EngineAutomationsSection.tsx:74
 msgid "Connect Smaily Campaign Intelligence on the Campaign Intelligence tab to set them up."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:71
+#: admin/src/components/steps/EngineAutomationsSection.tsx:74
 msgid "You can connect Campaign Intelligence at the next setup step."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:106
+#: admin/src/components/steps/EngineAutomationsSection.tsx:109
 msgid "No engine automations are available for your store yet. New triggers appear here automatically when the engine adds them."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:118
+#: admin/src/components/steps/EngineAutomationsSection.tsx:121
 msgid "Engine automations not saved"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:125
+#: admin/src/components/steps/EngineAutomationsSection.tsx:128
 msgid "Engine automations saved."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:156
+#: admin/src/components/steps/EngineAutomationsSection.tsx:159
 msgid "Loading engine automations…"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:168
+#: admin/src/components/steps/EngineAutomationsSection.tsx:171
 msgid "Campaign Intelligence rejected the stored API key"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:168
+#: admin/src/components/steps/EngineAutomationsSection.tsx:171
 msgid "The key was revoked or rotated. Disconnect and reconnect with a fresh setup link on the Campaign Intelligence tab, then come back here."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:174
+#: admin/src/components/steps/EngineAutomationsSection.tsx:177
 msgid "Couldn't load engine automations"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:201
+#: admin/src/components/steps/EngineAutomationsSection.tsx:204
 msgid "Test mode"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:207
+#: admin/src/components/steps/EngineAutomationsSection.tsx:210
 msgid "Smaily templates guide"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:260
+#: admin/src/components/steps/EngineAutomationsSection.tsx:263
 msgid "Cooldown"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:268
+#: admin/src/components/steps/EngineAutomationsSection.tsx:271
 msgid "days"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:274
+#: admin/src/components/steps/EngineAutomationsSection.tsx:277
 msgid "Minimum days between two fires of this automation for the same customer (1–365)."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:289
+#: admin/src/components/steps/EngineAutomationsSection.tsx:292
 msgid "Smaily workflow"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:306
+#: admin/src/components/steps/EngineAutomationsSection.tsx:309
 msgid "Smaily workflow per language"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:373
+#: admin/src/components/steps/EngineAutomationsSection.tsx:376
 msgid "Workflow id, e.g. 123"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:377
+#: admin/src/components/steps/EngineAutomationsSection.tsx:380
 msgid "No active workflows found in Smaily — enter the workflow id manually or create the workflow first."
 msgstr ""
 
 #. translators: %s is the automation name, e.g. "Replenishment due".
-#: admin/src/components/steps/EngineAutomationsSection.tsx:414
+#: admin/src/components/steps/EngineAutomationsSection.tsx:417
 #, js-format
 msgid "Turn off test mode for \"%s\"? Once you save, the engine will start sending this automation to real customers. You can switch back to test mode at any time."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:431
+#: admin/src/components/steps/EngineAutomationsSection.tsx:434
 msgid "Live — real customers receive this automation once saved."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:432
+#: admin/src/components/steps/EngineAutomationsSection.tsx:435
 msgid "Back to test mode"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:437
+#: admin/src/components/steps/EngineAutomationsSection.tsx:440
 msgid "Test mode is on — emails go only to the test addresses below, never to customers."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:439
+#: admin/src/components/steps/EngineAutomationsSection.tsx:442
 msgid "Test addresses"
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:453
+#: admin/src/components/steps/EngineAutomationsSection.tsx:456
 msgid "Comma-separated, up to 50 addresses."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:454
+#: admin/src/components/steps/EngineAutomationsSection.tsx:457
 msgid "This automation is enabled in test mode without any test addresses — no emails will be sent to anyone until you add at least one address."
 msgstr ""
 
-#: admin/src/components/steps/EngineAutomationsSection.tsx:460
+#: admin/src/components/steps/EngineAutomationsSection.tsx:463
 msgid "Activate for real…"
 msgstr ""
 
@@ -1660,26 +1659,30 @@ msgstr ""
 msgid "User guide to create API credentials"
 msgstr ""
 
-#: admin/src/components/steps/Step1Connect.tsx:72
+#: admin/src/components/steps/Step1Connect.tsx:66
+msgid "Open Smaily dashboard →"
+msgstr ""
+
+#: admin/src/components/steps/Step1Connect.tsx:81
 msgid "Smaily API credentials"
 msgstr ""
 
-#: admin/src/components/steps/Step1Connect.tsx:95
+#: admin/src/components/steps/Step1Connect.tsx:104
 msgid "Default fallback account"
 msgstr ""
 
-#: admin/src/components/steps/Step1Connect.tsx:96
+#: admin/src/components/steps/Step1Connect.tsx:105
 msgid "Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
 msgstr ""
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:121
+#: admin/src/components/steps/Step1Connect.tsx:130
 #, js-format
 msgid "Account for %s"
 msgstr ""
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:126
+#: admin/src/components/steps/Step1Connect.tsx:135
 #, js-format
 msgid "Contacts with the %s locale will sync to this Smaily account."
 msgstr ""
@@ -1887,7 +1890,7 @@ msgid "Note! Newsletter subscription welcome emails can be configured under subs
 msgstr ""
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:49
-#: admin/src/components/steps/Step6Done.tsx:107
+#: admin/src/components/steps/Step6Done.tsx:84
 msgid "Welcome email"
 msgstr ""
 
@@ -1896,7 +1899,7 @@ msgid "Sent when a shopper creates an account in your store (checkout or My Acco
 msgstr ""
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:61
-#: admin/src/components/steps/Step6Done.tsx:116
+#: admin/src/components/steps/Step6Done.tsx:93
 msgid "First-order email"
 msgstr ""
 
@@ -1905,7 +1908,7 @@ msgid "Sent when a customer purchases for the first time."
 msgstr ""
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:73
-#: admin/src/components/steps/Step6Done.tsx:125
+#: admin/src/components/steps/Step6Done.tsx:102
 msgid "Abandoned-cart reminder"
 msgstr ""
 
@@ -2200,77 +2203,65 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:13
+#: admin/src/components/steps/Step6Done.tsx:12
 msgid "Step 6 of 6"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:14
+#: admin/src/components/steps/Step6Done.tsx:13
 #: admin/src/components/wizard/Wizard.tsx:40
 msgid "Overview"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:15
+#: admin/src/components/steps/Step6Done.tsx:14
 msgid "Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save."
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:20
+#: admin/src/components/steps/Step6Done.tsx:19
 msgid "What's active"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:41
-msgid "All sync events appear in the"
-msgstr ""
-
-#: admin/src/components/steps/Step6Done.tsx:45
-msgid "tab (Settings → Event Log). Use it to diagnose any unexpected behaviour during the first days of operation."
-msgstr ""
-
-#: admin/src/components/steps/Step6Done.tsx:50
+#: admin/src/components/steps/Step6Done.tsx:39
 msgid "Open dashboards"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:58
-msgid "Open Smaily dashboard →"
-msgstr ""
-
-#: admin/src/components/steps/Step6Done.tsx:61
+#: admin/src/components/steps/Step6Done.tsx:39
 msgid "Open Campaign Intelligence dashboard →"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:69
+#: admin/src/components/steps/Step6Done.tsx:46
 msgid "Smaily connected"
 msgstr ""
 
 #. translators: %d: number of configured accounts.
-#: admin/src/components/steps/Step6Done.tsx:73
+#: admin/src/components/steps/Step6Done.tsx:50
 #, js-format
 msgid "%d accounts configured (Mode A)"
 msgstr ""
 
 #. translators: %s: multilingual mode identifier.
-#: admin/src/components/steps/Step6Done.tsx:77
+#: admin/src/components/steps/Step6Done.tsx:54
 #, js-format
 msgid "Multilingual mode: %s"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:82
+#: admin/src/components/steps/Step6Done.tsx:59
 msgid "Contact sync enabled"
 msgstr ""
 
 #. translators: %d: number of synced fields.
-#: admin/src/components/steps/Step6Done.tsx:86
+#: admin/src/components/steps/Step6Done.tsx:63
 #, js-format
 msgid "%d field synced"
 msgid_plural "%d fields synced"
 msgstr[0] ""
 msgstr[1] ""
 
-#: admin/src/components/steps/Step6Done.tsx:92
+#: admin/src/components/steps/Step6Done.tsx:69
 msgid "Initial import complete"
 msgstr ""
 
 #. translators: %d: number of contacts synced.
-#: admin/src/components/steps/Step6Done.tsx:96
+#: admin/src/components/steps/Step6Done.tsx:73
 #, js-format
 msgid "%d contact synced."
 msgid_plural "%d contacts synced."
@@ -2278,8 +2269,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: number of mapped workflows.
-#: admin/src/components/steps/Step6Done.tsx:111
-#: admin/src/components/steps/Step6Done.tsx:120
+#: admin/src/components/steps/Step6Done.tsx:88
+#: admin/src/components/steps/Step6Done.tsx:97
 #, js-format
 msgid "%d workflow mapped"
 msgid_plural "%d workflows mapped"
@@ -2287,18 +2278,18 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: cutoff in minutes.
-#: admin/src/components/steps/Step6Done.tsx:129
+#: admin/src/components/steps/Step6Done.tsx:106
 #, js-format
 msgid "%d-minute cutoff"
 msgstr ""
 
 #. translators: %d: number of active features (out of 5).
-#: admin/src/components/steps/Step6Done.tsx:139
+#: admin/src/components/steps/Step6Done.tsx:116
 #, js-format
 msgid "%d of 5 features active"
 msgstr ""
 
-#: admin/src/components/steps/Step6Done.tsx:141
+#: admin/src/components/steps/Step6Done.tsx:118
 msgid "Not connected (optional)"
 msgstr ""
 
