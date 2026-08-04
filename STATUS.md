@@ -26,7 +26,50 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1681 — every automation trigger now marks
+_Last updated: 2026-08-04 (**PRO-1683 — ticking Phone and Gender in the
+setup wizard now actually syncs them.** The wizard saved the merchant's
+selection under `phone` / `gender` while the sync has always read
+`user_phone` / `user_gender` (spec/FIELD_MAPPING.md §2), so
+`SubscriberPayloadBuilder`'s supported-fields intersection dropped both
+before a payload was ever built — no error, no notice, the checkbox simply
+did nothing, in every contact sync mode and on both the live and backfill
+paths. **Fixed on the WIZARD side** (`DEFAULT_SYNC_FIELDS` +
+`Step2Subscribers` labels now use the canonical names): the names the sync
+expects are the field-naming standard AND what merchants' existing Smaily
+segments and templates reference, so renaming them on the wire is a
+one-way door (the PRO-1678 sweep ground rule). **The upgrade path is a
+read-side alias, not a migration** (`SubscriberPayloadBuilder::
+canonical_fields()`, `phone`→`user_phone`, `gender`→`user_gender`): a
+store that saved its selection pre-fix keeps sending the same fields
+without re-saving, and it heals however the plugin was updated instead of
+depending on an upgrade hook a ZIP install may never fire. `EnvDetector::
+saved_settings()` canonicalises the same way so the checkbox shows ticked
+— otherwise the merchant could never turn the field back OFF. Only string
+VALUES are aliased and keys are preserved, so the legacy associative
+option shape passes through byte-identical (PRO-1684 is untouched, neither
+fixed nor worsened). Also dropped the per-instance memo of the selection —
+a handler registered at `init` outlives a settings save, and it was making
+one test pass for the wrong reason. Nothing on the wire changed: values
+still ship as `user_phone` and the legacy `Female`/`Male` gender enum, and
+a field with no source value is still OMITTED (absent preserves what
+Smaily holds, empty would wipe it). **The demonstration**
+(`tests/Integration/SubscriberSyncFieldSelectionTest.php`) drives the real
+`POST /settings` save route + the real pipelines (live contact sync and
+`BackfillJob`) with only the transport faked, and READS the wizard's
+checkbox list from `admin/src/state/types.ts` rather than copying it — a
+copy would keep passing while the shipped wizard saved discarded names.
+`SubscriberPayloadBuilderTest` adds the same cross-file pin to the unit
+gate. Confirmed to pin the change by reverting each half (wizard half 3/5
+fail, upgrade half 1/5). Merchant docs unchanged — `docs/site/index.html`
+never claimed these fields were unavailable; its "tick any additional
+fields (name, phone…)" line simply becomes true. Gates: `npm run
+ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit
+unit **688/688**, eslint/tsc clean, vitest **258/258**); `sg docker -c
+"composer run test:integration"` **OK (205 tests, 1221 assertions)** with
+1 pre-existing skip, dev sandbox tenant "Smaily Connect test" restored
+post-run. No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1681 — every automation trigger now marks
 the contact it enrols.** A contact Smaily holds only because a store
 automation enrolled them was indistinguishable from someone who subscribed
 themselves: of the three store-run triggers only abandoned cart sent anything
