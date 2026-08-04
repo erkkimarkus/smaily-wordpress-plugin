@@ -19,11 +19,13 @@ defined( 'ABSPATH' ) || exit;
  *
  * Presets:
  *   - legitimate_interest — all registered customers; no opt-in filter; no
- *     reconcile; automations honour unsubscribes unless the merchant opts into
- *     forcing.
+ *     reconcile.
  *   - consent (DEFAULT)   — only opted-in (user_newsletter=1); bidirectional
- *     Smaily<->WP reconcile; automations never re-subscribe.
+ *     Smaily<->WP reconcile.
  *   - checkout_optin      — no account sync; checkout checkbox only (guests).
+ *
+ * Automation triggers behave the same under every preset: they never
+ * re-subscribe a contact who unsubscribed in Smaily (PRO-1716).
  *
  * Default is `consent`: lawful-safe AND back-compat (legacy's cron already
  * filtered user_newsletter=1), so an upgrade never silently broadens the
@@ -40,9 +42,8 @@ final class ContactSyncMode {
 	 */
 	public const OPTION_SYNC_ENABLED = 'smaily_connect_subscriber_sync_enabled';
 
-	public const OPTION_MODE                    = 'smly_plus_contact_sync_mode';
-	public const OPTION_INCLUDE_GUESTS          = 'smly_plus_contact_sync_include_guests';
-	public const OPTION_AUTOMATION_FORCE_OPT_IN = 'smly_plus_contact_sync_automation_force_opt_in';
+	public const OPTION_MODE           = 'smly_plus_contact_sync_mode';
+	public const OPTION_INCLUDE_GUESTS = 'smly_plus_contact_sync_include_guests';
 
 	public const MODE_LEGITIMATE_INTEREST = 'legitimate_interest';
 	public const MODE_CONSENT             = 'consent';
@@ -119,20 +120,6 @@ final class ContactSyncMode {
 	/** The store mirrors Smaily's unsubscribes/returns back into WP (consent only). */
 	public function reconciles(): bool {
 		return $this->mode() === self::MODE_CONSENT;
-	}
-
-	/**
-	 * Whether automation triggers (welcome / first_order / abandoned_cart) send
-	 * force_opt_in=true. Consent + checkout: always false (never re-subscribe).
-	 * Legitimate interest: false by default; true only if the merchant enables
-	 * the advanced toggle — an explicit unsubscribe is honoured by default
-	 * (GDPR Art. 21).
-	 */
-	public function automation_force_opt_in(): bool {
-		if ( $this->mode() !== self::MODE_LEGITIMATE_INTEREST ) {
-			return false;
-		}
-		return $this->bool_option( self::OPTION_AUTOMATION_FORCE_OPT_IN );
 	}
 
 	private function bool_option( string $key ): bool {

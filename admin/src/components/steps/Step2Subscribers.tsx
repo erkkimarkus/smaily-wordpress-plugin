@@ -171,23 +171,6 @@ export function Step2Subscribers({
               />
             </div>
           )}
-
-          {state.contactSyncMode === 'legitimate_interest' && (
-            <div className="mt-4">
-              <Toggle
-                name="smly-automation-force-opt-in"
-                checked={state.automationForceOptIn}
-                onChange={(e) =>
-                  dispatch({ type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: e.target.checked })
-                }
-                label={ __( 'Force opt-in on automation triggers', 'smaily-connect' ) }
-                description={ __(
-                  'Advanced: a welcome / abandoned-cart / first-order automation will re-subscribe the contact in Smaily, overriding an existing unsubscribe.',
-                  'smaily-connect',
-                ) }
-              />
-            </div>
-          )}
         </Card>
       )}
 

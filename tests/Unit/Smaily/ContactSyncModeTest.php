@@ -103,21 +103,4 @@ final class ContactSyncModeTest extends TestCase {
 
 		self::assertTrue( ( new ContactSyncMode() )->include_guests() );
 	}
-
-	public function test_automation_force_opt_in_defaults_false_even_in_legitimate_interest(): void {
-		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
-
-		self::assertFalse( ( new ContactSyncMode() )->automation_force_opt_in() );
-	}
-
-	public function test_automation_force_opt_in_toggle_applies_only_in_legitimate_interest(): void {
-		$this->options[ ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN ] = '1';
-
-		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
-		self::assertTrue( ( new ContactSyncMode() )->automation_force_opt_in() );
-
-		// Same toggle, consent mode → still false (strict modes never re-subscribe).
-		$this->options[ ContactSyncMode::OPTION_MODE ] = ContactSyncMode::MODE_CONSENT;
-		self::assertFalse( ( new ContactSyncMode() )->automation_force_opt_in() );
-	}
 }

@@ -150,12 +150,9 @@ describe('wizardReducer — Step 2 Subscribers', () => {
     expect(next.contactSyncMode).toBe('legitimate_interest');
   });
 
-  it('toggles include-guests and automation force-opt-in', () => {
+  it('toggles include-guests', () => {
     const guests = wizardReducer(baseState, { type: 'SET_INCLUDE_GUESTS', payload: true });
     expect(guests.includeGuests).toBe(true);
-
-    const forced = wizardReducer(baseState, { type: 'SET_AUTOMATION_FORCE_OPT_IN', payload: true });
-    expect(forced.automationForceOptIn).toBe(true);
   });
 
   it('tracks backfill progress lifecycle', () => {

@@ -80,7 +80,6 @@ export interface BootPayload {
     checkoutSubscriptionCheckbox: boolean;
     contactSyncMode: string;
     includeGuests: boolean;
-    automationForceOptIn: boolean;
     abandonedCartCutoffMinutes: number;
     welcomeEnabled: boolean;
     firstOrderEnabled: boolean;
@@ -201,7 +200,6 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       checkoutSubscriptionCheckbox: false,
       contactSyncMode: DEFAULT_CONTACT_SYNC_MODE,
       includeGuests: false,
-      automationForceOptIn: false,
       contactsBackfill: idleBackfill,
     };
   }
@@ -283,7 +281,6 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     checkoutSubscriptionCheckbox: s.checkoutSubscriptionCheckbox,
     contactSyncMode: normalizeContactSyncMode(s.contactSyncMode),
     includeGuests: s.includeGuests,
-    automationForceOptIn: s.automationForceOptIn,
     contactsBackfill: idleBackfill,
   };
 }

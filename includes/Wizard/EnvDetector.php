@@ -457,7 +457,6 @@ class EnvDetector {
 			// Step 2: contact-sync mode (F3-48).
 			'contactSyncMode'               => (string) get_option( ContactSyncMode::OPTION_MODE, ContactSyncMode::DEFAULT_MODE ),
 			'includeGuests'                 => (bool) get_option( ContactSyncMode::OPTION_INCLUDE_GUESTS, false ),
-			'automationForceOptIn'          => (bool) get_option( ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN, false ),
 
 			// Step 3: WooCommerce automations.
 			'abandonedCartCutoffMinutes'    => (int) get_option( 'smaily_connect_abandoned_cart_cutoff', 30 ),

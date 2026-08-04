@@ -291,7 +291,9 @@ class SettingsEndpoint {
 			$mode = ContactSyncMode::DEFAULT_MODE;
 		}
 		$include_guests = ! empty( $data['includeGuests'] );
-		$force_opt_in   = ! empty( $data['automationForceOptIn'] );
+		// A browser holding a pre-PRO-1716 admin bundle still posts
+		// `automationForceOptIn`. Nothing reads it: the save succeeds and the
+		// retired option is never written again.
 
 		/*
 		 * Stored as '1' / '' — the on-disk shape the legacy settings page left
@@ -307,7 +309,6 @@ class SettingsEndpoint {
 		update_option( self::LEGACY_OPTION_CHECKOUT_OPTIN, $checkout_optin );
 		update_option( ContactSyncMode::OPTION_MODE, $mode );
 		update_option( ContactSyncMode::OPTION_INCLUDE_GUESTS, $include_guests );
-		update_option( ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN, $force_opt_in );
 
 		return $this->success_response();
 	}

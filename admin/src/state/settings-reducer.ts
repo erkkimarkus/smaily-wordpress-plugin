@@ -63,7 +63,6 @@ export interface ServerEnv {
   checkoutSubscriptionCheckbox?: boolean;
   contactSyncMode?: string;
   includeGuests?: boolean;
-  automationForceOptIn?: boolean;
 }
 
 /**
@@ -109,7 +108,6 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
     checkoutSubscriptionCheckbox: env.checkoutSubscriptionCheckbox ?? false,
     contactSyncMode: normalizeContactSyncMode(env.contactSyncMode),
     includeGuests: env.includeGuests ?? false,
-    automationForceOptIn: env.automationForceOptIn ?? false,
     contactsBackfill: idleBackfill,
 
     automationMappings: [],

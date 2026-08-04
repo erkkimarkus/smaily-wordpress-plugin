@@ -56,7 +56,6 @@ export const wizardInitialState: WizardState = {
   checkoutSubscriptionCheckbox: false,
   contactSyncMode: DEFAULT_CONTACT_SYNC_MODE,
   includeGuests: false,
-  automationForceOptIn: false,
   contactsBackfill: idleBackfill,
 
   automationMappings: [],
@@ -267,9 +266,6 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 
     case 'SET_INCLUDE_GUESTS':
       return { ...state, includeGuests: action.payload };
-
-    case 'SET_AUTOMATION_FORCE_OPT_IN':
-      return { ...state, automationForceOptIn: action.payload };
 
     case 'BACKFILL_START':
       return {

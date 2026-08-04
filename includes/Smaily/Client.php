@@ -113,11 +113,16 @@ class Client {
 	 *
 	 * @param int                              $workflow_id   Autoresponder ID.
 	 * @param array<int, array<string, mixed>> $addresses     Recipient address rows.
-	 * @param bool                             $force_opt_in  Whether to bypass double opt-in.
+	 * @param bool                             $force_opt_in  Whether to re-subscribe a contact
+	 *                                                        who unsubscribed in Smaily. Both
+	 *                                                        callers pass false; the default
+	 *                                                        matches them so a new trigger
+	 *                                                        can't opt into re-subscribing by
+	 *                                                        omission (PRO-1716).
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function trigger_automation( int $workflow_id, array $addresses, bool $force_opt_in = true ): array {
+	public function trigger_automation( int $workflow_id, array $addresses, bool $force_opt_in = false ): array {
 		$body = $this->request(
 			'POST',
 			'autoresponder',

@@ -32,7 +32,6 @@ export function buildTabPayload(
         checkoutSubscriptionCheckbox: state.checkoutSubscriptionCheckbox,
         contactSyncMode: state.contactSyncMode,
         includeGuests: state.includeGuests,
-        automationForceOptIn: state.automationForceOptIn,
       };
     case 'woocommerce':
       return {

@@ -34,7 +34,6 @@ function boot(syncFields: unknown): BootPayload {
       checkoutSubscriptionCheckbox: false,
       contactSyncMode: 'consent',
       includeGuests: false,
-      automationForceOptIn: false,
       abandonedCartCutoffMinutes: 30,
       welcomeEnabled: false,
       firstOrderEnabled: false,
