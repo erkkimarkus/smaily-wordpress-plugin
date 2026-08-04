@@ -1687,8 +1687,8 @@ msgid "Welcome email"
 msgstr "Tervituskiri"
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:28
-msgid "Sent when a new contact subscribes (registration, created_customer, subscription-form)."
-msgstr "Saadetakse, kui uus kontakt tellib (registreerumine, created_customer, tellimisvorm)."
+msgid "Sent when a shopper creates an account in your store (checkout or My Account registration) — not for accounts added in WordPress admin or created by another plugin."
+msgstr "Saadetakse, kui ostleja loob su poes konto (kassas või „Minu konto“ registreerimisel) — mitte kontode puhul, mille lisad WordPressi haldusliideses või mille loob mõni muu plugin."
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:39
 #: admin/src/components/steps/Step6Done.tsx:116

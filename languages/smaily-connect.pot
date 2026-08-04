@@ -1870,7 +1870,7 @@ msgid "Welcome email"
 msgstr ""
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:28
-msgid "Sent when a new contact subscribes (registration, created_customer, subscription-form)."
+msgid "Sent when a shopper creates an account in your store (checkout or My Account registration) — not for accounts added in WordPress admin or created by another plugin."
 msgstr ""
 
 #: admin/src/components/steps/Step3WooCommerce.tsx:39

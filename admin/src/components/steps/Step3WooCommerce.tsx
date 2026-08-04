@@ -17,7 +17,7 @@ export interface Step3WooCommerceProps {
  * Step 3 — WooCommerce automations.
  *
  * Three independently-togglable sections:
- *   3a Welcome email — fires on user_register / created_customer hooks
+ *   3a Welcome email — fires on the woocommerce_created_customer hook (PRO-1682)
  *   3b First-order email — fires on the customer's first paid order
  *   3c Abandoned-cart reminder — cron-driven (PLUGIN.md §5)
  *
@@ -56,7 +56,7 @@ export function Step3WooCommerce({
         dispatch={dispatch}
         trigger="welcome"
         title={ __( 'Welcome email', 'smaily-connect' ) }
-        description={ __( 'Sent when a new contact subscribes (registration, created_customer, subscription-form).', 'smaily-connect' ) }
+        description={ __( 'Sent when a shopper creates an account in your store (checkout or My Account registration) — not for accounts added in WordPress admin or created by another plugin.', 'smaily-connect' ) }
         isEnabled={state.welcomeEnabled}
         onEnabledChange={(enabled) => dispatch({ type: 'SET_WELCOME_ENABLED', payload: enabled })}
       />

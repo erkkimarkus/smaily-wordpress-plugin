@@ -54,6 +54,18 @@ class HookHandler {
 	public const EVENT_AUTOMATION_FIRST_ORDER = 'automation.first_order';
 
 	/**
+	 * Filter deciding whether a newly created account is enrolled in the welcome
+	 * automation (PRO-1682). Default: true for an account WooCommerce created
+	 * (`woocommerce_created_customer` — checkout, My Account registration),
+	 * false for a bare `user_register` (wp-admin staff accounts, accounts an
+	 * unrelated plugin creates). Receives ( bool $eligible, int $user_id,
+	 * string $source ), so a store can widen or narrow it per source — e.g.
+	 * return true on `user_register` to welcome accounts a shop-specific
+	 * registration plugin creates outside WooCommerce's own flows.
+	 */
+	public const FILTER_WELCOME_ELIGIBLE = 'smaily_connect_welcome_eligible';
+
+	/**
 	 * Master gate for the new live-sync path. Until the setup wizard is
 	 * finished, the legacy Smaily_Connect subscriber-sync owns WooCommerce
 	 * events; this handler stays dormant so the two never both fire (P1 #1,
@@ -111,13 +123,8 @@ class HookHandler {
 			);
 		}
 
-		if ( $this->is_enabled( self::OPTION_WELCOME_ENABLED, false ) ) {
-			$this->maybe_enqueue(
-				self::EVENT_AUTOMATION_WELCOME,
-				(string) $user_id,
-				$this->build_automation_payload( $user, 'welcome' )
-			);
-		}
+		// A bare user_register is NOT a shopper signal — see maybe_enqueue_welcome.
+		$this->maybe_enqueue_welcome( $user, 'user_register', false );
 	}
 
 	public function on_profile_update( int $user_id ): void {
@@ -176,11 +183,61 @@ class HookHandler {
 	}
 
 	public function on_woocommerce_created_customer( int $customer_id ): void {
-		// Same effect as user_register but fires from WooCommerce's
-		// checkout-creates-account flow. Reuse the same path so welcome
-		// emails fire identically whether the user came in through
-		// wp-login or through checkout.
+		// Contact sync is the same for any new account, so reuse that path —
+		// user_register already fired inside wp_insert_user and maybe_enqueue
+		// dedupes, so this doesn't double-enqueue.
 		$this->on_user_register( $customer_id );
+
+		// The welcome, however, fires ONLY from here: this hook is WooCommerce's
+		// own "a shopper got an account" signal (PRO-1682).
+		if ( $this->gate_closed() ) {
+			return;
+		}
+
+		$user = get_userdata( $customer_id );
+		if ( $user === false ) {
+			return;
+		}
+
+		$this->maybe_enqueue_welcome( $user, 'woocommerce_created_customer', true );
+	}
+
+	/**
+	 * Enrol a newly created account in the welcome automation — when the account
+	 * is a shopper's (PRO-1682).
+	 *
+	 * The welcome trigger used to fire on any `user_register`, so a staff account
+	 * created in wp-admin or an account an unrelated plugin created (membership,
+	 * forum) became an opted-in marketing contact — with no customer relationship
+	 * to rest a legitimate-interest basis on. Enrolment can't be undone once the
+	 * trigger fires, so WHO triggers is the only lever.
+	 *
+	 * The signal is the FLOW, not the role: `woocommerce_created_customer` fires
+	 * only for an account WooCommerce itself created — checkout, My Account
+	 * registration, order-confirmation "create an account" — and never for
+	 * wp-admin's Add New User or a plain wp_insert_user(). Keying on the flow
+	 * also leaves custom shopper roles (wholesale, VIP) working: a plugin can
+	 * swap the role through the `woocommerce_new_customer_data` filter and the
+	 * hook still fires, so a role check is never consulted.
+	 *
+	 * @param string $source           Hook the account arrived through.
+	 * @param bool   $eligible_default Whether that hook is a shopper signal.
+	 */
+	private function maybe_enqueue_welcome( \WP_User $user, string $source, bool $eligible_default ): void {
+		if ( ! $this->is_enabled( self::OPTION_WELCOME_ENABLED, false ) ) {
+			return;
+		}
+
+		/** This filter is documented on HookHandler::FILTER_WELCOME_ELIGIBLE. */
+		if ( ! (bool) apply_filters( self::FILTER_WELCOME_ELIGIBLE, $eligible_default, (int) $user->ID, $source ) ) {
+			return;
+		}
+
+		$this->maybe_enqueue(
+			self::EVENT_AUTOMATION_WELCOME,
+			(string) $user->ID,
+			$this->build_automation_payload( $user, 'welcome' )
+		);
 	}
 
 	/**
