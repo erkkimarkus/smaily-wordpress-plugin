@@ -785,6 +785,21 @@ had products iff it was old enough. Every gate was green throughout.
    the PREVIOUS cart. An "optimisation" that omits empty fields would silently
    resurrect the old cart in the next reminder. It is now pinned by a two-cart
    integration case, not just a comment.
+5. **Retiring a dead switch means auditing EVERY field it gated, not the one that
+   was reported.** The same option also gated `first_name`/`last_name`, also
+   defaulting to FALSE — so the fresh install that had just been fixed to send its
+   products still sent no NAME, and a template's first-name merge tag still
+   rendered nothing. It was found and fixed separately a day later (PRO-1729).
+   The fix scope should have been "which keys of this dead option are read", not
+   "the keys in the bug report" — a single `grep` of the option's consumers
+   answers it.
+6. **"Always send" is not one uniform rule — ask what the field means to the
+   destination.** A `product_*` slot is CART state: sending it empty is the
+   mechanism that clears the previous cart. A name is CONTACT state, where the
+   F3-47 omit rule applies: absent preserves, empty WIPES. Copying the products'
+   "fill everything unconditionally" shape onto the names would have made every
+   nameless shopper's reminder erase a name the contact already had. When you
+   generalise a fix across fields, re-derive the empty-vs-omit answer per field.
 
 ### 2.22 A gate that reads a key nothing writes always answers with its default — and a boolean OFF can't be stored with `update_option()` (PRO-1742 contact-sync switch, 2026-08-04)
 

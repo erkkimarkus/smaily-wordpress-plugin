@@ -26,7 +26,44 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1686 — a freemium Smaily account is now told
+_Last updated: 2026-08-04 (**PRO-1729 — the abandoned-cart reminder now carries
+the shopper's NAME, so a template's first-name merge tag renders.** PRO-1680
+found the reminder's product details gated on a selection option
+(`smaily_connect_abandoned_cart_fields`) whose keys default to FALSE and which
+**no UI has ever written**, and retired that gate for the products. The SAME
+dead gate also covered `first_name`/`last_name` — likewise defaulting to false —
+so a fresh install's reminder still went out with no name at all, and a Smaily
+template greeting the shopper by name rendered nothing. **Owner decision (Erkki,
+same rule as the products): the names always ride the reminder, with no
+merchant-facing choice**; a stored selection from a version that had the
+selector is ignored rather than migrated. **The one deliberate difference from
+the products:** a `product_*` slot is CART state and is sent EMPTY on purpose
+(overwriting all ten is what clears the previous cart from the contact), while
+the names are CONTACT state, where the F3-47 omit rule governs — an ABSENT field
+leaves the Smaily contact's value intact, an EMPTY one WIPES it. So a name we
+don't have is **omitted, never sent as `''`**: a nameless shopper's reminder must
+not erase a name the contact already carries. The source is unchanged (WP profile
+name for a known user, else the checkout-captured columns on the tracker row —
+so guests are covered, which the legacy pass never did). `store`/`language` keep
+reading the option and were deliberately left alone: unlike the names they
+default to TRUE, so they are neither unreachable nor broken on a fresh install.
+Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`,
+PHPUnit unit **727/727**, eslint/tsc clean, vitest **270/270**); integration full
+suite **240 tests, 1394 assertions**, 0 failures (only the known
+`BackwardCompatTest` suite-order skip, PRO-1771). **Demonstrated on the running
+store** — `CartPipelineTest` drives the real pipeline (real cart → tracker → the
+15-min sweep → CartFlusher) with only the Smaily transport faked and **no stored
+selection**: a named shopper's reminder carries the name, a nameless one's omits
+both fields, and a guest's checkout-typed name rides too; the two send cases were
+**confirmed to fail against the pre-fix code** (`null` where the name belongs),
+as were 3 of the unit cases. Merchant docs `docs/site/index.html` **unchanged** —
+it already describes the reminder as carrying the shopper's name, and there is no
+field-selector UI documented. DECISIONS PRO-1729 (addendum to PRO-1195/PRO-1680),
+LESSONS §2.21 extended (retiring a dead switch means auditing every field it
+gated; "always send" is not one uniform rule — re-derive empty-vs-omit per
+field). No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1686 — a freemium Smaily account is now told
 that the PACKAGE is the cause, instead of being told two things it is not.**
 When an account moves to a package without API access, the health notice used to
 say *"the Smaily API has been unreachable for over an hour — … paused until the

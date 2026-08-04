@@ -3365,6 +3365,31 @@ pipeline (two carts for one shopper; the earlier cart's products appear
 nowhere in the second reminder) — confirmed to fail with the fix reverted.
 Linear PRO-1680.
 
+**Addendum — PRO-1729 (2026-08-04): the NAMES are always sent too, but
+OMITTED when unknown.** The same never-written selection also gated
+`first_name`/`last_name`, whose keys likewise default to FALSE — so on a fresh
+install the reminder carried no name either, and a Smaily template's
+first-name merge tag rendered nothing. **Owner decision (Erkki): the same rule
+as the products** — the names always ride the reminder, with no merchant-facing
+choice, and a stored selection from an older version is ignored rather than
+migrated. **The one deliberate difference from PRO-1680:** a `product_*` slot
+is a CART field and is sent EMPTY on purpose (overwriting all ten is what
+clears the previous cart from the contact), whereas the names are CONTACT
+fields, where the F3-47 omit rule governs — an ABSENT field leaves the Smaily
+contact's value intact, an EMPTY one WIPES it. So a name we don't know is
+omitted, never sent as `''`: a nameless shopper's reminder must not erase a
+name the contact already carries (one the contact sync put there, say). The
+source is unchanged — the WP profile name for a known user, else the
+checkout-captured `first_name`/`last_name` columns on the tracker row (the
+guest path; the legacy pass had registered users only, so this is strictly
+more than legacy ever sent). `store`/`language` keep reading the option:
+unlike the names they default to TRUE, so they are neither unreachable nor
+broken on a fresh install — out of scope, untouched. Demonstrated in
+`CartPipelineTest` against the real pipeline with the transport faked and NO
+stored selection (a named shopper's reminder carries the name; a nameless
+one's omits both fields; a guest's checkout-typed name rides too) — the send
+cases confirmed to fail with the fix reverted. Linear PRO-1729.
+
 ### PRO-1194 (sign-off) — Privacy-policy template: legal entity, URL, lawful-basis framing confirmed
 
 **Context:** the merchant privacy-policy template in `docs/DATA_MODEL_GDPR.md`
