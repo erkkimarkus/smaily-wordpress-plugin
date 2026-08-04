@@ -5,7 +5,6 @@ import { __, _n, sprintf } from '@admin/lib/i18n';
 export interface Step6DoneProps {
   state: WizardState;
   inSettings?: boolean;
-  onOpenSmailyDashboard?: () => void;
   onOpenRecEngineDashboard?: () => void;
 }
 
@@ -17,8 +16,9 @@ interface SummaryItem {
 
 /**
  * Step 6 — Done. Renders a live state-reflection summary of everything
- * the user configured + outbound links to the Smaily + rec-engine
- * dashboards.
+ * the user configured + the outbound link to the rec-engine dashboard.
+ * The Smaily-account link lives on step 1 (PRO-1718), where a merchant
+ * actually needs it — to fetch the API credentials.
  *
  * Each summary row is derived from state, not stored. That keeps Step 6
  * always honest — if the user navigates Back and toggles something off,
@@ -29,7 +29,6 @@ interface SummaryItem {
 export function Step6Done({
   state,
   inSettings = false,
-  onOpenSmailyDashboard,
   onOpenRecEngineDashboard,
 }: Step6DoneProps): React.JSX.Element {
   const items: SummaryItem[] = computeSummary(state);
@@ -91,23 +90,15 @@ export function Step6Done({
         )}
       </Banner>
 
-      <Card title={__('Open dashboards', 'smaily-connect')}>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => openSmailyDashboard(state, onOpenSmailyDashboard)}
-            disabled={state.smailyConnection.kind !== 'success' || !smailySubdomain(state)}
-          >
-            {__('Open Smaily dashboard →', 'smaily-connect')}
-          </Button>
-          {state.recEngineConnection.kind === 'success' && (
+      {state.recEngineConnection.kind === 'success' && (
+        <Card title={__('Open dashboards', 'smaily-connect')}>
+          <div className="flex flex-wrap items-center gap-3">
             <Button variant="secondary" type="button" onClick={onOpenRecEngineDashboard}>
               {__('Open Campaign Intelligence dashboard →', 'smaily-connect')}
             </Button>
-          )}
-        </div>
-      </Card>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -221,31 +212,3 @@ function countMappings(state: WizardState, trigger: 'welcome' | 'first_order' | 
   return state.automationMappings.filter((m) => m.triggerType === trigger).length;
 }
 
-function smailySubdomain(state: WizardState): string {
-  const sub = state.smailyCredentials.subdomain.trim();
-  if (sub !== '') {
-    return sub;
-  }
-  // Mode A — fall back to the configured default-fallback account's subdomain.
-  const fallback = state.perLanguageAccounts.find(
-    (a) => a.accountKey === state.defaultFallbackAccountKey,
-  );
-  return fallback?.credentials.subdomain.trim() ?? '';
-}
-
-function openSmailyDashboard(
-  state: WizardState,
-  override?: () => void,
-): void {
-  if (override) {
-    override();
-    return;
-  }
-  const sub = smailySubdomain(state);
-  if (sub === '') {
-    return;
-  }
-  if (typeof window !== 'undefined') {
-    window.open(`https://${sub}.sendsmaily.net`, '_blank', 'noopener,noreferrer');
-  }
-}

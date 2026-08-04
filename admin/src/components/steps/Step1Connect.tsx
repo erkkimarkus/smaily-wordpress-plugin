@@ -8,7 +8,7 @@ import {
   type WizardAction,
   type WizardState,
 } from '../../state/types';
-import { Card, Radio } from '../primitives';
+import { Button, Card, Radio } from '../primitives';
 import { MultilingualModePicker } from '../wizard';
 import { CredentialBlock } from './CredentialBlock';
 import { TransactionalEmailsSection } from './TransactionalEmailsSection';
@@ -95,6 +95,21 @@ export function Step1Connect({
               </>
             )}
           </p>
+          {/* The link to the merchant's own Smaily account (PRO-1718) —
+              here, at the step that sends them there for the API user,
+              instead of on the closing overview step. It appears as soon
+              as a subdomain is known, since that IS the account address. */}
+          {smailySubdomain(state) !== '' && (
+            <div className="mt-3">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => openSmailyDashboard(state)}
+              >
+                { __( 'Open Smaily dashboard →', 'smaily-connect' ) }
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -255,6 +270,26 @@ function FallbackPicker({ state, dispatch }: FallbackPickerProps): React.JSX.Ele
       })}
     </div>
   );
+}
+
+function smailySubdomain(state: WizardState): string {
+  const sub = state.smailyCredentials.subdomain.trim();
+  if (sub !== '') {
+    return sub;
+  }
+  // Mode A — fall back to the configured default-fallback account's subdomain.
+  const fallback = state.perLanguageAccounts.find(
+    (a) => a.accountKey === state.defaultFallbackAccountKey,
+  );
+  return fallback?.credentials.subdomain.trim() ?? '';
+}
+
+function openSmailyDashboard(state: WizardState): void {
+  const sub = smailySubdomain(state);
+  if (sub === '' || typeof window === 'undefined') {
+    return;
+  }
+  window.open(`https://${sub}.sendsmaily.net`, '_blank', 'noopener,noreferrer');
 }
 
 function humaniseLocale(locale: string): string {

@@ -52,7 +52,7 @@ describe('Step6Done', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('exposes both dashboard buttons when both Smaily and rec-engine are connected', () => {
+  it('exposes the rec-engine dashboard button when the rec engine is connected', () => {
     const seeded = {
       ...wizardInitialState,
       smailyConnection: { kind: 'success' as const },
@@ -60,9 +60,21 @@ describe('Step6Done', () => {
     };
     render(<Step6Done state={seeded} />);
 
-    expect(screen.getByRole('button', { name: /open smaily dashboard/i })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /open campaign intelligence dashboard/i }),
     ).toBeInTheDocument();
+  });
+
+  it('leaves the Smaily account link to step 1 (PRO-1718)', () => {
+    const seeded = {
+      ...wizardInitialState,
+      smailyConnection: { kind: 'success' as const },
+      smailyCredentials: { subdomain: 'petshop', username: 'api', password: 'x' },
+    };
+    render(<Step6Done state={seeded} />);
+
+    expect(
+      screen.queryByRole('button', { name: /open smaily dashboard/i }),
+    ).not.toBeInTheDocument();
   });
 });
