@@ -305,6 +305,56 @@ final class SubscriberPayloadBuilderTest extends TestCase {
 	}
 
 	/**
+	 * The legacy readers that print the merchant's profile/account/checkout
+	 * inputs speak the pre-wizard key names, so they get the same answer in
+	 * their own vocabulary rather than a second translation table (PRO-1743).
+	 */
+	public function test_a_wizard_selection_is_offered_to_the_legacy_readers_under_their_own_key_names(): void {
+		Functions\when( 'get_option' )->justReturn( array( 'user_phone', 'user_gender', 'birthday' ) );
+
+		$keys = SubscriberPayloadBuilder::effective_selection_legacy_keys();
+
+		self::assertContains( 'user_phone', $keys );
+		self::assertContains( 'user_gender', $keys );
+		self::assertContains( 'user_dob', $keys, 'The form field is `user_dob`; the contact field is `birthday`.' );
+		self::assertNotContains( 'first_name', $keys, 'An unticked box stays unticked for the form readers too.' );
+		self::assertNotContains( 'birthday', $keys, 'The legacy readers never saw a `birthday` key.' );
+	}
+
+	public function test_the_legacy_readers_always_get_the_keys_that_are_not_a_choice(): void {
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$keys = SubscriberPayloadBuilder::effective_selection_legacy_keys();
+
+		self::assertSame(
+			array( 'store_url', 'user_email', 'language' ),
+			$keys,
+			'Email, store and language are sent regardless — the legacy settings page forced all three on as well.'
+		);
+	}
+
+	public function test_a_legacy_selection_reaches_the_legacy_readers_unchanged(): void {
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				'store_url'   => true,
+				'user_email'  => true,
+				'language'    => true,
+				'customer_id' => false,
+				'first_name'  => true,
+				'user_dob'    => true,
+				'user_gender' => false,
+				'user_phone'  => true,
+			)
+		);
+
+		self::assertEqualsCanonicalizing(
+			array( 'store_url', 'user_email', 'language', 'first_name', 'user_dob', 'user_phone' ),
+			SubscriberPayloadBuilder::effective_selection_legacy_keys(),
+			'A store configured before the wizard must get exactly the answer it always got.'
+		);
+	}
+
+	/**
 	 * The drift PRO-1683 fixed: the wizard's checkbox list is what the
 	 * merchant's selection is saved as, so every name in it must be a name
 	 * this builder supports. A name only the wizard knows is silently
