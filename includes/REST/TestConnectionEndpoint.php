@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\RefusalReason;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -105,18 +106,37 @@ class TestConnectionEndpoint {
 			);
 		}
 
-		$client    = $this->build_client( $subdomain, $username, $password );
-		$connected = $client->test_connection();
+		$client = $this->build_client( $subdomain, $username, $password );
+		$reason = $client->check_connection();
 
 		return new WP_REST_Response(
 			array(
-				'connected' => $connected,
-				'error'     => $connected
-					? null
-					: __( 'Smaily did not accept those credentials.', 'smaily-connect' ),
+				'connected' => $reason === RefusalReason::OK,
+				'error'     => $reason === RefusalReason::OK ? null : $this->error_for( $reason ),
 			),
 			200
 		);
+	}
+
+	/**
+	 * The merchant-facing reason the test failed. Each cause gets its own answer
+	 * (PRO-1686): a package block is not a typo and not an outage, so saying
+	 * "Smaily did not accept those credentials" to all three sent merchants
+	 * re-typing a password that was never wrong.
+	 */
+	private function error_for( string $reason ): string {
+		if ( $reason === RefusalReason::PLAN_BLOCKED ) {
+			return __(
+				'Smaily refused the request because this account\'s package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
+				'smaily-connect'
+			);
+		}
+
+		if ( $reason === RefusalReason::UNREACHABLE ) {
+			return __( 'Smaily could not be reached. This looks temporary — try again in a moment.', 'smaily-connect' );
+		}
+
+		return __( 'Smaily did not accept those credentials.', 'smaily-connect' );
 	}
 
 	/**

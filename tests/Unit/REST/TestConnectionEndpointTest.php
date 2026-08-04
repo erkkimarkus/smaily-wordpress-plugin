@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\REST\TestConnectionEndpoint;
 use Smaily\Connect\Smaily\Client;
+use Smaily\Connect\Smaily\RefusalReason;
 use WP_REST_Request;
 
 final class TestConnectionEndpointTest extends TestCase {
@@ -78,7 +79,7 @@ final class TestConnectionEndpointTest extends TestCase {
 		$request->set_param( 'username', 'alice' );
 		$request->set_param( 'password', 's3cret' );
 
-		$endpoint = $this->endpoint_with_client( true );
+		$endpoint = $this->endpoint_with_client( RefusalReason::OK );
 		$response = $endpoint->handle( $request );
 
 		self::assertSame( 200, $response->get_status() );
@@ -92,12 +93,46 @@ final class TestConnectionEndpointTest extends TestCase {
 		$request->set_param( 'username', 'alice' );
 		$request->set_param( 'password', 'wrong' );
 
-		$endpoint = $this->endpoint_with_client( false );
+		$endpoint = $this->endpoint_with_client( RefusalReason::CREDENTIALS_REJECTED );
 		$response = $endpoint->handle( $request );
 
 		self::assertSame( 200, $response->get_status() );
 		self::assertFalse( $response->get_data()['connected'] );
-		self::assertNotNull( $response->get_data()['error'] );
+		$error = (string) $response->get_data()['error'];
+		self::assertStringContainsString( 'credentials', $error );
+		self::assertStringNotContainsString( 'package', $error, 'Wrong credentials must not be blamed on the plan.' );
+	}
+
+	public function test_handle_blames_the_package_when_that_is_what_smaily_said(): void {
+		// PRO-1686: a freemium account refuses every endpoint with 403 {"code":227}.
+		// The test must say so — the credentials were never the problem.
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', 's3cret' );
+
+		$endpoint = $this->endpoint_with_client( RefusalReason::PLAN_BLOCKED );
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		$error = (string) $response->get_data()['error'];
+		self::assertStringContainsString( 'package', $error );
+		self::assertStringNotContainsString( 'could not be reached', $error );
+	}
+
+	public function test_handle_says_unreachable_when_smaily_never_answered(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', 's3cret' );
+
+		$endpoint = $this->endpoint_with_client( RefusalReason::UNREACHABLE );
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		$error = (string) $response->get_data()['error'];
+		self::assertStringContainsString( 'could not be reached', $error );
+		self::assertStringNotContainsString( 'package', $error );
 	}
 
 	public function test_handle_short_circuits_when_required_field_empty(): void {
@@ -119,9 +154,9 @@ final class TestConnectionEndpointTest extends TestCase {
 		self::assertNotNull( $response->get_data()['error'] );
 	}
 
-	private function endpoint_with_client( bool $connection_result ): TestConnectionEndpoint {
+	private function endpoint_with_client( string $connection_result ): TestConnectionEndpoint {
 		$client = $this->createMock( Client::class );
-		$client->method( 'test_connection' )->willReturn( $connection_result );
+		$client->method( 'check_connection' )->willReturn( $connection_result );
 
 		return new class( $client ) extends TestConnectionEndpoint {
 			private Client $injected;
