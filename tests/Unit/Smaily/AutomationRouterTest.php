@@ -88,7 +88,7 @@ final class AutomationRouterTest extends TestCase {
 							&& $addresses[0]['first_name'] === 'Anna';
 					}
 				),
-				// Default (consent) mode → never re-subscribe on trigger.
+				// A trigger never re-subscribes a contact (PRO-1716).
 				false
 			)
 			->willReturn( array( 'status' => 'ok' ) );
@@ -115,21 +115,45 @@ final class AutomationRouterTest extends TestCase {
 		self::assertSame( 'et_account', $captured_key );
 	}
 
-	public function test_legitimate_interest_with_toggle_forces_opt_in(): void {
-		$this->options[ ContactSyncMode::OPTION_MODE ]                   = ContactSyncMode::MODE_LEGITIMATE_INTEREST;
-		$this->options[ ContactSyncMode::OPTION_AUTOMATION_FORCE_OPT_IN ] = '1';
+	/**
+	 * PRO-1716 retired the "Force opt-in on automation triggers" setting. A
+	 * store that had it ON keeps the stored option as a harmless orphan, so
+	 * the three states a live store can be in — never saved, saved on, saved
+	 * off — must all reach Smaily with force_opt_in=false, under the one
+	 * preset that ever exposed the setting.
+	 *
+	 * @dataProvider retired_force_opt_in_option_states
+	 *
+	 * @param array<string, mixed> $stored The retired option's stored value, if any.
+	 */
+	public function test_a_trigger_never_forces_opt_in_whatever_the_retired_option_says( array $stored ): void {
+		$this->options = array_merge(
+			array( ContactSyncMode::OPTION_MODE => ContactSyncMode::MODE_LEGITIMATE_INTEREST ),
+			$stored
+		);
 
 		$resolver = $this->resolverThatReturns( new WorkflowMatch( 7, 'default' ) );
 
 		$client = $this->createMock( Client::class );
 		$client->expects( $this->once() )
 			->method( 'trigger_automation' )
-			->with( 7, $this->anything(), true ) // legitimate interest + toggle → force opt-in
+			->with( 7, $this->anything(), false )
 			->willReturn( array( 'status' => 'ok' ) );
 
 		$router = new AutomationRouter( $resolver, static fn (): Client => $client );
 
 		self::assertTrue( $router->trigger_automation( 'welcome', array( 'email' => 'a@b.c' ) ) );
+	}
+
+	/**
+	 * @return array<string, array<int, array<string, mixed>>>
+	 */
+	public static function retired_force_opt_in_option_states(): array {
+		return array(
+			'never saved' => array( array() ),
+			'saved on'    => array( array( 'smly_plus_contact_sync_automation_force_opt_in' => '1' ) ),
+			'saved off'   => array( array( 'smly_plus_contact_sync_automation_force_opt_in' => '' ) ),
+		);
 	}
 
 	public function test_lets_api_exception_bubble_for_flusher_retry_handling(): void {
