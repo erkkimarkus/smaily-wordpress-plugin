@@ -22,12 +22,17 @@ use Smaily\Connect\Smaily\Client as SmailyClient;
 use Smaily\Connect\Smaily\EventQueue;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 use Smaily\Connect\Smaily\RecEngine\IngestQueue;
+use Smaily\Connect\Smaily\RefusalReason;
 use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 
 /**
- * Two `error`-severity signals (§13a), both from the health-check cron:
+ * `error`-severity signals (§13a), all from the health-check cron:
  *   - failed events > threshold in 24h (across both durable queues);
- *   - rec-engine unreachable for > 1h (time-based, via a periodic ping).
+ *   - rec-engine unreachable for > 1h (time-based, via a periodic ping);
+ *   - the Smaily API refusing, under the cause it actually gave (PRO-1686):
+ *     the account's package, the credentials, or genuinely unreachable. Only
+ *     the last one waits out the hour's grace — the other two are Smaily's own
+ *     verdict and will read the same in an hour.
  *
  * Each maps to a sticky-until-resolved admin notice: the health-check sets it
  * while the condition holds and clears it the moment the condition resolves
@@ -100,17 +105,18 @@ final class NotificationManager {
 	 * recurring Action Scheduler tick (Bootstrap schedules HEALTH_HOOK).
 	 */
 	public function run_health_check(): void {
-		$now               = time();
-		$failed            = $this->failed_last_24h();
-		$down_since        = $this->probe_engine( $now );
-		$smaily_down_since = $this->probe_smaily( $now );
+		$now        = time();
+		$failed     = $this->failed_last_24h();
+		$down_since = $this->probe_engine( $now );
+		$smaily     = $this->probe_smaily( $now );
 
 		$notices = $this->evaluate_signals(
 			$failed,
 			$down_since,
 			$now,
 			$this->failed_threshold(),
-			$smaily_down_since
+			$smaily['down_since'],
+			$smaily['reason']
 		);
 
 		update_option( self::OPTION_NOTICES, $notices, false );
@@ -120,7 +126,8 @@ final class NotificationManager {
 	 * Pure signal evaluation — given the inputs, return the active-notice map.
 	 * Split out so the threshold + grace logic is unit-testable without a DB,
 	 * network, or clock. Covers the pilot's BOTH sync paths: the rec-engine
-	 * (`engine_down`) and Smaily email (`smaily_down`).
+	 * (`engine_down`) and Smaily email — the latter under the cause Smaily gave
+	 * (`smaily_plan_blocked` / `smaily_credentials_rejected` / `smaily_down`).
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
@@ -129,7 +136,8 @@ final class NotificationManager {
 		?int $down_since,
 		int $now,
 		int $threshold,
-		?int $smaily_down_since = null
+		?int $smaily_down_since = null,
+		string $smaily_reason = RefusalReason::UNREACHABLE
 	): array {
 		$notices = array();
 
@@ -148,14 +156,35 @@ final class NotificationManager {
 			);
 		}
 
-		if ( $smaily_down_since !== null && ( $now - $smaily_down_since ) >= self::ENGINE_DOWN_GRACE ) {
-			$notices['smaily_down'] = array(
-				'severity'   => 'error',
-				'down_since' => $smaily_down_since,
-			);
+		if ( $smaily_down_since !== null ) {
+			// An explicit refusal — the package, or the credentials — is
+			// definitive: Smaily already told us the answer, and it is the same
+			// answer in an hour (PRO-1686). Only the "might be a blip" case
+			// keeps the grace period.
+			$waited = ( $now - $smaily_down_since ) >= self::ENGINE_DOWN_GRACE;
+
+			if ( $waited || $smaily_reason !== RefusalReason::UNREACHABLE ) {
+				$notices[ self::smaily_notice_key( $smaily_reason ) ] = array(
+					'severity'   => 'error',
+					'down_since' => $smaily_down_since,
+				);
+			}
 		}
 
 		return $notices;
+	}
+
+	/** The notice key each refusal cause maps to (one message per cause). */
+	private static function smaily_notice_key( string $reason ): string {
+		if ( $reason === RefusalReason::PLAN_BLOCKED ) {
+			return 'smaily_plan_blocked';
+		}
+
+		if ( $reason === RefusalReason::CREDENTIALS_REJECTED ) {
+			return 'smaily_credentials_rejected';
+		}
+
+		return 'smaily_down';
 	}
 
 	/**
@@ -207,24 +236,37 @@ final class NotificationManager {
 	 * the pilot's OTHER sync path (contacts + welcome/abandoned-cart automations).
 	 * The factory returns null when the email side isn't configured (setup wizard
 	 * not finished), so an un-set-up store is never reported as "Smaily down".
+	 *
+	 * Also returns WHY Smaily refused (PRO-1686), so the notice can name the
+	 * cause. The reason is recomputed every run and never stored: it is only
+	 * true of the probe that just happened, and the moment Smaily answers again
+	 * — the package restored, the credentials fixed — down_since is deleted and
+	 * the notice goes with it, with nothing for the merchant to re-enter.
+	 *
+	 * @return array{down_since: ?int, reason: string}
 	 */
-	private function probe_smaily( int $now ): ?int {
+	private function probe_smaily( int $now ): array {
 		$client = ( $this->smaily_client_factory )();
 		if ( ! $client instanceof SmailyClient ) {
 			delete_option( self::OPTION_SMAILY_DOWN_SINCE );
-			return null;
+			return array(
+				'down_since' => null,
+				'reason'     => RefusalReason::OK,
+			);
 		}
 
-		$up = false;
 		try {
-			$up = $client->test_connection();
+			$reason = $client->check_connection();
 		} catch ( \Throwable $e ) {
-			$up = false;
+			$reason = RefusalReason::UNREACHABLE;
 		}
 
-		if ( $up ) {
+		if ( $reason === RefusalReason::OK ) {
 			delete_option( self::OPTION_SMAILY_DOWN_SINCE );
-			return null;
+			return array(
+				'down_since' => null,
+				'reason'     => RefusalReason::OK,
+			);
 		}
 
 		$down_since = (int) get_option( self::OPTION_SMAILY_DOWN_SINCE, 0 );
@@ -233,7 +275,10 @@ final class NotificationManager {
 			update_option( self::OPTION_SMAILY_DOWN_SINCE, $down_since, false );
 		}
 
-		return $down_since;
+		return array(
+			'down_since' => $down_since,
+			'reason'     => $reason,
+		);
 	}
 
 	/** Failed rows across both durable queues in the last 24h. */
@@ -441,6 +486,20 @@ final class NotificationManager {
 		if ( $key === 'smaily_down' ) {
 			return __(
 				'Smaily Connect: the Smaily API has been unreachable for over an hour — contact sync and email automations are paused until the connection recovers.',
+				'smaily-connect'
+			);
+		}
+
+		if ( $key === 'smaily_plan_blocked' ) {
+			return __(
+				'Smaily Connect: Smaily is refusing every request because this account\'s package does not include API access. Contact sync and email automations stay stopped until the account is on a package that includes it — waiting will not restore them, and the credentials cannot be checked until then.',
+				'smaily-connect'
+			);
+		}
+
+		if ( $key === 'smaily_credentials_rejected' ) {
+			return __(
+				'Smaily Connect: Smaily is rejecting the saved API credentials, so contact sync and email automations have stopped. Check the subdomain, API username and password under Settings → Connection.',
 				'smaily-connect'
 			);
 		}

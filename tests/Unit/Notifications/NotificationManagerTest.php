@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Notifications\NotificationManager;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\Client as SmailyClient;
+use Smaily\Connect\Smaily\RefusalReason;
 use Smaily\Connect\Smaily\RecEngine\Client as RecEngineClient;
 
 final class NotificationManagerTest extends TestCase {
@@ -104,6 +105,32 @@ final class NotificationManagerTest extends TestCase {
 
 		self::assertArrayHasKey( 'engine_down', $notices );
 		self::assertArrayHasKey( 'smaily_down', $notices );
+	}
+
+	public function test_a_package_block_raises_its_own_signal_without_waiting_out_the_grace(): void {
+		// PRO-1686: Smaily already answered "227 — a paid package is required".
+		// That answer will not change in an hour, and it is not "unreachable".
+		$now     = 1_000_000;
+		$notices = $this->manager()->evaluate_signals( 0, null, $now, 50, $now - 60, RefusalReason::PLAN_BLOCKED );
+
+		self::assertArrayHasKey( 'smaily_plan_blocked', $notices );
+		self::assertArrayNotHasKey( 'smaily_down', $notices, 'a package block is not an outage' );
+	}
+
+	public function test_rejected_credentials_raise_their_own_signal(): void {
+		$now     = 1_000_000;
+		$notices = $this->manager()->evaluate_signals( 0, null, $now, 50, $now - 60, RefusalReason::CREDENTIALS_REJECTED );
+
+		self::assertArrayHasKey( 'smaily_credentials_rejected', $notices );
+		self::assertArrayNotHasKey( 'smaily_plan_blocked', $notices );
+		self::assertArrayNotHasKey( 'smaily_down', $notices );
+	}
+
+	public function test_smaily_answering_again_clears_every_smaily_signal(): void {
+		// The restore path: nothing down ⇒ no notice, whatever the last cause was.
+		$notices = $this->manager()->evaluate_signals( 0, null, 1_000_000, 50, null, RefusalReason::OK );
+
+		self::assertSame( array(), $notices );
 	}
 
 	public function test_consent_advisory_fires_only_when_browse_on_connected_and_no_consent_api(): void {
