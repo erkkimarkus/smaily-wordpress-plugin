@@ -26,7 +26,56 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-04 (**PRO-1680 — an abandoned-cart reminder now always
+_Last updated: 2026-08-04 (**PRO-1685 — a Smaily refusal that can never
+succeed now stops being retried, and the merchant is told.** `Flusher` /
+`CartFlusher` caught EVERY `ApiException` as transient and called
+`record_attempt()` on a counter nobody read, so a permanent refusal (401
+revoked credentials, 403, 404 deleted workflow, 422 rejected address) was
+re-POSTed every 60s forever: the queue grew for as long as the condition
+lasted, the oldest-first drain kept handing those rows the batch slots ahead
+of fresher work, and since the "N sync events failed" notice counts only
+`status = 'failed'`, the merchant was never told. **The policy was already
+written** — `ApiException`/`Client` docblocks ("4xx no-retry, 429 honour
+Retry-After, 5xx exponential backoff"), `EventQueue::record_attempt()` ("when
+attempts reaches the policy ceiling the caller flips the row to
+STATUS_FAILED"), spec `PLUGIN.md` §8 ("max 5 attempts") — and simply never
+applied on the Smaily side (the rec-engine side has applied its half since
+F3-18). **New `Smaily\RetryPolicy`** is the one place that decides: 4xx bar
+429 → `mark_failed` at once (`permanent_http_<code>: …`); everything else
+(5xx, 429, transport error) → retried on the rec queue's ladder (1m, 5m, 15m,
+1h, 6h) or for exactly the `Retry-After` Smaily sent (capped 6h), to 5
+attempts, then `mark_failed` (`retry_limit_exceeded after 5 attempts: …`).
+`Client::request()` now parses `Retry-After` onto the exception (delta-seconds
+only); migration **010** adds `next_retry_at` + `idx_status_retry` to
+`smly_plus_event_queue`, mirroring the rec queue (NULL = due now, so existing
+rows are unaffected). **Deliberately marketing rows only:**
+`TransactionalFlusher` keeps its PRO-1519 time ceiling and passes no backoff
+(a pending transactional row suppresses the customer's native WC email while
+it waits), which is why the backoff argument defaults to 0. **Bias on
+purpose:** anything not recognisably a permanent refusal — including a
+transport error with no status — counts as temporary; mis-classifying
+recoverable work as permanent is the worse mistake, and either way the Event
+Log recovery path bounds it (`reset_failed()` now clears status + attempts +
+the retry park for ANY row in this queue; `QueueJanitor` prunes a failed row
+only after 90 days, `pending` never). **The demonstration**
+(`tests/Integration/SmailyRetryPolicyTest.php`) drives the real queue + the
+real flush hook with only the transport faked: a 401 fails once and is never
+re-POSTed; the failed row reaches the health check's `failed_events` notice; a
+500 is parked ~60s and the immediate next tick skips it, the following failure
+waits 300s; a 429 waits the 900s it was asked to; a row behind a doomed one
+still sends; a ceiling row reads `retry_limit_exceeded` through the Event Log
+REST route; Retry revives it to `pending`/attempts 0/no park and it then
+sends. Confirmed to pin the fix by reverting both halves (7/7 fail). Merchant
+docs `docs/site/index.html` updated in BOTH languages (the new `Last error`
+values + "retried a few times with growing gaps, not every minute forever";
+the stale "a Smaily contact send can't be replayed" line corrected — it can,
+the payload is stored). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors,
+PHPStan `[OK] No errors`, PHPUnit unit **683/683**, eslint/tsc clean, vitest
+**258/258**); `sg docker -c "composer run test:integration"` **OK (197 tests,
+1166 assertions)** with 1 pre-existing skip, dev sandbox tenant "Smaily Connect
+test" restored post-run. No version bump — ships with the next release cut._
+
+Prior: 2026-08-04 (**PRO-1680 — an abandoned-cart reminder now always
 carries the cart's products.** `CartPayloadBuilder` read the
 `product_<field>_1..10` slots out of the merchant field-selection option
 (`smaily_connect_abandoned_cart_fields`) whose `product_*` keys ALL default to

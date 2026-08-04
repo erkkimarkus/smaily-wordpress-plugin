@@ -4238,6 +4238,83 @@ above are otherwise unchanged — same options, same trigger types, same
 send pipeline). `AutomationSection`'s `accountKeyOverride` prop (Stage 1)
 is reused unchanged by the relocated `TransactionalTriggersSection`.
 
+---
+
+### PRO-1685 — The Smaily queue applies the written retry policy: a permanent refusal stops, a temporary one backs off
+
+**Context:** the Smaily-side flushers (`Flusher`, `CartFlusher`) caught
+EVERY `ApiException` as transient and called `record_attempt()`. Nothing
+ever read the counter it bumped and outstanding rows are deliberately never
+pruned, so a refusal that can never succeed — 401 on revoked credentials,
+403, 404 on a deleted workflow, 422 on a rejected address — was re-POSTed
+on every 60s tick indefinitely: the queue grew for as long as the condition
+lasted, the oldest-first drain kept handing the doomed rows the batch slots
+ahead of fresher work, and because `NotificationManager::failed_last_24h()`
+counts only `status = 'failed'`, the "N sync events failed" notice never
+fired for work that never stopped being retried. The policy was already
+WRITTEN — `ApiException`'s and `Client`'s docblocks ("4xx no-retry, 429
+honour Retry-After, 5xx exponential backoff"), `EventQueue::record_attempt()`
+("when attempts reaches the policy ceiling the caller flips the row to
+STATUS_FAILED"), spec `PLUGIN.md` §8 ("…max 5 attempts") — and simply never
+applied on this side. The rec-engine queue has applied its half of the same
+policy since F3-18 (`AbstractD6Flusher::is_terminal()` + `max_attempts` +
+`next_retry_at`).
+
+**Decision:** implement the written policy, in ONE place —
+`Smaily\RetryPolicy`, applied by both marketing flushers:
+- **Permanent = 4xx except 429.** `mark_failed` immediately, reason
+  `permanent_http_<code>: <message>`. No retry attempts consumed.
+- **Temporary = everything else** (5xx, 429, and a transport error with
+  code 0), retried with `next_retry_at` spacing on the SAME ladder the rec
+  queue uses (1m, 5m, 15m, 1h, 6h) — or for exactly the `Retry-After` Smaily
+  sent (capped at 6h) — up to `MAX_ATTEMPTS = 5`, then `mark_failed` with
+  `retry_limit_exceeded after N attempts: <message>`.
+- `Client::request()` now parses the `Retry-After` header (delta-seconds
+  form only; an HTTP-date falls back to the ladder) onto the exception —
+  that is the only way "honour Retry-After" can reach the queue, since the
+  client itself deliberately does not retry (F3-10).
+- Schema: migration 010 adds `next_retry_at` + `idx_status_retry` to
+  `smly_plus_event_queue`, mirroring the rec queue (migration 004). NULL =
+  due now, so every existing row and every fresh enqueue is unaffected.
+
+**Rationale for the bias:** the real risk here is MIS-classification —
+treating a recoverable failure as permanent silently drops genuine work,
+which is worse than a bounded number of wasted retries. So anything not
+recognisably a permanent refusal is temporary, explicitly including a
+transport error that never received a status. The blast radius either way is
+bounded by the Event Log recovery path: `POST /events/retry` →
+`EventQueue::reset_failed()` resets status + attempts + (now) the retry park
+for ANY row in this queue, whichever flusher owns it. Marking rows failed
+also lets the existing `QueueJanitor` prune them — after 90 days, ten times
+the `sent` retention, and only once they are long past diagnosis; `pending`
+rows are still never pruned.
+
+**Scope — deliberately marketing rows only.** `TransactionalFlusher` keeps
+its own PRO-1519 bound (a time ceiling, not attempts) and passes no backoff,
+so it still retries on every tick: a pending transactional row SUPPRESSES the
+customer's native WooCommerce email the whole time it waits, so what must be
+capped there is elapsed time, and spacing its retries out would only delay
+the fail-open. That is why `record_attempt()`'s backoff argument defaults to
+0 (due immediately) rather than to the flush cadence.
+
+**Alternatives considered:** (a) deriving due-ness from `created_at` +
+cumulative backoff to avoid a schema change — rejected as fragile and
+unlike the proven sibling queue; (b) a `max_attempts` COLUMN like the rec
+queue — rejected, nothing varies it per row, and it would render as a
+misleading "n/5" for the transactional rows sharing the table (the Event Log
+keeps projecting NULL for Smaily rows; the reason lives in `last_error`);
+(c) classifying by Smaily's in-body `{code}` envelope — out of scope, that is
+sibling PRO-1686 (which refusals count as permanent for PLAN reasons); the
+non-101 body codes the cart/transactional paths already treat as terminal are
+untouched.
+
+**Relationships:** applies F3-10's "row-level retry goes through the queue
+table" half on the Smaily side; mirrors F3-18/N-7.1's terminal-4xx split
+(`AbstractD6Flusher`); extends F3-53's "a deterministic throw must never
+become an eternal retry loop" from Throwables to HTTP refusals; leaves
+PRO-1519 (transactional time ceiling) and PRO-1195 (cart flusher ownership)
+intact.
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

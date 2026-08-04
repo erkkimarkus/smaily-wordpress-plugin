@@ -423,6 +423,8 @@ CREATE TABLE {$prefix}smly_rec_visitor (
 - `POST /api/contact/` — single contact sync (upsert)
 - `POST /api/autoresponder/{id}` — trigger automation
 
+**Error handling** — the same policy as the rec-engine side below: 4xx is not retried (validation, auth, not-found); 429/5xx (and a transport error with no status) are retried with exponential backoff, honouring `Retry-After`, max 5 attempts. Implemented in `Smaily\RetryPolicy` and applied by the queue flushers; the `Client` itself never retries (see DECISIONS F3-10, PRO-1685). Exception: `TransactionalFlusher` bounds its retries by elapsed time instead (PRO-1519) — a pending row suppresses the customer's native WooCommerce email while it waits.
+
 ### Rec-engine side
 
 **Authoritative contract**: see `RECENGINE_API_CONTRACT.md` v1.0. Below is a referenced summary for the plugin-side implementation.

@@ -1018,27 +1018,27 @@ td code{white-space:nowrap}
       <p>The <strong>Event Log</strong> lists what the plugin sent and any failures. Each row shows a status — <span class="pill pending">pending</span>, <span class="pill sent">sent</span> or <span class="pill failed">failed</span> — and <strong>Details</strong> opens the exact request that was sent and the engine's response.</p>
       <ol>
         <li>Open <span class="path">Settings → Event Log</span> and set the <strong>Status</strong> filter to <strong>Failed</strong> (or click <em>View only failed</em> in the red banner).</li>
-        <li>Read the <strong>Last error</strong> column. <code>http_4xx</code> / <code>d6_item_error</code> means the record was rejected (fix the record); <code>http_5xx</code> or a timeout is a temporary outage (a retry usually succeeds).</li>
+        <li>Read the <strong>Last error</strong> column. <code>http_4xx</code> / <code>d6_item_error</code> means the record was rejected (fix the record); <code>http_5xx</code> or a timeout is a temporary outage (a retry usually succeeds). On a Smaily send, <code>permanent_http_401</code> (or 403 / 404 / 422) means Smaily refused it in a way a retry can't fix — check the account credentials or the mapped workflow first; <code>retry_limit_exceeded</code> means it was retried five times over several hours and then given up on.</li>
         <li>Click <strong>Retry</strong> on a single row, or <strong>Retry all failed</strong> in the banner. The row flips to <span class="pill pending">pending</span>, then <span class="pill sent">sent</span> within about a minute.</li>
       </ol>
       <div class="note">
         <span class="k">Proactive health notices</span>
         <p>A periodic health check raises a red admin notice when something needs attention — e.g. <em>"N sync events failed in the last 24 hours"</em>, or that the recommendation engine or the Smaily API has been unreachable for over an hour. Each notice links to the Event Log and clears itself once the problem is gone.</p>
       </div>
-      <p><em>Note:</em> queued records to Campaign Intelligence can be retried because they still hold their payload. A Smaily contact send can't be replayed — but the next scheduled sync re‑sends the current state.</p>
+      <p><em>Note:</em> a failed row stays retryable for 90 days, so there is no rush — and a Smaily contact send that keeps failing is retried a few times with growing gaps before it lands in <span class="pill failed">failed</span>, rather than being repeated every minute forever.</p>
     </div>
     <div data-lang="et">
       <p><strong>Event Log</strong> loetleb, mida plugin saatis, ja iga tõrke. Iga rida näitab olekut — <span class="pill pending">pending</span>, <span class="pill sent">sent</span> või <span class="pill failed">failed</span> — ja <strong>Details</strong> avab täpse saadetud päringu ning mootori vastuse.</p>
       <ol>
         <li>Ava <span class="path">Settings → Event Log</span> ja sea <strong>Status</strong>‑filter <strong>Failed</strong> peale (või klõpsa punases bänneris <em>View only failed</em>).</li>
-        <li>Loe <strong>Last error</strong> veergu. <code>http_4xx</code> / <code>d6_item_error</code> tähendab, et kirje lükati tagasi (paranda kirje); <code>http_5xx</code> või ajaületus on ajutine katkestus (kordus tavaliselt õnnestub).</li>
+        <li>Loe <strong>Last error</strong> veergu. <code>http_4xx</code> / <code>d6_item_error</code> tähendab, et kirje lükati tagasi (paranda kirje); <code>http_5xx</code> või ajaületus on ajutine katkestus (kordus tavaliselt õnnestub). Smaily saadetise puhul tähendab <code>permanent_http_401</code> (või 403 / 404 / 422), et Smaily keeldus viisil, mida kordus ei paranda — kontrolli esmalt konto andmeid või seotud automaatikat; <code>retry_limit_exceeded</code> tähendab, et seda prooviti mitme tunni jooksul viis korda ja siis loobuti.</li>
         <li>Klõpsa üksikul real <strong>Retry</strong> või bänneris <strong>Retry all failed</strong>. Rida läheb <span class="pill pending">pending</span> peale, siis umbes minutiga <span class="pill sent">sent</span>.</li>
       </ol>
       <div class="note">
         <span class="k">Ennetavad terviseteated</span>
         <p>Perioodiline tervisekontroll tõstab punase haldusteate, kui miski vajab tähelepanu — nt <em>"N sync events failed in the last 24 hours"</em> või et soovitusmootor või Smaily API on olnud üle tunni kättesaamatu. Iga teade viitab Event Logile ja kaob ise, kui probleem on möödas.</p>
       </div>
-      <p><em>Märkus:</em> Campaign Intelligence'i järjekorda pandud kirjeid saab korrata, sest need hoiavad oma sisu alles. Smaily kontakti‑saadetist ei saa uuesti mängida — kuid järgmine ajastatud sünk saadab praeguse seisu uuesti.</p>
+      <p><em>Märkus:</em> ebaõnnestunud rida jääb korratavaks 90 päevaks, nii et kiiret pole — ja pidevalt ebaõnnestuvat Smaily kontakti‑saadetist proovitakse mõned korrad üha pikemate vahedega, enne kui see jõuab olekusse <span class="pill failed">failed</span>, selle asemel et seda iga minut lõputult korrata.</p>
     </div>
   </div>
   <hr class="secend">
