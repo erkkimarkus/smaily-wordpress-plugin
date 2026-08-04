@@ -23,6 +23,7 @@ use Smaily\Connect\Multilingual\WPMLAdapter;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\ContactSyncMode;
+use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 
 /**
  * One-shot snapshot of the WP site state the wizard / settings panels
@@ -435,7 +436,12 @@ class EnvDetector {
 
 			// Step 2: subscribers.
 			'subscriberSyncEnabled'         => (bool) get_option( 'smaily_connect_subscriber_sync_enabled', true ),
-			'syncFields'                    => (array) get_option( 'smaily_connect_subscriber_sync_fields', array() ),
+			// Canonicalised so a selection saved under the pre-PRO-1683
+			// wizard names (`phone`/`gender`) still shows its checkbox
+			// ticked — and re-saves under the name the sync reads.
+			'syncFields'                    => SubscriberPayloadBuilder::canonical_fields(
+				(array) get_option( 'smaily_connect_subscriber_sync_fields', array() )
+			),
 			// Must match the key SettingsEndpoint::save_subscribers() writes
 			// to. Previously read from `smaily_connect_wp_subscription_enabled`
 			// which was never written anywhere — the checkbox flip in Step 2

@@ -366,13 +366,20 @@ export interface WizardState {
  * Default sub-set of subscriber-sync fields — matches the upstream
  * Options::SUBSCRIBER_SYNC_DEFAULT_FIELDS list. UI in Step 2 (sub-PR 2.E)
  * lets the user toggle each one.
+ *
+ * These names are what the merchant's selection is SAVED as, so every one
+ * of them must be a name SubscriberPayloadBuilder::SUPPORTED_FIELDS knows —
+ * a name only this list uses is silently discarded before anything is sent
+ * (PRO-1683: `phone` / `gender` were, for as long as the wizard existed).
+ * The canonical spelling is the field-mapping standard, spec/FIELD_MAPPING.md
+ * §2/§3 — not this file.
  */
 export const DEFAULT_SYNC_FIELDS = [
   'first_name',
   'last_name',
-  'phone',
+  'user_phone',
   'birthday',
-  'gender',
+  'user_gender',
   'customer_group',
   'customer_id',
   'first_registered',

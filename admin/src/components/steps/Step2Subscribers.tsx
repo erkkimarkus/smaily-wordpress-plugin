@@ -351,9 +351,9 @@ const CONTACT_SYNC_MODES: ReadonlyArray<{ value: ContactSyncMode; label: string;
 const FIELD_LABELS: Record<string, string> = {
   first_name: __( 'First name', 'smaily-connect' ),
   last_name: __( 'Last name', 'smaily-connect' ),
-  phone: __( 'Phone', 'smaily-connect' ),
+  user_phone: __( 'Phone', 'smaily-connect' ),
   birthday: __( 'Birthday', 'smaily-connect' ),
-  gender: __( 'Gender', 'smaily-connect' ),
+  user_gender: __( 'Gender', 'smaily-connect' ),
   customer_group: __( 'Customer group', 'smaily-connect' ),
   customer_id: __( 'Customer ID', 'smaily-connect' ),
   first_registered: __( 'First registered date', 'smaily-connect' ),

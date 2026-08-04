@@ -58,9 +58,22 @@ class SubscriberPayloadBuilder {
 	);
 
 	/**
-	 * @var array<int, string>|null Cached opt-in toggle list. Null until first read.
+	 * Pre-PRO-1683 toggle keys the wizard saved → the canonical names above.
+	 *
+	 * The wizard's checkbox list wrote `phone` / `gender` while this builder
+	 * has always read `user_phone` / `user_gender`, so both selections were
+	 * discarded by the SUPPORTED_FIELDS intersection and neither field ever
+	 * reached Smaily. The wizard now writes the canonical names; this map is
+	 * what keeps a store that saved its selection BEFORE the fix working
+	 * without a migration — the wire names are untouched either way
+	 * (FIELD_MAPPING.md §2: renaming them would break existing segments).
+	 *
+	 * @var array<string, string>
 	 */
-	private ?array $enabled_fields = null;
+	private const LEGACY_FIELD_ALIASES = array(
+		'phone'  => 'user_phone',
+		'gender' => 'user_gender',
+	);
 
 	/**
 	 * Build the Smaily contact payload for a WP user.
@@ -112,13 +125,13 @@ class SubscriberPayloadBuilder {
 	}
 
 	/**
+	 * The merchant's selection, read fresh per payload: a handler registered
+	 * at `init` outlives a settings save in a long-running process, and
+	 * `get_option()` on this autoloaded key is an in-memory lookup anyway.
+	 *
 	 * @return array<int, string>
 	 */
 	private function enabled(): array {
-		if ( $this->enabled_fields !== null ) {
-			return $this->enabled_fields;
-		}
-
 		$stored = get_option( self::OPTION_SYNC_FIELDS, null );
 		if ( ! is_array( $stored ) ) {
 			// Never-saved or corrupt — fall back to the documented
@@ -129,11 +142,32 @@ class SubscriberPayloadBuilder {
 		// Reject unknown field names — a stale value in the option
 		// from a future plugin version shouldn't drag bogus keys
 		// into the payload.
-		$this->enabled_fields = array_values(
-			array_intersect( self::SUPPORTED_FIELDS, array_map( 'strval', $stored ) )
+		return array_values(
+			array_intersect( self::SUPPORTED_FIELDS, array_map( 'strval', self::canonical_fields( $stored ) ) )
 		);
+	}
 
-		return $this->enabled_fields;
+	/**
+	 * Translate a stored field selection to the canonical §2/§3 names.
+	 *
+	 * Only string VALUES are rewritten and every key is preserved, so the
+	 * legacy associative shape (`array( 'user_phone' => false, … )`, whose
+	 * values are booleans) comes back byte-identical — this is not the place
+	 * that teaches the readers to understand that shape.
+	 *
+	 * @param array<int|string, mixed> $stored Raw option value.
+	 *
+	 * @return array<int|string, mixed>
+	 */
+	public static function canonical_fields( array $stored ): array {
+		$canonical = array();
+		foreach ( $stored as $key => $value ) {
+			$canonical[ $key ] = is_string( $value ) && isset( self::LEGACY_FIELD_ALIASES[ $value ] )
+				? self::LEGACY_FIELD_ALIASES[ $value ]
+				: $value;
+		}
+
+		return $canonical;
 	}
 
 	/**
