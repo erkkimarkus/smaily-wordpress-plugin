@@ -60,7 +60,8 @@ errors, PHPStan `[OK] No errors`, PHPUnit unit **725/725**, eslint/tsc clean,
 vitest **270/270**); new `tests/Integration/SmailyPlanBlockedNoticeTest.php`
 **OK, 4 tests** — **3 of its 4 cases fail against the pre-fix code**. Merchant
 docs `docs/site/index.html` updated in BOTH languages (a package bullet in the
-Smaily connection errors list + the proactive-health-notices note). `.pot` /
+Smaily connection errors list, the proactive-health-notices note, and the Event
+Log bullet — a failed row's reason now carries `(Smaily code 227)`). `.pot` /
 `-et.po` rebuilt via `bin/build-i18n.sh` with Estonian translations for the four
 new strings. DECISIONS PRO-1686. **Open: human acceptance** — restoring the plan
 on the live account and re-running the walk (the plugin half is proven by the
