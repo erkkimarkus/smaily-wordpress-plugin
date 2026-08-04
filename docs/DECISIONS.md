@@ -4869,6 +4869,36 @@ get_user_data()` still reads the option as a map for the registered-user opt-in
 path; same class of bug, same pre-wizard-only window, left as a follow-up rather
 than folded in.
 
+**PRO-1772 addendum — the fourth reader, and the last known one.** That
+follow-up was the same bug one call deeper: `Data_Handler::get_user_data()`
+iterated the selection as `foreach ( $options as $field => $enabled )`, so on a
+wizard-shaped (list) selection the loop variable is an integer index and every
+`switch` case misses. The array it returns is what
+`Subscriber_Synchronization::update_subscriber()` POSTs, so the contact reached
+Smaily with **no email address and no fields at all** — an API error in the log
+and nothing updated. Its reach is wider than the guest opt-in above: the
+WordPress profile save (`personal_options_update` / `edit_user_profile_update`),
+the WooCommerce account-details save, `woocommerce_created_customer`, and the
+registered-user branch of the very opt-in PRO-1743 fixed for guests — all in the
+same pre-wizard-Finish window (LegacyHookBridge strips these hooks at Finish).
+The one other caller, `Cron::smaily_sync_subscribers()`, is the retired legacy
+mass-send: kept for the upstream diff, deliberately never registered (F3-53),
+so it is not a live path — but it reads the same method and is now correct
+too. **Same decision, same bridge:** it reads
+`effective_selection_legacy_keys()`, which its `switch` already speaks
+(`user_dob`, `user_phone`, …), so the fix is the one-line read swap and no fifth
+translation table. The always-present trio keeps the meaning established above —
+and for this reader it is also literally what a pre-wizard store already had,
+since the legacy sanitizer forced `store_url`/`user_email`/`language` true.
+**Demonstration:** two cases in `tests/Integration/SubscriberFieldFormsTest.php`
+drive the registered-customer branch of the real checkout opt-in on the running
+store with only the Smaily transport faked (the order's billing email is
+deliberately a DIFFERENT address, so the assertion proves the contact is built
+from the user's profile). The wizard-shaped case fails against the pre-fix code
+(`email` null, payload empty); the legacy-shaped case passes before and after —
+behaviour unchanged. With this, every known reader of the field selection goes
+through the one interpreter.
+
 ### PRO-1686 — A refusal is reported under the cause Smaily gave: the package, the credentials, or an outage
 
 **Context:** when a Smaily account moves to a freemium package, everything the

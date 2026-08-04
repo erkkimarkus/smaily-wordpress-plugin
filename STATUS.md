@@ -26,7 +26,36 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-05 (**PRO-1767 — a connected store now captures campaign
+_Last updated: 2026-08-05 (**PRO-1772 — a registered customer's contact update
+no longer reaches Smaily empty on a wizard-configured store.** The fourth and
+last known reader of the merchant's field selection that still iterated it as a
+MAP: `Data_Handler::get_user_data()`, the builder behind
+`Subscriber_Synchronization::update_subscriber()`. On a wizard-configured store
+(the selection is a LIST of names there) every `switch` case missed, so the
+contact POSTed to Smaily carried **no email address and no fields at all** — an
+API error in the log and nothing updated. Reachable from the WordPress profile
+save, the WooCommerce account-details save, customer-created, and the
+registered-user branch of the checkout opt-in — the same pre-wizard-Finish
+window as the readers PRO-1743 fixed (LegacyHookBridge strips those hooks at
+Finish), plus the retired legacy cron's sync helper. **Fix:** the same one-line
+bridge as PRO-1743 — read `SubscriberPayloadBuilder::
+effective_selection_legacy_keys()`, the shared interpreter's answer in the
+legacy key names this reader speaks — so there is no fifth translation table to
+drift. `store_url`/`user_email`/`language` are always in that answer (PRO-1743
+semantics, unchanged). **A store configured before the wizard is unchanged.**
+Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No
+errors`, PHPUnit unit **738/738**, eslint/tsc clean, vitest **275/275**);
+integration full suite **OK (253 tests, 1483 assertions)**, no failures, incl.
+`SubscriberFieldFormsTest` (**OK, 8 tests**) — two new cases drive the REAL
+registered-customer opt-in on the running store with only the Smaily transport
+faked, against both stored shapes, and the wizard-shaped one **fails against
+the pre-fix code** (`email` is null, the payload is empty). Merchant docs
+`docs/site/index.html` **unchanged** — it already describes ticking additional
+fields, which is what now happens. DECISIONS PRO-1743 (PRO-1772 addendum). The
+shape-drift class is now closed: every known reader of the selection goes
+through the one interpreter. No version bump — ships with the next release cut._
+
+Prior: 2026-08-05 (**PRO-1767 — a connected store now captures campaign
 attribution in the browser even with browse tracking OFF.** The browser-side
 writer exists because a full-page cache serves a campaign landing without ever
 running PHP, so the server-side `LandingCapture` is blind on exactly the hit
@@ -296,9 +325,10 @@ with no email). Not covered server-side: the checkout page's own conditional
 tags (the documented harness limit), so "the input renders on a real checkout
 screen" stays a manual pilot check. Merchant docs `docs/site/index.html`
 **unchanged** — it already describes ticking additional fields, which is what
-now happens. DECISIONS PRO-1743. Follow-up left open: `Data_Handler::
-get_user_data()` still reads the option as a map (registered-user opt-in,
-pre-wizard window only). No version bump — ships with the next release cut._
+now happens. DECISIONS PRO-1743. Follow-up left open at the time: `Data_Handler::
+get_user_data()` still read the option as a map (registered-user opt-in,
+pre-wizard window only) — closed by PRO-1772, above. No version bump — ships
+with the next release cut._
 
 Prior: 2026-08-04 (**PRO-1769 — the contact import stopped after its
 first 100 contacts and reported success; it now walks the whole user table.**
