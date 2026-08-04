@@ -28,6 +28,8 @@ final class ClientTest extends TestCase {
 		);
 		Functions\when( 'apply_filters' )->returnArg( 2 );
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+		// Every non-2xx reads Retry-After (PRO-1685); absent unless a test says otherwise.
+		Functions\when( 'wp_remote_retrieve_header' )->justReturn( '' );
 	}
 
 	protected function tearDown(): void {
@@ -86,6 +88,40 @@ final class ClientTest extends TestCase {
 		$this->expectExceptionCode( 503 );
 
 		$client->trigger_automation( 42, array( array( 'email' => 'a@b.c' ) ) );
+	}
+
+	public function test_a_rate_limited_response_carries_smailys_retry_after(): void {
+		// PRO-1685: "429 honour Retry-After" needs the wait to reach the
+		// caller — RetryPolicy parks the row for exactly this many seconds.
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"err":"slow down"}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 429 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"err":"slow down"}' );
+		Functions\when( 'wp_remote_retrieve_header' )->justReturn( '120' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		$client = new Client( 'demo', 'user', 'pass' );
+
+		try {
+			$client->upsert_subscribers( array( array( 'email' => 'a@b.c' ) ) );
+			self::fail( 'A 429 must throw.' );
+		} catch ( ApiException $e ) {
+			self::assertSame( 429, $e->getCode() );
+			self::assertSame( 120, $e->retry_after() );
+		}
+	}
+
+	public function test_a_failure_without_a_retry_after_leaves_the_wait_to_the_caller(): void {
+		Functions\when( 'wp_remote_post' )->justReturn( $this->successful_response( '{"err":"boom"}' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 503 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( '{"err":"boom"}' );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+
+		try {
+			( new Client( 'demo', 'user', 'pass' ) )->upsert_subscribers( array( array( 'email' => 'a@b.c' ) ) );
+			self::fail( 'A 503 must throw.' );
+		} catch ( ApiException $e ) {
+			self::assertNull( $e->retry_after() );
+		}
 	}
 
 	public function test_last_exchange_captures_request_and_response_without_auth(): void {

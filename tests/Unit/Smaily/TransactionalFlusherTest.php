@@ -450,8 +450,8 @@ final class TransactionalFlusherTest extends TestCase {
 				$this->marked_failed[] = compact( 'id', 'error' );
 			}
 
-			public function record_attempt( int $id, string $error ): void {
-				$this->attempts[] = compact( 'id', 'error' );
+			public function record_attempt( int $id, string $error, int $retry_in_seconds = 0 ): void {
+				$this->attempts[] = compact( 'id', 'error', 'retry_in_seconds' );
 			}
 
 			public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {

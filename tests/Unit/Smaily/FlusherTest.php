@@ -293,6 +293,55 @@ final class FlusherTest extends TestCase {
 		self::assertSame( 1, $stats['retried'], 'ApiException → record_attempt, not mark_failed.' );
 		self::assertCount( 1, $queue->attempts );
 		self::assertSame( 12, $queue->attempts[0]['id'] );
+		self::assertSame( 60, $queue->attempts[0]['retry_in_seconds'], 'First retry waits one flush cadence.' );
+	}
+
+	public function test_a_permanent_refusal_stops_being_retried(): void {
+		// PRO-1685: a 4xx that can never succeed (revoked credentials here)
+		// used to be recorded as an attempt and re-POSTed every 60s forever.
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 12,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'email' => 'a@b.c', 'fields' => array() ) ),
+					'attempts'   => 0,
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )
+			->willThrowException( new ApiException( 'Smaily API returned HTTP 401 for POST contact', 401 ) );
+
+		$stats = ( new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client ) )->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertSame( 0, $stats['retried'] );
+		self::assertSame( array(), $queue->attempts );
+		self::assertStringContainsString( 'permanent_http_401', $queue->marked_failed[0]['error'] );
+	}
+
+	public function test_the_retry_ceiling_fails_a_row_that_keeps_failing_transiently(): void {
+		$queue = $this->fake_queue(
+			array(
+				array(
+					'id'         => 12,
+					'event_type' => HookHandler::EVENT_CONTACT_SYNC,
+					'payload'    => json_encode( array( 'email' => 'a@b.c', 'fields' => array() ) ),
+					'attempts'   => \Smaily\Connect\Smaily\RetryPolicy::MAX_ATTEMPTS - 1,
+				),
+			)
+		);
+
+		$client = $this->createMock( Client::class );
+		$client->method( 'upsert_subscribers' )
+			->willThrowException( new ApiException( 'Smaily API returned HTTP 503 for POST contact', 503 ) );
+
+		$stats = ( new Flusher( $queue, $this->automation_router_returning_true(), static fn () => $client ) )->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertStringContainsString( 'retry_limit_exceeded', $queue->marked_failed[0]['error'] );
 	}
 
 	public function test_automation_skip_no_workflow_match_is_terminal_sent(): void {
@@ -387,8 +436,8 @@ final class FlusherTest extends TestCase {
 				$this->marked_failed[] = compact( 'id', 'error' );
 			}
 
-			public function record_attempt( int $id, string $error ): void {
-				$this->attempts[] = compact( 'id', 'error' );
+			public function record_attempt( int $id, string $error, int $retry_in_seconds = 0 ): void {
+				$this->attempts[] = compact( 'id', 'error', 'retry_in_seconds' );
 			}
 			/** @var array<int, array{sent: ?string, response: ?string}> */
 			public array $exchanges = array();

@@ -174,6 +174,30 @@ final class CartFlusherTest extends TestCase {
 		self::assertStringContainsString( '"http":429', (string) $queue->exchanges[5]['response'], 'The throwing exchange is still captured (try/finally, F3-44).' );
 	}
 
+	public function test_a_permanent_refusal_stops_being_retried(): void {
+		// PRO-1685: same policy as the main flusher — a 4xx that can never
+		// succeed fails the row instead of being retried every 60s forever.
+		$queue = $this->fake_queue( array( $this->cart_event( 5 ) ) );
+
+		$router = new class extends AutomationRouter {
+			public function __construct() {}
+
+			public function trigger_automation( string $trigger_type, array $contact_data, array $additional_fields = array() ): bool {
+				throw new ApiException( 'Smaily API returned HTTP 403 for POST autoresponder', 403 );
+			}
+
+			public function last_exchange(): ?array {
+				return array( 'request' => array( 'endpoint' => 'autoresponder' ), 'response' => array( 'http' => 403 ) );
+			}
+		};
+
+		$stats = ( new CartFlusher( $queue, $router, static fn () => null ) )->flush();
+
+		self::assertSame( 1, $stats['failed'] );
+		self::assertSame( array(), $queue->attempts );
+		self::assertStringContainsString( 'permanent_http_403', $queue->marked_failed[0]['error'] );
+	}
+
 	public function test_malformed_payload_marks_failed(): void {
 		$queue = $this->fake_queue(
 			array(
@@ -299,8 +323,8 @@ final class CartFlusherTest extends TestCase {
 				$this->marked_failed[] = compact( 'id', 'error' );
 			}
 
-			public function record_attempt( int $id, string $error ): void {
-				$this->attempts[] = compact( 'id', 'error' );
+			public function record_attempt( int $id, string $error, int $retry_in_seconds = 0 ): void {
+				$this->attempts[] = compact( 'id', 'error', 'retry_in_seconds' );
 			}
 
 			public function store_exchange( int $id, ?string $sent_payload, ?string $last_response ): void {

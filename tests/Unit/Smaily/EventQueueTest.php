@@ -136,7 +136,23 @@ final class EventQueueTest extends TestCase {
 		self::assertCount( 1, $wpdb->prepare_calls );
 		self::assertStringContainsString( 'FROM wp_smly_plus_event_queue', $wpdb->prepare_calls[0]['sql'] );
 		self::assertSame( EventQueue::STATUS_PENDING, $wpdb->prepare_calls[0]['args'][0] );
-		self::assertSame( 25, $wpdb->prepare_calls[0]['args'][1] );
+		self::assertSame( 25, $wpdb->prepare_calls[0]['args'][2] );
+	}
+
+	public function test_pending_only_returns_rows_whose_retry_park_has_elapsed(): void {
+		// PRO-1685: a row parked by record_attempt()'s backoff must stay out
+		// of the drain until it's due — otherwise the 60s tick hammers it and
+		// it keeps its oldest-first slot ahead of fresher work.
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->pending( 25 );
+
+		self::assertStringContainsString(
+			'( next_retry_at IS NULL OR next_retry_at <= %s )',
+			$wpdb->prepare_calls[0]['sql']
+		);
+		self::assertSame( '2026-05-19 12:00:00', $wpdb->prepare_calls[0]['args'][1], 'The due-check compares against UTC now.' );
 	}
 
 	public function test_pending_event_type_scoping_builds_in_and_not_in_clauses(): void {
@@ -146,13 +162,15 @@ final class EventQueueTest extends TestCase {
 		$wpdb            = $this->fake_wpdb_full();
 		$GLOBALS['wpdb'] = $wpdb;
 
+		$now = '2026-05-19 12:00:00';
+
 		( new EventQueue() )->pending( 10, array( 'automation.abandoned_cart' ) );
 		self::assertStringContainsString( 'event_type IN ( %s )', $wpdb->prepare_calls[0]['sql'] );
-		self::assertSame( array( EventQueue::STATUS_PENDING, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[0]['args'] );
+		self::assertSame( array( EventQueue::STATUS_PENDING, $now, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[0]['args'] );
 
 		( new EventQueue() )->pending( 10, null, array( 'automation.abandoned_cart' ) );
 		self::assertStringContainsString( 'event_type NOT IN ( %s )', $wpdb->prepare_calls[1]['sql'] );
-		self::assertSame( array( EventQueue::STATUS_PENDING, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[1]['args'] );
+		self::assertSame( array( EventQueue::STATUS_PENDING, $now, 'automation.abandoned_cart', 10 ), $wpdb->prepare_calls[1]['args'] );
 	}
 
 	public function test_pending_returns_empty_array_when_get_results_returns_non_array(): void {
@@ -191,16 +209,41 @@ final class EventQueueTest extends TestCase {
 		self::assertSame( array( 'id' => 7 ), $wpdb->updates[0]['where'] );
 	}
 
-	public function test_record_attempt_bumps_counter_via_raw_query(): void {
+	public function test_record_attempt_bumps_counter_and_parks_the_row(): void {
 		$wpdb            = $this->fake_wpdb_full();
 		$GLOBALS['wpdb'] = $wpdb;
 
-		( new EventQueue() )->record_attempt( 5, 'rate limited' );
+		( new EventQueue() )->record_attempt( 5, 'rate limited', 900 );
 
 		self::assertCount( 1, $wpdb->prepare_calls );
 		self::assertStringContainsString( 'attempts = attempts + 1', $wpdb->prepare_calls[0]['sql'] );
-		self::assertSame( array( 'rate limited', 5 ), $wpdb->prepare_calls[0]['args'] );
+		self::assertStringContainsString( 'next_retry_at = ( UTC_TIMESTAMP() + INTERVAL %d SECOND )', $wpdb->prepare_calls[0]['sql'] );
+		self::assertSame( array( 'rate limited', 900, 5 ), $wpdb->prepare_calls[0]['args'] );
 		self::assertCount( 1, $wpdb->queries );
+	}
+
+	public function test_record_attempt_without_a_backoff_leaves_the_row_due_immediately(): void {
+		// The backoff is opt-in: TransactionalFlusher bounds its retries by
+		// elapsed time, not by spacing, so it must keep the every-tick
+		// behaviour it was built on (PRO-1519 / PRO-1685).
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->record_attempt( 5, 'temporary outage' );
+
+		self::assertSame( array( 'temporary outage', 0, 5 ), $wpdb->prepare_calls[0]['args'] );
+	}
+
+	public function test_reset_failed_clears_the_retry_park_so_a_revived_row_is_due_now(): void {
+		// The Event Log recovery path must be able to undo a wrong
+		// classification: status, attempts AND the park all go back (PRO-1685).
+		$wpdb            = $this->fake_wpdb_full();
+		$GLOBALS['wpdb'] = $wpdb;
+
+		( new EventQueue() )->reset_failed( array( 7 ) );
+
+		self::assertStringContainsString( 'attempts = 0', $wpdb->prepare_calls[0]['sql'] );
+		self::assertStringContainsString( 'next_retry_at = NULL', $wpdb->prepare_calls[0]['sql'] );
 	}
 
 	/**
