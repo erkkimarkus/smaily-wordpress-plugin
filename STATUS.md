@@ -26,7 +26,51 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-05 (**PRO-1772 — a registered customer's contact update
+_Last updated: 2026-08-07 (**PRO-1779 / PRO-1804 / PRO-1843 — contract
+re-synced byte-identical to engine `bfebf942` (md5 `39afc210…`) — v1.8.0 →
+v1.8.1, CC-8 pass.** Three engine doc commits since our `547ad4d6` sync:
+`4104659` (§2 `403 tenant_inactive` is now reachable), `8c2f043` (§5 — a
+partly-refunded line still counts as kept), `bfebf94` (v1.8.1 — the same
+`tenant_inactive` response now also covers purged/offboarded tenants).
+**What changed, and the follow-through call on each:**
+  1. **§2 `403 tenant_inactive` is real, applies to EVERY API-key endpoint
+     (§2–§14), and is now emitted for a suspended OR a GDPR-purged tenant.**
+     The body is byte-identical in both cases, `"tenant_status": "suspended"`
+     literal included — a fixed string, **never** a state discriminator, so a
+     sender must not branch on it. Sender rule: non-retryable like `401` —
+     stop sending, surface an admin notice. **Today we half-comply**:
+     `AbstractD6Flusher::is_terminal()` treats any non-429 4xx as terminal, so
+     a 403 marks those rows failed with no retry, and the health-check ping
+     failure raises the generic `engine_down` notice after its grace window.
+     What is missing is the *specific* signal — nothing stops the next batch
+     from being attempted, and the merchant is told "engine unreachable"
+     rather than "this account is deactivated". A dedicated notice is a
+     user-visible surface needing a design call → **follow-up, not built here**.
+  2. **§5 — a partially-refunded quantity stays KEPT** (Erkki decision
+     2026-08-05, PRO-1597): `returned_at` marks the whole LINE, there is no
+     per-unit field, so 1 of 3 refunded is not a return. **Already exactly what
+     we send** — `OrderPayloadBuilder::items()` flags a line only when the
+     accumulated refunded quantity reaches the full line quantity
+     (`returns_by_item()`'s docblock says so in the same words). No change.
+  3. **§5/§6 errata — `smaily_rec_id` is a UUID, not a free string**, and a
+     malformed value rejects the WHOLE order (not just its attribution).
+     Already implemented (PRO-1710): `LandingCapture` cookies only a
+     well-formed UUID and `OrderPayloadBuilder` omits the field otherwise;
+     the mock mirrors the live Zod check. No change.
+  4. **v1.7.0 §6 deprecation follow-through — PRO-1712 done in the next
+     commit** (the previous sync flagged it): `smaily_rec_id` / `smaily_ctx`
+     leave `BeaconEndpoint::EVENT_FIELDS`.
+  5. **§3 catalog `currency` stays OPTIONAL** (engine default `EUR`) and we
+     still don't send it — unchanged from the previous sync's call; still a
+     follow-up for a non-EUR store, not a sync obligation.
+**Mock follow-through: none required.** No wire shape changed — v1.8.1 is a
+PATCH documenting which engine states emit an already-specified response, and
+the two errata document validation that has been live (and mock-mirrored)
+since PRO-1710. No live-walk required for the same reason. Gate: `bash
+bin/check-contract-staleness.sh` **green** (`OK: … byte-identical … engine
+commit bfebf942…`)._
+
+Prior: 2026-08-05 (**PRO-1772 — a registered customer's contact update
 no longer reaches Smaily empty on a wizard-configured store.** The fourth and
 last known reader of the merchant's field selection that still iterated it as a
 MAP: `Data_Handler::get_user_data()`, the builder behind

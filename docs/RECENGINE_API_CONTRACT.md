@@ -1,8 +1,8 @@
 # Smaily Recommendation Engine — API Contract v1.8
 
-**Version**: 1.8.0
+**Version**: 1.8.1
 **Published**: 2026-05-19
-**Last updated**: 2026-07-30 (v1.8.0 — §5 return signals: `items[].returned_at` documented as official + two new optional reason fields, plus engine-side full-refund derivation; MINOR bump per the versioning rule: new optional fields, backward-compatible — PRO-1597)
+**Last updated**: 2026-08-06 (v1.8.1 — §2's `403 tenant_inactive` now also covers purged/offboarded tenants. PATCH bump: no new endpoint, field or wire shape; a fix to which engine states emit an already-documented response — PRO-1820)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -512,7 +512,7 @@ User-Agent: SmailyRecEngine-WooPlugin/0.1.0
 
 **Response 401** if the API key is invalid (see Authentication).
 
-**Response 403** if the tenant is deactivated:
+**Response 403** if the tenant is deactivated — **suspended or purged/offboarded**:
 ```json
 {
   "error": "tenant_inactive",
@@ -520,6 +520,10 @@ User-Agent: SmailyRecEngine-WooPlugin/0.1.0
   "tenant_status": "suspended"
 }
 ```
+
+> **This response is live as of 2026-08-04** (PRO-1690) and applies to **every** API-key-authenticated endpoint in this contract (§2–§14), not only to ping — a deactivated tenant is refused at the shared authentication step. The body above is exact and identical in all cases: the engine distinguishes deactivation reasons internally, but never on the wire. `401` still means "this key is not valid"; `403 tenant_inactive` means "this key is valid, this account is not". **Sender rule**: treat `403 tenant_inactive` as non-retryable — stop sending and surface an admin notice, exactly as for `401`. Retries will not clear it; only the engine operator can.
+
+> **Covered states** (v1.8.1, PRO-1820): **operator suspension** (billing or abuse — temporary, an operator can lift it) and **purge/offboarding** (the client relationship ended and the tenant's data was deleted under GDPR — permanent). Both answer with the byte-identical body above, including the literal `"tenant_status": "suspended"`; that value is a fixed string, **not** a state discriminator — do not branch on it. A purged tenant's credentials are permanently invalid: no key, setup token or regenerate flow can revive them, and data sent to a purged tenant after the purge is rejected at the gate, never stored.
 
 **Rate limit**: 100 req/sec (default for non-browse endpoints).
 
@@ -894,7 +898,7 @@ Batch upload of orders + line items. **Order natural key is `(tenant_id, externa
 | `discount_amount` | number | NO | Total discount (default 0) |
 | `currency` | string (ISO 4217) | NO | Default `EUR`. Stored **as sent** — not strictly ISO-validated. |
 | `status` | enum | YES | `completed` / `processing` / `cancelled` / `refunded`. **Required** — a missing or out-of-enum `status` is a per-item `errors[]` entry. |
-| `smaily_rec_id` | string | NO | Attribution: which recommendation was clicked pre-purchase (from cookie). Stored; consumed by the async attribution cron (see below). |
+| `smaily_rec_id` | UUID v4 string | NO | Attribution: which recommendation was clicked pre-purchase (from cookie). Stored; consumed by the async attribution cron (see below). **UUID-validated — a malformed value rejects the whole order** (see below). |
 | `smaily_visitor_token` | string | NO | Attribution: visitor token (from cookie). Stored; async. |
 | `smaily_rec_ctx` | string | NO | Attribution: context (from cookie). **Stored and available to the attribution flow, but not yet consumed by matching** (future feature). |
 | `session_id` | string | NO | Accept-and-ignore (PRO-1544): stored on the order, but no longer read by the attribution matcher — the browse-event/`session_id` matching step it used to feed was removed in PRO-1524. Kept accepting it so senders don't need a plugin update. |
@@ -918,6 +922,7 @@ Batch upload of orders + line items. **Order natural key is `(tenant_id, externa
 - **Do not guess.** Send a standardised value only where the platform's own value maps unambiguously (Shopify's return reasons do; a merchant's free-text RMA note does not). Keyword-guessing free text into `defect` or `size_small` is worse than sending nothing — it feeds invented verdicts into learning. When in doubt: `other` plus the raw string, or omit the reason entirely.
 - **`return_reason_raw` is diagnostic only** — never a ranking or gating input, never rendered into an email. Send the merchant/system-side note (Shopify `returnReasonNote`, the definition handle, Woo's refund reason). **Do not send buyer-written free text** (Shopify's `customerNote`): it carries personal data and no analytical value the enum lacks.
 - **A fully-refunded order is derived engine-side as all lines returned.** When `status: "refunded"` arrives, every line of that order is stamped returned at the order's `ordered_at` — so **senders need not send `returned_at` for a full refund**. An explicitly sent `returned_at` always wins over the derivation. Senders **SHOULD** still send `returned_at` per line for **partial or line-level returns**, which the order status cannot express (on WooCommerce a partial refund does not even change the order status).
+- **A return is whole-line, not per-unit — a partially-refunded quantity stays KEPT.** `returned_at` marks the *line*; there is no per-unit return field. So a line of `qty: 3` with one unit refunded is **not** flagged returned: the customer still owns two of them, and the engine keeps treating that SKU as kept and recommendable. Only send `returned_at` when the line came back in full. This deliberately under-reports returns rather than suppressing a product the customer still has — a wrong suppression costs a real recommendation slot, a missed return costs only a signal the consumers already tolerate as best-effort (above). A `returned_qty` widening is **deferred** until a fashion pilot shows real partial-return volume; nothing on the wire changes until then. (Erkki decision, 2026-08-05, PRO-1597.)
 - **Return signals are best-effort.** Smaller stores routinely process refunds off-platform and will send nothing at all here; WooCommerce has no returns concept in core and no structured reason anywhere in its ecosystem. The engine degrades gracefully on NULL — every consumer treats "no return recorded" as "kept", which is the correct default.
 - **Forward-only.** No historical backfill of returns is expected or required. Both consumers are windowed (180 days / 365 days), so the signal fully matures within ~6 months of switch-on. Do not read a low return rate in the first months as a real one.
 - ⚠️ **Items are fully replaced on order re-ingest** (see below), so a later sync of a returned order that omits these fields **erases the return**. Whoever pushes a return must keep pushing it on every subsequent sync of that order. (The derived full-refund case is self-healing — it is re-derived from `status` on every sync.)
@@ -959,6 +964,9 @@ Matching steps (run by the cron; PRO-1524, 2026-07-23 — a former 4th-priority
 4. No match → `rec_attribution` with `attribution_type='control_purchase'`, `outcome_score=0.0` (a softer `assisted_open` tier may also apply here — see `lib/engine/attribution/match-purchase-to-rec.ts`).
 
 `smaily_rec_ctx` is stored and made available to the attribution flow but **not yet consumed by matching** (future feature). Detailed logic lives in `lib/engine/attribution/`.
+
+<a id="rec-id-uuid-validation"></a>
+**`smaily_rec_id` is UUID-validated, and a bad value costs the order — not just the field.** The value is a `recommendations.rec_id`, so the route types it as a UUID (`z.string().uuid()`). A present-but-malformed value (a truncated cookie, a `rec_abc123`-style placeholder, an empty string) fails per-order validation: that order lands in `errors[]` with `field: "smaily_rec_id"` and is **not written** — the order's revenue is lost to the engine, not merely its attribution. This is the standard per-order rejection path described above: the rest of the batch still processes, the rejected order's `event_id` is not registered, and a corrected retry writes it normally. **Sender rule**: omit the field entirely when there is no cookie or the cookie value is not a well-formed UUID. Omitted (or `null`) is always safe — the order then attributes through the visitor-token or email-click mechanism, or as `control_purchase`. Do not send `""`.
 
 **Idempotency**: two layers, as described in [Idempotency](#idempotency):
 - **Layer 1**: `(tenant_id, external_order_id)` natural-key UPSERT (items are fully replaced on update).
@@ -1028,7 +1036,7 @@ Browse events batch. The highest-volume endpoint.
 | `source` | string | NO | Defaults to `web` if omitted. Constant: `web`, `plugin_woo`, `plugin_shopify`, `plugin_magento`, `make`, `custom`. The engine stores `source` as an opaque label (not enum-validated); senders must use their listed constant so per-source analytics stay clean. |
 | `customer_email` | string | NO | Identity hint (if user is logged in). **Deprecated for client-originated senders — see below.** |
 | `smaily_visitor_token` | string | NO | Identity hint (from cookie) |
-| `smaily_rec_id` | string | NO | **Deprecated, accept-and-ignore as of v1.7.0 — see below.** Accepted on the wire; no longer persisted or consulted. |
+| `smaily_rec_id` | UUID v4 string | NO | **Deprecated, accept-and-ignore as of v1.7.0 — see below.** Accepted on the wire; no longer persisted or consulted. Still **UUID-validated** when present — a malformed value rejects that event. Prefer omitting it. |
 | `smaily_ctx` | string | NO | **Deprecated, accept-and-ignore as of v1.7.0 — see below.** Accepted on the wire; no longer persisted or consulted. |
 | `external_id` | string | NO | Platform user_id |
 
@@ -2020,6 +2028,23 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **Engine-side full-refund derivation (behavior change, no wire change)**: an order arriving with `status: "refunded"` now has **every line stamped returned** at the order's own `ordered_at`. Senders need not send `returned_at` for a full refund; an explicitly sent `returned_at` always wins. `ordered_at` rather than ingest time is deliberate — items are fully replaced on re-ingest, so a `now()` derivation would move the date on every re-sync and a full historical re-sync would restamp old refunds as fresh returns. Senders **SHOULD** still send per-line `returned_at` for **partial** returns, which order status cannot express (a WooCommerce partial refund does not change the order status at all).
 - **Expectation-setting, stated in §5**: return signals are best-effort and **forward-only**. Many stores process refunds off-platform and will send nothing; WooCommerce has no returns concept in core. The engine degrades gracefully on NULL (no return recorded = kept). Both consumers are windowed (180 d / 365 d), so no historical backfill is expected — and an early low return rate should not be read as a real one.
 - ⚠️ **Sender obligation**: because items are fully replaced on order re-ingest, a later sync of a returned order that omits these fields erases the return. Only the derived full-refund case is self-healing.
+
+**v1.8.0 — errata: §5/§6 `smaily_rec_id` is a UUID, not a free string** (documentation-only; no code/schema change — the contract is being aligned to validation that has been live since the first release). PRO-1713, raised by the WooCommerce plugin team:
+- **§5 and §6 field-reference rows retyped `string` → `UUID v4 string`.** Both routes have always validated the field with `z.string().uuid()` (`app/api/v1/ingest/orders/route.ts`, `app/api/v1/ingest/browse/route.ts`); the contract's plain-`string` typing invited senders to forward whatever the cookie held. Every example value in this document was already a well-formed UUID (fixed in the v1.7.0 errata batch), so the tables were the last place still saying otherwise.
+- **§5 gains a normative note on the cost of a bad value** ([`smaily_rec_id` is UUID-validated](#rec-id-uuid-validation)): a malformed value fails per-order validation, so the **whole order** is rejected into `errors[]` and not written — the order's revenue is lost to the engine, not merely its attribution. This is the ordinary per-order rejection path (batch continues, `event_id` not registered, corrected retry writes normally), but it is worth stating because senders reasonably assume an optional attribution hint degrades to "no attribution" rather than "no order". **Sender rule stated explicitly**: omit the field when there is no cookie or the cookie is not a well-formed UUID; never send `""`.
+- **§6 row notes that the deprecated field is still validated** — accept-and-ignore (v1.7.0) means the value is never persisted or consulted, but a malformed value still fails that event's validation. Omitting it is the only fully safe option.
+- No semantics change and no code change: this errata documents enforced reality. Widening the validation was considered and **not** done — the field is a `recommendations.rec_id` lookup key, and a loose type would only move the failure to a silent no-match.
+
+**v1.8.0 — errata: §2's `403 tenant_inactive` now actually happens** (documentation-only on the wire — the response shape is unchanged from what this contract has always specified; the engine side gained the tenant state that can produce it). PRO-1690:
+- **The documented response was, until now, unreachable.** No engine code path emitted `tenant_inactive` and `tenants` had no status column: deactivating a tenant meant revoking its API keys one at a time. The engine now has an operator suspension state, so the response is real.
+- **Scope stated explicitly in §2**: it applies to every API-key-authenticated endpoint (§2–§14), because enforcement sits at the shared authentication step rather than per route. The body is byte-identical everywhere.
+- **No new error code, field or status.** Suspension reasons (billing vs. abuse) are an engine/merchant-console distinction and are deliberately NOT exposed on the wire — a sender's correct reaction is the same either way.
+- **Sender obligation restated**: `403 tenant_inactive` is non-retryable, like `401`. A plugin that backs off and retries will simply keep failing.
+
+**v1.8.1** (2026-08-06) — **§2's `403 tenant_inactive` extends to purged/offboarded tenants**. PATCH bump per the [Versioning](#versioning) rule (no new endpoint, no new field, no shape change — a fix to *which engine states* emit a response this contract already specifies). PRO-1820, Erkki-approved 2026-08-06:
+- **The gate read only one of the two deactivation stamps.** A GDPR-purged (offboarded) tenant's API key kept authenticating, so a plugin that outlived its purge re-created customer and order rows inside a tombstoned tenant — observed in production on 2026-08-04 for two tenants purged on 2026-07-30. Both key-resolution paths (per-connection keys and the legacy single-key fallback) now carry the tombstone, and the shared authentication step refuses it.
+- **Deliberately the SAME response, not a new one.** A purged tenant answers byte-identically to a suspended one, `"tenant_status": "suspended"` literal included. That field is a fixed string, never a state discriminator — senders must not branch on it. The plugin contract gains no state: a sender's correct reaction (stop sending, surface an admin notice, do not retry) is already the documented one.
+- **Nothing to implement plugin-side.** A plugin that already handles `403 tenant_inactive` per the §2 sender rule is correct as-is. The semantics are informational: unlike suspension, a purge is permanent — the credentials cannot be revived by any key, setup token or regenerate flow (PRO-1820 closed those mints on 2026-08-05), and data sent after the purge is rejected at the gate and never stored.
 
 ### Appendix F: Migration notes
 
