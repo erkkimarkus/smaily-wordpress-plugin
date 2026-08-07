@@ -26,7 +26,73 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-07 (**v3.11.0 release gate — delta security audit
+_Last updated: 2026-08-07 (**v3.11.0 — PUBLISHED.** MINOR bump shipping the
+sendsmaily upstream merge plus the whole PRO-16xx/17xx defect sweep — 100
+commits since the v3.10.0 tag. User-facing headline (see the `readme.txt`
+3.11.0 entry): the ticked contact fields (Phone/Gender included) now actually
+reach Smaily and are actually asked for at checkout; contact import no longer
+stops after the first hundred; turning "Sync contacts to Smaily" off really
+stops it; the first-order automation also fires on the block/Store-API
+checkout; contacts carry a per-automation "last run" field to segment on;
+fully-returned order lines are reported to Campaign Intelligence as returns;
+and the "force opt-in" choice on automation triggers is retired (an automation
+never overrides an unsubscribe made in Smaily). **This is the "next release
+cut" that every `No version bump — ships with the next release cut` entry
+below was waiting for** — everything from the v3.10.0 tag to `5b3dbbc` is now
+shipped. Version bumped in all four places + the three test pins, committed
+first (`c73b7b9007554e484a4935ffdc93384d249f9e21`), then the i18n restamp
+(`ed49abc79767854487cfb04a14df412d99c02942`) — both pushed to `origin/main`.
+Builds: `npm run build:admin && npm run build:client` (`dist/admin/admin.js`,
+`dist/public/js/sc-runtime.js` **and** `dist/public/js/sc-landing.js` — the
+PRO-1767 second storefront bundle, built by its own vite pass); blocks rebuilt
+(all three); **i18n rebuild RUN** (`bin/build-i18n.sh` — `.mo` + the
+admin-bundle et JSON). `composer install --no-dev --optimize-autoloader` →
+`composer run package` → `composer install` (dev vendor restored, verified).
+**ZIP verified**: 3.11.0 in the plugin header, both version constants and the
+readme Stable tag; required present (`dist/admin/admin.js`,
+`dist/public/js/sc-runtime.js`, `dist/public/js/sc-landing.js`,
+`blocks/*/build/*` all three, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + the admin-bundle et JSON, `composer.json`,
+clean non-dirty build-hash `ed49abc`); tests/docs/node_modules/admin-src/
+`dist/client`/dev-vendor absent (grep-verified, the only shipped vendor package
+is `woocommerce/action-scheduler`); 401 files, **1 191 528 B** (vs. v3.10.0's
+1 148 878 B — consistent with the 100-commit feature delta + refreshed i18n).
+**PCP against the built ZIP** (`docker cp` into the wp-env `…-cli-1` container,
+unzipped to `smaily-connect-pkg` — never the bind-mounted `smaily-connect` dir
+— `--slug=smaily-connect --exclude-directories=vendor`, temp copies removed
+after): **0 ERRORS, 5 warnings — the first fully error-free PCP release gate,
+and the new baseline future gates compare against.** The
+`plugin_updater_detected` ERROR every gate from 3.2.0 onward carried is
+confirmed GONE (the `Update URI` header was removed in v3.9.0 ahead of the
+upstream merge, F3-35). Four warnings are the known accepted set (direct-DB
+query + no-caching on `BackfillJob`'s custom table; `DynamicHooknameFound` on a
+prefixed `self::FILTER_*` constant — the register's documented false-positive
+class). The fifth is real but **deliberately shipped as-is**:
+`upgrade_notice_limit` — the 3.11.0 upgrade notice is 636 chars against PCP's
+300 (earlier gates tightened the wording at the cut; Erkki's call this time is
+to leave it and fold it into the **wordpress.org readme-prep** item together
+with the changelog trim — the Changelog section is 32 927 chars against the
+wordpress.org parser's 5 000, so everything below ~3.10.0 would be silently
+truncated on a wp.org listing). Neither matters for a GH-fork release; both
+matter for the upstream/wordpress.org submission (PR #135). **`ci:strict`
+exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit **739/739**,
+vitest **275/275** across 37 files, tsc/eslint clean). **Integration suite
+RE-RUN in full**: `sg docker -c "composer run test:integration"` **OK (254
+tests, 1485 assertions)**, 1 pre-existing environment skip
+(`BackwardCompatTest` — the legacy double-sync premise doesn't apply in this
+env), dev sandbox tenant "Smaily Connect test" correctly restored post-run
+(not MiuMjau, `connected=1`). Gated by the delta security audit of the same
+day (`SECURITY_DELTA_AUDIT_2026-08-07.md`, 0 Blocking/Critical/High; its 1
+Medium is the `attribution.ts` validation asymmetry, explicitly a fast-follow).
+**PUBLISHED 2026-08-07**: tag `v3.11.0` on
+`ed49abc79767854487cfb04a14df412d99c02942` (HEAD, **not** the bump commit — the
+i18n restamp landed after it, so tagging HEAD keeps the tagged tree consistent
+with the ZIP's embedded build-hash), GH release
+https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.11.0,
+ZIP SHA256
+`a8c1c6800fb0f1dcf08394e09b54b73df87a9e73933540887f2912b136ba449d`._
+
+Prior: 2026-08-07 (**v3.11.0 release gate — delta security audit
 `v3.10.0..HEAD` done; 0 blocking findings, the release may proceed.** The
 re-audit policy fires on both grounds here (release boundary + a delta far
 over the 2 000-line threshold: **100 commits, 157 files, +12 080 / −2 166**,
