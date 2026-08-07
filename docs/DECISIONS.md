@@ -3712,15 +3712,14 @@ actually trigger today. `attach_logged_in_identity()`'s return shape also
 dropped the now-unused `verified_email` key (only `verified_allowed` is
 consumed after the simplification).
 
-**Not done in this pass (follow-up, flagged not fixed):** `smaily_rec_id` and
-`smaily_ctx` remain in `EVENT_FIELDS` and are client-suppliable on a browse
-event, contrary to F3-49's client-side-omission intent, via the same
-whitelist-pass-through mechanism this decision just closed for
-`customer_email`. The JS client never sends them today, so there is no known
-live exploitation, but the whitelist itself does not enforce that. Recorded
-here rather than fixed, per the recorded decision's scope (customer_email
-only, this pass) — a follow-up Linear issue should evaluate whether the same
-spoofing logic applies and, if so, close it the same way.
+**Not done in this pass (follow-up — CLOSED by PRO-1712, 2026-08-07):**
+`smaily_rec_id` and `smaily_ctx` remained in `EVENT_FIELDS` and were
+client-suppliable on a browse event, contrary to F3-49's client-side-omission
+intent, via the same whitelist-pass-through mechanism this decision closed for
+`customer_email`. The JS client never sent them, so there was no known live
+exploitation, but the whitelist itself did not enforce that. The follow-up
+evaluation concluded the same spoofing logic applies and closed it the same
+way — see PRO-1712 below.
 
 **Tests:** unit (`BeaconEndpointTest::test_client_supplied_customer_email_is_stripped`,
 `BeaconEndpointIdentityTest::test_client_supplied_customer_email_is_stripped_and_never_checked`)
@@ -5024,9 +5023,8 @@ ingest_orders` to keep the mock pinned to the engine's validation.
 mirrors the PRO-1498/PRO-1506 pattern of repairing at BOTH enqueue and flush
 time for the same reason (a row/cookie captured before the fix can't heal
 itself). §6 browse carries the same engine constraint and is out of scope here —
-the plugin's JS never puts a rec id on a browse event, but the `/relay`
-whitelist still accepts a client-supplied one (the unresolved PRO-1486
-spoofing follow-up).
+the plugin's JS never puts a rec id on a browse event, and since PRO-1712 the
+`/relay` whitelist strips a client-supplied one too.
 
 ### PRO-1633 — A return is a property of the ORDER, re-derived on every send; a line comes back only in full
 
@@ -5167,6 +5165,48 @@ the non-cached path — the two are deliberately redundant); keeps PRO-1710's UU
 rule in the one place both bundles read; keeps the F3-41 naming rule (`sc-`
 prefix, no tracker keyword) for the new browser-visible file; does not touch
 F3-50 browse-consent gating in any way.
+
+### PRO-1712 — the deprecated browse attribution hints leave the `/relay` whitelist
+
+**Context:** contract v1.7.0 deprecated `smaily_rec_id` and `smaily_ctx` on
+browse events to accept-and-ignore — the engine dropped both columns
+(migrations `0080`/`0081`) and deleted the 4th-priority attribution fallback
+they fed, which had never matched a purchase in production. Both are
+client-originated (read from the cookies a campaign landing writes) and
+therefore spoofable with no server-side verification: exactly the class
+PRO-1486 closed for `customer_email`, left open here because the engine still
+accepted the fields and nothing was known to break. That was the last argument
+for keeping them.
+
+**Decision:** `smaily_rec_id` and `smaily_ctx` are removed from
+`BeaconEndpoint::EVENT_FIELDS`. A client-supplied value on the `/relay` POST
+is dropped by the whitelist like any other unrecognized field, before the
+batch is forwarded.
+
+**Rationale:** the engine no longer persists or consults either field, so
+forwarding a client-supplied value buys nothing and keeps a spoofing surface
+open for free. Our own JS client never sent them (`rec-engine-client.ts`
+`enrich()`, F3-49), so normal browse traffic is byte-identical on the wire —
+the strip only removes values a hand-crafted request injected. Rec attribution
+is untouched: it rides the ORDER path (`smaily_rec_id` on §5, from the cookies
+`LandingCapture` writes and `HookHandler` stamps onto the order), never the
+browse event.
+
+**Scope:** the same caveat PRO-1486 records still holds — this whitelist
+governs the browse-event POST only; a future recommendations-GET proxy needs
+its own field handling rather than reusing `validate_batch()`.
+
+**Tests:** unit
+(`BeaconEndpointTest::test_deprecated_attribution_hints_are_stripped`) pins the
+whitelist strip; integration
+(`RecEngineBrowseProxyTest::test_deprecated_attribution_hints_never_reach_the_engine`)
+proves over the real `/relay` path that neither field reaches the mock engine
+while the event still forwards with its legitimate `smaily_visitor_token`.
+
+**Relationships:** PRO-1486 (the precedent and the follow-up this closes),
+F3-49 (client-side data-minimization — this is its server-side enforcement for
+the last two fields), PRO-1524/PRO-1465 (the engine-side deprecation that made
+the fields worthless on the wire).
 
 ## How to keep this document going
 

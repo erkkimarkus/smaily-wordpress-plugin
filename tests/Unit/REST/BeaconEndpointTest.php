@@ -71,6 +71,28 @@ final class BeaconEndpointTest extends TestCase {
 		self::assertArrayNotHasKey( 'customer_email', $result['events'][0] );
 	}
 
+	public function test_deprecated_attribution_hints_are_stripped(): void {
+		// PRO-1712: contract v1.7.0 deprecated smaily_rec_id / smaily_ctx as
+		// browse-event attribution hints to accept-and-ignore (the engine dropped
+		// the columns and the fallback they fed), so forwarding a client-supplied
+		// value buys nothing and leaves the PRO-1486 spoofing surface open. Real
+		// attribution rides the ORDER path, not the browse event.
+		$result = BeaconEndpoint::validate_batch(
+			array(
+				array(
+					'event_id'      => 'e1',
+					'event_type'    => 'product_view',
+					'smaily_rec_id' => 'aa11bb22-cc33-dd44-ee55-ff6677889900',
+					'smaily_ctx'    => 'spoofed_campaign',
+				),
+			)
+		);
+
+		self::assertTrue( $result['valid'] );
+		self::assertArrayNotHasKey( 'smaily_rec_id', $result['events'][0] );
+		self::assertArrayNotHasKey( 'smaily_ctx', $result['events'][0] );
+	}
+
 	public function test_product_id_is_dropped_by_the_whitelist(): void {
 		// product_id (PRO-1390) is a proxy-internal field resolve_cart_product_skus()
 		// consumes BEFORE validate_batch runs; it must never reach the engine even

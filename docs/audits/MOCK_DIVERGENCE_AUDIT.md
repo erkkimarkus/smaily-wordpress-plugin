@@ -129,10 +129,11 @@ sitting in a shopper's browser on a live store. The stored order meta is left
 untouched — only the wire object omits the field. `smaily_vt` (visitor token) is
 deliberately NOT uuid-typed: it is an opaque engine token (`z.string()`).
 Typing `smaily_rec_id` as a UUID in the contract document itself is the engine
-ask filed as PRO-1713; §6 browse carries the same engine constraint and is
-**not** covered by this fix (the plugin's JS never puts a rec id on a browse
-event, but `BeaconEndpoint::EVENT_FIELDS` still whitelists a client-supplied
-one — the same class as the unresolved PRO-1486 spoofing follow-up).
+ask filed as PRO-1713 (delivered — the v1.8.1 sync carries the retyped §5/§6
+rows); §6 browse carries the same engine constraint and is **not** covered by
+this fix, but it can no longer bite: since PRO-1712 `BeaconEndpoint::
+EVENT_FIELDS` strips a client-supplied `smaily_rec_id`/`smaily_ctx` outright,
+so no rec id — valid or junk — reaches the engine on a browse event.
 
 **`items[].returned_at` is validated as the `Z` form (added 2026-08-05,
 PRO-1633).** Contract v1.8.0 §5 puts a datetime on the ORDER LINE for the first

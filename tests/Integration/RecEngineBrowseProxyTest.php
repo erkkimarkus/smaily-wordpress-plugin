@@ -308,6 +308,31 @@ final class RecEngineBrowseProxyTest extends TestCase {
 		self::assertSame( 'vt_opaque_9', $received[0]['smaily_visitor_token'] ?? null );
 	}
 
+	public function test_deprecated_attribution_hints_never_reach_the_engine(): void {
+		// PRO-1712: v1.7.0 deprecated smaily_rec_id / smaily_ctx on browse to
+		// accept-and-ignore, so a client-supplied value is pure spoofing surface
+		// (PRO-1486's class). It is stripped before forwarding; the rest of the
+		// event — including the legitimate visitor token — still goes through.
+		$this->enable_beacon();
+
+		$response = RestRequestHelper::post(
+			'/relay',
+			array(
+				'events' => array(
+					array( 'event_id' => 'dep-1', 'event_type' => 'product_view', 'sku' => 'ACA-1', 'session_id' => 's1', 'event_ts' => '2026-06-06T10:00:00Z', 'smaily_visitor_token' => 'vt_opaque_9', 'smaily_rec_id' => 'aa11bb22-cc33-dd44-ee55-ff6677889900', 'smaily_ctx' => 'spoofed_campaign' ),
+				),
+			)
+		);
+
+		self::assertSame( 200, $response->get_status() );
+		self::assertSame( 1, $response->get_data()['processed'], 'Normal browse traffic is unaffected — the event still forwards.' );
+
+		$received = self::$engine->state()['last_browse_events'] ?? array();
+		self::assertArrayNotHasKey( 'smaily_rec_id', $received[0] ?? array() );
+		self::assertArrayNotHasKey( 'smaily_ctx', $received[0] ?? array() );
+		self::assertSame( 'vt_opaque_9', $received[0]['smaily_visitor_token'] ?? null, 'The identity hint the engine DOES read is untouched.' );
+	}
+
 	public function test_resent_event_id_is_deduplicated(): void {
 		$this->enable_beacon();
 

@@ -26,7 +26,35 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-07 (**PRO-1779 / PRO-1804 / PRO-1843 — contract
+_Last updated: 2026-08-07 (**PRO-1712 — a spoofed recommendation id can no
+longer ride a browse event to the engine.** Contract v1.7.0 deprecated
+`smaily_rec_id` / `smaily_ctx` on §6 browse to accept-and-ignore: the engine
+dropped both columns and deleted the 4th-priority attribution fallback they
+fed (it had never matched a purchase in production). Both are client-supplied
+— read from the campaign cookies — so `BeaconEndpoint::EVENT_FIELDS`
+whitelisting them left exactly the spoofing surface PRO-1486 closed for
+`customer_email`, now for zero benefit. **Fix:** both keys leave
+`EVENT_FIELDS`, so `validate_batch()` drops a client-supplied value before the
+batch is forwarded. **Normal browse traffic is byte-identical on the wire** —
+our JS client never sent them (`rec-engine-client.ts` `enrich()`, F3-49) — and
+**real rec attribution is untouched**: it rides the ORDER path (`smaily_rec_id`
+on §5, from the cookies `LandingCapture` writes), never the browse event. Tests:
+unit `BeaconEndpointTest::test_deprecated_attribution_hints_are_stripped` pins
+the strip; integration
+`RecEngineBrowseProxyTest::test_deprecated_attribution_hints_never_reach_the_engine`
+proves over the real `/relay` path that neither field reaches the mock engine
+while the event still forwards with its legitimate `smaily_visitor_token`.
+Mock unchanged (it never inspected either field) and no live-walk — this is
+server-side FILTERING, nothing new is emitted. DECISIONS PRO-1712 (+ the
+PRO-1486 follow-up marked closed, and the mock-divergence register's browse
+caveat retired). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
+`[OK] No errors`, PHPUnit unit **739/739**, eslint/tsc clean, vitest
+**275/275**); `sg docker -c "composer run test:integration"` **254 tests, 1485
+assertions**, no failures, 1 pre-existing skip, dev sandbox tenant "Smaily
+Connect test" restored post-run.
+No version bump — ships with the next release cut._
+
+Prior: 2026-08-07 (**PRO-1779 / PRO-1804 / PRO-1843 — contract
 re-synced byte-identical to engine `bfebf942` (md5 `39afc210…`) — v1.8.0 →
 v1.8.1, CC-8 pass.** Three engine doc commits since our `547ad4d6` sync:
 `4104659` (§2 `403 tenant_inactive` is now reachable), `8c2f043` (§5 — a

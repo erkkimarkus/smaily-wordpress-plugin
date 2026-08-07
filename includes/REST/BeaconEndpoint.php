@@ -54,11 +54,12 @@ use WP_REST_Response;
  *      JS client never produces an invalid type or an id-less event, so a
  *      violation signals tampering ⇒ hard 400, nothing forwarded. The
  *      whitelist (EVENT_FIELDS) deliberately excludes `customer_email`
- *      (PRO-1486) — a client-supplied value is spoofable (arbitrary
- *      attribution, or probing another contact's opt-out state by guessing
- *      emails); the only sanctioned source is the server-side
- *      attach_logged_in_identity() below. This strip is scoped to THIS
- *      browse-event POST handler — see EVENT_FIELDS's docblock for the
+ *      (PRO-1486) and the two deprecated attribution hints `smaily_rec_id` /
+ *      `smaily_ctx` (PRO-1712) — a client-supplied value is spoofable
+ *      (arbitrary attribution, or probing another contact's opt-out state by
+ *      guessing emails); the only sanctioned source of an identity hint is the
+ *      server-side attach_logged_in_identity() below. This strip is scoped to
+ *      THIS browse-event POST handler — see EVENT_FIELDS's docblock for the
  *      caveat a future recommendations-GET proxy must not inherit it blindly.
  *
  * Browse does NOT use the IngestQueue/Flusher pattern (catalog/customers/orders
@@ -131,6 +132,17 @@ class BeaconEndpoint {
 	 * query param is a different call shape and must not inherit this
 	 * whitelist unmodified; see the DECISIONS.md PRO-1486 entry.
 	 *
+	 * PRO-1712: `smaily_rec_id` and `smaily_ctx` are out for the same reason,
+	 * now that the last argument for keeping them is gone. Contract v1.7.0
+	 * deprecated both as browse-event attribution hints to accept-and-ignore —
+	 * the engine dropped the columns and the 4th-priority fallback they fed, so
+	 * forwarding a client-supplied value buys nothing and leaves the same
+	 * spoofing surface PRO-1486 closed for `customer_email`. Our own JS client
+	 * never sent them (`rec-engine-client.ts` `enrich()`, F3-49), so normal
+	 * browse traffic is byte-identical. Real rec attribution is unaffected: it
+	 * rides the ORDER path (`smaily_rec_id` on §5, from the cookies
+	 * `LandingCapture` writes), never the browse event.
+	 *
 	 * @var array<int, string>
 	 */
 	private const EVENT_FIELDS = array(
@@ -144,8 +156,6 @@ class BeaconEndpoint {
 		'event_ts',
 		'source',
 		'smaily_visitor_token',
-		'smaily_rec_id',
-		'smaily_ctx',
 		'external_id',
 	);
 
