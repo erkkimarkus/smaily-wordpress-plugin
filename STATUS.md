@@ -26,7 +26,49 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-07 (**PRO-1712 — a spoofed recommendation id can no
+_Last updated: 2026-08-07 (**v3.11.0 release gate — delta security audit
+`v3.10.0..HEAD` done; 0 blocking findings, the release may proceed.** The
+re-audit policy fires on both grounds here (release boundary + a delta far
+over the 2 000-line threshold: **100 commits, 157 files, +12 080 / −2 166**,
+the sendsmaily upstream merge plus the whole PRO-16xx/17xx defect sweep), and
+on nearly every named high-risk surface — the public `/relay` route, a new
+storefront JS bundle that writes cookies pre-consent, custom-table SQL,
+REST admin routes, consent/GDPR posture. Full file-by-file read of the
+production delta: **0 Blocking / 0 Critical / 0 High, 1 Medium (should-fix,
+non-blocking), 1 Low, 4 Info**. The **Medium** is a validation asymmetry the
+delta *widens* rather than creates: `public/js/lib/attribution.ts` ports the
+PRO-1710 UUID check for `smaily_rec` but not the `vt_…` / slug shape+length
+checks its PHP twin `LandingCapture::resolve()` applies to `smaily_vt` /
+`smaily_ctx`, and PRO-1767's `sc-landing.js` newly hands that permissive
+writer to browse-OFF stores whose only writer used to be the strict PHP one —
+a crafted landing URL can plant an arbitrary/oversized value in a 30/365-day
+cookie that rides to order meta and onto the §5 orders wire. No privilege
+boundary, no data exposure, and the same path has been live on every
+browse-enabled store since 3.4 → **fast-follow, not a blocker**. The **Low**
+is the retired `smly_plus_contact_sync_automation_force_opt_in` option left
+on disk unread. Everything else came back clean, and the delta's net effect
+is **positive**: PRO-1712 removes surface from the only public route (verified
+as a pure whitelist narrowing with no case/alias/nesting bypass), PRO-1710 /
+PRO-1716 / PRO-1682 / PRO-1742 all tighten validation or consent, RetryPolicy
+clamps a Smaily-supplied `Retry-After` and ends the infinite 60 s re-POST of
+permanent 4xx refusals, and the upstream merge corrected three legacy SQL
+statements that mis-`prepare()`d a table name. `sc-landing.js` was inspected
+as built: 1 194 bytes, **zero** `fetch`/`XHR`/`sendBeacon`/top-level `import`,
+boot blob carries no `beaconUrl`/tenant/key. Report
+`docs/audits/SECURITY_DELTA_AUDIT_2026-08-07.md` + register row in
+`docs/audits/INDEX.md`. Gate for this pass: `npm run ci:strict` **exit=0**
+(PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit **739/739**,
+eslint/tsc clean, vitest **275/275**); no product code changed. PCP against
+the built ZIP belongs to the release-build pass. **Also truth-fixed:**
+`docs/audits/MOCK_DIVERGENCE_AUDIT.md` §3 still said the PRO-1633
+return-signals live-walk had "not yet run to completion" — it ran 2026-08-05
+(**LIVE OK, 12/12**, already recorded above); §3 now says so. Re-probed today:
+the dev wp-env's sandbox key is **401 again**, so the NEXT live-walk needs a
+fresh "Smaily Connect test" setup token through
+`bin/exchange-setup-token.php`; the 2026-08-05 result stands for this tree
+(nothing on the `OrderPayloadBuilder` return path has changed since)._
+
+Prior: 2026-08-07 (**PRO-1712 — a spoofed recommendation id can no
 longer ride a browse event to the engine.** Contract v1.7.0 deprecated
 `smaily_rec_id` / `smaily_ctx` on §6 browse to accept-and-ignore: the engine
 dropped both columns and deleted the 4th-priority attribution fallback they
