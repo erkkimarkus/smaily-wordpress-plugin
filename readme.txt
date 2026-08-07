@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.10.0
+Stable tag: 3.11.0
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -87,6 +87,27 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 3. Open the Smaily Connect admin page and follow the setup wizard to connect your Smaily account and configure the integrations.
 
 == Changelog ==
+
+= 3.11.0 =
+* New: every contact synced to Smaily now carries a field per store automation (welcome, first order, abandoned cart) recording when that automation last ran for them, so you can build Smaily segments that target — or exclude — the contacts your store automations have touched.
+* New: an order line the customer has fully sent back (refunded in full, including a partial refund made from the order's Refund screen, which does not change the order status) is now reported to Smaily Campaign Intelligence as a return, so recommendations stop treating returned products as successful purchases. Returns are re-derived from the order on every sync, so existing orders pick this up on their next update.
+* Fixed: the first-order automation now also fires on the WooCommerce Blocks / Store API checkout, not only on the classic checkout.
+* Fixed: the Phone and Gender contact fields ticked in the setup wizard now actually reach Smaily.
+* Fixed: on a store configured with the setup wizard, a registered customer's contact update (profile save, account details, checkout opt-in) reached Smaily with no email address and no fields, so nothing was updated.
+* Fixed: the checkout and account opt-in forms now ask the customer for exactly the additional contact fields the merchant ticked, instead of ignoring the selection.
+* Fixed: a store upgraded from an older plugin version keeps syncing the contact fields it has always synced; if its saved field selection cannot be read, the merchant is now told in an admin notice instead of contacts silently syncing with fewer fields.
+* Fixed: turning the "Sync contacts to Smaily" switch off now actually stops the contact sync.
+* Fixed: the welcome automation is now triggered only by a shopper creating their own account, not by accounts created through other paths (for example by an administrator in WordPress admin).
+* Fixed: importing existing contacts to Smaily now imports every contact, not only the first hundred.
+* Fixed: a contact import with nothing to sync now finishes on its own instead of appearing to stall.
+* Fixed: abandoned-cart reminders now always include the shopper's name and the product details (name, price, image, link) the reminder template needs, also on stores that never opened the older abandoned-cart settings.
+* Fixed: email-link attribution (which product recommendation a purchase came from) is now captured in the browser on a connected store even when browse tracking is off — previously that capture only ran as part of browse tracking, so a store with browse tracking off and a full-page cache had no way to record it.
+* Fixed: a malformed recommendation id in a landing URL no longer travels onto the order. Smaily Campaign Intelligence rejects the whole order over an invalid id, so the order used to be lost rather than just its attribution.
+* Improved: when Smaily refuses a request because your Smaily package does not include the feature, the Event Log and the connection test now say so, instead of reporting it as a Smaily outage that will recover on its own.
+* Improved: the setup wizard's copy and terminology were reviewed end to end (English and Estonian) — the Smaily account link now sits on the first step, the Campaign Intelligence automations stay hidden until Campaign Intelligence is connected, and the Event Log advisory was dropped from the overview step.
+* Changed: the "force opt-in" choice on automation triggers is retired. An automation enrols a contact Smaily has never seen, but never overrides an unsubscribe the contact made in Smaily — which is what every store that left the setting at its default already did.
+* Hardened: a Smaily refusal that can never succeed (an invalid request, a package block) is no longer retried indefinitely; retries now respect Smaily's own wait hint and stop at a ceiling, and the reason is shown in the Event Log.
+* Hardened: browse-tracking events no longer forward a browser-supplied recommendation id or campaign context to Smaily Campaign Intelligence. Real recommendation attribution is unaffected — it travels with the order, not with browse events.
 
 = 3.10.0 =
 * Improved: the Transactional emails settings are now discoverable — the account connection lives on the Connection tab (with its own connection test), and the Order-confirmation / Shipping-confirmation triggers now show on the WooCommerce tab once that account is connected, instead of being buried as a fourth section under WooCommerce automations. Wording also clarifies this is a separate Smaily account, not a "sub-account".
@@ -349,6 +370,9 @@ Introduced a new Elementor widget that makes it easy to add a Smaily subscriptio
 * Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
 
 == Upgrade Notice ==
+
+= 3.11.0 =
+A large reliability release for contact sync and automations: the ticked contact fields (including Phone and Gender) now actually reach Smaily and are actually asked for at checkout, contact import no longer stops after the first hundred contacts, turning contact sync off really stops it, and the first-order automation also fires on the block checkout. Contacts now also carry a per-automation "last run" field you can segment on, and returned order lines are reported to Campaign Intelligence. The "force opt-in" choice on automation triggers is retired — an automation no longer overrides an unsubscribe made in Smaily. Safe update.
 
 = 3.10.0 =
 Transactional emails settings moved to the Connection and WooCommerce tabs for discoverability; Event Log "Retry all failed" now also reachable for older failed events. Safe update.
