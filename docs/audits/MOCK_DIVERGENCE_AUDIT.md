@@ -146,9 +146,23 @@ unnoticed. The two REASON fields are deliberately **not** validated: §5 is
 normative that an unrecognised `return_reason_standardised` is stored as `other`
 and never rejected, and an over-long `return_reason_raw` is truncated, not
 refused. The engine's acceptance of the whole shape is
-`bin/walk-pro1633-return-signals.cjs` — ⏳ **not yet run to completion**: the
-dev wp-env's stored sandbox API key is currently rejected (401) and needs a
-fresh setup token.
+`bin/walk-pro1633-return-signals.cjs` — ✅ **run to completion 2026-08-05
+against the "Smaily Connect test" SANDBOX tenant: LIVE OK, 12/12** (this
+paragraph first shipped saying the walk was still blocked on a 401 sandbox
+key; the key was restored via `bin/exchange-setup-token.php` and the walk ran
+the same day — see STATUS.md's PRO-1633 entry). The live engine ACCEPTS the
+returned line (`{"http":200,"outcome":"accepted"}`, `sent:1 failed:0`),
+`returned_at` arrives in the IsoDate `Z` form, `return_reason_raw` carries the
+merchant reason with no `return_reason_standardised`, the untouched line stays
+kept, a later unrelated sync still carries the return, and 1-of-3 refunded is
+still kept. So `returned_at` is now live-verified, not mock-only. Engine-side
+residue: two ingested sandbox orders; store-side: none.
+
+**Sandbox key state (2026-08-07):** the dev wp-env's stored sandbox key is
+rejected (401 `Valid API key required`) again — a re-run of this or any other
+live-walk needs a fresh "Smaily Connect test" setup token exchanged through
+`bin/exchange-setup-token.php`. The 2026-08-05 result stands for the current
+tree: nothing on the `OrderPayloadBuilder` return path has changed since.
 
 ---
 
