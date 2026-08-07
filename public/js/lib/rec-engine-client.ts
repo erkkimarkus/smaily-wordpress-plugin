@@ -125,6 +125,16 @@ export type MergeReason =
 /** Default batch window before the buffer auto-flushes (ms). */
 const DEFAULT_BATCH_WINDOW_MS = 30_000;
 
+/**
+ * The one event type that does NOT wait for the batch window (PRO-1878).
+ * `checkout_complete` fires on the order-received page, which shoppers close
+ * within seconds — the 30s timer rarely elapses, so the event depended on the
+ * pagehide sendBeacon path and a real share of them was lost (the engine
+ * measured only ~52% of orders producing a checkout_complete). Every other
+ * event type rides a page the shopper stays on long enough.
+ */
+const IMMEDIATE_FLUSH_EVENT: EventType = 'checkout_complete';
+
 /** The wire shape of a single browse event (§6). */
 interface WireEvent {
   event_id: string;
@@ -165,7 +175,9 @@ type Logger = { log: (...args: unknown[]) => void; warn: (...args: unknown[]) =>
  * Transport: events buffer in memory for `batchWindowMs` (default 30s), then
  * POST same-origin to `beaconUrl` as `{events:[...]}` (the WP wrapper points
  * that at /wp-json/smaily-connect/v1/beacon). On page-hide the remaining
- * buffer is flushed via `navigator.sendBeacon` so it survives unload.
+ * buffer is flushed via `navigator.sendBeacon` so it survives unload. One
+ * event type — `checkout_complete` — sends immediately instead of buffering
+ * (PRO-1878).
  *
  * Consent: nothing is ever SENT without consent. track() always buffers
  * (cheap, synchronous), but every flush checks `consentChecker` first and
@@ -195,12 +207,22 @@ export class RecEngineClient {
   /**
    * Queue a browse event for the next batched flush. Synchronous; never
    * throws on consent denial — the consent check happens at flush time.
+   *
+   * `checkout_complete` is the exception: it flushes immediately instead of
+   * waiting for the window (PRO-1878, see IMMEDIATE_FLUSH_EVENT). No
+   * double-send risk — flush() takes the buffer synchronously before its first
+   * await, so a pagehide landing mid-flight finds nothing left to send; the
+   * consent gate is unchanged (flush() still drops the buffer without it).
    */
   public track(event: TrackingEvent): void {
     if (this.destroyed) {
       return;
     }
     this.buffer.push(this.enrich(event));
+    if (event.event_type === IMMEDIATE_FLUSH_EVENT) {
+      void this.flush();
+      return;
+    }
     this.scheduleFlush();
   }
 

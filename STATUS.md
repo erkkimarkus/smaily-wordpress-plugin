@@ -26,7 +26,33 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-07 (**v3.11.0 — PUBLISHED.** MINOR bump shipping the
+_Last updated: 2026-08-07 (**PRO-1878 (capture side) — `checkout_complete`
+no longer waits for the 30s batch window.** Browse events buffer for 30s or
+until `pagehide` (`sendBeacon`), which is fine for every page a shopper stays
+on — but `checkout_complete` fires on the order-received page, closed within
+seconds, so the event depended almost entirely on the best-effort unload path.
+The engine measured only ~52% of orders producing a `checkout_complete`, and
+that asymmetry against `checkout_start` (unaffected — shoppers linger on
+checkout past the timer) is the one genuine plugin-side loss in the PRO-1878
+investigation. **Fix:** `RecEngineClient.track()` calls the existing `flush()`
+immediately when the event is `checkout_complete` (`IMMEDIATE_FLUSH_EVENT`);
+every other type keeps the window untouched. Reusing `flush()` — rather than a
+second transport — keeps the **consent gate identical** (no consent still drops
+the buffer and sends nothing) and rules out a double-send: `flush()` clears the
+pending timer and takes the buffer synchronously before its first `await`, so a
+`pagehide` landing mid-flight finds it empty, and the in-flight request is
+`keepalive` so unload doesn't kill it. **JS-only — no PHP touched**, so no
+integration run; `/relay` and the engine wire shape are unchanged. Tests: five
+new vitest cases pin the immediate POST, that it carries the whole buffer, that
+nothing re-sends on pagehide or the timer, that `checkout_start` still waits the
+full 30s, and that a consent-less `checkout_complete` still sends nothing.
+Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No
+errors`, PHPUnit unit **739/739**, eslint/tsc clean, vitest **280/280**).
+DECISIONS PRO-1878. **PRO-1878 stays OPEN** — this is the capture-side half; the
+remaining question (how the engine counts/joins these events) is engine-side.
+No version bump — ships with the next release cut._
+
+Prior: 2026-08-07 (**v3.11.0 — PUBLISHED.** MINOR bump shipping the
 sendsmaily upstream merge plus the whole PRO-16xx/17xx defect sweep — 100
 commits since the v3.10.0 tag. User-facing headline (see the `readme.txt`
 3.11.0 entry): the ticked contact fields (Phone/Gender included) now actually

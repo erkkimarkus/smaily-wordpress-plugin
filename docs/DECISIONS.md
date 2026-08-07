@@ -5208,6 +5208,54 @@ F3-49 (client-side data-minimization — this is its server-side enforcement for
 the last two fields), PRO-1524/PRO-1465 (the engine-side deprecation that made
 the fields worthless on the wire).
 
+### PRO-1878 — `checkout_complete` flushes immediately, everything else keeps the 30s window
+
+**Context:** browse events buffer in memory for `batchWindowMs` (30s) or until
+`pagehide` fires, where `flushOnUnload()` sends them with `sendBeacon`. That is
+fine for every page a shopper stays on — but `checkout_complete` fires on the
+order-received page, which shoppers close within seconds. The event therefore
+depended almost entirely on the pagehide path, which is best-effort (a killed
+tab, a blocked/failed `sendBeacon`, a browser that never fires the handler), and
+the engine measured only ~52% of orders producing a `checkout_complete`. That
+asymmetry against `checkout_start` — which is unaffected, shoppers linger on
+checkout past the timer — is the one genuine plugin-side loss in the PRO-1878
+investigation.
+
+**Decision:** `RecEngineClient.track()` sends immediately (the existing
+`flush()`) when the tracked event is `checkout_complete`
+(`IMMEDIATE_FLUSH_EVENT`), instead of scheduling the batch window. All other
+event types are untouched.
+
+**Rationale:** the buffer exists to avoid a POST per browse event on a browsing
+session; the order-received page is the end of the session and produces exactly
+one event, so batching buys nothing there and costs a measurable share of the
+conversions. Reusing `flush()` rather than adding a second transport keeps the
+consent gate (`flush()` still drops the buffer when consent is absent — no
+consent still means the event never leaves the browser) and the retry/in-flight
+semantics identical. No double-send: `flush()` clears the pending timer and
+takes the buffer synchronously before its first `await`, so a `pagehide` landing
+mid-flight finds an empty buffer and sends nothing; the in-flight request is
+`keepalive`, so unload does not kill it.
+
+**Alternatives:** (a) `sendBeacon` on `checkout_complete` — same reliability
+question we are trying to escape and a second transport to keep consistent; (b)
+a shorter window for the whole client — degrades batching on browsing pages for
+one event's benefit; (c) covering `checkout_start` too — not needed, shoppers
+stay on checkout well past 30s, and it would trade batching away for nothing.
+
+**Tests:** vitest (`rec-engine-client.test.ts`) pins the immediate POST, that it
+takes the whole buffer with it, that no second send happens on pagehide or the
+timer, that `checkout_start` still waits the full 30s, and that a
+consent-less `checkout_complete` still sends nothing.
+
+**Scope:** capture-side only. PRO-1878 stays open — the remaining question (how
+the engine counts/joins these events) is engine-side.
+
+**Relationships:** F3-24 (browse-beacon architecture and the batch window this
+narrows), F3-50 (the consent gate, unchanged), browse browser-timing is still
+not live-walk-coverable (the CLAUDE.md note stands — this changes WHEN the
+buffer is sent, not when the browser fires the event).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

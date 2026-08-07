@@ -184,7 +184,9 @@ export function init(): RecEngineClient | null {
     // listeners once consent is granted (so cart tracking is consent-gated too).
     attachCartListeners(client);
     // The page-view is sent on the 30s batch window or, more usually, on
-    // pagehide via sendBeacon — no explicit flush needed.
+    // pagehide via sendBeacon — no explicit flush needed. The one exception is
+    // checkout_complete (order-received), which the client sends immediately
+    // because the shopper closes that tab within seconds (PRO-1878).
   };
 
   // Fire now if consent is already granted; otherwise wait for the visitor to
