@@ -115,6 +115,61 @@ describe('RecEngineClient (3.4.1 transport)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('sends checkout_complete immediately instead of waiting for the window (PRO-1878)', () => {
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'checkout_complete' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = lastFetchBody(fetchMock);
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0]).toMatchObject({ event_type: 'checkout_complete' });
+  });
+
+  it('takes the whole buffer with the immediate checkout_complete flush', () => {
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'product_view', sku: 'A' });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    client.track({ event_type: 'checkout_complete' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(lastFetchBody(fetchMock).events).toHaveLength(2);
+  });
+
+  it('does not re-send the immediately-flushed checkout_complete on pagehide or the timer', async () => {
+    const beacon = vi.fn((_url: string, _data?: BodyInit): boolean => true);
+    Object.defineProperty(navigator, 'sendBeacon', { value: beacon, configurable: true });
+
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'checkout_complete' });
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(beacon).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // @ts-expect-error cleanup
+    delete navigator.sendBeacon;
+  });
+
+  it('still buffers checkout_start for the 30s window (only checkout_complete is immediate)', async () => {
+    client = new RecEngineClient(makeConfig());
+    client.track({ event_type: 'checkout_start' });
+
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a checkout_complete without consent, exactly like any other event', () => {
+    client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
+    client.track({ event_type: 'checkout_complete' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('drops the buffer and never POSTs when consent is absent', async () => {
     client = new RecEngineClient(makeConfig({ consentChecker: () => false }));
     client.track({ event_type: 'product_view', sku: 'A' });
