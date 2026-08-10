@@ -532,10 +532,12 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    `tests/Unit/ConstantsTest.php`, `tests/bootstrap.php`,
    `tests/phpstan-bootstrap.php` (else ConstantsTest fails). Commit FIRST so
    `package:hash` stamps a clean (non-`-dirty`) build-hash.
-2. `npm run build:admin && npm run build:client` → `dist/admin/*`,
+2. `npm run build:admin` → `dist/admin/*`,
    `dist/public/js/sc-runtime.js` + `dist/public/js/sc-landing.js` (the second
    storefront bundle is built by a chained `build:landing` pass — see the beacon
    note below; if it's missing from `dist/`, the landing pass didn't run).
+   ONE command builds all three: the old `build:client` was a duplicate of
+   `build:admin` (there is no `client` vite mode) and was removed in PRO-1949.
 3. `composer run install-block-modules && composer run build` → `blocks/*/build/*`
    (the first installs `blocks/node_modules`; without it `wp-scripts` is missing).
 4. Translations: run **`bash bin/build-i18n.sh`** (needs the wp-env container) to
@@ -550,9 +552,15 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
    `dist/public/js/sc-landing.js`, `blocks/*/build/*`,
    `vendor/autoload.php`, `languages/*.mo`, `build-hash.txt` at the root);
-   NOT present (`tests`, `docs`, any `*.ts` source,
-   `node_modules`, `admin/src`, `dist/client`, dev vendor pkgs). `.zipignore`
+   NOT present (`tests`, `docs`, any `*.ts` source, any `*.map`,
+   `node_modules`, `admin/src`, dev vendor pkgs). `.zipignore`
    excludes `blocks/node_modules` (583M) — a bloated ZIP means it leaked.
+   **Source maps are stripped from the ZIP (PRO-1949)** — `.zipignore` drops
+   `*.map` and `composer run package` sed-strips the then-dangling
+   `//# sourceMappingURL=` trailer out of the staged bundles, so the check is
+   two-part: no `*.map` entries AND no trailer left in the shipped JS
+   (`unzip -p … dist/admin/admin.js | grep -c sourceMappingURL` ⇒ 0). Local
+   builds still emit maps — nothing about debugging changes, only the ZIP.
 7. **`gh release create … --repo erkkimarkus/smaily-wordpress-plugin`** — the
    `--repo` is MANDATORY: `gh` defaults to `upstream` (sendsmaily) and 404s
    (no write access). **Tag convention: the GA line (3.0.0+) uses a full

@@ -5333,6 +5333,42 @@ reach values already stamped, and length is not shape.
 PRO-1896 (the capture-side cap and the 64-char session bound), F3-46
 (LandingCapture, the capture-side owner of these shapes).
 
+### PRO-1949 — Source maps are stripped from the release ZIP; the readable source is the public GitHub repo (DECIDED by Erkki 2026-08-10)
+
+**Context:** PRO-1781 kept the TypeScript sources out of the ZIP
+(`publicDir: false` + `/public/js*`, the counterpart of `/admin/src*`), and
+justified it with "the readable source stays in the bundles' source maps". But
+a vite map embeds the very same sources via `sourcesContent` —
+`dist/admin/admin.js.map` alone is ~966 kB of a ~1.14 MB ZIP — so the
+exclusions saved almost nothing and shipped the source anyway, in a shape no
+merchant benefits from.
+
+**Decision:** strip them. `.zipignore` excludes `*.map`, and `composer run
+package` runs `package:strip-map-refs` over the staging tree (a `sed` that
+deletes the `//# sourceMappingURL=` trailer line from every staged `*.js`), so
+the shipped bundles carry neither the maps nor a dangling reference to them.
+`vite.config.ts` keeps `sourcemap: true` — local builds are unchanged and stay
+debuggable; the strip happens only at packaging.
+
+**Rationale:** the wordpress.org expectation of readable source is met by the
+public GitHub repo (a link a reviewer can read, diff, and clone), not by a
+966 kB blob a merchant downloads with every update. Doing it at packaging
+rather than at build time is what makes it unforgettable: no `SMAILY_RELEASE=1`
+flag to remember, and a release cut can never accidentally ship maps because it
+built the bundles a different way.
+
+**Alternatives:** (a) keep the maps as the reviewer-readable source — rejected
+above, it is a ~6× ZIP for an audience of approximately nobody; (b) build the
+release with `sourcemap: false` — same ZIP, but it needs a release-only flag
+that is exactly the kind of step that gets skipped, and dev builds lose maps if
+the flag becomes the default; (c) exclude `*.map` in `.zipignore` only —
+leaves every shipped bundle ending in a trailer pointing at a file that is not
+there.
+
+**Relationships:** PRO-1781 (the source exclusions this completes, and the
+"maps carry the source" claim it supersedes), F3-41 (the shipped bundle names
+the strip runs over).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

@@ -21,9 +21,8 @@
 # the upstream .zipignore predates these directories. Each line below
 # was bundled into the artifact by accident and serves no purpose at
 # runtime (WordPress needs dist/admin/*, dist/public/js/* (the storefront
-# browse beacon, 3.4), the PHP tree, and blocks/*/build/*; dist/client/* is
-# the unused npm-extraction stub). Order matches the on-disk size of the
-# offender —
+# browse beacon, 3.4), the PHP tree, and blocks/*/build/*).
+# Order matches the on-disk size of the offender —
 # node_modules dominates everything else by two orders of magnitude.
 /node_modules*
 /coverage*
@@ -32,11 +31,16 @@
 /admin/src*
 # The storefront bundles' TypeScript sources (incl. *.test.ts) — the exact
 # counterpart of /admin/src for the public/ side. Only PHP loads anything from
-# public/; the built bundles live in dist/public/js/ and their source maps
-# carry the readable source. Nothing here is reachable at runtime.
+# public/; the built bundles live in dist/public/js/. Nothing here is
+# reachable at runtime; the readable source is the public GitHub repo.
 /public/js*
 /admin/dist*
-/dist/client*
+# Source maps (PRO-1949). dist/admin/admin.js.map alone embeds the whole
+# TypeScript tree via sourcesContent — ~966 kB of a ~1.14 MB ZIP, which also
+# undoes the source exclusions above. Builds keep emitting them locally for
+# debugging; `composer run package` additionally strips the then-dangling
+# `//# sourceMappingURL=` trailer from the staged bundles.
+*.map
 /spec*
 /docs*
 /CLAUDE.md
