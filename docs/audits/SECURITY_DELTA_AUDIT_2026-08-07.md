@@ -265,6 +265,8 @@ self-inflicted outbound-request amplifier.
 1. **Medium §1** — port the `smaily_vt` / `smaily_ctx` shape checks into
    `attribution.ts`, and cap cookie length in
    `HookHandler::save_attribution_cookies_to_order()`.
+   **RESOLVED 2026-08-10 (PRO-1896, `ac3f9c9` + `bd6bed4`)** — both halves
+   applied as described; DECISIONS PRO-1896.
 2. **Low §2** — delete `smly_plus_contact_sync_automation_force_opt_in` in the
    option-scrub path.
 3. **Doc hygiene** — `MOCK_DIVERGENCE_AUDIT.md` §3's *header* still carries the
