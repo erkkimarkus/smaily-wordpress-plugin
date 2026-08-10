@@ -392,6 +392,10 @@ drifted store is the backfill running the SAME resolver (SP-B), not a one-off.
   `etaSeconds` instead of the API's snake_case `eta_seconds`; vitest green, tsc
   red, ci:strict exit=2.)
 - `sg docker -c "composer run test:integration"` — real-environment integration.
+  **Any `vite build` (`build:admin`/`build:client`/`build:landing`) empties the
+  out-dir and takes `dist/build-hash.txt` with it**, so the next integration run
+  fails `BuildHashTest` on a gitignored artifact rather than on your change. Run
+  `composer run package:hash` after any client/admin build, before integration.
 - Live-walk scripts live in `bin/` (e.g. `bin/walk-3.3.cjs`). Run against the
   connected engine; needs a setup-token (above).
 - `composer run package` — produces the distributable ZIP.
