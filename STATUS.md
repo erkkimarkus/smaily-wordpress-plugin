@@ -26,7 +26,35 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**PRO-1781 + PRO-1902 — build-output hygiene and the
+_Last updated: 2026-08-10 (**PRO-1949 — the release ZIP no longer ships source
+maps.** Erkki's call today: strip them. A vite map embeds the whole TypeScript
+tree via `sourcesContent`, so `dist/admin/admin.js.map` alone was ~966 kB of a
+~1.14 MB ZIP and quietly undid the fresh PRO-1781 source exclusions — **this
+supersedes that entry's "the readable source stays in the bundles' source
+maps"**; the readable source is the public GitHub repo. Two-part fix, both at
+packaging so nothing can be forgotten at build time: `.zipignore` excludes
+`*.map`, and `composer run package` runs the new `package:strip-map-refs`
+(a `sed` deleting the `//# sourceMappingURL=` trailer from every staged `*.js`)
+so no shipped bundle points at a file that isn't there. `vite.config.ts` keeps
+`sourcemap: true` — local builds are untouched and still debuggable. Folded in
+from the same issue: the `build:client` npm script was a byte-for-byte
+duplicate of `build:admin` (there is no `client` vite mode) and is **removed** —
+`npm run build:admin` alone builds admin + both storefront bundles; and the dead
+`dist/client` references are gone (`.zipignore` line, the `test -f
+dist/client/rec-engine-client.js` check in `lint_and_test.yml`, the vite header
+comment, the CLAUDE.md release checklist, DEVELOPER.md, the StorefrontBeaconTest
+skip hint). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan
+`[OK] No errors`, PHPUnit unit **743/743**, eslint/tsc clean, vitest
+**282/282**) and `sg docker -c "composer run test:integration"` **OK (256 tests,
+1492 assertions, 1 pre-existing skip)**, dev sandbox tenant "Smaily Connect test"
+restored. ZIP built once and verified, then deleted (dev vendor restored):
+**880 144 B / 376 files vs. the 1 145 287 B of the PRO-1781 build — 265 kB
+smaller**; zero `*.map` entries, zero `sourceMappingURL` occurrences in the three
+shipped bundles, all three still parse (`node --check`), required files present,
+tests/docs/`*.ts`/dev-vendor absent. DECISIONS PRO-1949. **No version bump —
+ships with the next release cut** (v3.11.1 is already published).)_
+
+Prior: 2026-08-10 (**PRO-1781 + PRO-1902 — build-output hygiene and the
 last hardcoded attribution cookie names.** **PRO-1781 (dist hygiene, two
 pre-existing items):** (1) vite's `publicDir` default treated `public/` as a
 static-asset folder and copied it verbatim into `dist/`, so the ZIP shipped the
