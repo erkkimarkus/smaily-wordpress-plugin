@@ -26,7 +26,10 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**v3.11.1 — PREPARED, not yet published.** PATCH
+_Last updated: 2026-08-10 (**v3.11.1 — PUBLISHED**:
+https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.11.1,
+tag on the bump commit `e6413e5`, asset SHA256 `fc8ea222…aa5c08a9` verified at
+publish. PATCH
 cut, fixes only: the three "No version bump — ships with the next release cut"
 entries below (PRO-1878 capture side, PRO-1896 attribution hardening, PRO-1897
 retired-option cleanup) plus doc hygiene — 9 commits since the v3.11.0 tag,
