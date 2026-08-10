@@ -26,7 +26,58 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**PRO-1896 — the browser attribution writer now
+_Last updated: 2026-08-10 (**v3.11.1 — PREPARED, not yet published.** PATCH
+cut, fixes only: the three "No version bump — ships with the next release cut"
+entries below (PRO-1878 capture side, PRO-1896 attribution hardening, PRO-1897
+retired-option cleanup) plus doc hygiene — 9 commits since the v3.11.0 tag,
+`ed49abc..HEAD`. **Also in this cut, PRO-1900 (wordpress.org readme prep):** the
+two cosmetic readme warnings the v3.11.0 PCP gate left standing are fixed —
+`== Changelog ==` now carries the 3.x line only (1.x/2.x history linked to the
+GitHub releases page; **the real parser limit is 5 000 WORDS, not characters** —
+the 3.11.0 gate row's "32 927 chars vs 5 000" was a chars/words mix-up, the
+section was ~5 077 words, barely over; it is now ~3 300 words with ~35 %
+headroom) and the 3.11.0 upgrade notice is re-worded to 298 bytes (PCP's
+`strlen` limit is 300). Version bumped in all four places + the three test pins,
+committed first: `e6413e52254e0f7964960c34e599396c81d410b8`. Builds:
+`npm run build:admin && npm run build:client` (`dist/admin/admin.js`,
+`dist/public/js/sc-runtime.js` 6.97 kB **and** `dist/public/js/sc-landing.js`
+1.29 kB — separate vite passes, neither with a top-level `import`), then
+`composer run package:hash` to restore the build-hash artifact vite had wiped;
+all three `blocks/*/build/*` rebuilt. **i18n rebuild SKIPPED, justified:**
+`git diff ed49abc..HEAD` is empty for `languages/` and `admin/src/`, and the
+`includes/` delta adds/changes no translatable string, so the `.mo` + the
+admin-bundle et JSON on disk (2026-08-07, from the 3.11.0 restamp) are current.
+`composer install --no-dev --optimize-autoloader` → `composer run package` →
+`composer install` (dev vendor restored). **ZIP verified**: 3.11.1 in the plugin
+header, both constants and the readme Stable tag; clean non-dirty build-hash
+`e6413e5`; required present (`dist/admin/admin.js`, both storefront bundles,
+all three `blocks/*/build/*`, `vendor/autoload.php`,
+`languages/smaily-connect-et.mo` + the admin-bundle et JSON, `composer.json`);
+tests/docs/node_modules/`admin/src`/`dist/client`/dev-vendor absent (the only
+shipped vendor package is `woocommerce/action-scheduler`); 400 files,
+**1 191 727 B** (vs. v3.11.0's 1 191 528 B). **PCP against the built ZIP**
+(`docker cp` into the wp-env `…-cli-1` container, unzipped to
+`smaily-connect-pkg` — never the bind-mounted `smaily-connect` dir —
+`--slug=smaily-connect --exclude-directories=vendor`, temp copies removed
+after): **0 ERRORS, 3 WARNINGS** — down from 3.11.0's 5, with **both readme
+warnings gone**; what remains is exactly the known accepted set (the
+`BackfillJob.php` direct-DB-query pair + the `DynamicHooknameFound`
+false-positive on `self::FILTER_WELCOME_ELIGIBLE`). Gates: `npm run ci:strict`
+**exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit unit **741/741**,
+eslint/tsc clean, vitest **282/282** across 37 files) and `sg docker -c
+"composer run test:integration"` **OK (256 tests, 1491 assertions)**, 1
+pre-existing environment skip (`BackwardCompatTest`), dev sandbox tenant "Smaily
+Connect test" correctly restored post-run (not MiuMjau, `connected=1`).
+**No new full audit for this cut, deliberately and per policy:** the delta is
+9 commits / ~250 changed plugin lines, far under the ~2 000-line rule of thumb,
+and its only security-sensitive content **is** the fast-follow the 2026-08-07
+v3.11.0 delta security audit itself prescribed (its one Medium → PRO-1896, its
+one Low → PRO-1897), already re-verified by that audit's own reasoning; no REST
+route, `/relay` field set, capability, crypto, SQL, secret/PII or consent
+surface changed. **Publication (tag + GH release) is the orchestrator's step —
+not performed by this pass.** Register row in `docs/audits/INDEX.md`._
+
+Prior: 2026-08-10 (**PRO-1896 — the browser attribution writer now
 refuses what its server twin refuses, and an oversized cookie can no longer ride
 an order.** The one Medium of the 2026-08-07 v3.11.0 gate delta security audit
 (§1), agreed as a fast-follow. `public/js/lib/attribution.ts` had ported only
