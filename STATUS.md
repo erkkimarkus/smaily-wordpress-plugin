@@ -26,7 +26,37 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-07 (**PRO-1878 (capture side) — `checkout_complete`
+_Last updated: 2026-08-10 (**PRO-1896 — the browser attribution writer now
+refuses what its server twin refuses, and an oversized cookie can no longer ride
+an order.** The one Medium of the 2026-08-07 v3.11.0 gate delta security audit
+(§1), agreed as a fast-follow. `public/js/lib/attribution.ts` had ported only
+the rec-id UUID rule (PRO-1710) and accepted `smaily_vt` / `smaily_ctx` at any
+value and any length, while its PHP twin `LandingCapture::resolve()` shape-checks
+all three — and PRO-1767 newly hands that permissive writer to browse-OFF stores,
+whose only writer used to be the strict PHP one. **Fix, both ends:** (a) the
+writer gets `VISITOR_TOKEN_PATTERN` / `CONTEXT_PATTERN` mirroring the PHP regexes
+verbatim (`/^vt_[A-Za-z0-9]{1,64}$/`, `/^[A-Za-z0-9._-]{1,64}$/`), applied
+through the same per-slot `isValid` hook the rec-id already used — junk is never
+cookied, though the param is still stripped from the URL; (b)
+`HookHandler::save_attribution_cookies_to_order()` caps each cookie at the
+longest value its shape can hold (`ORDER_META_MAX_LENGTH` — rec_id 36, visitor
+67, context 64, session 64) and DROPS anything longer, because the capture fix
+cannot reach a cookie already in a browser (it outlives the fixed bundle by its
+30/365-day TTL) and a trimmed token would be a plausible-looking wrong value on
+the §5 wire. Both storefront bundles rebuilt in their separate vite passes
+(`sc-runtime.js` 6.97 kB, `sc-landing.js` 1.29 kB — still no top-level import,
+so both still load as classic scripts). Tests: 2 new vitest cases (off-shape and
+oversized vt/ctx refused) + the pre-existing fixtures that used off-shape tokens
+(`vt1`/`vt9`/`vt-order`) corrected to real `vt_…` shapes; 2 new unit cases (over
+the cap dropped, exactly at the cap still stamped) + 1 integration case (a
+planted 200-char `smaily_rec_ctx` cookie is not stamped and the order ingests
+without the field). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors,
+PHPStan `[OK] No errors`, PHPUnit unit **741/741**, eslint/tsc clean, vitest
+**282/282**) and `composer run test:integration` **exit=0, 255 tests / 1490
+assertions / 1 pre-existing skip**. DECISIONS
+PRO-1896. No version bump — ships with the next release cut._
+
+Prior: 2026-08-07 (**PRO-1878 (capture side) — `checkout_complete`
 no longer waits for the 30s batch window.** Browse events buffer for 30s or
 until `pagehide` (`sendBeacon`), which is fine for every page a shopper stays
 on — but `checkout_complete` fires on the order-received page, closed within

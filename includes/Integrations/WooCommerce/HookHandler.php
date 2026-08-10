@@ -84,6 +84,26 @@ class HookHandler {
 		'_smaily_rec_ctx'         => 'smaily_rec_ctx',
 	);
 
+	/**
+	 * Longest value each attribution cookie can legitimately hold, from the
+	 * shapes LandingCapture accepts: a UUID rec_id (Support\RecId), `vt_` + up
+	 * to 64 alphanumerics, a context slug of up to 64. The anonymous session id
+	 * is a UUID in every producer we ship but is shape-checked nowhere, so it
+	 * gets the same generous 64 bound rather than an exact one.
+	 *
+	 * A cookie over its cap cannot be a real signal, so it is dropped rather
+	 * than truncated — a trimmed token would be a plausible-looking wrong value
+	 * on the §5 orders wire. This is the backstop for a value planted by the
+	 * pre-PRO-1896 permissive JS writer, which outlives the fixed bundle by the
+	 * cookie's 30/365-day TTL.
+	 */
+	private const ORDER_META_MAX_LENGTH = array(
+		'_smaily_anon_session_id' => 64,
+		'_smaily_visitor_token'   => 67,
+		'_smaily_rec_id'          => 36,
+		'_smaily_rec_ctx'         => 64,
+	);
+
 	/** @var array<string, bool> per-request dedupe set keyed by "{event}:{entity_id}". */
 	private static array $seen = array();
 
@@ -602,6 +622,20 @@ class HookHandler {
 
 			$value = sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) );
 			if ( $value === '' ) {
+				continue;
+			}
+
+			if ( strlen( $value ) > self::ORDER_META_MAX_LENGTH[ $meta_key ] ) {
+				// Shape-only log: the value itself is untrusted request input.
+				\Smaily\Connect\Support\DebugLog::write(
+					sprintf(
+						'[smaily-connect] order %d: dropped an oversized %s cookie (%d chars, max %d) — not stamped onto the order.',
+						$order->get_id(),
+						$cookie_name,
+						strlen( $value ),
+						self::ORDER_META_MAX_LENGTH[ $meta_key ]
+					)
+				);
 				continue;
 			}
 

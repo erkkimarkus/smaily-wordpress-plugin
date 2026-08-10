@@ -5256,6 +5256,48 @@ narrows), F3-50 (the consent gate, unchanged), browse browser-timing is still
 not live-walk-coverable (the CLAUDE.md note stands — this changes WHEN the
 buffer is sent, not when the browser fires the event).
 
+### PRO-1896 — Both attribution writers accept exactly the same values, and an over-cap cookie is dropped, never trimmed
+
+**Context:** the two writers of the same three first-party attribution cookies
+disagreed. `LandingCapture::resolve()` (PHP) shape-checks all three —
+`RecId::is_valid()`, `/^vt_[A-Za-z0-9]{1,64}$/`, `/^[A-Za-z0-9._-]{1,64}$/` —
+while `public/js/lib/attribution.ts` only ported the rec-id UUID rule
+(PRO-1710), taking `smaily_vt` / `smaily_ctx` at any value and any length.
+PRO-1767 turned that asymmetry from theoretical into reachable: `sc-landing.js`
+now loads on browse-OFF stores, whose only writer used to be the strict PHP
+one. A crafted landing URL could plant an arbitrary/oversized value in a
+30/365-day cookie that rode to order meta and onto the §5 orders wire (delta
+security audit 2026-08-07, Medium §1).
+
+**Decision:** (a) `attribution.ts` gets `VISITOR_TOKEN_PATTERN` /
+`CONTEXT_PATTERN` mirroring the PHP regexes verbatim, applied through the same
+per-slot `isValid` the rec-id already used — an off-shape value is refused the
+cookie while the param is still stripped from the URL. (b)
+`HookHandler::save_attribution_cookies_to_order()` caps each cookie at the
+longest value its shape can hold (`ORDER_META_MAX_LENGTH`: rec_id 36,
+visitor 67, context 64, session 64) and **drops** anything longer.
+
+**Rationale:** the capture fix cannot reach a cookie already in a browser — a
+value planted before this ships outlives it by the cookie's 30/365-day TTL, so
+the send path needs its own backstop (the same two-ended reasoning as
+PRO-1710). Dropping rather than truncating, because a trimmed token is a
+plausible-looking wrong value: it would reach the engine as if it were real
+attribution, where an absent field is simply an un-attributed order. The
+session id gets the generous 64 bound rather than an exact UUID length because
+nothing shape-checks it anywhere; the cap is there to bound a planted value,
+not to type the field.
+
+**Alternatives:** (a) validate on the send side only — leaves the oversized
+`Cookie` header on every subsequent request to the store, the audit's second
+impact; (b) truncate to the cap — see above; (c) share one regex source across
+PHP and TS — there is no build step joining them, so the pattern is duplicated
+with a comment naming its twin, exactly as `RecId` / `REC_ID_PATTERN` already
+are.
+
+**Relationships:** PRO-1710 (the rec-id half of the same rule, and the
+drop-don't-guess precedent), PRO-1767 (why the gap became reachable), F3-46
+(the server-side capture this mirrors).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

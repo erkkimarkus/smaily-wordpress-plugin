@@ -373,6 +373,28 @@ final class RecEngineOrdersTest extends TestCase {
 		self::assertSame( 'stale-junk-cookie', (string) wc_get_order( $order_id )->get_meta( '_smaily_rec_id' ), 'The stored meta is left alone — only the wire object drops it.' );
 	}
 
+	public function test_an_oversized_attribution_cookie_is_not_stamped_and_the_order_ingests_without_it(): void {
+		// PRO-1896: the pre-fix browser writer cookied any `?smaily_ctx=` value,
+		// and that cookie outlives the fixed bundle by its 30-day TTL. The
+		// checkout stamping caps it, so the planted value never reaches the §5
+		// wire — while the order itself ingests normally.
+		$product  = $this->make_product( 'ORD-CTX-OVERSIZE', '15.00' );
+		$order_id = $this->make_order( 'ctx-oversize@example.test', 'completed', $product );
+
+		$_COOKIE = array( 'smaily_rec_ctx' => str_repeat( 'x', 200 ) );
+		( new HookHandler( new EventQueue() ) )->on_checkout_order_processed( $order_id, array() );
+		$_COOKIE = array();
+
+		self::assertSame( '', (string) wc_get_order( $order_id )->get_meta( '_smaily_rec_ctx' ) );
+
+		$stats = $this->flusher()->flush();
+
+		self::assertSame( 1, $stats['sent'], 'stats: ' . wp_json_encode( $stats ) );
+		$payloads = self::$engine->state()['last_orders_payload'] ?? null;
+		self::assertIsArray( $payloads );
+		self::assertArrayNotHasKey( 'smaily_rec_ctx', $payloads[0] );
+	}
+
 	public function test_mock_rejects_a_non_uuid_smaily_rec_id_like_the_live_engine(): void {
 		// PRO-1710 mock fidelity: the live route validates smaily_rec_id as
 		// `z.string().uuid()` PER ORDER (D6). The plugin can no longer produce

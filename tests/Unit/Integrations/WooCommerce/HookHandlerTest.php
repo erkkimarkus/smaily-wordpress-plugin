@@ -476,6 +476,41 @@ final class HookHandlerTest extends TestCase {
 		self::assertSame( 'visitor-abc', $order->get_meta( '_smaily_visitor_token' ) );
 	}
 
+	public function test_oversized_attribution_cookies_are_not_stamped_onto_the_order(): void {
+		// PRO-1896: a cookie planted by the pre-fix permissive JS writer (or a
+		// crafted one) outlives the fixed bundle by its 30/365-day TTL, so the
+		// order stamp caps it rather than forwarding it to the §5 wire.
+		Functions\when( 'get_option' )->justReturn( false );
+
+		$order = $this->fake_order( 100, 'buyer@example.test', 9, 1 );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$_COOKIE['smaily_rec_ctx'] = str_repeat( 'a', 65 );
+		$_COOKIE['smaily_rec_uid'] = 'vt_' . str_repeat( 'b', 65 );
+
+		( new HookHandler( $this->queue ) )->on_checkout_order_processed( 100 );
+
+		self::assertSame( '', $order->get_meta( '_smaily_rec_ctx' ) );
+		self::assertSame( '', $order->get_meta( '_smaily_visitor_token' ) );
+	}
+
+	public function test_attribution_cookies_at_the_length_cap_still_ride_the_order(): void {
+		Functions\when( 'get_option' )->justReturn( false );
+
+		$order = $this->fake_order( 100, 'buyer@example.test', 9, 1 );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$ctx                       = str_repeat( 'a', 64 );
+		$vt                        = 'vt_' . str_repeat( 'b', 64 );
+		$_COOKIE['smaily_rec_ctx'] = $ctx;
+		$_COOKIE['smaily_rec_uid'] = $vt;
+
+		( new HookHandler( $this->queue ) )->on_checkout_order_processed( 100 );
+
+		self::assertSame( $ctx, $order->get_meta( '_smaily_rec_ctx' ) );
+		self::assertSame( $vt, $order->get_meta( '_smaily_visitor_token' ) );
+	}
+
 	public function test_block_checkout_stamps_rec_attribution_onto_order(): void {
 		// F3-46 gap fix: block checkout never fires woocommerce_checkout_order_processed,
 		// so the smaily_rec cookie must be stamped via the Store-API twin.
