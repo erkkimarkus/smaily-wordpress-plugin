@@ -5,8 +5,8 @@ import { resolve } from 'node:path';
 /**
  * Single Vite config with two named build entries:
  *
- *   admin/admin              → dist/admin/admin.js + dist/admin/admin.css
- *   client/rec-engine-client → dist/client/rec-engine-client.js
+ *   admin/admin        → dist/admin/admin.js + dist/admin/admin.css
+ *   public/js/sc-runtime → dist/public/js/sc-runtime.js
  *
  * Erkki ratified the single-config approach for sub-PR 2.A. We split into
  * separate `vite.*.config.ts` files only if the build-time options start
@@ -17,13 +17,11 @@ import { resolve } from 'node:path';
  * sub-PR 2.H). It imports React, ReactDOM, the admin/src/* TypeScript
  * tree, and Tailwind via the index.css side-effect import.
  *
- * The client bundle is the WordPress-free RecEngineClient — Phase 3
- * sub-PR 6 fills in the class body; Phase 2 ships a stub with the public
- * API surface fully signed (each method throws "Not implemented") so the
- * API contour is locked at the start of Phase 2 rather than redesigned
- * later. Mailstone 2 extracts this file unchanged into
- * @smaily/recengine-client; the WP-wrapper (public/js/beacon.ts, shipped as
- * dist/public/js/sc-runtime.js) stays in the plugin.
+ * The WordPress-free RecEngineClient (public/js/lib/rec-engine-client.ts) is
+ * NOT an entry of its own — beacon.ts inlines it, and it stays as source for
+ * the Milestone-2 extraction into @smaily/recengine-client. There is no
+ * `client` mode; `--mode admin` and the default mode build the same two
+ * entries (PRO-1949 removed the `build:client` script that implied otherwise).
  *
  * A THIRD entry — the attribution-only storefront bundle (public/js/landing.ts
  * → dist/public/js/sc-landing.js, PRO-1767) — is built in its OWN pass

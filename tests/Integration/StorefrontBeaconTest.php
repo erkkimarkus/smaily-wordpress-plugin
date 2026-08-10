@@ -162,7 +162,7 @@ final class StorefrontBeaconTest extends TestCase {
 	private function require_built_bundles(): void {
 		$dir = SMAILY_CONNECT_PLUGIN_PATH . 'dist/public/js/';
 		if ( ! file_exists( $dir . 'sc-runtime.js' ) || ! file_exists( $dir . 'sc-landing.js' ) ) {
-			self::markTestSkipped( 'Storefront bundles not built — run `npm run build:client`.' );
+			self::markTestSkipped( 'Storefront bundles not built — run `npm run build:admin`.' );
 		}
 	}
 
