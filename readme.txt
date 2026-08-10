@@ -88,6 +88,8 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
+Only releases from 3.0.0 onward are listed here. The complete version history, including the 1.x and 2.x releases, is published at https://github.com/erkkimarkus/smaily-wordpress-plugin/releases
+
 = 3.11.0 =
 * New: every contact synced to Smaily now carries a field per store automation (welcome, first order, abandoned cart) recording when that automation last ran for them, so you can build Smaily segments that target — or exclude — the contacts your store automations have touched.
 * New: an order line the customer has fully sent back (refunded in full, including a partial refund made from the order's Refund screen, which does not change the order status) is now reported to Smaily Campaign Intelligence as a return, so recommendations stop treating returned products as successful purchases. Returns are re-derived from the order on every sync, so existing orders pick this up on their next update.
@@ -209,170 +211,10 @@ First general-availability release, graduating the 2.1.0-beta line. Existing set
 * WooCommerce → Smaily Campaign Intelligence sync: catalog, customers, orders and consent-gated browse tracking, with backfill of existing data, an Event Log (with per-row retry and the request/response detail), and GDPR export / erase / opt-out.
 * Hardening: WordPress.org Plugin Check pass (sanitization, escaping, prefixing, ABSPATH guards); editor blocks updated to Block API v3 for the WordPress 7.0 iframe editor; diagnostics gated behind WP_DEBUG.
 
-= 2.1.0-beta.10 =
-
-* Improved: the Event Log's "Details" view now shows the exact request sent to Campaign Intelligence and the engine's response, instead of an empty payload — making sync issues far easier to diagnose. An event that was skipped without being sent is now clearly marked as such.
-* Changed: removed the old plugin settings screen — all configuration lives in the setup wizard and Settings (which use the same underlying options). Your subscription widget and the Plugins-page "Settings" link are unchanged.
-
-= 2.1.0-beta.9 =
-
-* Fixed: orders that previously never reached Campaign Intelligence are now sent. (1) Orders in a custom WooCommerce status — for example a shipping plugin's "label printed" or "shipped" — are now treated as sales instead of being silently skipped. (2) An order that contains a product you later deleted is no longer dropped: the line is kept from the order's saved details so the whole order still reaches the engine (that one deleted item just won't drive product-level recommendations). On-hold orders are not counted as a sale until payment is captured — they're sent once they move to processing or completed. After updating, re-run the order import (Campaign Intelligence → Import existing data → Orders) to pick up orders that were skipped before.
-* Fixed: the "Settings" link under Smaily Connect on the Plugins page now opens the current plugin screen instead of the old module's settings page.
-
-= 2.1.0-beta.8 =
-
-* Fixed: the browse-tracking script now loads for visitors who use ad/tracking blockers. Its filename and endpoint were renamed off a generic name that common blocker lists flagged, which had stopped browse events from being recorded for those visitors. Browse tracking is otherwise unchanged — it still only runs when you've enabled it and the shopper has given cookie/marketing consent.
-
-= 2.1.0-beta.7 =
-
-* Fixed: products you move to the Trash that customers had previously ordered are now kept in Campaign Intelligence as out-of-stock, instead of disappearing. The recommendation engine still learns from that purchase history (so those customers keep getting the right kind of suggestions) but won't recommend a trashed product. Restoring a product from the Trash marks it available again. After updating, re-run the product import (Campaign Intelligence → Import existing data → Products) so products already in the Trash are picked up.
-
-= 2.1.0-beta.6 =
-
-* Changed: Smaily Campaign Intelligence now connects to its production address `https://intelligence.smaily.com` for new connections. Existing connections keep working unchanged — no settings change is required. To move an existing store onto the new address, reconnect using a fresh setup link from Smaily.
-
-= 2.1.0-beta.5 =
-
-* Renamed: the recommendation-engine feature is now called **Smaily Campaign Intelligence** throughout the admin (the Campaign Intelligence tab and setup step, the connection screen, health notices, and privacy data labels). This is a display-name change only — your data, connection and settings are unaffected, and no re-import is needed.
-
-= 2.1.0-beta.4 =
-
-* Fixed: deleting draft or never-published products (including the temporary "auto-draft" entries WordPress cleans up automatically) no longer creates failed catalog events in the Event Log. Such products were never sent to the recommendation engine, so there is nothing to remove.
-* Fixed: the catalog import progress on multilingual stores now shows the true number of products synced (e.g. "1354 products synced") instead of a misleading fraction that compared products against the per-language post count.
-* Fixed: the Event Log's Retry and Details buttons stay visible on narrow screens and on failed rows — they are no longer pushed off the right edge.
-
-= 2.1.0-beta.3 =
-
-* Improved: multilingual stores (WPML / Polylang) — a translated product is now a single product in recommendations instead of one per language, so recommendations no longer mix languages or repeat the same item. Each customer sees product names, descriptions and links in their own language.
-* Improved: product variations on multilingual stores are linked across languages (with WooCommerce Multilingual).
-* Improved: gift cards, donations and similar non-products are excluded from recommendations more reliably — the plugin now sends each product's type and virtual/downloadable status so the engine can classify them. (The plugin does not filter your products, so virtual or downloadable goods you genuinely sell are kept.)
-* On multilingual stores, re-run the catalog import after upgrading (coordinate with Smaily for the clean re-sync).
-
-= 2.1.0-beta.2 =
-
-* Fixed: stores whose products have no SKUs now sync fully to the recommendation engine. Products without a SKU are keyed by a stable synthetic identifier (wc-<id>) across catalog, order and browse-tracking sync; previously such products were silently skipped and their orders failed to sync.
-* Fixed: orders whose products were later permanently deleted from the store no longer fail repeatedly in the Event Log — they are skipped cleanly (WooCommerce removes the product reference on deletion, so those line items cannot be synced).
-* Fixed: orders with no syncable line items (e.g. fee-only orders) are now skipped cleanly instead of repeatedly failing in the Event Log.
-* Fixed: products sold out at variation level are now correctly marked out-of-stock for the recommendation engine (previously only parent-product stock changes were tracked).
-* Fixed: product attribute values now sync as readable labels instead of internal IDs, enabling brand- and attribute-based recommendation rules. Re-run the catalog import after upgrading to refresh existing data.
-* Fixed: admin health notices now appear at the top of the plugin's Settings and wizard pages (full width, like on other admin pages) instead of overlapping the page header.
-* Fixed: abandoned cart reminders are only sent for recently abandoned carts (24 hours by default) — older carts are expired silently, so re-enabling the feature after a pause can never mass-email historical carts. A failure to send one reminder no longer blocks the rest.
-
-= 2.1.0-beta.1 =
-
-Major update, built alongside the existing 1.x feature set (existing installs upgrade in place; legacy behaviour continues until the new setup wizard is completed):
-
-* New guided setup wizard and a redesigned, mobile-friendly admin interface.
-* WooCommerce ↔ Smaily recommendation-engine integration: product catalog, customer and order sync with durable idempotent queues, plus one-click import (backfill) of existing store data.
-* Optional storefront browse tracking (off by default, cookie-consent-gated) to improve recommendations.
-* Event Log: every sync event visible in the admin, with per-row and bulk retry for failures.
-* Proactive health notices when the Smaily API or the recommendation engine is unreachable, or failures accumulate.
-* Privacy: WordPress personal-data export/erasure cover recommendation-engine data; shoppers can opt out of recommendation profiling from My Account; stored API credentials re-encrypted with authenticated encryption (AES-256-GCM).
-* Multilingual-aware subscriber routing (Polylang, WPML, TranslatePress).
-
-= 2.0.0 =
-
-Upgrades the minimum required WordPress version to 6.5 and minimum required PHP version to 7.4. This change also improves the support for WordPress version 7.0.
-
-= 1.6.2 =
-
-Fixed a bug in the Elementor newsletter widget where the failure redirect URL was incorrectly using the success URL value, causing subscribers to be redirected to the wrong page after a failed subscription attempt.
-
-Fixed a bug where changes made to user profile fields (first name, last name, phone, date of birth, gender) on the WooCommerce account page were silently discarded and never saved.
-
-Fixed a bug where the WooCommerce abandoned cart cron job would skip carts with items, treating them as empty due to checking the wrong variable.
-
-Fixed a bug where the WooCommerce subscriber sync would send incorrect gender values to Smaily, causing gender data to not match the subscriber profile.
-
-Fixed a bug where malformed or unparseable date of birth values would cause a PHP warning during WooCommerce subscriber sync. Invalid dates are now silently skipped.
-
-Fixed the checkout opt-in block not loading its frontend script correctly due to a wrong asset manifest filename.
-
-Fixed the admin credentials page where an untranslated error message was shown when disconnecting the API.
-
-= 1.6.1 =
-
-Fixed an issue where the discounted price was not correctly calculated in the RSS feed when using the tax rate parameter. The discounted price is now calculated correctly regardless of the tax rate used in the feed.
-
-Unified the discount percentage display value in the RSS feed. The discount percentage is now displayed at most with one decimal place and without trailing zeros. For example, a discount of 10% will be displayed as "10%" instead of "10.0%". A discount of 10.5% will be displayed as "10.5%" instead of "10.50%". This change improves the readability of the discount percentage for the imported products in Smaily templates.
-
-= 1.6.0 =
-
-Added support for adding a tax rate to the RSS-feed product prices. This allows to change the tax rate used in the feed to match the tax rate used in Smaily email templates. This is especially useful for stores that want to target customers in different regions with different tax rates in their email campaigns.
-
-Smaily Elementor widget now supports adding custom hidden fields to the subscription form. This allows to set custom fields for subscribers added via the Elementor widget allowing to better segment the subscribers in Smaily.
-
-= 1.5.1 =
-
-Added a label to the hidden fields section in the Smaily subscription block settings for better clarity.
-
-= 1.5.0 =
-
-You can now customize the hidden fields on the Smaily subscription block form. This allows to set custom fields for subscribers added via the block form allowing to better segment the subscribers in Smaily.
-
-= 1.4.3 =
-
-Added more hooks where the Smaily abandoned cart record is deleted. The current approach might on some occasions leave abandoned cart records lingering around even when the user has made a purchase.
-
-= 1.4.2 =
-Fixes an issue where Elementor integration assets were being excluded from the plugin package. This caused the Elementor widget styles to be missing after installation. The packaging patterns have been updated to ensure all necessary assets are included.
-
-= 1.4.1 =
-Fixes an issue where the abandoned cart cutoff time minimum value was 30 minutes instead of 10 minutes as intended. The minimum cutoff time has been corrected to 10 minutes, allowing users to set a lower threshold for considering carts as abandoned.
-
-= 1.4.0 =
-
-Improved RSS-feed items to show prices including taxes. Also added support for Discount Rules for WooCommerce plugin to correctly show discounted prices in the feed and in the abandoned cart reminders.
-
-= 1.3.3 =
-
-Improved the Elementor widget performance by reducing the number of API calls made during the rendering process.
-
-= 1.3.2 =
-
-Fixed a bug where the RSS-feed `pubDate` was not correctly formatted, which could lead to issues while importing sorted products into Smaily templates. Now the `pubDate` is formatted according to the RFC 822 standard, ensuring compatibility with RSS parsers.
-
-= 1.3.1 =
-
-- Improved the admin notice when the Smaily API credentials are invalid. Now the notice is rendered closer to the credentials input fields for better visibility.
-- Improved autoresponder listing function validation to handle edge cases and ensure robust performance.
-
-= 1.3.0 =
-
-Improved the Contact Form 7 integration by allowing user to configure each form individually.
-
-= 1.2.4 =
-
-Render admin notices outside the form element to ensure proper display and avoid potential conflicts with form submission.
-
-= 1.2.3 =
-
-Load the plugin text domain in the `init` action. This complies with the WordPress 6.7+ plugin development standards and ensures that the plugin translations are loaded correctly.
-
-= 1.2.2 =
-
-Fixed RSS feed product query by removing random ordering. The combination of random ordering and query limits could result in empty product feeds on subsequent requests, causing RSS parser failures.
-
-= 1.2.1 =
-
-Fixed a bug where abandoned cart reminder emails were not sent due to a syntax error in the query statement building process.
-
-= 1.2.0 =
-
-Added a new block component for embedding Smaily Landing Pages.
-
-= 1.1.0 =
-
-Introduced a new Elementor widget that makes it easy to add a Smaily subscription form when building pages with Elementor.
-
-
-= 1.0.0 =
-* Combined Smaily for Contact Form 7, Smaily for WP, and Smaily for WooCommerce into a single plugin for a streamlined experience.
-
 == Upgrade Notice ==
 
 = 3.11.0 =
-A large reliability release for contact sync and automations: the ticked contact fields (including Phone and Gender) now actually reach Smaily and are actually asked for at checkout, contact import no longer stops after the first hundred contacts, turning contact sync off really stops it, and the first-order automation also fires on the block checkout. Contacts now also carry a per-automation "last run" field you can segment on, and returned order lines are reported to Campaign Intelligence. The "force opt-in" choice on automation triggers is retired — an automation no longer overrides an unsubscribe made in Smaily. Safe update.
+Reliability release for contact sync and automations: ticked fields (Phone, Gender) reach Smaily and are asked at checkout, import no longer stops at 100, sync-off really stops it, first-order fires on block checkout. Adds per-automation last-run fields, returns; force opt-in retired. Safe update.
 
 = 3.10.0 =
 Transactional emails settings moved to the Connection and WooCommerce tabs for discoverability; Event Log "Retry all failed" now also reachable for older failed events. Safe update.
