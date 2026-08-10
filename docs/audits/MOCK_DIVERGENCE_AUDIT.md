@@ -31,9 +31,16 @@ second live round.
 
 | Mark | Meaning |
 |------|---------|
-| ✅ | Live-verified by me against the real MiuMjau engine (walk-3.2 / probes) |
-| 📋 | Engine-team-reported; **not yet** live-probed (endpoint not implemented plugin-side) |
-| ⏳ | To be live-verified when 3.3 implements the endpoint |
+| ✅ | Live-verified against the real engine by a named walk (`bin/walk-*.cjs`) |
+| 📋 | Engine-team-reported; **not yet** live-probed |
+| ⏳ | Still to be live-verified |
+
+**Marks refreshed 2026-08-10.** This document was written in 3.2.4, when catalog
+was the only endpoint the plugin implemented and the other three could only
+carry the engine team's report. All four have since been live-walked, so §§2–4
+now read ✅ with the walk that proves each one named in its header — see the
+"Live-verified" note under each table for the dimensions a walk did **not**
+cover.
 
 ## Cross-cutting findings (apply to every ingest endpoint)
 
@@ -75,7 +82,12 @@ refinement, not a blocker).
 
 ---
 
-## 2. customers — `POST /api/v1/ingest/customers`  📋 engine-team-reported, ⏳ to verify
+## 2. customers — `POST /api/v1/ingest/customers`  ✅ live-verified (`bin/walk-3.3.cjs`, 2026-06-04)
+
+> The table below is the **3.2.4 engine-team report on the pre-Route-A
+> scaffold**, kept as history. W4 widened the engine toward the plugin's
+> variant-A design and the walk below confirmed it live — read the
+> "Live-verified" note first.
 
 | Dimension | Spec / mock assumption (variant A) | Real engine (reported) | Mock fix under Route A |
 |-----------|------------------------------------|------------------------|------------------------|
@@ -89,9 +101,24 @@ refinement, not a blocker).
 the plugin doesn't currently have that value; sourcing/storing it is design
 work. Single-object vs batch changes the queue/flush batching for customers.
 
+**Live-verified 2026-06-04** — `bin/walk-3.3.cjs`, 10/10 against the deployed
+engine (commit `791c00b`, the D6 reference milestone). Every "reported" row
+above is superseded: the engine takes the **batch `{customers:[...]}` wrapper**,
+keys on **email** (W4 dropped `smaily_contact_id`, D1), and returns **per-item
+`errors[]`** — the walk exercised D6 partial success (`{processed:1,
+errors:[{index:1,field:email}]}`) against the real engine for the first time,
+plus the invariant, per-item `event_id` dedup, an all-sent batch, and
+omit-vs-null on the wire. It also caught the `first_seen_at` datetime bug the
+mock could not (fix `e4dfb91`, the shared `IsoDate` helper) — the reason this
+document exists. **Not covered:** which fields the engine silently drops was
+never enumerated (the last row's "6 fields, TBD which" is still open).
+
 ---
 
-## 3. orders — `POST /api/v1/ingest/orders`  📋 engine-team-reported, ⏳ to verify
+## 3. orders — `POST /api/v1/ingest/orders`  ✅ live-verified (`bin/walk-3.3-orders.cjs`, 2026-06-05; re-walked three times since)
+
+> The table below is the **3.2.4 engine-team report on the pre-Route-A
+> scaffold**, kept as history — superseded by the walks recorded under it.
 
 | Dimension | Spec / mock assumption (variant A) | Real engine (reported) | Mock fix under Route A |
 |-----------|------------------------------------|------------------------|------------------------|
@@ -105,6 +132,23 @@ work. Single-object vs batch changes the queue/flush batching for customers.
 `currency`, `smaily_rec_ctx` (per spec) — these are sent but silently dropped
 today. No plugin error, but the data won't land until Route A stores them.
 Single-object batching change as with customers.
+
+**Live-verified 2026-06-05** — `bin/walk-3.3-orders.cjs`, 12/12 against the
+deployed engine (commit `873edb9`). Supersedes the "reported" rows: the engine
+takes the **batch `{orders:[...]}` wrapper**, returns **per-item `errors[]`**
+(D6 partial success, `errors:[{index:1,field:status}]`), and **does not** drop
+`status` — it validates it as a strict enum and rejects a raw WC status
+(`shipped`), which is what proves the WC→enum mapping both necessary and
+correct. `ordered_at` arrived in the `Z` form (the F3-21 datetime bug did not
+recur).
+
+Re-walked since, each against the "Smaily Connect test" sandbox: **F3-42/F3-43**
+custom statuses + deleted-product lines (`bin/walk-f3-43-orders.cjs`, `ed20b74`,
+2026-06-19), **PRO-1241** gross money (`bin/walk-pro1241-gross-orders.cjs`, 9/9,
+`b249887`, 2026-07-11), and **PRO-1633** return signals
+(`bin/walk-pro1633-return-signals.cjs`, 12/12, 2026-08-05, recorded in
+`443f026`). The PRO-1710 `smaily_rec_id` UUID constraint below is the one
+orders finding that came from **reading the engine route**, not a walk.
 
 **`smaily_rec_id` must be a UUID (found 2026-08-04 during the v1.8.0 contract
 sync) — ✅ RESOLVED (PRO-1710, 2026-08-04).** The contract's §5 field table types
@@ -166,7 +210,10 @@ tree: nothing on the `OrderPayloadBuilder` return path has changed since.
 
 ---
 
-## 4. browse — `POST /api/v1/ingest/browse`  📋 engine-team-reported ("cleanest" = wrapper-shape only), ⏳ to verify
+## 4. browse — `POST /api/v1/ingest/browse`  ✅ live-verified (`bin/walk-3.4-browse.cjs`, 2026-06-08) — except `source` required-ness, ⏳ never probed
+
+> The table below is the **3.2.4 engine-team report on the pre-Route-A
+> scaffold**, kept as history — superseded by the walk recorded under it.
 
 | Dimension | Spec / mock assumption | Real engine (reported) | Mock fix under Route A |
 |-----------|------------------------|------------------------|------------------------|
@@ -194,6 +241,26 @@ HTTP 400, no `errors[]`), exactly like catalog, and needs the **same N-7
 retrofit** to per-item `errors[]` (DECISIONS F3-18 / D6). The only existing
 partial-success reference is the **admin CSV path** (`commitCatalog →
 import_errors`), not the HTTP endpoints.
+
+**Live-verified 2026-06-08** — `bin/walk-3.4-browse.cjs`, 13/13 against the
+deployed engine (commit `1396697`), run over both paths: the `/relay` proxy
+(in-process REST dispatch through `BeaconEndpoint` → `Client::ingest_browse`)
+and `Client::ingest_browse` direct, for the §6 per-item behaviours the proxy
+rejects first. Supersedes the "TBD"/all-or-nothing rows: **all 9 §6 event
+types** are processed (confirming the EventType 8→9 fix against the engine, not
+just the mock), `event_id` **is** required and its absence comes back as a
+**per-item** `errors[{field:event_id}]` — so the N-7 D6 retrofit is live, not
+all-or-nothing — an invalid `event_type` likewise, `event_id` dedup works, and
+`retroactive_bound=2` proves anon session events rebinding to a customer once
+an email resolves. The abuse filter was exercised on the live route
+(101 events→400, bad type→400, missing id→400, per-session rate limit→429).
+
+**Not covered, and still ⏳:** the `source` **required-ness** row. The walk
+always sends `source: 'plugin_woo'`, so it has never probed what the engine does
+when the field is omitted. Also out of a server-side walk's reach by
+construction: the **browser moment** a page-view fires (`checkout_start` on the
+checkout page, `checkout_complete` on order-received) — that is a manual pilot
+check, per CLAUDE.md; do not read this ✅ as covering render timing.
 
 ---
 
@@ -240,14 +307,16 @@ token → still identified, email-carrying opted-out → anonymous).
 
 1. **catalog** — ✅ **done (W1)**. Wrapper key, category_path, per-item dedup all
    aligned mock ↔ plugin ↔ engine. Residual: F3-18 all-or-nothing batch edge.
-2. **customers** (after W4) — batch `{customers:[...]}` + email-key (W4 drops
-   `smaily_contact_id`, D1); per-item `event_id`. Re-probe + align mock then.
-3. **orders** (after W5) — batch `{orders:[...]}` + `status`/`currency`/
-   `smaily_rec_ctx` accepted; per-item `event_id`. Re-probe + align mock then.
-4. **browse** — per-item `event_id` already canonical (W1/W6); confirm
-   `event_id`/`source` required-ness when implemented plugin-side. **Batch
-   errors: all-or-nothing today → per-item `errors[]` retrofit (N-7), same as
-   catalog (F3-18 / D6).**
+2. **customers** — ✅ **done (W4, walk-3.3)**. Batch `{customers:[...]}` +
+   email-key (W4 dropped `smaily_contact_id`, D1); per-item `event_id`; D6
+   `errors[]`. Residual: the silently-dropped field set was never enumerated.
+3. **orders** — ✅ **done (W5, walk-3.3-orders)**. Batch `{orders:[...]}`;
+   per-item `event_id`; D6 `errors[]`; `status` validated as an enum rather
+   than dropped.
+4. **browse** — ✅ **done (walk-3.4-browse)**. Per-item `event_id` canonical
+   (W1/W6) and required; the N-7 per-item `errors[]` retrofit is live, so the
+   all-or-nothing row above no longer holds. Residual: `source` required-ness
+   was never probed.
 
 **Build the mock from the engine's real responses**, not from the spec — capture
 a real response per endpoint (as done for catalog) or sync against an
@@ -256,8 +325,15 @@ engine-team fixture, so the mock cannot drift back toward the aspirational spec
 
 ## Open dependency
 
-All of customers / orders / browse are **engine-team-reported, not yet
-live-probed** — the plugin doesn't implement those endpoints, so there's no
-authenticated path to probe them today. Each row marked 📋 must be confirmed
-against the real engine when 3.3 implements the endpoint, the same way catalog
-was confirmed in 3.2.4.
+**Closed 2026-08-10.** The 3.2.4 blocker — "the plugin doesn't implement those
+endpoints, so there's no authenticated path to probe them" — went away when 3.3
+and 3.4 shipped them: customers (`walk-3.3.cjs`, 2026-06-04), orders
+(`walk-3.3-orders.cjs`, 2026-06-05, re-walked through 2026-08-05) and browse
+(`walk-3.4-browse.cjs`, 2026-06-08) were each confirmed against the real engine
+the same way catalog was in 3.2.4.
+
+Two dimensions remain unprobed and keep their ⏳: the field set the customers
+endpoint silently drops (§2), and `source` required-ness on browse (§4). Both
+are low-stakes — the plugin sends `source` on every event and stores nothing
+that depends on a dropped customer field — so neither is worth a walk of its
+own; fold them into the next walk that touches those endpoints.
