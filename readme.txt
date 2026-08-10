@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.11.0
+Stable tag: 3.11.1
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -89,6 +89,11 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 == Changelog ==
 
 Only releases from 3.0.0 onward are listed here. The complete version history, including the 1.x and 2.x releases, is published at https://github.com/erkkimarkus/smaily-wordpress-plugin/releases
+
+= 3.11.1 =
+* Fixed: the order-completion signal sent to Smaily Campaign Intelligence no longer depends on the shopper keeping the order-received page open. It is sent as soon as the order is confirmed, so completed orders are no longer under-counted when recommendations are computed.
+* Fixed: email-link attribution values arriving in a landing URL are now checked in the browser before they are stored, and an oversized value can no longer be attached to an order.
+* Fixed: the retired "force opt-in" setting's leftover database row is now removed when the plugin updates.
 
 = 3.11.0 =
 * New: every contact synced to Smaily now carries a field per store automation (welcome, first order, abandoned cart) recording when that automation last ran for them, so you can build Smaily segments that target — or exclude — the contacts your store automations have touched.
@@ -212,6 +217,9 @@ First general-availability release, graduating the 2.1.0-beta line. Existing set
 * Hardening: WordPress.org Plugin Check pass (sanitization, escaping, prefixing, ABSPATH guards); editor blocks updated to Block API v3 for the WordPress 7.0 iframe editor; diagnostics gated behind WP_DEBUG.
 
 == Upgrade Notice ==
+
+= 3.11.1 =
+Fixes only. The order-completion signal for Campaign Intelligence is now sent as soon as the order is confirmed, instead of depending on the shopper keeping the page open; email-link attribution values are validated before being stored; a retired setting leaves no row behind. Safe update.
 
 = 3.11.0 =
 Reliability release for contact sync and automations: ticked fields (Phone, Gender) reach Smaily and are asked at checkout, import no longer stops at 100, sync-off really stops it, first-order fires on block checkout. Adds per-automation last-run fields, returns; force opt-in retired. Safe update.
