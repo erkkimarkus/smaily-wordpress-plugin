@@ -5298,6 +5298,41 @@ are.
 drop-don't-guess precedent), PRO-1767 (why the gap became reachable), F3-46
 (the server-side capture this mirrors).
 
+### PRO-1942 — The orders wire shape-checks all four attribution signals at send time, from one shared definition
+
+**Context:** `OrderPayloadBuilder::build()` validated `smaily_rec_id` (PRO-1710)
+and forwarded `smaily_visitor_token` / `smaily_rec_ctx` / `session_id` to the §5
+orders wire on a bare non-empty check. PRO-1896 bounded what can be *stamped*
+onto an order from now on, but a value stamped before it shipped is already on
+orders in the queue, and those retry through the flusher for the queue's
+lifetime — the send path had no shape rule of its own for three of the four.
+
+**Decision:** a new `Support\AttributionShape` holds the visitor-token and
+context regexes (the LandingCapture definitions, moved not copied — LandingCapture
+now calls it), plus `is_session_id()`, and `OrderPayloadBuilder` checks all three
+at send time. An off-shape value is **omitted** from the payload, with a
+shape-only DebugLog line; the rest of the order sends normally and the meta is
+left on the order untouched.
+
+**Rationale:** the exact twin of the PRO-1710 treatment, and the same
+one-definition-two-ends move `RecId` already made — the drift this closes existed
+precisely because the shapes lived only in the capture path. Omit rather than
+truncate for PRO-1896's reason: a trimmed token reaches the engine as if it were
+real attribution. `session_id` keeps PRO-1896's deliberately generous bound (the
+context charset, 64) rather than the UUID its producers actually emit — nothing
+has ever enforced a shape on it, and a rule stricter than the consumer's would
+drop values the engine accepts.
+
+**Alternatives:** (a) duplicate the two regexes in the builder — rejected, that
+is the drift being fixed (the PHP↔TS duplication in PRO-1896 stands only because
+no build step joins those two languages); (b) sanitise/truncate to shape — see
+above; (c) rely on the PRO-1896 order-meta cap alone — it is length-only, cannot
+reach values already stamped, and length is not shape.
+
+**Relationships:** PRO-1710 (the rec-id half, and the pattern this copies),
+PRO-1896 (the capture-side cap and the 64-char session bound), F3-46
+(LandingCapture, the capture-side owner of these shapes).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

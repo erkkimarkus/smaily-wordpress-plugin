@@ -11,6 +11,7 @@ namespace Smaily\Connect\Smaily\RecEngine;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Smaily\RecEngine\Support\AttributionShape;
 use Smaily\Connect\Smaily\RecEngine\Support\IsoDate;
 use Smaily\Connect\Smaily\RecEngine\Support\RecId;
 use Smaily\Connect\Smaily\RecEngine\Support\SkuResolver;
@@ -65,10 +66,14 @@ use Smaily\Connect\Support\DebugLog;
  * stored attribution signals (smaily_rec_id / smaily_visitor_token /
  * smaily_rec_ctx / session_id), stamped onto order meta at checkout by the
  * email HookHandler. The ingest response carries no attribution counts.
- * `smaily_rec_id` is the one attribution signal with a SHAPE the engine
- * enforces (`z.string().uuid()`, per-order D6) — a stored non-UUID value is
- * dropped here rather than sent, so one junk cookie can't cost the order
- * (PRO-1710, Support\RecId).
+ * Every one of them is shape-checked at SEND time, against the same definitions
+ * the capture path applies (Support\RecId for the uuid `smaily_rec_id`,
+ * Support\AttributionShape for the other three) — an off-shape value is OMITTED,
+ * never truncated, and the order ingests without that signal. Send-time is where
+ * this has to happen as well as at capture: a value cookied by a producer that
+ * did not check it outlives the fix by the cookie's TTL, it is already sitting on
+ * orders placed before the fix, and those orders retry through the flusher for
+ * the queue's lifetime (PRO-1710 for the rec_id, PRO-1942 for the rest).
  *
  * Not final: tests subclass to stub WC reads. Same rationale as the other
  * PayloadBuilders.
@@ -187,16 +192,22 @@ class OrderPayloadBuilder {
 			);
 		}
 		$visitor_token = $this->meta( $order, self::META_VISITOR_TOKEN );
-		if ( $visitor_token !== '' ) {
+		if ( AttributionShape::is_visitor_token( $visitor_token ) ) {
 			$payload['smaily_visitor_token'] = $visitor_token;
+		} elseif ( $visitor_token !== '' ) {
+			$this->log_off_shape( $order, self::META_VISITOR_TOKEN );
 		}
 		$rec_ctx = $this->meta( $order, self::META_REC_CTX );
-		if ( $rec_ctx !== '' ) {
+		if ( AttributionShape::is_context( $rec_ctx ) ) {
 			$payload['smaily_rec_ctx'] = $rec_ctx;
+		} elseif ( $rec_ctx !== '' ) {
+			$this->log_off_shape( $order, self::META_REC_CTX );
 		}
 		$session_id = $this->meta( $order, self::META_SESSION_ID );
-		if ( $session_id !== '' ) {
+		if ( AttributionShape::is_session_id( $session_id ) ) {
 			$payload['session_id'] = $session_id;
+		} elseif ( $session_id !== '' ) {
+			$this->log_off_shape( $order, self::META_SESSION_ID );
 		}
 
 		return $payload;
@@ -431,6 +442,23 @@ class OrderPayloadBuilder {
 			return mb_substr( $text, 0, self::RETURN_REASON_MAX );
 		}
 		return substr( $text, 0, self::RETURN_REASON_MAX );
+	}
+
+	/**
+	 * Shape-only log line for an attribution value that did not reach the wire
+	 * (PRO-1942). The value itself is never logged — it is untrusted cookie
+	 * input, and the meta stays on the order either way (merchant data isn't
+	 * rewritten); the send-time exchange stored on the queue row (F3-44) shows
+	 * exactly what went out.
+	 */
+	private function log_off_shape( \WC_Order $order, string $meta_key ): void {
+		DebugLog::write(
+			sprintf(
+				'[smaily-connect orders] order %d: dropped an off-shape %s from the payload — the order ingests without that attribution signal',
+				$order->get_id(),
+				$meta_key
+			)
+		);
 	}
 
 	private function meta( \WC_Order $order, string $key ): string {

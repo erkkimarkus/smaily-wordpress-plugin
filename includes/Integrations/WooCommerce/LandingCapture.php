@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Smaily\RecEngine\Support\AttributionShape;
 use Smaily\Connect\Smaily\RecEngine\Support\RecId;
 use Smaily\Connect\Support\DebugLog;
 
@@ -167,12 +168,12 @@ class LandingCapture {
 		}
 
 		$visitor = $this->clean( $get, self::URL_PARAM_VISITOR );
-		if ( $this->is_visitor_token( $visitor ) ) {
+		if ( AttributionShape::is_visitor_token( $visitor ) ) {
 			$out[ self::SLOT_VISITOR ] = $visitor;
 		}
 
 		$context = $this->clean( $get, self::URL_PARAM_CONTEXT );
-		if ( $this->is_context( $context ) ) {
+		if ( AttributionShape::is_context( $context ) ) {
 			$out[ self::SLOT_CONTEXT ] = $context;
 		}
 
@@ -225,16 +226,6 @@ class LandingCapture {
 			return '';
 		}
 		return trim( sanitize_text_field( wp_unslash( (string) $get[ $key ] ) ) );
-	}
-
-	/** Engine visitor-token format: `vt_` + alphanumerics (re: visitor-tokens/manager.ts). */
-	private function is_visitor_token( string $value ): bool {
-		return 1 === preg_match( '/^vt_[A-Za-z0-9]{1,64}$/', $value );
-	}
-
-	/** Intent slug (welcome / cart_abandoned / cross_sell / …). */
-	private function is_context( string $value ): bool {
-		return '' !== $value && 1 === preg_match( '/^[A-Za-z0-9._-]{1,64}$/', $value );
 	}
 
 	/**

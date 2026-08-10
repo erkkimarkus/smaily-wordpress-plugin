@@ -272,6 +272,34 @@ final class OrderPayloadBuilderTest extends TestCase {
 		self::assertSame( 'completed', $payload['status'], 'The order itself still ships.' );
 	}
 
+	public function test_off_shape_attribution_signals_are_dropped_and_the_order_still_ships(): void {
+		// PRO-1942, the twin of the rec_id case above for the other three
+		// signals: a value cookied by a producer that never shape-checked it
+		// (the pre-PRO-1896 JS writer, a crafted URL) is already on orders
+		// placed before the fix, and those orders retry through the flusher.
+		// An off-shape value is OMITTED — never truncated, which would put a
+		// plausible-looking wrong value on the §5 wire.
+		$order = $this->mock_order(
+			array(
+				'status' => 'completed',
+				'meta'   => array(
+					'_smaily_rec_id'          => self::REC_UUID,
+					'_smaily_visitor_token'   => 'not-a-vt-token',
+					'_smaily_rec_ctx'         => 'cart abandoned!',
+					'_smaily_anon_session_id' => str_repeat( 'a', 65 ),
+				),
+			)
+		);
+
+		$payload = ( new OrderPayloadBuilder() )->build( $order, 'u' );
+
+		self::assertArrayNotHasKey( 'smaily_visitor_token', $payload, 'A token without the vt_ shape is not sent.' );
+		self::assertArrayNotHasKey( 'smaily_rec_ctx', $payload, 'A context outside the slug charset is not sent.' );
+		self::assertArrayNotHasKey( 'session_id', $payload, 'A session id over the 64-char bound is not sent.' );
+		self::assertSame( self::REC_UUID, $payload['smaily_rec_id'], 'A valid signal alongside them is untouched.' );
+		self::assertSame( 'completed', $payload['status'], 'The order itself still ships.' );
+	}
+
 	public function test_non_product_line_items_are_skipped(): void {
 		// get_items() also returns shipping / fee / coupon lines — only
 		// product lines become wire items.

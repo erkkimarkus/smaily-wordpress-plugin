@@ -26,7 +26,30 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**v3.11.1 — PUBLISHED**:
+_Last updated: 2026-08-10 (**PRO-1942 — the orders wire now shape-checks all
+four attribution signals at send time, not just the rec id.**
+`OrderPayloadBuilder` validated `smaily_rec_id` (PRO-1710) and forwarded
+`smaily_visitor_token` / `smaily_rec_ctx` / `session_id` on a bare non-empty
+check. PRO-1896 (published hours earlier in v3.11.1) bounds what can be STAMPED
+onto an order from now on, but a value stamped before it can already be sitting
+on orders that retry through the flusher for the queue's lifetime — so the send
+side needs the same rule, exactly as PRO-1710 argued for the rec id. **Fix:** the
+visitor-token / context regexes move out of `LandingCapture` into a shared
+`Smaily\RecEngine\Support\AttributionShape` (the `RecId` pattern — one definition,
+capture and send both call it), which `OrderPayloadBuilder` now applies to all
+three; `session_id` keeps PRO-1896's deliberately generous bound (the context
+charset, 64 chars) rather than the UUID its producers emit, since nothing has ever
+enforced a shape on it. An off-shape value is OMITTED (never truncated — a trimmed
+token is a plausible-looking wrong value on the §5 wire) with a shape-only
+DebugLog line; the order ships normally and the meta stays on the order. Tests: 1
+new unit case (all three off-shape signals dropped, the order still ships). Gates:
+`npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit
+unit **742/742**, eslint/tsc clean, vitest **282/282**) and `sg docker -c
+"composer run test:integration"` **OK (256 tests, 1 pre-existing skip)**.
+DECISIONS PRO-1942. **No version bump — ships with the next release cut**
+(v3.11.1 is already published)._
+
+Prior: 2026-08-10 (**v3.11.1 — PUBLISHED**:
 https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.11.1,
 tag on the bump commit `e6413e5`, asset SHA256 `fc8ea222…aa5c08a9` verified at
 publish. PATCH
