@@ -60,6 +60,14 @@ export default defineConfig(({ mode }) => {
   return {
   plugins: [react()],
 
+  // Vite's publicDir default is `public/` — which here is the plugin's
+  // storefront PHP tree plus the TypeScript SOURCES of the very bundles this
+  // config builds. Copied verbatim into dist/, they shipped in the release ZIP
+  // (raw *.ts including *.test.ts, a duplicate smaily-public.class.php, the
+  // partials/template PHP). Nothing in public/ is a static asset the built
+  // bundles need, so the copy step is switched off entirely.
+  publicDir: false,
+
   build: {
     outDir: 'dist',
     emptyOutDir: mode !== 'landing',
