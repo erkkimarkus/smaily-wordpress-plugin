@@ -392,10 +392,9 @@ drifted store is the backfill running the SAME resolver (SP-B), not a one-off.
   `etaSeconds` instead of the API's snake_case `eta_seconds`; vitest green, tsc
   red, ci:strict exit=2.)
 - `sg docker -c "composer run test:integration"` — real-environment integration.
-  **Any `vite build` (`build:admin`/`build:client`/`build:landing`) empties the
-  out-dir and takes `dist/build-hash.txt` with it**, so the next integration run
-  fails `BuildHashTest` on a gitignored artifact rather than on your change. Run
-  `composer run package:hash` after any client/admin build, before integration.
+  The build stamp lives at the plugin ROOT (`build-hash.txt`, PRO-1781), outside
+  the out-dir a `vite build` empties — no post-build `package:hash` ritual is
+  needed before an integration run any more.
 - Live-walk scripts live in `bin/` (e.g. `bin/walk-3.3.cjs`). Run against the
   connected engine; needs a setup-token (above).
 - `composer run package` — produces the distributable ZIP.
@@ -550,7 +549,8 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
 6. VERIFY the ZIP before releasing: version string; required present
    (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
    `dist/public/js/sc-landing.js`, `blocks/*/build/*`,
-   `vendor/autoload.php`, `languages/*.mo`); NOT present (`tests`, `docs`,
+   `vendor/autoload.php`, `languages/*.mo`, `build-hash.txt` at the root);
+   NOT present (`tests`, `docs`, any `*.ts` source,
    `node_modules`, `admin/src`, `dist/client`, dev vendor pkgs). `.zipignore`
    excludes `blocks/node_modules` (583M) — a bloated ZIP means it leaked.
 7. **`gh release create … --repo erkkimarkus/smaily-wordpress-plugin`** — the

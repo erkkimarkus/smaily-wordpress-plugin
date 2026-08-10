@@ -2,6 +2,9 @@ logs/
 vendor/
 node_modules/
 dist/
+# Build stamp (composer run package:hash) — deliberately OUTSIDE dist/, which
+# vite empties on every build. Shipped in the ZIP from disk, never committed.
+build-hash.txt
 coverage/
 .env
 smaily-connect.zip
