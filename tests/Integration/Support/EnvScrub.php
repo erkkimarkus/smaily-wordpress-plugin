@@ -109,6 +109,12 @@ final class EnvScrub {
 			// stale cached values would make re-runnable one-time migrations
 			// (e.g. the PRO-1195 legacy cart drain) silently no-op in tests.
 			\Smaily\Connect\Migration\LegacyCartDrain::DRAINED_OPTION,
+			// Same class of bug, worse symptom (PRO-1943): with the version
+			// stamp still cached, update_option() to a NEW value finds the row
+			// gone (0 rows affected), writes nothing and leaves the cache — so
+			// Bootstrap::maybe_run_upgrade() cannot be re-armed mid-suite and
+			// upgrade-detect tests pass or fail by suite order.
+			\Smaily\Connect\Activation::OPTION_PLUGIN_VERSION,
 		) );
 		foreach ( $keys_to_flush as $key ) {
 			wp_cache_delete( (string) $key, 'options' );

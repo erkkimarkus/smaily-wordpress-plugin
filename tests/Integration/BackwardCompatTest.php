@@ -119,16 +119,23 @@ final class BackwardCompatTest extends TestCase {
 		// PRO-1716 retired the "Force opt-in on automation triggers" setting
 		// and removed every reader; a store that had enabled it kept a truthy
 		// option nothing reads and the merchant can no longer see or change.
-		// The upgrade sweep must clear it (PRO-1897). Driven through
-		// Activation::run() — the routine maybe_run_upgrade() delegates to,
-		// pinned by the two tests above — because EnvScrub leaves a stale
-		// per-key cache on the autoload=false version stamp, so the
-		// upgrade-detect entry point can't be re-armed mid-suite.
+		// The upgrade sweep must clear it (PRO-1897). Driven end-to-end through
+		// the real entry point — a trailing version stamp, then the same
+		// admin_init call a file-overwrite upgrade makes. This used to have to
+		// call Activation::run() directly: EnvScrub left a stale per-key cache
+		// on the autoload=false version stamp, so re-arming the upgrade-detect
+		// mid-suite was impossible (PRO-1943).
 		$retired = 'smly_plus_contact_sync_automation_force_opt_in';
 		update_option( $retired, '1' );
+		update_option( Activation::OPTION_PLUGIN_VERSION, '0.0.0-pre' );
 
-		Activation::run();
+		Bootstrap::instance()->maybe_run_upgrade();
 
+		self::assertSame(
+			(string) SMAILY_CONNECT_VERSION,
+			(string) get_option( Activation::OPTION_PLUGIN_VERSION ),
+			'The upgrade-detect must have re-armed and run — regardless of what ran before it (PRO-1943).'
+		);
 		self::assertFalse(
 			get_option( $retired ),
 			'The retired force-opt-in option must not survive an upgrade run (PRO-1897).'

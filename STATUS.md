@@ -41,13 +41,31 @@ three; `session_id` keeps PRO-1896's deliberately generous bound (the context
 charset, 64 chars) rather than the UUID its producers emit, since nothing has ever
 enforced a shape on it. An off-shape value is OMITTED (never truncated — a trimmed
 token is a plausible-looking wrong value on the §5 wire) with a shape-only
-DebugLog line; the order ships normally and the meta stays on the order. Tests: 1
-new unit case (all three off-shape signals dropped, the order still ships). Gates:
-`npm run ci:strict` **exit=0** (PHPCS 0 errors, PHPStan `[OK] No errors`, PHPUnit
-unit **742/742**, eslint/tsc clean, vitest **282/282**) and `sg docker -c
-"composer run test:integration"` **OK (256 tests, 1 pre-existing skip)**.
-DECISIONS PRO-1942. **No version bump — ships with the next release cut**
-(v3.11.1 is already published)._
+DebugLog line; the order ships normally and the meta stays on the order. Also
+**PRO-1943** (test-harness only): `tests/Integration/Support/EnvScrub.php` flushed
+the per-key object cache for an explicit list that omitted the autoload=false
+`smly_plus_plugin_version` stamp, so after a scrub `get_option()` served the
+pre-scrub value and re-arming `Bootstrap::maybe_run_upgrade()` mid-suite was
+impossible (the row is gone, so `update_option()` writes nothing and leaves the
+cache); `Activation::OPTION_PLUGIN_VERSION` is now on the flush list and
+`BackwardCompatTest` drives the full `maybe_run_upgrade()` path (verified both
+ways: the converted test FAILS on the old EnvScrub in a filtered class run, passes
+with the flush). That work also **explained the 2026-08-10 transient
+`AutomationMarkerPipelineTest` triple failure** — nothing to do with the aborted
+run's DB state: `wp_delete_user()` lives in `wp-admin/includes/user.php`, which no
+front-end request loads, and that class's tearDown reached it only because some
+earlier test in the run happened to pull it in (directly, or via dbDelta's
+`upgrade.php`). Integration suite order is FILESYSTEM order, so any edit that
+reshuffles the directory can move the incidental loader after it and all three
+cases die in tearDown — reproduced exactly while doing this work. Fixed with the
+one-line `require_once` guard its five siblings already carry. Tests: 1 new unit
+case (all three off-shape signals dropped, the order still ships) + the
+BackwardCompat upgrade case above. Gates: `npm run ci:strict` **exit=0** (PHPCS 0
+errors, PHPStan `[OK] No errors`, PHPUnit unit **742/742**, eslint/tsc clean,
+vitest **282/282**) and `sg docker -c "composer run test:integration"` **OK (256
+tests, 1492 assertions, 1 pre-existing skip)** — run twice, stable, dev sandbox
+tenant "Smaily Connect test" restored. DECISIONS PRO-1942. **No version bump —
+ships with the next release cut** (v3.11.1 is already published)._
 
 Prior: 2026-08-10 (**v3.11.1 — PUBLISHED**:
 https://github.com/erkkimarkus/smaily-wordpress-plugin/releases/tag/v3.11.1,

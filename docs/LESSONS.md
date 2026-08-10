@@ -881,6 +881,33 @@ perfectly on the day of the refund and been wrong on the next status change.
    integration test therefore drives a LATER, unrelated sync of the same order
    and asserts the field is still there — that assertion is the whole point.
 
+### 2.25 An integration test that borrows another test's side effects fails by SUITE ORDER — and suite order is filesystem order (PRO-1943, 2026-08-10)
+
+Two harness bugs found together, both of the same shape: a test relying on
+state it did not arrange itself.
+
+1. **A per-key option cache the scrub forgot is worse than a stale value — it
+   makes the option unwritable.** `EnvScrub` LIKE-deletes the `smly_%` rows but
+   flushes per-key caches only for a named list. For an `autoload=false` option
+   left off that list, `get_option()` keeps serving the pre-scrub value AND
+   `update_option()` to a new value finds no row to UPDATE (0 rows affected),
+   writes nothing and returns false — leaving the cache intact. So the option is
+   frozen for the rest of the process. That is why upgrade-detect could only be
+   driven through `Activation::run()` directly: `Bootstrap::maybe_run_upgrade()`
+   could not be re-armed. **Any new autoload=false option goes on the flush
+   list.**
+2. **A missing admin-only function is an ORDER bug, not a flake.**
+   `AutomationMarkerPipelineTest`'s tearDown called `wp_delete_user()`, which
+   lives in `wp-admin/includes/user.php` — never loaded by a front-end request.
+   It worked only because some earlier test in the run pulled that file in
+   (explicitly, or via `dbDelta`'s `upgrade.php`). PHPUnit walks a test directory
+   in FILESYSTEM order, and rewriting a file can move it in that order, so an
+   unrelated edit elsewhere silently relocated the loader and all three cases
+   died in tearDown. It had already been written off once as "DB state left by an
+   aborted run". **If a test needs a WP admin API, `require_once` it (guarded)
+   like the five sibling tests do — and read "works on my run" as unproven until
+   the class passes both alone and inside the suite.**
+
 ## 3. The non-technical lesson: spec errors vs bugs
 
 Several of the biggest fixes **weren't bugs** — they were **spec errors** (ambiguity

@@ -69,6 +69,15 @@ final class AutomationMarkerPipelineTest extends TestCase {
 				$order->delete( true );
 			}
 		}
+		// wp_delete_user() lives in wp-admin/includes/user.php, which nothing in
+		// a front-end request loads — this class used to reach it only because
+		// some earlier test in the run happened to pull it in (directly, or via
+		// dbDelta's upgrade.php). Suite order is filesystem order, so that made
+		// the cleanup — and with it all three cases — fail whenever an edit
+		// reshuffled the files. Load it explicitly, like every sibling does.
+		if ( ! function_exists( 'wp_delete_user' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+		}
 		foreach ( $this->created_users as $user_id ) {
 			wp_delete_user( $user_id );
 		}
