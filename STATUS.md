@@ -26,7 +26,42 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**PRO-1942 — the orders wire now shape-checks all
+_Last updated: 2026-08-10 (**PRO-1781 + PRO-1902 — build-output hygiene and the
+last hardcoded attribution cookie names.** **PRO-1781 (dist hygiene, two
+pre-existing items):** (1) vite's `publicDir` default treated `public/` as a
+static-asset folder and copied it verbatim into `dist/`, so the ZIP shipped the
+raw TypeScript sources of the very bundles it builds (`*.test.ts` included), a
+second copy of `smaily-public.class.php` and the partials/template PHP —
+`publicDir: false` (the copy step serves nothing; no bundle references an asset
+in `public/`) plus a `.zipignore` line for `public/js*`, the counterpart of the
+`admin/src*` exclusion the public side never got. ZIP now carries **zero**
+`*.ts`/`*.tsx`; the readable source a wp.org reviewer would look for stays in
+the bundles' source maps. (2) The build stamp moved from `dist/build-hash.txt`
+to the plugin ROOT `build-hash.txt` — inside the out-dir every vite build wiped
+it and the next integration run failed `BuildHashTest` on a missing build
+artifact rather than on the change under test (three sessions lost a cycle to
+it, two of them today). `package:hash`, `admin/wizard.php`, the test, `.gitignore`
+and the CLAUDE.md notes follow; **the post-build `package:hash` ritual is retired**
+(proven: `npm run build` then `BuildHashTest` green with no regeneration).
+**PRO-1902:** `HookHandler`'s order stamping was the only reader of the four
+attribution cookies still hardcoding their names, while `StorefrontBeacon`,
+`LandingCapture`, `IdentityHookHandler` and `BeaconEndpoint` all resolve them
+from the tenant's engine config — on a tenant with overridden names the cookies
+were written under one name and looked up under another, so **no** order carried
+a rec id, context, visitor token or session id. `ORDER_META_KEYS` becomes
+`ORDER_META_COOKIES` (meta key => config key + shipped default) resolved through
+`RecEngineSettings::config()`; the order META keys are our own schema and are
+unchanged. MiuMjau is on defaults — latent, no live impact. Tests: 1 new unit
+case pinning that tenant-renamed cookies still land on the order (verified it
+fails on the old code). Gates: `npm run ci:strict` **exit=0** (PHPCS 0 errors,
+PHPStan `[OK]`, PHPUnit unit **743/743**, eslint/tsc clean, vitest **282/282**)
+and `sg docker -c "composer run test:integration"` **OK (256 tests, 1492
+assertions, 1 pre-existing skip)**; release ZIP built once and verified (1 145 287
+B, no `*.ts`, `build-hash.txt` at the root, required files present, dev artifacts
+absent) — **not published**. **No version bump — ships with the next release
+cut.**)_
+
+Prior: 2026-08-10 (**PRO-1942 — the orders wire now shape-checks all
 four attribution signals at send time, not just the rec id.**
 `OrderPayloadBuilder` validated `smaily_rec_id` (PRO-1710) and forwarded
 `smaily_visitor_token` / `smaily_rec_ctx` / `session_id` on a bare non-empty
