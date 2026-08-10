@@ -68,6 +68,18 @@ export const DEFAULT_TTL_DAYS: AttributionTtlDays = { visitor: 365, recId: 30, c
 export const REC_ID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /**
+ * The engine's visitor-token shape (`vt_` + alphanumerics) and the campaign
+ * context slug, mirroring `LandingCapture::is_visitor_token()` /
+ * `::is_context()` verbatim. Two writers of the same cookies must accept the
+ * same values (PRO-1896): before this, a crafted landing URL could plant an
+ * arbitrary/oversized value in a 30/365-day cookie here that the strict PHP
+ * writer would have refused — and PRO-1767 newly hands this writer to
+ * browse-OFF stores, whose only writer used to be that strict one.
+ */
+export const VISITOR_TOKEN_PATTERN = /^vt_[A-Za-z0-9]{1,64}$/;
+export const CONTEXT_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+/**
  * First-party cookie write. SameSite=Lax so a campaign param survives the
  * top-level email-link → shop navigation (Lax allows cookies on top-level
  * GET); Secure only on https. Path=/ so the whole storefront sees it.
@@ -98,7 +110,12 @@ export function captureAttributionParams(config: AttributionConfig): boolean {
   const url = new URL(window.location.href);
   const params = url.searchParams;
   const mapping: Array<{ param: string; cookie: string; ttl: number; isValid?: (v: string) => boolean }> = [
-    { param: config.urlParams.visitorToken, cookie: config.cookieNames.visitor, ttl: config.cookieTtlDays.visitor },
+    {
+      param: config.urlParams.visitorToken,
+      cookie: config.cookieNames.visitor,
+      ttl: config.cookieTtlDays.visitor,
+      isValid: (v) => VISITOR_TOKEN_PATTERN.test(v),
+    },
     {
       param: config.urlParams.recId,
       cookie: config.cookieNames.recId,
@@ -108,7 +125,12 @@ export function captureAttributionParams(config: AttributionConfig): boolean {
       // the URL below; it's the cookie write that is refused.
       isValid: (v) => REC_ID_PATTERN.test(v),
     },
-    { param: config.urlParams.context, cookie: config.cookieNames.context, ttl: config.cookieTtlDays.context },
+    {
+      param: config.urlParams.context,
+      cookie: config.cookieNames.context,
+      ttl: config.cookieTtlDays.context,
+      isValid: (v) => CONTEXT_PATTERN.test(v),
+    },
   ];
 
   let captured = false;

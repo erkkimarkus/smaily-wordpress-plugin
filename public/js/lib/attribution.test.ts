@@ -31,11 +31,11 @@ describe('captureAttributionParams (PRO-1767 attribution-only writer)', () => {
   });
 
   it('writes the three attribution cookies and strips the params', () => {
-    window.history.replaceState({}, '', `/landing?smaily_vt=vt1&smaily_rec=${REC_UUID}&smaily_ctx=welcome&keep=1`);
+    window.history.replaceState({}, '', `/landing?smaily_vt=vt_1&smaily_rec=${REC_UUID}&smaily_ctx=welcome&keep=1`);
 
     expect(captureAttributionParams(makeConfig())).toBe(true);
 
-    expect(document.cookie).toContain('smaily_rec_uid=vt1');
+    expect(document.cookie).toContain('smaily_rec_uid=vt_1');
     expect(document.cookie).toContain(`smaily_rec_id=${REC_UUID}`);
     expect(document.cookie).toContain('smaily_rec_ctx=welcome');
     expect(window.location.search).toBe('?keep=1');
@@ -49,6 +49,26 @@ describe('captureAttributionParams (PRO-1767 attribution-only writer)', () => {
     expect(document.cookie).not.toContain('smaily_rec_id=');
     expect(document.cookie).toContain('smaily_rec_ctx=welcome');
     expect(window.location.search).toBe('');
+  });
+
+  it('refuses an off-shape visitor token and context (PRO-1896 — the PHP twin refuses them)', () => {
+    window.history.replaceState({}, '', '/landing?smaily_vt=not-a-token&smaily_ctx=has%20spaces');
+
+    expect(captureAttributionParams(makeConfig())).toBe(false);
+
+    expect(document.cookie).not.toContain('smaily_rec_uid=');
+    expect(document.cookie).not.toContain('smaily_rec_ctx=');
+    expect(window.location.search).toBe('');
+  });
+
+  it('refuses an oversized visitor token and context (>64 chars past the prefix)', () => {
+    const long = 'a'.repeat(65);
+    window.history.replaceState({}, '', `/landing?smaily_vt=vt_${long}&smaily_ctx=${long}`);
+
+    expect(captureAttributionParams(makeConfig())).toBe(false);
+
+    expect(document.cookie).not.toContain('smaily_rec_uid=');
+    expect(document.cookie).not.toContain('smaily_rec_ctx=');
   });
 
   it('writes no session cookie — this bundle only does attribution', () => {

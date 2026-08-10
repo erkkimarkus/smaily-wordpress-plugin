@@ -136,23 +136,23 @@ describe('beacon-core: init', () => {
   });
 
   it('captures campaign URL params on init', () => {
-    window.history.replaceState({}, '', '/landing?smaily_vt=vt9&keep=1');
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt_9&keep=1');
     window.smailyConnectBeacon = makeBoot({ consentOverride: () => true, context: { pageType: 'other' } });
 
     init();
 
-    expect(document.cookie).toContain('smaily_rec_uid=vt9');
+    expect(document.cookie).toContain('smaily_rec_uid=vt_9');
     expect(window.location.search).toBe('?keep=1');
   });
 
   it('captures campaign URL params on init even without consent (PRO-1388), but sends nothing', async () => {
-    window.history.replaceState({}, '', '/landing?smaily_vt=vt9&keep=1');
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt_9&keep=1');
     window.smailyConnectBeacon = makeBoot({ consentOverride: () => false, context: { pageType: 'other' } });
 
     const client = init();
 
     // Attribution cookie written and URL stripped despite no consent.
-    expect(document.cookie).toContain('smaily_rec_uid=vt9');
+    expect(document.cookie).toContain('smaily_rec_uid=vt_9');
     expect(window.location.search).toBe('?keep=1');
     // No session cookie, no send.
     expect(document.cookie).not.toContain('smaily_anon_sid');
@@ -188,13 +188,13 @@ describe('beacon-core: init', () => {
   });
 
   it('a token captured pre-consent from the URL rides later events once consent is granted (PRO-1388)', async () => {
-    window.history.replaceState({}, '', '/landing?smaily_vt=vt-preconsent');
+    window.history.replaceState({}, '', '/landing?smaily_vt=vt_preconsent');
     let consent = false;
     window.smailyConnectBeacon = makeBoot({ consentOverride: () => consent, context: { pageType: 'other' } });
     const client = init();
 
     // Captured immediately, before any consent — no send yet.
-    expect(document.cookie).toContain('smaily_rec_uid=vt-preconsent');
+    expect(document.cookie).toContain('smaily_rec_uid=vt_preconsent');
     await client?.flush();
     expect(fetchMock).not.toHaveBeenCalled();
 
@@ -203,7 +203,7 @@ describe('beacon-core: init', () => {
     document.dispatchEvent(new Event('wp_listen_for_consent_change'));
     client?.track({ event_type: 'cart_add', product_id: '1' });
     await client?.flush();
-    expect(lastEvents(fetchMock)[0]).toMatchObject({ smaily_visitor_token: 'vt-preconsent' });
+    expect(lastEvents(fetchMock)[0]).toMatchObject({ smaily_visitor_token: 'vt_preconsent' });
   });
 
 });
