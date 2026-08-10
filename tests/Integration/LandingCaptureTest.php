@@ -82,7 +82,7 @@ final class LandingCaptureTest extends TestCase {
 		$capture->capture();
 
 		// Names come from the seeded engine config (EnvSeed::fixture_config) and
-		// MUST match what HookHandler::ORDER_META_KEYS reads at checkout.
+		// MUST match what HookHandler::ORDER_META_COOKIES reads at checkout.
 		self::assertSame( self::UUID, $capture->written['smaily_rec_id'] ?? null );
 		self::assertSame( 'vt_8f3k2aBz01', $capture->written['smaily_rec_uid'] ?? null );
 		self::assertSame( 'cart_abandoned', $capture->written['smaily_rec_ctx'] ?? null );

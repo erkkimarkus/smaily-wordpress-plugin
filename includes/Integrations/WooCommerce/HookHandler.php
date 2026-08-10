@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\AutomationMarker;
 use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\ContactReconciler;
@@ -77,11 +78,22 @@ class HookHandler {
 	private const OPTION_WELCOME_ENABLED     = 'smly_plus_welcome_enabled';
 	private const OPTION_FIRST_ORDER_ENABLED = 'smly_plus_first_order_enabled';
 
-	private const ORDER_META_KEYS = array(
-		'_smaily_anon_session_id' => 'smaily_anon_sid',
-		'_smaily_visitor_token'   => 'smaily_rec_uid',
-		'_smaily_rec_id'          => 'smaily_rec_id',
-		'_smaily_rec_ctx'         => 'smaily_rec_ctx',
+	/**
+	 * Order meta key => the engine-config key naming the cookie it is read from,
+	 * plus the default cookie name the engine ships with.
+	 *
+	 * The META keys are our own order schema and are fixed. The COOKIE names are
+	 * tenant configuration: every writer and reader of them — StorefrontBeacon,
+	 * LandingCapture, IdentityHookHandler, BeaconEndpoint — resolves them from
+	 * `RecEngineSettings::config()`, so a tenant with overridden names would
+	 * otherwise have its cookies written under one name and looked up here under
+	 * another, stamping no attribution onto any order at all (PRO-1902).
+	 */
+	private const ORDER_META_COOKIES = array(
+		'_smaily_anon_session_id' => array( 'session_cookie_name', 'smaily_anon_sid' ),
+		'_smaily_visitor_token'   => array( 'tracking_cookie_name', 'smaily_rec_uid' ),
+		'_smaily_rec_id'          => array( 'rec_id_cookie_name', 'smaily_rec_id' ),
+		'_smaily_rec_ctx'         => array( 'context_cookie_name', 'smaily_rec_ctx' ),
 	);
 
 	/**
@@ -119,6 +131,8 @@ class HookHandler {
 	private ?ContactAudience $audience = null;
 
 	private ?ContactSyncMode $mode = null;
+
+	private ?RecEngineSettings $rec_settings = null;
 
 	public function __construct( EventQueue $queue ) {
 		$this->queue = $queue;
@@ -543,6 +557,13 @@ class HookHandler {
 		return $this->mode;
 	}
 
+	private function rec_settings(): RecEngineSettings {
+		if ( $this->rec_settings === null ) {
+			$this->rec_settings = new RecEngineSettings();
+		}
+		return $this->rec_settings;
+	}
+
 	/**
 	 * Turn a user_newsletter transition into a Smaily consent change. Opt-in
 	 * (→1) sends is_unsubscribed=0 (subscribe — an explicit re-grant overrides a
@@ -614,8 +635,16 @@ class HookHandler {
 
 	private function save_attribution_cookies_to_order( \WC_Order $order ): void {
 		$wrote_any = false;
+		$config    = $this->rec_settings()->config();
 
-		foreach ( self::ORDER_META_KEYS as $meta_key => $cookie_name ) {
+		foreach ( self::ORDER_META_COOKIES as $meta_key => $spec ) {
+			list( $config_key, $default_name ) = $spec;
+
+			$cookie_name = isset( $config[ $config_key ] ) ? (string) $config[ $config_key ] : '';
+			if ( '' === $cookie_name ) {
+				$cookie_name = $default_name;
+			}
+
 			if ( ! isset( $_COOKIE[ $cookie_name ] ) ) {
 				continue;
 			}

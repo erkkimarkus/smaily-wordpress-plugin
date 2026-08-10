@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Integrations\WooCommerce\HookHandler;
 use Smaily\Connect\Multilingual\DetectorFactory;
+use Smaily\Connect\Settings\RecEngineSettings;
 use Smaily\Connect\Smaily\ContactReconciler;
 use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\EventQueue;
@@ -474,6 +475,37 @@ final class HookHandlerTest extends TestCase {
 
 		self::assertSame( 'anon-xyz', $order->get_meta( '_smaily_anon_session_id' ) );
 		self::assertSame( 'visitor-abc', $order->get_meta( '_smaily_visitor_token' ) );
+	}
+
+	public function test_tenant_overridden_cookie_names_still_land_on_the_order(): void {
+		// PRO-1902: the cookie names are tenant config (the beacon, LandingCapture
+		// and the identity merge all resolve them from the engine config). A store
+		// whose tenant renamed them must still get attribution stamped — and the
+		// engine's DEFAULT names must not be read on such a store.
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				if ( $key === RecEngineSettings::OPTION_CONFIG ) {
+					return '{"session_cookie_name":"acme_sid","tracking_cookie_name":"acme_vt","rec_id_cookie_name":"acme_rec","context_cookie_name":"acme_ctx"}';
+				}
+				return $default;
+			}
+		);
+
+		$order = $this->fake_order( 100, 'buyer@example.test', 9, 1 );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$_COOKIE['acme_sid']        = 'anon-xyz';
+		$_COOKIE['acme_vt']         = 'visitor-abc';
+		$_COOKIE['acme_rec']        = 'rec-uuid-123';
+		$_COOKIE['acme_ctx']        = 'newsletter';
+		$_COOKIE['smaily_rec_uid']  = 'stale-default-name-value';
+
+		( new HookHandler( $this->queue ) )->on_checkout_order_processed( 100 );
+
+		self::assertSame( 'anon-xyz', $order->get_meta( '_smaily_anon_session_id' ) );
+		self::assertSame( 'visitor-abc', $order->get_meta( '_smaily_visitor_token' ) );
+		self::assertSame( 'rec-uuid-123', $order->get_meta( '_smaily_rec_id' ) );
+		self::assertSame( 'newsletter', $order->get_meta( '_smaily_rec_ctx' ) );
 	}
 
 	public function test_oversized_attribution_cookies_are_not_stamped_onto_the_order(): void {
