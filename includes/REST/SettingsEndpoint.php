@@ -506,7 +506,7 @@ class SettingsEndpoint {
 		// (products/customers/orders fire while is_connected()). The per-domain
 		// sync toggles were removed — only the browse-tracking preference (a
 		// legal-consent gate, opt-in default-off) is persisted here. The four
-		// removed option keys are cleaned up in Activation::cleanup_removed_rec_feature_options().
+		// removed option keys are cleaned up in Activation::cleanup_retired_options().
 		update_option( 'smly_plus_rec_track_browsing', ! empty( $features['trackBrowsing'] ) );
 
 		return $this->success_response();

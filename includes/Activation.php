@@ -53,7 +53,7 @@ final class Activation {
 		self::set_default_options();
 		self::run_migrations();
 		self::drain_legacy_abandoned_carts();
-		self::cleanup_removed_rec_feature_options();
+		self::cleanup_retired_options();
 		self::reencrypt_legacy_secrets();
 		self::migrate_wp_cron_to_action_scheduler();
 		self::schedule_recurring_action_scheduler_jobs();
@@ -147,24 +147,35 @@ final class Activation {
 	}
 
 	/**
-	 * One-time removal of the per-domain rec-engine sync option keys (3.9).
+	 * One-time removal of option keys whose setting has been retired.
 	 *
-	 * `sync_orders` / `sync_customers` / `sync_products` / `track_cart_events`
-	 * were write-only UI toggles with no consumer — the ingest hook handlers
-	 * always gated on is_connected() alone. 3.9 made that the explicit model
-	 * (connect ⇒ sync all; the system decides) and dropped the toggles, so
-	 * these keys are now dead. delete_option() is idempotent (a no-op when the
-	 * key is absent, as on a fresh install that never saved Step-4 settings),
-	 * so this is safe to run on every upgrade-detect. The browse-tracking key
-	 * (smly_plus_rec_track_browsing) is the surviving Step-4 preference and is
-	 * NOT removed.
+	 * The uninstall sweep already catches these by LIKE-prefix, but that only
+	 * runs on delete — an upgraded store keeps the orphan row forever unless
+	 * it is removed here. delete_option() is idempotent (a no-op when the key
+	 * is absent, as on a fresh install that never saved the setting), so this
+	 * is safe to run on every upgrade-detect.
+	 *
+	 * Retired keys:
+	 *
+	 *   - The per-domain rec-engine sync toggles (3.9). `sync_orders` /
+	 *     `sync_customers` / `sync_products` / `track_cart_events` were
+	 *     write-only UI toggles with no consumer — the ingest hook handlers
+	 *     always gated on is_connected() alone. 3.9 made that the explicit
+	 *     model (connect ⇒ sync all; the system decides) and dropped the
+	 *     toggles. The browse-tracking key (smly_plus_rec_track_browsing) is
+	 *     the surviving Step-4 preference and is NOT removed.
+	 *   - "Force opt-in on automation triggers" (PRO-1716). Every reader is
+	 *     gone — AutomationRouter now passes force_opt_in=false
+	 *     unconditionally — so a store that once enabled it kept a truthy
+	 *     option the merchant can no longer see or change (PRO-1897).
 	 */
-	private static function cleanup_removed_rec_feature_options(): void {
+	private static function cleanup_retired_options(): void {
 		$dead_keys = array(
 			'smly_plus_rec_sync_orders',
 			'smly_plus_rec_sync_customers',
 			'smly_plus_rec_sync_products',
 			'smly_plus_rec_track_cart_events',
+			'smly_plus_contact_sync_automation_force_opt_in',
 		);
 		foreach ( $dead_keys as $key ) {
 			delete_option( $key );

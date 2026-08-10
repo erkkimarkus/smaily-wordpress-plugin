@@ -115,6 +115,26 @@ final class BackwardCompatTest extends TestCase {
 		// tearDown forces a full re-migration that recreates it.
 	}
 
+	public function test_upgrade_trigger_deletes_the_retired_force_opt_in_option(): void {
+		// PRO-1716 retired the "Force opt-in on automation triggers" setting
+		// and removed every reader; a store that had enabled it kept a truthy
+		// option nothing reads and the merchant can no longer see or change.
+		// The upgrade sweep must clear it (PRO-1897). Driven through
+		// Activation::run() — the routine maybe_run_upgrade() delegates to,
+		// pinned by the two tests above — because EnvScrub leaves a stale
+		// per-key cache on the autoload=false version stamp, so the
+		// upgrade-detect entry point can't be re-armed mid-suite.
+		$retired = 'smly_plus_contact_sync_automation_force_opt_in';
+		update_option( $retired, '1' );
+
+		Activation::run();
+
+		self::assertFalse(
+			get_option( $retired ),
+			'The retired force-opt-in option must not survive an upgrade run (PRO-1897).'
+		);
+	}
+
 	public function test_legacy_subscriber_sync_is_stripped_after_wizard_finish(): void {
 		if ( ! $this->legacy_sync_present( 'woocommerce_created_customer' ) ) {
 			self::markTestSkipped(

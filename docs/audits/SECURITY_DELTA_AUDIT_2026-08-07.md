@@ -269,6 +269,12 @@ self-inflicted outbound-request amplifier.
    applied as described; DECISIONS PRO-1896.
 2. **Low §2** — delete `smly_plus_contact_sync_automation_force_opt_in` in the
    option-scrub path.
+   **RESOLVED 2026-08-10 (PRO-1897)** — the key joined the retired-option list
+   `Activation::cleanup_retired_options()` (renamed from
+   `cleanup_removed_rec_feature_options()`) deletes on every upgrade-detect, so
+   an upgraded store no longer keeps the orphan row; uninstall + `EnvScrub`
+   already caught it via their `smly_plus_` LIKE-sweeps. Pinned by
+   `BackwardCompatTest::test_upgrade_trigger_deletes_the_retired_force_opt_in_option`.
 3. **Doc hygiene** — `MOCK_DIVERGENCE_AUDIT.md` §3's *header* still carries the
    pre-3.3 `📋 engine-team-reported, ⏳ to verify` marks for orders even though
    the endpoint has been live-walked repeatedly (the §3 body is now correct);
