@@ -23,7 +23,8 @@ phpunit.xml
 # Test coverage output.
 tmp/
 .phpcs-cache
-.claude/
+.claude/*
+!.claude/settings.json
 
 # i18n build (transient: esbuild transpile + make-json use-map)
 _i18n-src/
