@@ -26,7 +26,35 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**PRO-2286 — an upgrading store can verify its
+_Last updated: 2026-09-04 (**PRO-2287 — an upgraded store makes no scheduled
+call to Smaily before the merchant confirms setup.** The PRO-2285 rehearsal
+found the daily `smly_plus_contact_sync` tick running its reconcile +
+contact-refresh against the carried-over legacy credentials on a store whose
+wizard was not finished — while the live checkout/registration path is gated on
+`smly_plus_setup_completed` and the legacy daily mass-send is retired on upgrade
+(F3-53/F3-48.3), leaving the daily tick as the one scheduled outbound caller on
+an unconfirmed store. Decision A (Erkki, 2026-09-03):
+`Bootstrap::on_contact_sync_tick()` now returns early — logging `[smaily-connect
+contact.sync] skipped: setup not completed` — while that option is false, so
+BOTH steps are skipped (no Smaily call, no contact-refresh scheduling) and the
+daily catch-up resumes on the next tick after the wizard is confirmed. The gate
+sits at the tick, NOT inside `ContactReconciler`/`BackfillJob` — those are also
+driven by the wizard's own Backfill UI and REST route, where the merchant has
+explicitly asked for the work. Live syncing is untouched (the legacy hooks own
+it until Finish; `HookHandler::gate_closed()` and the `LegacyHookBridge`
+integration test are unchanged). Proven on the dev wp-env by firing the real AS
+hook: with the option false the debug log carries only the skip line and no
+contacts tick is scheduled; with it true the same call reconciles (a real
+outbound Smaily request) and starts the refresh (`nothing_to_sync`) — the option
+was restored to its prior value. Docs: `docs/MIGRATION.md`'s "contact sync
+continues uninterrupted" is now split into the two truths (live syncing
+continues; the daily catch-up pauses and resumes after the wizard), and the
+"Don't skip the wizard indefinitely" paragraph follows; `docs/site/index.html`'s
+upgrade note says the same in BOTH languages. DECISIONS PRO-2287. Gates: `npm
+run ci:strict` exit 0 (751 unit + 285 JS tests), integration 256 tests OK via
+`sg docker`, dev connection restored to the sandbox tenant.)_
+
+Prior: 2026-09-04 (**PRO-2286 — an upgrading store can verify its
 Smaily connection without retyping the API password.** The wizard's Step 1
 blocked Steps 2-6 until "Test connection" succeeded, and the test endpoint
 rejected an empty password — so a store upgraded from the wordpress.org 2.0.0
@@ -127,23 +155,22 @@ Docs-only; no code, so no gates run.)_
 
 **Next session opens with:**
 
-- **Done this session:** PRO-2277 (CI-built + verified release ZIP), PRO-2280
-  (pre-merge tidy — readme address, the refreshed PR #135 description POSTED,
-  this block), PRO-2281 (working repo = `sendsmaily/main`; docs + runbook
-  repointed), PRO-2285 (2.0.0 → v3 upgrade rehearsal — all six scenarios pass,
-  two findings filed).
-- **(a) PRO-2286 — DONE** (2026-09-04): the connection test reuses the stored
-  password when the field is left empty and the account on screen is still the
-  stored one; MIGRATION.md + the docs site corrected. Human acceptance on a real
-  legacy store still open (criterion 1 was proven live only against a synthetic
-  account with the Smaily hop stubbed).
-- **(b) PRO-2287 — NEXT, decided A** (Erkki, 2026-09-03): gate the daily
-  `smly_plus_contact_sync` tick on `setup_completed` like the live hooks (daily
-  catch-up resumes after wizard confirmation); correct MIGRATION.md.
-- **(c) PRO-2283 gate** (Erkki's one-way door), blocked on (a)+(b) shipping in
-  3.11.2: merge PR #135 → bump 3.11.2 (the bump adds the merchant-language
-  `= 3.11.2 =` changelog block to `readme.txt`, incl. one line for PRO-2286 —
-  readme.txt was deliberately left untouched here) → official-repo release, plain tag
+- **Done this session:** PRO-2286 (stored-password connection test, incl. the
+  simplification pass 78aa625), PRO-2287 (the daily contact-sync tick waits for
+  the wizard). Both rehearsal findings from PRO-2285 are now closed in code.
+  Human acceptance on a real legacy store is still open for PRO-2286 (criterion
+  1 was proven live only against a synthetic account with the Smaily hop
+  stubbed).
+- **(a) PRO-2291 — NEXT:** rewrite `docs/MIGRATION.md` for the real merchant
+  journey (2.0.0 → 3.11.2). PRO-2286 and PRO-2287 corrected the two sentences
+  they made false; the broader rewrite was deliberately left to this issue.
+- **(b) The 3.11.2 bump** after that — the bump adds the merchant-language
+  `= 3.11.2 =` changelog block to `readme.txt`, incl. one line each for PRO-2286
+  and PRO-2287 (readme.txt was deliberately left untouched by both).
+- **Commit trailers:** the four PRO-2286 commits carry AI-attribution trailers
+  by accident; they stay as they are (Erkki's call). No trailers from now on.
+- **(c) PRO-2283 gate** (Erkki's one-way door), blocked on (a)+(b):
+  merge PR #135 → bump 3.11.2 → official-repo release, plain tag
   `3.11.2`, CI attaches the verified ZIP → `./release.sh -u sendsmaily`; then
   update the pilot stores by hand, archive the fork read-only, repoint `origin`.
 - **(d) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +

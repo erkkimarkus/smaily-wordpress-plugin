@@ -23,8 +23,13 @@ with the legacy plugin are important to understand in advance.
   new version replaces the old one.
 - **Your existing data and credentials persist.** Smaily account, subscriber
   sync settings, WooCommerce integration — all continue working.
-- **Contact sync continues uninterrupted** during the upgrade. There's no
-  window where syncing stops.
+- **Live contact sync continues uninterrupted** during the upgrade: a customer
+  who checks out or registers an account is synced to Smaily exactly as before,
+  with no window where that stops.
+- **The daily catch-up sync pauses until you finish the wizard.** The scheduled
+  once-a-day pass that re-syncs existing contacts waits for you to confirm your
+  setup, so an upgraded store makes no scheduled calls to Smaily before you have
+  reviewed the settings. It resumes automatically once the wizard is finished.
 - **A new setup wizard runs the first time you open the plugin in WP-admin**
   after upgrading. The legacy admin pages are hidden, but the underlying data
   is untouched.
@@ -260,12 +265,14 @@ path that the legacy guard recognizes.
 
 ### Don't skip the wizard indefinitely
 
-While the legacy code keeps subscriber syncing alive without the wizard, the
-new code's features (Backfill, recommendation engine integration, new
-abandoned-cart workflow) are **locked** until the wizard finishes. There's no
-penalty for using legacy sync for a few days while you familiarize yourself
-with the new UI — but plan to complete the wizard within a week or two so you
-can take advantage of the new features.
+While the legacy code keeps live subscriber syncing alive without the wizard,
+the new code's features (Backfill, recommendation engine integration, new
+abandoned-cart workflow) are **locked** until the wizard finishes, and the
+daily catch-up sync stays paused. New checkouts and registrations still reach
+Smaily, so using legacy sync for a few days while you familiarize yourself with
+the new UI costs you little — but plan to complete the wizard within a week or
+two so the daily catch-up resumes and you can take advantage of the new
+features.
 
 ### Don't reinstall the legacy plugin separately
 
