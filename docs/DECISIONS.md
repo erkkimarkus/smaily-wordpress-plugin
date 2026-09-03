@@ -5509,6 +5509,47 @@ rehearsal that found it), PRO-1686 (why a failed test needs its own reason),
 PRO-2287 (the other rehearsal finding, the daily sync gate).
 
 
+### PRO-2287 — The daily contact-sync tick waits for the setup wizard (2026-09-04)
+
+**Context:** the PRO-2285 upgrade rehearsal found that a store upgraded from
+2.0.0 makes a real Smaily API call before the merchant has finished the wizard:
+the legacy credentials carry over, and the daily `smly_plus_contact_sync` tick
+ran its reconcile + contact-refresh against them with no gate. The live
+checkout/registration path is gated (`HookHandler::gate_closed()` — the legacy
+hooks own live sync until Finish), and the legacy daily mass-send is retired on
+upgrade by design (F3-53/F3-48.3), so the daily tick was the one scheduled
+outbound caller on an unconfirmed store — and `docs/MIGRATION.md` promised
+"contact sync continues uninterrupted" without saying which sync.
+
+**Decision (Erkki, 2026-09-03):** `Bootstrap::on_contact_sync_tick()` returns
+early — logging `[smaily-connect contact.sync] skipped: setup not completed` —
+while `smly_plus_setup_completed` is false, the same option the live hooks read.
+Both steps are skipped, so no Smaily call and no contact-refresh scheduling
+happen. The daily catch-up resumes on the next tick after the wizard is
+confirmed. `docs/MIGRATION.md` and the merchant docs site now say exactly that:
+live syncing continues through the upgrade, the daily catch-up resumes after
+setup is confirmed.
+
+**Rationale:** the gate belongs at the tick, not inside `ContactReconciler` or
+`BackfillJob` — both are also driven by the wizard's own Backfill UI and the
+REST route, where the merchant has explicitly asked for the work. An upgraded
+store should make no scheduled outbound call until its operator has seen and
+confirmed the settings that call is made under; that is the same promise Step 1
+makes about credentials (PRO-2286).
+
+**Alternatives considered:** (b) keep the daily tick running on the carried-over
+credentials — rejected: it syncs on settings the merchant has not reviewed and
+contradicts the "legacy owns sync until Finish" split; (c) bridge the legacy
+daily catch-up for the window — rejected: that is exactly the F3-47 site-locale
+language clobber F3-48.3 retired, and it would resurrect a retired code path for
+a window measured in days.
+
+**Relationships:** F3-48.3 (the tick stopped bridging the legacy mass-send),
+F3-53 (why a retired legacy cron must find nothing to fire), PRO-2285 (the
+rehearsal that found it), PRO-2286 (the other rehearsal finding), P1 #1 /
+`HookHandler::gate_closed()` (the live-path gate this mirrors).
+
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

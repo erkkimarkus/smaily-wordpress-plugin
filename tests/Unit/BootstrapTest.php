@@ -64,9 +64,12 @@ final class BootstrapTest extends TestCase {
 		// swallows the missing-connection error and the refresh schedule guards
 		// on as_schedule_single_action being absent in the unit context.
 		Actions\expectDone( 'smaily_connect_cron_sync_subscribers' )->never();
+		Functions\when( 'get_option' )->justReturn( true );
 
 		$creds = $this->createMock( Credentials::class );
-		$creds->method( 'get' )->willReturn( null );
+		// Reconcile builds the Smaily client, so the credentials are read —
+		// this is the seam that tells "the tick ran" from "the tick skipped".
+		$creds->expects( self::atLeastOnce() )->method( 'get' )->willReturn( null );
 
 		$bs = Bootstrap::instance();
 		$bs->set_credentials( $creds );
@@ -74,6 +77,29 @@ final class BootstrapTest extends TestCase {
 		$bs->on_contact_sync_tick();
 
 		// Reached here without throwing on the unconfigured connection.
+		$this->addToAssertionCount( 1 );
+	}
+
+	public function test_contact_sync_tick_waits_for_the_setup_wizard(): void {
+		// PRO-2287: an upgraded 2.0.0 store carries working legacy credentials,
+		// so without this gate the daily tick called Smaily before the merchant
+		// had confirmed setup. Neither step may run: no Smaily client is built
+		// (credentials untouched) and no contact-refresh tick is scheduled.
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = null ) {
+				return $key === 'smly_plus_setup_completed' ? false : $default;
+			}
+		);
+		Functions\expect( 'as_schedule_single_action' )->never();
+
+		$creds = $this->createMock( Credentials::class );
+		$creds->expects( self::never() )->method( 'get' );
+
+		$bs = Bootstrap::instance();
+		$bs->set_credentials( $creds );
+
+		$bs->on_contact_sync_tick();
+
 		$this->addToAssertionCount( 1 );
 	}
 

@@ -362,8 +362,21 @@ final class Bootstrap {
 	 * and (2) drives a mode-aware, resolver-correct contact refresh (the
 	 * audience-filtered BackfillJob from F3-48.1/.2). The abandoned-cart bridge
 	 * (on_abandoned_cart_tick) is unaffected.
+	 *
+	 * PRO-2287: both steps wait for the setup wizard, the same gate the live
+	 * checkout/registration sync uses (HookHandler::gate_closed). On a store
+	 * upgraded from 2.0.0 the legacy credentials carry over, so before the
+	 * wizard is confirmed this tick would otherwise call Smaily on a store the
+	 * merchant has not yet set up. Live syncing is unaffected — the legacy
+	 * hooks own it until Finish — and the daily catch-up resumes on the next
+	 * tick after the wizard is confirmed.
 	 */
 	public function on_contact_sync_tick(): void {
+		if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect contact.sync] skipped: setup not completed' );
+			return;
+		}
+
 		$this->run_contact_reconcile();
 		$this->maybe_start_contact_refresh();
 	}
