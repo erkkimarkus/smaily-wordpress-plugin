@@ -6,7 +6,7 @@ Requires at least: 6.6
 Tested up to: 7.0
 WC requires at least: 6.9
 WC tested up to: 10.7
-Stable tag: 3.11.1
+Stable tag: 3.11.2
 License: GPLv3 or later
 
 Email marketing, automations and personalized product recommendations for WordPress, WooCommerce, Contact Form 7 and Elementor — powered by Smaily.
@@ -89,6 +89,14 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 == Changelog ==
 
 Only releases from 3.0.0 onward are listed here. The complete version history, including the 1.x and 2.x releases, is published at https://github.com/sendsmaily/smaily-wordpress-plugin/releases
+
+= 3.11.2 =
+* Fixed: on a store where Smaily Campaign Intelligence uses its own attribution cookie names, orders now carry their recommendation attribution again — the checkout was looking those cookies up under the default names only, so no order recorded which recommendation it came from.
+* Fixed: a malformed recommendation attribution value (visitor token, campaign context, session) is now left off the order sent to Smaily Campaign Intelligence instead of being sent as if it were real attribution.
+* Improved: the setup wizard can now test the connection of a Smaily account your store already has stored, without you retyping its API password.
+* Improved: on a store upgrading from an older plugin version, the daily contact catch-up sync now waits until the setup wizard has been confirmed, so it cannot run against a half-configured store. Live contact syncing (signups, profile changes, checkout opt-in) keeps working throughout.
+* Improved: the release package is now built and verified automatically for every release, and no longer carries developer-only source maps or TypeScript sources.
+* Improved: the migration guide now describes the 2.0.0 to 3.11.2 upgrade merchants actually take through the WordPress updater.
 
 = 3.11.1 =
 * Fixed: the order-completion signal sent to Smaily Campaign Intelligence no longer depends on the shopper keeping the order-received page open. It is sent as soon as the order is confirmed, so completed orders are no longer under-counted when recommendations are computed.
@@ -217,6 +225,9 @@ First general-availability release, graduating the 2.1.0-beta line. Existing set
 * Hardening: WordPress.org Plugin Check pass (sanitization, escaping, prefixing, ABSPATH guards); editor blocks updated to Block API v3 for the WordPress 7.0 iframe editor; diagnostics gated behind WP_DEBUG.
 
 == Upgrade Notice ==
+
+= 3.11.2 =
+This is the major version 3 rewrite. After updating, open Smaily Connect in the admin menu and confirm your settings in the setup wizard. Live contact syncing keeps working meanwhile; the daily catch-up sync resumes once the wizard is confirmed. See the migration guide for the full upgrade path.
 
 = 3.11.1 =
 Fixes only. The order-completion signal for Campaign Intelligence is now sent as soon as the order is confirmed, instead of depending on the shopper keeping the page open; email-link attribution values are validated before being stored; a retired setting leaves no row behind. Safe update.

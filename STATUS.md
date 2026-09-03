@@ -26,7 +26,23 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**PRO-2291 — the migration guide now describes the
+_Last updated: 2026-09-04 (**3.11.2 version bump — the tree is release-ready;
+nothing is tagged.** Version `3.11.2` in the four places plus the three test
+pins (`smaily-connect.php` header + both constants, `package.json`,
+`readme.txt` Stable tag, `tests/Unit/ConstantsTest.php`, `tests/bootstrap.php`,
+`tests/phpstan-bootstrap.php`) — the same file set the 3.11.1 bump touched.
+`readme.txt` gains a merchant-language `= 3.11.2 =` changelog block (the two
+attribution fixes, PRO-2286's stored-password connection test, PRO-2287's
+wizard-gated daily catch-up, the CI-built and source-map-free package,
+PRO-2291's rewritten migration guide) and a 296-character Upgrade Notice
+written for a 2.0.0 store taking this through the wordpress.org updater.
+Gates: `npm run ci:strict` exit 0; integration suite green; and the full local
+ZIP pre-flight (admin + landing bundles, blocks, i18n, `--no-dev` vendor,
+`composer run package`) verified with `bin/verify-release-zip.sh
+smaily-connect.zip 3.11.2` before the ZIP was deleted — the released asset is
+still CI's, this only proves the tree builds it.)_
+
+Prior: 2026-09-04 (**PRO-2291 — the migration guide now describes the
 upgrade merchants actually take.** `docs/MIGRATION.md` was still a 1.x → 2.0
 document: it named `smaily-connect-2.0.0.zip` as the NEW package, told the
 merchant to upload it by hand and to "verify Smaily Connect shows version
@@ -189,22 +205,20 @@ Docs-only; no code, so no gates run.)_
 
 **Next session opens with:**
 
-- **Done this session:** PRO-2286 (stored-password connection test, incl. the
-  simplification pass 78aa625), PRO-2287 (the daily contact-sync tick waits for
-  the wizard), PRO-2291 (`docs/MIGRATION.md` rewritten for the 2.0.0 → 3.11.2
-  path). Both rehearsal findings from PRO-2285 are now closed in code.
-  Human acceptance on a real legacy store is still open for PRO-2286 (criterion
+- **(a) The 3.11.2 bump — DONE** (this file's own commit): versions, test pins,
+  `readme.txt` changelog + Upgrade Notice; `ci:strict`, the integration suite and
+  a full local ZIP pre-flight (`verify-release-zip.sh … 3.11.2`) all green.
+  Nothing tagged, nothing released, remotes untouched.
+- **(b) PRO-2283 gate — NEXT, and it is Erkki's** (one-way door): merge PR #135 →
+  `gh release create 3.11.2 --repo sendsmaily/smaily-wordpress-plugin --target
+  main` (plain tag, no `v`, no local ZIP argument) → CI attaches the verified ZIP
+  → `./release.sh -u sendsmaily`; then update the pilot stores by hand, archive
+  the fork read-only, repoint `origin` at the official repo.
+- **PRO-2295 decided:** no rollback rehearsal — `docs/MIGRATION.md` keeps its
+  honest hedge that the 3.11.2 → 2.0.0 direction was not rehearsed.
+- Human acceptance on a real legacy store is still open for PRO-2286 (criterion
   1 was proven live only against a synthetic account with the Smaily hop
-  stubbed).
-- **(a) The 3.11.2 bump — NEXT:** the bump adds the merchant-language
-  `= 3.11.2 =` changelog block to `readme.txt`, incl. one line each for PRO-2286
-  and PRO-2287 (readme.txt was deliberately left untouched by both).
-- **Commit trailers:** the four PRO-2286 commits carry AI-attribution trailers
-  by accident; they stay as they are (Erkki's call). No trailers from now on.
-- **(b) PRO-2283 gate** (Erkki's one-way door), blocked on (a):
-  merge PR #135 → bump 3.11.2 → official-repo release, plain tag
-  `3.11.2`, CI attaches the verified ZIP → `./release.sh -u sendsmaily`; then
-  update the pilot stores by hand, archive the fork read-only, repoint `origin`.
+  stubbed). No AI-attribution trailers on commits from here on.
 - **(c) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +
   PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian admin-strings
   spot-check (the ZIP's `.mo` is host-built — PRO-2277).
