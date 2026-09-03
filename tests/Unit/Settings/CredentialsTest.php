@@ -154,4 +154,14 @@ final class CredentialsTest extends TestCase {
 		self::assertStringNotContainsString( '..', (string) $captured_key );
 		self::assertStringNotContainsString( '/', (string) $captured_key );
 	}
+
+	public function test_matches_is_true_only_for_the_account_the_set_was_stored_for(): void {
+		// PRO-2286: the stored password may only vouch for its own account.
+		$set = new CredentialSet( 'demo', 'alice', 's3cret' );
+
+		self::assertTrue( $set->matches( 'demo', 'alice' ) );
+		self::assertFalse( $set->matches( 'other', 'alice' ), 'A different subdomain is a different account.' );
+		self::assertFalse( $set->matches( 'demo', 'bob' ), 'A different username is a different account.' );
+		self::assertFalse( $set->matches( 'Demo', 'alice' ), 'Comparison is exact, not case-folded.' );
+	}
 }

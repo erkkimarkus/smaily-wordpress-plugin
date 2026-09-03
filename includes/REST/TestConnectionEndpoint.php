@@ -104,7 +104,22 @@ class TestConnectionEndpoint {
 		$password  = (string) $request->get_param( 'password' );
 
 		if ( $password === '' ) {
-			$password = $this->stored_password_for( $subdomain, $username );
+			// PRO-2286: a store upgrading from the wordpress.org 2.0.0
+			// package carries working credentials, but the wizard never
+			// puts the password in the browser — so the merchant had to
+			// retype a secret they may not have any more just to get past
+			// Step 1. The save path already treats an empty password as
+			// "keep the stored one"; the test now does the same.
+			//
+			// Scoped to an exact subdomain + username match on purpose: a
+			// merchant typing a DIFFERENT account into the fields is
+			// testing that account, and must not be told it works because
+			// the old one still does.
+			$stored = $this->stored_credentials();
+
+			if ( $stored !== null && $stored->matches( $subdomain, $username ) ) {
+				$password = $stored->password;
+			}
 		}
 
 		if ( $subdomain === '' || $username === '' || $password === '' ) {
@@ -148,32 +163,6 @@ class TestConnectionEndpoint {
 		}
 
 		return __( 'Smaily did not accept those credentials.', 'smaily-connect' );
-	}
-
-	/**
-	 * The stored password for the submitted account, or '' when there is
-	 * none to reuse.
-	 *
-	 * PRO-2286: a store upgrading from the wordpress.org 2.0.0 package
-	 * carries working credentials, but the wizard never puts the password
-	 * in the browser — so the merchant had to retype a secret they may
-	 * not have any more just to get past Step 1. The save path already
-	 * treats an empty password as "keep the stored one"; the test now
-	 * does the same.
-	 *
-	 * Scoped to an exact subdomain + username match on purpose: a
-	 * merchant typing a DIFFERENT account into the fields is testing
-	 * that account, and must not be told it works because the old one
-	 * still does.
-	 */
-	private function stored_password_for( string $subdomain, string $username ): string {
-		$stored = $this->stored_credentials();
-
-		if ( $stored === null || $stored->subdomain !== $subdomain || $stored->username !== $username ) {
-			return '';
-		}
-
-		return $stored->password;
 	}
 
 	/**

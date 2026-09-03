@@ -87,18 +87,14 @@ smly_run_docker() {
 # returns 1 when wp-env is not running.
 smly_find_cli_container() {
   local candidates candidate
-  candidates=$(smly_run_docker "docker ps --filter name=wp-env- --filter name=-wordpress-1 --format {{.Names}}" 2>/dev/null || true)
+  candidates=$(smly_run_docker "docker ps --filter name=wp-env- --format {{.Names}}" 2>/dev/null || true)
   for candidate in $candidates; do
-    # docker ORs repeated --filter name= values, so the list above also
-    # carries the mysql/cli sidecars in whatever order docker lists them.
-    # Keep only the WordPress containers, or the name rewrite below is a
-    # no-op and we hand back e.g. …-tests-mysql-1 (which has no php).
-    if [[ "$candidate" != *-wordpress-1 ]]; then
-      continue
-    fi
-    # Skip the tests-wordpress container — wp-env spawns a separate
-    # instance for its own automated tests; we want the dev one.
-    if [[ "$candidate" == *-tests-wordpress-1 ]]; then
+    # The docker filter only narrows to wp-env, so the list also carries the
+    # mysql/cli sidecars: keep only the WordPress containers (or the name
+    # rewrite below is a no-op and we hand back e.g. …-tests-mysql-1, which
+    # has no php), and skip the tests-wordpress one — wp-env spawns a
+    # separate instance for its own automated tests; we want the dev one.
+    if [[ "$candidate" != *-wordpress-1 || "$candidate" == *-tests-wordpress-1 ]]; then
       continue
     fi
     # We exec into the cli sidecar (which shares the WordPress volume

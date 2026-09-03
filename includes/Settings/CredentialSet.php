@@ -38,4 +38,14 @@ final class CredentialSet {
 	public function is_complete(): bool {
 		return $this->subdomain !== '' && $this->username !== '' && $this->password !== '';
 	}
+
+	/**
+	 * True when this set belongs to the given account — i.e. both the
+	 * subdomain and the username are the ones stored here. Callers reusing
+	 * a stored password check this first, so a set never vouches for an
+	 * account it was not stored for (PRO-2286).
+	 */
+	public function matches( string $subdomain, string $username ): bool {
+		return $this->subdomain === $subdomain && $this->username === $username;
+	}
 }

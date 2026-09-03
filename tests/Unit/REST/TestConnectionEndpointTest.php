@@ -200,13 +200,19 @@ final class TestConnectionEndpointTest extends TestCase {
 		$request->set_param( 'username', 'alice' );
 		$request->set_param( 'password', '' );
 
-		$endpoint = $this->endpoint_that_refuses_to_build_a_client(
+		$endpoint = $this->endpoint_with_client(
+			RefusalReason::OK,
 			new CredentialSet( 'demo', 'alice', 'stored-secret' )
 		);
 		$response = $endpoint->handle( $request );
 
 		self::assertFalse( $response->get_data()['connected'] );
 		self::assertStringContainsString( 'required', (string) $response->get_data()['error'] );
+		self::assertSame(
+			'',
+			$endpoint->last_password_used(),
+			'No Client may be built for a mismatching account — the recorder stays untouched.'
+		);
 	}
 
 	public function test_handle_asks_for_the_password_when_nothing_is_stored(): void {
@@ -229,21 +235,6 @@ final class TestConnectionEndpointTest extends TestCase {
 
 		self::assertFalse( $response->get_data()['connected'] );
 		self::assertStringContainsString( 'required', (string) $response->get_data()['error'] );
-	}
-
-	private function endpoint_that_refuses_to_build_a_client( CredentialSet $stored ): TestConnectionEndpoint {
-		return new class( $stored ) extends TestConnectionEndpoint {
-			private CredentialSet $stored;
-			public function __construct( CredentialSet $stored ) {
-				$this->stored = $stored;
-			}
-			protected function stored_credentials(): ?CredentialSet {
-				return $this->stored;
-			}
-			protected function build_client( string $subdomain, string $username, string $password ): Client {
-				throw new \RuntimeException( 'Client must not be built for a mismatching account' );
-			}
-		};
 	}
 
 	private function endpoint_with_client( string $connection_result, ?CredentialSet $stored = null ): TestConnectionEndpoint {

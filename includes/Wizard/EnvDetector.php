@@ -422,13 +422,8 @@ class EnvDetector {
 			// it to render the compact "✓ Connected" view instead of
 			// forcing a password re-entry on every wizard pass.
 			'smailyConnected'               => (bool) get_option( 'smly_plus_default_connection_verified', false ),
-			// PRO-2286 — a store upgraded from the wordpress.org 2.0.0
-			// package has working credentials but was never marked
-			// verified by new code, so smailyConnected above is false and
-			// the merchant lands on the password field. This boolean tells
-			// the wizard the server still holds a usable password, so
-			// "Test connection" can run without one. The VALUE never
-			// leaves the server — only this flag.
+			// See WizardState.smailyHasStoredPassword (PRO-2286). The VALUE
+			// never leaves the server — only this flag.
 			'smailyHasStoredPassword'       => $set !== null && $set->is_complete(),
 			// Sub-PR 2.H.18 — true once Step 6 Finish ran. The wizard
 			// uses this to know whether the merchant has completed at

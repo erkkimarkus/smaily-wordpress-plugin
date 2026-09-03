@@ -71,9 +71,9 @@ export interface BootPayload {
      */
     smailyConnected: boolean;
     /**
-     * True when the server still holds a usable password for the default
-     * account (PRO-2286). Optional for payload compatibility — an old
-     * cached bundle / payload pair must not crash hydrate.
+     * See WizardState.smailyHasStoredPassword (PRO-2286). Optional for
+     * payload compatibility — an old cached bundle / payload pair must
+     * not crash hydrate.
      */
     smailyHasStoredPassword?: boolean;
     /** True once the merchant clicked Finish on Step 6 (sub-PR 2.H.18). */
