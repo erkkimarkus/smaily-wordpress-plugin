@@ -89,6 +89,13 @@ smly_find_cli_container() {
   local candidates candidate
   candidates=$(smly_run_docker "docker ps --filter name=wp-env- --filter name=-wordpress-1 --format {{.Names}}" 2>/dev/null || true)
   for candidate in $candidates; do
+    # docker ORs repeated --filter name= values, so the list above also
+    # carries the mysql/cli sidecars in whatever order docker lists them.
+    # Keep only the WordPress containers, or the name rewrite below is a
+    # no-op and we hand back e.g. …-tests-mysql-1 (which has no php).
+    if [[ "$candidate" != *-wordpress-1 ]]; then
+      continue
+    fi
     # Skip the tests-wordpress container — wp-env spawns a separate
     # instance for its own automated tests; we want the dev one.
     if [[ "$candidate" == *-tests-wordpress-1 ]]; then
