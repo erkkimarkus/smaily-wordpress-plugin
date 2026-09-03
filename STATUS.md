@@ -282,18 +282,27 @@ Docs-only; no code, so no gates run.)_
   `readme.txt` changelog + Upgrade Notice; `ci:strict`, the integration suite and
   a full local ZIP pre-flight (`verify-release-zip.sh … 3.11.2`) all green.
   Nothing tagged, nothing released, remotes untouched.
-- **(b) PRO-2283 gate — NEXT, and it is Erkki's** (one-way door): merge PR #135 →
-  `gh release create 3.11.2 --repo sendsmaily/smaily-wordpress-plugin --target
-  main` (plain tag, no `v`, no local ZIP argument) → CI attaches the verified ZIP
-  → `./release.sh -u sendsmaily`; then update the pilot stores by hand and
-  archive the fork read-only. `origin` ALREADY points at the official repo,
-  whose `main` is protected — until PR #135 merges, work still lands on the fork
-  (`git push https://github.com/erkkimarkus/smaily-wordpress-plugin.git
-  main:main`), which is that PR's head.
-- **PRO-2292 done** (this file's commit): the setup-completed flag now reads
-  through `SetupState::completed()`. Refactor only, no behaviour change; in the
-  fork = PR #135's head, so it lands in 3.11.2. The release gate is unchanged —
-  it still waits on (b).
+- **(b) The ONE blocker for 3.11.2 is an approving review on PR #135 from a
+  sendsmaily admin** — asked of Kait 2026-09-03 (PRO-2283 + a review request on
+  the PR). A direct push to the official `main` was REJECTED by its branch rules
+  (no merge commits — ours is the 2026-08-04 upstream merge `4a3d979` — and one
+  approving review required); the repo allows **squash-merge only**, and Erkki's
+  decision is squash + Kait's approval, with the full history staying in the
+  archived fork. `origin` already points at the official repo, so until the merge
+  lands workers push to the fork = PR #135's head (`git push
+  https://github.com/erkkimarkus/smaily-wordpress-plugin.git main:main`).
+- **(b2) After approval, in order** (Erkki's, one-way door): squash-merge PR #135
+  → reset local `main` to `origin/main` → `gh release create 3.11.2 --repo
+  sendsmaily/smaily-wordpress-plugin --target main --notes-file
+  ~/.local/state/smaily-connect/release-notes-3.11.2.md` (plain tag, no `v`, no
+  local ZIP argument) → CI attaches the verified ZIP → verify it →
+  `./release.sh -u sendsmaily` (**install SVN first**) → update the pilot stores
+  by hand → archive the fork read-only.
+- **Done this session, all landing in 3.11.2:** PRO-2292 (the setup-completed
+  flag reads through `SetupState::completed()`; refactor only), PRO-2298 (the
+  wizard's Campaign Intelligence copy — the ET rendered in a browser is still
+  human acceptance, see (d)) and PRO-2288 (the POT slug pin + catalog refresh).
+  None of them moves the gate; it is (b).
 - **PRO-2295 decided:** no rollback rehearsal — `docs/MIGRATION.md` keeps its
   honest hedge that the 3.11.2 → 2.0.0 direction was not rehearsed.
 - Human acceptance on a real legacy store is still open for PRO-2286 (criterion
@@ -307,8 +316,8 @@ Docs-only; no code, so no gates run.)_
   the only thing left on it is Erkki's proofread of the Estonian paragraphs
   before the release.
 - **Open question:** PRO-1878 awaits the engine team's answer (since 2026-08-10).
-  **Low backlog filed today:** PRO-2279 (Actions majors), PRO-2282 (developer
-  README), PRO-2288 (POT slug on host builds).
+  **Low backlog still open:** PRO-2279 (Actions majors), PRO-2282 (developer
+  README).
 
 Prior: 2026-09-03 (**PRO-2280 — pre-merge tidy ahead of PR #135.**
 Three things go stale the moment the upstream merge lands, fixed now. (1)
