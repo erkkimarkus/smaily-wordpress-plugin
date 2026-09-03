@@ -11,8 +11,10 @@ each sub-PR, just compressed to ~60 seconds via Docker.
 - Docker daemon running (`docker info` returns successfully).
 - Node 22 + npm available on the host (CI version — matches the
   package-lock.json resolution).
-- `npx wp-env` available (no global install required — `npx` downloads
-  the package on first run).
+- `npx @wordpress/env` available (no global install required — `npx`
+  downloads the package on first run). Use the full package name: the bare
+  `npx wp-env` alias only prints a deprecation notice and exits 0 without
+  starting anything.
 
 ## One-time setup
 
@@ -29,7 +31,7 @@ plugin throws a fatal on activation (Composer autoload missing).
 ## Start the environment
 
 ```bash
-npx wp-env start
+npx @wordpress/env start
 ```
 
 First run pulls the WordPress core image, the PHP 8.3 base, the
@@ -146,8 +148,8 @@ should redirect to `?page=smaily-connect-wizard`. The previously-misleading
 ## Tear-down
 
 ```bash
-npx wp-env stop          # keeps volumes, restart with `start` later
-npx wp-env destroy       # full reset, wipes the wp_options table too
+npx @wordpress/env stop      # keeps volumes, restart with `start` later
+npx @wordpress/env destroy   # full reset, wipes the wp_options table too
 ```
 
 ## Known limitations (Phase 2 scope)

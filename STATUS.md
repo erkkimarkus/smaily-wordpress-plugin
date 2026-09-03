@@ -26,7 +26,48 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-03 (**PRO-2281 — the developer docs and the release
+_Last updated: 2026-09-03 (**PRO-2285 — the wordpress.org upgrade path was
+rehearsed end to end: real 2.0.0 package → the v3 package built from `main`.**
+A throwaway wp-env (WP 7.0 / PHP 8.3 / WC 11.1, its own ports, the repo NOT
+mapped in) ran the directory's real `smaily-connect` 2.0.0, configured as a
+legacy merchant would be (synthetic credentials, subscriber sync on with
+optional fields, checkout opt-in on, abandoned cart on with a 45-min cutoff,
+RSS values, a product + a customer + one un-sent legacy cart row, all three
+legacy WP-Cron events armed), then took `wp plugin install <zip> --force` —
+the wordpress.org updater's effective path — onto the 3.11.1 ZIP built with the
+runbook sequence and passed by `bin/verify-release-zip.sh`. **All six acceptance
+criteria passed**: no fatal (the only debug.log lines are the plugin's own audit
+/ drain logs), `smly_plus_plugin_version=3.11.1`; every legacy option kept its
+2.0.0 value and is read by the new code (`ContactSyncMode::sync_enabled()`
+true, `effective_selection()` = the three optional fields, normalised cart
+status, cutoff 45), and the credential blob was silently re-encrypted CBC →
+`smy2:` GCM and still decrypts; all three legacy WP-Cron events cleared with
+the audit logged and the twelve `smly_*` recurring AS actions armed; the legacy
+`admin.php?page=smaily-connect` surface is gone (403) while the wizard renders
+200 and Settings redirects to it; the legacy abandoned-cart table survived
+untouched and the new tables came up at schema version 10, with the one-time
+legacy-cart drain moving the un-sent row into `smly_plus_cart_session`;
+deactivate → reactivate (and a WooCommerce reactivation — the F3-53 scar)
+duplicated no AS row, re-ran no one-time migration and resurrected no legacy
+cron. **Two merchant-visible findings, filed as their own issues, no plugin
+code touched:** (1) the wizard's Step-1 "already connected" shortcut cannot fire
+on an upgraded legacy store — `smly_plus_default_connection_verified` is only
+ever written by a new-code save, so `smailyConnected` hydrates false and the
+merchant must retype the Smaily API password (a hard gate: Steps 2–6 stay
+locked until Test connection succeeds, and `TestConnectionEndpoint` rejects an
+empty password), which `docs/MIGRATION.md` still describes as "pre-filled; just
+verify and continue"; (2) before the wizard is finished the daily
+`smly_plus_contact_sync` tick already runs the new reconcile + contact-refresh
+against the carried-over legacy credentials (observed: an outbound Smaily API
+call, then `nothing_to_sync` under the default consent audience), while the
+legacy daily mass-send is retired by design (F3-48.3) — so the "sync continues
+uninterrupted" promise in `docs/MIGRATION.md` needs re-stating. Repo change:
+`TESTING.md`'s wp-env commands corrected to `npx @wordpress/env …` (the bare
+`npx wp-env` alias was confirmed live to print a deprecation notice and exit
+without starting — README and DEVELOPER.md already said so). The throwaway env
+was destroyed; the repo's own wp-env containers were never started.)_
+
+Prior: 2026-09-03 (**PRO-2281 — the developer docs and the release
 runbook now name the official repository.** Erkki's decision today: once PR #135
 merges, `sendsmaily/smaily-wordpress-plugin`'s `main` IS the working repository
 and the fork is archived read-only as history; releases are cut there under a
@@ -51,8 +92,13 @@ Docs-only; no code, so no gates run.)_
 
 - **Done this session:** PRO-2277 (the release workflow now builds *and verifies*
   the shippable ZIP), PRO-2280 (pre-merge tidy — readme address, the refreshed
-  PR #135 description drafted for Erkki's nod) and PRO-2281 (the developer docs
-  and the release runbook now name the official repository as the working one).
+  PR #135 description drafted for Erkki's nod), PRO-2281 (the developer docs
+  and the release runbook now name the official repository as the working one)
+  and PRO-2285 (the 2.0.0 → v3 upgrade rehearsal — six of six acceptance
+  criteria passed; two merchant-visible findings pending as their own issues:
+  the forced Smaily password re-entry in the wizard's Step 1, and the daily
+  contact-sync tick running before the wizard is finished — both also make
+  `docs/MIGRATION.md` inaccurate).
 - **(a) Erkki, in this order:** merge PR #135 (after the nod on the refreshed
   description) → bump to a **fresh 3.11.2** (main has behaviour changes since the
   3.11.1 tag — not a re-tag) → GitHub release on
