@@ -519,14 +519,24 @@ WRONG for this, so use **`bin/build-i18n.sh`** (it needs the wp-env container):
   (`update-po` preserves `msgstr`). Verify a real render with the Playwright check
   (set the dev site to a locale, confirm `wp.i18n.__()` returns the translation).
 
-### Cutting a release ZIP + GH release (the full local sequence)
+### Cutting a release ZIP + GH release (official repo; local build = the reference)
+**A release is cut in the official repository `sendsmaily/smaily-wordpress-plugin`
+and the release ZIP is built by CI there — not on your machine** (PRO-2281,
+2026-09-03: after the PR #135 merge the official `main` IS the working
+repository; the fork `erkkimarkus/smaily-wordpress-plugin` is archived
+read-only history). Your working checkout's `origin` should therefore be
+`sendsmaily/smaily-wordpress-plugin` — check with `git remote -v` before
+pushing a bump commit; if `origin` is still the fork, fix the remote (that is a
+one-time human action, not something a task changes silently).
+
 `composer run package` ALONE is not a release — it rsync+zips the working tree
 but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,
 `blocks/*/build/` are gitignored. **Since PRO-2277 `release.yml` runs this whole
-sequence in CI** (see the note right below), so on the official repo the CI ZIP
-is the authoritative one; on this fork the local sequence below is still how a
-ZIP is cut, and it stays the reference the CI build is checked against. Full
-sequence (verified 2026-06-14, v2.1.0-beta.3-rc.1):
+sequence in CI**, and that CI ZIP is the artifact merchants get. Steps 1–6 below
+stay documented because they are how you REPRODUCE or COMPARE a ZIP locally (a
+packaging bug, a PCP run against the built ZIP, a pre-flight before tagging) —
+they are no longer how the released asset is produced. Full sequence (verified
+2026-06-14, v2.1.0-beta.3-rc.1):
 1. Bump version in FOUR places: `smaily-connect.php` (Version header +
    `SMAILY_CONNECT_VERSION` + `SMAILY_CONNECT_PLUGIN_VERSION`), `package.json`,
    `readme.txt` (Stable tag + Changelog + Upgrade Notice). Also the test pins:
@@ -567,32 +577,36 @@ sequence (verified 2026-06-14, v2.1.0-beta.3-rc.1):
    two-part: no `*.map` entries AND no trailer left in the shipped JS
    (`unzip -p … dist/admin/admin.js | grep -c sourceMappingURL` ⇒ 0). Local
    builds still emit maps — nothing about debugging changes, only the ZIP.
-7. **`gh release create … --repo erkkimarkus/smaily-wordpress-plugin`** — the
-   `--repo` is MANDATORY: `gh` defaults to `upstream` (sendsmaily) and 404s
-   (no write access). **Tag convention: the GA line (3.0.0+) uses a full
-   `v<version>` tag as a NORMAL release (non-prerelease → shows as Latest)** —
-   e.g. `gh release create v3.3.2 smaily-connect.zip --repo … --target main
-   --title "…" --notes-file …`, NO `--prerelease`. (The OLD beta line used
-   `v<version>-rc.<N>` + `--prerelease`; that's history, don't copy it for a GA
-   release.) On THIS fork `release.yml` now also fires on publish and builds +
-   attaches its own verified ZIP — so either upload the local one first and let
-   CI overwrite it with the identical build, or skip the local asset entirely.
-   (Historical note: the fork's pre-PRO-2277 release runs are all red — that was
-   the old broken workflow, not a signal about the release.)
+7. **Release it — push, tag, let CI build, then publish to wordpress.org.**
+   a. Push the bump commit to `main` on `sendsmaily/smaily-wordpress-plugin`.
+   b. `gh release create 3.11.2 --repo sendsmaily/smaily-wordpress-plugin
+      --target main --title "…" --notes-file …` — **NO local ZIP argument**:
+      the workflow attaches the asset. **Tag convention: the PLAIN version, no
+      `v` prefix** (`3.11.2` — that is what `release.sh` builds its download URL
+      from and what the repo's history uses; the workflow tolerates a leading
+      `v`, don't rely on it). A NORMAL release, no `--prerelease`.
+   c. `release.yml` builds admin + both storefront bundles + blocks +
+      translations + a `--no-dev` vendor tree, runs `bin/verify-release-zip.sh`
+      and attaches `smaily-connect.zip`. A tag that doesn't match the plugin
+      header version fails the run **before** anything is uploaded. Wait for the
+      run (`gh run watch`); optionally download the asset and re-check it with
+      `bash bin/verify-release-zip.sh smaily-connect.zip <version>`.
+   d. `./release.sh -u sendsmaily` — pushes that asset to the wordpress.org SVN.
+      **One-way door:** it reaches every install; it is Erkki's to run.
+   To dry-run the builder without touching a release:
+   `gh workflow run release.yml --repo sendsmaily/smaily-wordpress-plugin --ref
+   main` — on `workflow_dispatch` the verified ZIP is uploaded as a workflow
+   ARTIFACT (`gh run download <id>`), never as a release asset.
 
-**The official (sendsmaily) repo publishes from CI — the ZIP is NOT built locally
-there.** The maintainer's path is: (1) create a GitHub release whose tag is the
-**PLAIN version, no `v` prefix** (`3.11.2` — that is what `release.sh` builds its
-download URL from and what upstream history uses; the workflow tolerates a leading
-`v` but don't rely on it), (2) `release.yml` builds admin + both storefront bundles
-+ blocks + translations + a `--no-dev` vendor tree, runs
-`bin/verify-release-zip.sh` and attaches `smaily-connect.zip` to the release,
-(3) `./release.sh -u sendsmaily` pushes that asset to the wordpress.org SVN.
-A tag that doesn't match the plugin header version fails the run **before**
-anything is uploaded. To dry-run the builder without touching a release:
-`gh workflow run release.yml --repo <owner>/smaily-wordpress-plugin --ref main`
-— on `workflow_dispatch` the verified ZIP is uploaded as a workflow ARTIFACT
-(`gh run download <id>`), never as a release asset.
+**HISTORY — the fork flow (for reading old releases, not for cutting new ones).**
+Releases up to and including v3.11.1 were cut on
+`erkkimarkus/smaily-wordpress-plugin` with a **`v`-prefixed** tag
+(`gh release create v3.3.2 smaily-connect.zip --repo erkkimarkus/… --target main`),
+a locally built ZIP uploaded by hand, and a mandatory `--repo` because `gh`
+defaulted to the sendsmaily remote we had no write access to. Older beta tags
+add an `-rc.<N>` suffix + `--prerelease`. Do NOT copy any of this for a new
+release; the fork's pre-PRO-2277 release runs are all red (the old broken
+workflow, not a signal about those releases).
 
 ### CI "Lint and test the codebase" is PRE-EXISTING red on main — not authoritative
 The GH workflow runs `composer run test:php` (= bare `phpunit`, includes the
@@ -915,6 +929,12 @@ URL from the endpoints-map carries the engine's placeholder syntax — confirm i
 un-interpolated token is YOUR request, not an engine bug. (LESSONS §2.9.)
 
 ### Merging `upstream/main` (sendsmaily) — MERGE, ours wins, and audit the CLEAN hunks
+**HISTORY once PR #135 has landed** (PRO-2281): after the merge there is ONE
+working repository and no upstream/fork split, so nothing routine merges
+`upstream/main` any more — keep this section for reading the merge commits it
+produced, and for the CLEAN-hunk hazards below, which generalize to any large
+merge.
+
 The upstream PR (#135) folds this rewrite into `sendsmaily/smaily-wordpress-plugin`.
 When upstream lands maintenance on the legacy plugin, our PR goes un-mergeable and the
 fix is a **merge of `upstream/main` into our `main` — never a rebase, never a

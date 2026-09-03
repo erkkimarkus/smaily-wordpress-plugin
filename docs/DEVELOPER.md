@@ -106,13 +106,23 @@ The default wp-env (WP 7.0 / WC 10.7 / HPOS) does not match the pilot (WC
 
 ## Release process
 
-`composer run package` alone is not a release. The authoritative ZIP is built
-locally: version bump in all pinned places → commit → JS + blocks + i18n
-builds → prod-vendor `composer install --no-dev` → package → verify ZIP
-contents → `gh release create … --repo erkkimarkus/smaily-wordpress-plugin`
-(the `--repo` is mandatory). PCP (Plugin Check) runs against the BUILT ZIP,
-never the dev tree. The full verified sequence, ZIP checklist, and PCP gotchas
-live in CLAUDE.md "Cutting a release ZIP + GH release" — follow it verbatim.
+Releases are cut in the official repository
+[`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin)
+— its `main` is the working repository, so your checkout's `origin` should
+point there (`git remote -v`). The release ZIP is built by CI, not locally:
+version bump in all pinned places → commit → push to `main` → `gh release
+create <plain-version> --repo sendsmaily/smaily-wordpress-plugin --target main
+--title … --notes-file …` (**plain** tag, e.g. `3.11.2`, no `v`, and no local
+ZIP argument — `release.yml` builds, verifies with `bin/verify-release-zip.sh`
+and attaches it) → `./release.sh -u sendsmaily` publishes that asset to the
+wordpress.org SVN. The local build sequence (JS + blocks + i18n builds →
+prod-vendor `composer install --no-dev` → `composer run package`) is how you
+REPRODUCE or COMPARE a ZIP, not how the released one is produced. PCP (Plugin
+Check) runs against a BUILT ZIP, never the dev tree. The full sequence, ZIP
+checklist, and PCP gotchas live in CLAUDE.md "Cutting a release ZIP + GH
+release" — follow it verbatim; the old fork flow (`v`-prefixed tag, `--repo
+erkkimarkus/…`, hand-uploaded ZIP) is history, kept there only for reading
+releases up to v3.11.1.
 The re-audit policy (when a release forces a security/quality re-audit) is in
 [`audits/INDEX.md`](audits/INDEX.md).
 
