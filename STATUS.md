@@ -26,7 +26,41 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**PRO-2287 — an upgraded store makes no scheduled
+_Last updated: 2026-09-04 (**PRO-2291 — the migration guide now describes the
+upgrade merchants actually take.** `docs/MIGRATION.md` was still a 1.x → 2.0
+document: it named `smaily-connect-2.0.0.zip` as the NEW package, told the
+merchant to upload it by hand and to "verify Smaily Connect shows version
+2.0.x". The ~2,000 stores on the directory's 2.0.0 will take
+`2.0.0 → 3.11.2` through WordPress's own updater instead. Rewritten to that
+path, structure and voice kept: the recommended route is `Dashboard → Updates`
+/ auto-update (`wp plugin update smaily-connect` for CLI), with the manual-ZIP
++ `--force` route kept as the agency/staging alternative; every version,
+package and "verify it shows X" mention is now 2.0.0 → 3.11.2. The steps were
+read back against the PRO-2285 rehearsal record and now state what it observed:
+which settings carry over (credentials silently re-encrypted and still
+decrypting, subscriber-sync options incl. the optional fields, checkout opt-in,
+abandoned-cart status + cutoff, RSS values), the three legacy WP-Cron events
+cleared and the recurring Action Scheduler jobs armed, the legacy admin page
+gone with the old Settings URL redirecting into the wizard, the legacy
+abandoned-cart table kept with its un-sent rows drained once into
+`smly_plus_cart_session`, and deactivate/reactivate being safe. The wizard step
+list is the real six (Create a connection / Contacts / Automated letters /
+Campaign Intelligence / Subscription forms and RSS / Overview). PRO-2286's
+pre-filled-fields wording and PRO-2287's live-vs-daily split are kept, with
+Step 3 now saying explicitly that the live sync is the ONLY sync until the
+wizard is confirmed. Rollback restated as 2.0.0 from the directory's Advanced
+View → Previous versions, with an honest note that the rollback direction was
+not rehearsed and the re-encrypted password may need re-entering. Also
+corrected in passing because they were false in the same document: the
+WooCommerce floor (said 10.0, the plugin requires 6.9) and the wizard URL
+(`admin.php?page=smaily-connect` — a 403 in the rehearsal; the page is
+`smaily-connect-wizard`); the `smly_plus_cart_session` table was missing from
+the verify + cleanup lists. `README.md` and `docs/INDEX.md` describe the guide
+by its new subject. No plugin code, no `docs/site/index.html` change (its
+upgrade note does not contradict the rewrite); the repo has no Markdown lint,
+so no gates run.)_
+
+Prior: 2026-09-04 (**PRO-2287 — an upgraded store makes no scheduled
 call to Smaily before the merchant confirms setup.** The PRO-2285 rehearsal
 found the daily `smly_plus_contact_sync` tick running its reconcile +
 contact-refresh against the carried-over legacy credentials on a store whose
@@ -157,26 +191,24 @@ Docs-only; no code, so no gates run.)_
 
 - **Done this session:** PRO-2286 (stored-password connection test, incl. the
   simplification pass 78aa625), PRO-2287 (the daily contact-sync tick waits for
-  the wizard). Both rehearsal findings from PRO-2285 are now closed in code.
+  the wizard), PRO-2291 (`docs/MIGRATION.md` rewritten for the 2.0.0 → 3.11.2
+  path). Both rehearsal findings from PRO-2285 are now closed in code.
   Human acceptance on a real legacy store is still open for PRO-2286 (criterion
   1 was proven live only against a synthetic account with the Smaily hop
   stubbed).
-- **(a) PRO-2291 — NEXT:** rewrite `docs/MIGRATION.md` for the real merchant
-  journey (2.0.0 → 3.11.2). PRO-2286 and PRO-2287 corrected the two sentences
-  they made false; the broader rewrite was deliberately left to this issue.
-- **(b) The 3.11.2 bump** after that — the bump adds the merchant-language
+- **(a) The 3.11.2 bump — NEXT:** the bump adds the merchant-language
   `= 3.11.2 =` changelog block to `readme.txt`, incl. one line each for PRO-2286
   and PRO-2287 (readme.txt was deliberately left untouched by both).
 - **Commit trailers:** the four PRO-2286 commits carry AI-attribution trailers
   by accident; they stay as they are (Erkki's call). No trailers from now on.
-- **(c) PRO-2283 gate** (Erkki's one-way door), blocked on (a)+(b):
+- **(b) PRO-2283 gate** (Erkki's one-way door), blocked on (a):
   merge PR #135 → bump 3.11.2 → official-repo release, plain tag
   `3.11.2`, CI attaches the verified ZIP → `./release.sh -u sendsmaily`; then
   update the pilot stores by hand, archive the fork read-only, repoint `origin`.
-- **(d) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +
+- **(c) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +
   PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian admin-strings
   spot-check (the ZIP's `.mo` is host-built — PRO-2277).
-- **(e)** PRO-1770 needs Erkki's list of stores; GMS-11 Campaign Intelligence
+- **(d)** PRO-1770 needs Erkki's list of stores; GMS-11 Campaign Intelligence
   promo text for the wizard's CI step waits on marketing's final copy, then
   EN+ET; PRO-1893 tenant-inactive handling needs a design nod first.
 - **Open question:** PRO-1878 awaits the engine team's answer (since 2026-08-10).

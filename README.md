@@ -46,7 +46,7 @@ The plugin uses Action Scheduler (bundled with WooCommerce) for background work 
 
 **Fresh install:** download the latest release ZIP from the [Releases](../../releases) page → in WordPress admin, **Plugins → Add New Plugin → Upload Plugin** → choose the ZIP → **Install Now** → **Activate** → open **Smaily Connect** to start the setup wizard.
 
-**Upgrading from legacy 1.x:** read [`docs/MIGRATION.md`](docs/MIGRATION.md) first. It covers the upgrade paths, the first-hour verification protocol, the legacy credential guard, and rollback. The migration is designed to be safe and reversible.
+**Upgrading from 2.0.0:** read [`docs/MIGRATION.md`](docs/MIGRATION.md) first. It covers the upgrade paths, the first-hour verification protocol, the 2.0.0 credential guard, and rollback. The migration is designed to be safe and reversible.
 
 ---
 
@@ -72,7 +72,7 @@ Project / developer documentation lives in [`docs/`](docs/) — start with [`doc
 |----------|---------|
 | [`docs/site/index.html`](docs/site/index.html) | Merchant docs site (bilingual; hosted at [smaily.com/connect-woo](https://smaily.com/connect-woo/)) |
 | [`docs/INDEX.md`](docs/INDEX.md) | Catalog of every document in the project |
-| [`docs/MIGRATION.md`](docs/MIGRATION.md) | Step-by-step upgrade from the legacy 1.x plugin |
+| [`docs/MIGRATION.md`](docs/MIGRATION.md) | Step-by-step upgrade from the wordpress.org 2.0.0 package to 3.x |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Every significant architectural decision, with rationale |
 | [`docs/RECENGINE_API_CONTRACT.md`](docs/RECENGINE_API_CONTRACT.md) | The canonical plugin ↔ Campaign Intelligence contract |
 | [`docs/audits/`](docs/audits/) | Security, code-quality, and WordPress.org-readiness audits + the audit register |

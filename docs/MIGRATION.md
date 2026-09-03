@@ -1,26 +1,27 @@
-# MIGRATION.md — Upgrading from legacy Smaily plugin to Smaily Connect 2.0
+# MIGRATION.md — Upgrading Smaily Connect from 2.0.0 to 3.11.2
 
-This guide is for sites currently running the legacy
-`sendsmaily/smaily-wordpress-plugin` (version 1.x) and upgrading to **Smaily
-Connect 2.0**. If you're installing the plugin fresh on a clean WordPress site,
-see `INSTALL.md` instead.
+This guide is for sites currently running **Smaily Connect 2.0.0** from
+wordpress.org — the last release of the plugin's 1.x line. It describes the
+upgrade to **Smaily Connect 3.11.2**, the first wordpress.org release of the
+new (3.x) version. If you're installing the plugin fresh on a clean WordPress
+site, see `INSTALL.md` instead.
 
-**Which versions this covers.** The upgrade merchants take from wordpress.org
-is **2.0.0 → 3.11.2** — the directory's 2.0.0 package replaced in place by the
-current release. This guide was first written when the new code line was
-numbered "2.0"; the same code line is now numbered 3.x, so read "Smaily
-Connect 2.0" below as "the new plugin".
+**Which versions this covers.** `2.0.0 → 3.11.2`, delivered by WordPress's own
+plugin updater on the same `smaily-connect` slug. It is the same plugin, in the
+same folder, updated in place. (The new version line was numbered "2.0" while it
+was in development; it is released as 3.x because the 1.x line already occupies
+`2.0.0` on wordpress.org.)
 
 **Read this document fully before starting the upgrade.** The upgrade is designed
-to be safe and reversible, but a few specifics about how the new version coexists
-with the legacy plugin are important to understand in advance.
+to be safe and reversible, but a few specifics about how 3.11.2 coexists with
+your existing 2.0.0 settings are important to understand in advance.
 
 ---
 
 ## TL;DR — what to expect
 
-- **It's an in-place upgrade.** Same plugin slug, same folder, same file. The
-  new version replaces the old one.
+- **It's an in-place update.** Same plugin slug, same folder, same file. WordPress
+  replaces 2.0.0 with 3.11.2 like any other plugin update.
 - **Your existing data and credentials persist.** Smaily account, subscriber
   sync settings, WooCommerce integration — all continue working.
 - **Live contact sync continues uninterrupted** during the upgrade: a customer
@@ -31,17 +32,18 @@ with the legacy plugin are important to understand in advance.
   setup, so an upgraded store makes no scheduled calls to Smaily before you have
   reviewed the settings. It resumes automatically once the wizard is finished.
 - **A new setup wizard runs the first time you open the plugin in WP-admin**
-  after upgrading. The legacy admin pages are hidden, but the underlying data
-  is untouched.
+  after upgrading. The 2.0.0 admin pages are replaced by it, but the underlying
+  data is untouched.
 - **After the wizard finishes**, the new code takes over subscriber syncing and
-  the legacy hooks are deactivated. You get access to new features (Backfill,
-  recommendation engine integration).
-- **Rollback is possible** by reinstalling the legacy version — your data is
-  not destroyed.
+  the 2.0.0 hooks are deactivated. You get access to new features (Backfill,
+  Campaign Intelligence).
+- **Rollback is possible** by reinstalling 2.0.0 from wordpress.org — your data
+  is not destroyed.
 
-The upgrade has been tested at the mechanism level (database, hooks, credential
-handling). The first real `1.x → 2.0` install in production is your site, which
-is why the verification steps below matter.
+The upgrade was rehearsed end to end before release: a throwaway WordPress site
+running the real wordpress.org 2.0.0 package, configured the way a merchant is,
+taken onto the 3.x package the same way the updater takes it. What that
+rehearsal observed is what this guide describes.
 
 ---
 
@@ -65,7 +67,7 @@ This document, in full. Take 10 minutes.
 
 3. **Verify version compatibility:**
    - WordPress: **6.6 or later** (tested up to 7.0)
-   - WooCommerce: **10.0 or later** (tested up to 10.7)
+   - WooCommerce: **6.9 or later** (tested up to 10.7)
    - PHP: **8.0 or later** (8.3 recommended)
 
    You can check these in `Tools → Site Health → Info` in WP-admin.
@@ -78,67 +80,78 @@ This document, in full. Take 10 minutes.
 
 ## The upgrade procedure
 
-There are three ways to upgrade. The recommended path is the simplest and most
-reliable for most sites.
+### Recommended: the WordPress plugin updater
 
-### Recommended: Upload via WP-admin
+Once 3.11.2 is published, WordPress offers it like any other plugin update:
 
-1. Go to `Plugins` in WP-admin
-2. Click `Add New Plugin` → `Upload Plugin`
-3. Choose the new `smaily-connect-2.0.0.zip` file
-4. When asked "Replace current with uploaded?", click **Replace**
-5. **Wait** for the upload and replacement to complete (typically 10-30 seconds)
-6. The plugin remains active. You should see the standard "Plugin updated
+1. Go to `Dashboard → Updates`, or `Plugins → Installed Plugins`
+2. Find **Smaily Connect** and click `Update now`
+3. **Wait** for the update to complete (typically 10-30 seconds)
+4. The plugin remains active. You should see the standard "Plugin updated
    successfully" message.
 
-### Alternative: Deactivate first, then upload
-
-If your hosting environment doesn't allow Replace, or you want to be extra
-cautious:
-
-1. `Plugins → Installed Plugins → Smaily for WooCommerce → Deactivate`
-2. `Plugins → Add New → Upload Plugin` → upload the new ZIP
-3. After upload completes, `Activate` the plugin
-
-This path may briefly interrupt subscriber syncing (a few seconds while the
-plugin is deactivated). Negligible in practice.
+If you have auto-updates enabled for this plugin, WordPress installs 3.11.2 on
+its own — nothing to do, but still walk through the first-hour checks below when
+you next open WP-admin.
 
 ### CLI: WP-CLI
 
 For sites managed via SSH or CI:
 
 ```bash
-wp plugin install /path/to/smaily-connect-2.0.0.zip --force
+wp plugin update smaily-connect
+```
+
+### Manual install from the release ZIP (agencies, staging sites)
+
+If you're testing on a staging copy before the directory update reaches
+production, or your environment installs plugins from a ZIP:
+
+1. `Plugins → Add New Plugin → Upload Plugin` → choose the 3.11.2 ZIP
+2. When asked "Replace current with uploaded?", click **Replace**
+3. The plugin stays active
+
+The WP-CLI equivalent is:
+
+```bash
+wp plugin install /path/to/smaily-connect.zip --force
 wp plugin deactivate smaily-connect
 wp plugin activate smaily-connect
 ```
 
-**Important:** the `deactivate` + `activate` step is **necessary** even after
+**Important:** the `deactivate` + `activate` step is worth doing after
 `--force`, because `--force` on an already-active plugin doesn't trigger the
 activation hook on its own. The plugin's built-in upgrade detector (see below)
-will eventually catch this, but explicit deactivate-activate runs the
-activation hook immediately and is cleaner.
+catches this on the next WP-admin page load anyway, but explicit
+deactivate-activate runs it immediately and is cleaner.
 
 ---
 
 ## What happens during the upgrade
 
-The new version contains both the legacy code (`Smaily_Connect\*` namespace)
-and the new code (`Smaily\Connect\*` namespace) in the same plugin file. They
-run side by side until you finish the new setup wizard. Here's what changes
-immediately on activation:
+3.11.2 contains both the 2.0.0 code (`Smaily_Connect\*` namespace) and the new
+code (`Smaily\Connect\*` namespace) in the same plugin. They run side by side
+until you finish the new setup wizard. Here's what changes immediately:
 
 | What | Change | Impact on you |
 |------|--------|---------------|
-| Smaily credentials | Read by both legacy and new code; not converted | None — your subdomain, username, and password keep working |
-| Subscriber sync | Continues via legacy code (new code is gated until wizard finishes) | None — contacts continue flowing to Smaily |
-| Admin menu | Legacy "Smaily" top-level menu is hidden; new "Smaily Connect" menu appears | The plugin's admin area looks new |
+| Smaily credentials | Kept; the stored password is silently re-encrypted to a stronger format and still decrypts | None — your subdomain, username, and password keep working |
+| Subscriber sync settings | Kept as saved in 2.0.0, including which optional fields you sync and the checkout opt-in setting, and read by the new code | None — the same contacts, the same fields |
+| Abandoned cart settings | Kept, including your order-status selection and your cutoff (e.g. 45 minutes) | None — the same timing, on the new pipeline |
+| RSS feed settings | Kept as saved | None — your existing feed URLs keep working |
+| Subscriber sync | Continues via the 2.0.0 code (the new code is gated until the wizard finishes) | None — contacts continue flowing to Smaily |
+| Admin menu | The 2.0.0 "Smaily" pages are replaced by the new **Smaily Connect** menu; the old Settings URL redirects into the wizard | The plugin's admin area looks new |
 | Database tables | New tables (`smly_plus_*`, `smly_rec_*`) are created automatically | Background change; you don't need to do anything |
-| Scheduled jobs | Legacy WP-Cron jobs are removed; new Action Scheduler jobs are scheduled in their place | More reliable background work; you can monitor in `Tools → Scheduled Actions` |
+| Abandoned-cart table | The 2.0.0 table is kept untouched; any cart in it that was never sent is moved once into the new cart storage | Carts in flight at upgrade time are not lost |
+| Scheduled jobs | The three 2.0.0 WP-Cron events are cleared and recurring Action Scheduler jobs are scheduled in their place | More reliable background work; you can monitor in `Tools → Scheduled Actions` |
+
+Deactivating and reactivating the plugin afterwards (or reactivating
+WooCommerce) is safe: it does not duplicate scheduled jobs, does not re-run the
+one-time migrations, and does not bring the old cron events back.
 
 **Existing Smaily templates that reference fields like `{{ first_name }}`
-continue to work** — the new code uses the same field-naming convention as the
-legacy plugin and the official Smaily WooCommerce plugin.
+continue to work** — the new code uses the same field-naming convention as
+2.0.0.
 
 ---
 
@@ -152,15 +165,16 @@ take about 10 minutes.
 1. Reload any WP-admin page
 2. Look for **Smaily Connect** in the left sidebar (top-level menu, with the
    Smaily logo)
-3. The legacy **Smaily** menu should be hidden
+3. The 2.0.0 "Smaily" admin page is gone. Its Settings URL
+   (`admin.php?page=smaily-connect-settings`) now opens the new plugin and
+   redirects into the wizard until setup is finished.
 
-If the legacy menu is still visible after a hard reload, see Troubleshooting
-below.
+If the old menu is still visible after a hard reload, see Troubleshooting below.
 
 ### Step 2: The wizard should launch
 
 1. Click `Smaily Connect` in the sidebar
-2. The setup wizard should open on Step 1 (Connection)
+2. The setup wizard should open on Step 1 (Create a connection)
 3. Your existing Smaily **subdomain** and **API username** are **pre-filled**.
    The **API password** field is empty — the plugin never sends a stored
    password back to the browser. Leave it empty: **Test connection** uses the
@@ -168,20 +182,24 @@ below.
    to a different Smaily account or rotating the password.
 
 If the wizard doesn't launch automatically, you can open it directly at
-`/wp-admin/admin.php?page=smaily-connect`.
+`/wp-admin/admin.php?page=smaily-connect-wizard`.
 
 ### Step 3: Verify subscriber sync is still working (without touching anything)
 
-1. **Do not complete the wizard yet.** Sync is currently running via the legacy
-   code path.
+Until you finish the wizard, the **live** sync is the only sync running: a
+customer who checks out or registers is synced through the 2.0.0 code path, and
+the scheduled daily catch-up stays paused (see "Don't skip the wizard
+indefinitely" below). So this check is a check of the live path.
+
+1. **Do not complete the wizard yet.**
 2. Open a private/incognito window and make a small WooCommerce purchase (a
    test product, low price, your own email)
 3. Wait 1-2 minutes
 4. Check your Smaily account — the test contact should appear, exactly as it
    did before the upgrade
 
-If the contact arrives, **legacy sync is healthy**. You can proceed to the
-wizard at your convenience.
+If the contact arrives, **live sync is healthy**. You can proceed to the wizard
+at your convenience.
 
 ### Step 4: Check the database
 
@@ -191,6 +209,7 @@ tables exist:
 - `wp_smly_plus_event_queue` (or your prefix instead of `wp_`)
 - `wp_smly_plus_backfill_job`
 - `wp_smly_plus_automation_mapping`
+- `wp_smly_plus_cart_session`
 - `wp_smly_rec_event_queue`
 - `wp_smly_rec_visitor`
 
@@ -199,25 +218,27 @@ didn't fire" in Troubleshooting.
 
 ### Step 5: Check Action Scheduler
 
-`Tools → Scheduled Actions`. Filter by `smly_plus`. You should see recurring
-jobs scheduled (contact sync, abandoned cart, queue flush, retry). Status
-should be `Pending` or `Complete`, not `Failed`.
+`Tools → Scheduled Actions`. Filter by `smly_`. You should see recurring jobs
+scheduled (contact sync, abandoned cart, queue flush, retry). Status should be
+`Pending` or `Complete`, not `Failed`.
 
 ---
 
 ## Completing the wizard
 
 When you're ready (any time within the first few days after upgrading), complete
-the setup wizard. This is when sync officially hands off from legacy to new code.
+the setup wizard. This is when sync officially hands off from the 2.0.0 code to
+the new code.
 
 ### What changes when you finish the wizard
 
-The new code's hook handler activates and the legacy hooks are deregistered.
+The new code's hook handler activates and the 2.0.0 hooks are deregistered.
 After this point:
 
 - **Only the new code** handles new WooCommerce events (customer registration,
   account updates, checkout)
-- **Existing legacy data** (credentials, queued events, automation mappings) is
+- **The daily catch-up sync resumes** on its next scheduled run
+- **Existing data** (credentials, queued events, automation mappings) is
   preserved unchanged
 - **Smaily-side data** (your subscriber lists, templates, automations) is
   completely unaffected — the change is only in how your WordPress site **sends**
@@ -225,16 +246,17 @@ After this point:
 
 ### The wizard steps
 
-1. **Connection** — your subdomain and API username are pre-filled and the
-   password field is empty; press **Test connection** (it reuses the stored
+1. **Create a connection** — your subdomain and API username are pre-filled and
+   the password field is empty; press **Test connection** (it reuses the stored
    password) and continue
-2. **Subscriber sync** — choose which WordPress events trigger contact sync
-   (registration, checkout, account updates)
-3. **WooCommerce integration** — abandoned cart, welcome series, first-order
-   triggers
-4. **Recommendation engine** (optional) — connect to the rec engine if you have
-   a setup token from Smaily
-5. **Finish** — review and confirm
+2. **Contacts** — synchronization settings: which WordPress events trigger
+   contact sync, and which optional fields are sent
+3. **Automated letters** — triggers for automations (abandoned cart, welcome
+   series, first order)
+4. **Campaign Intelligence** (optional) — connect to Smaily Campaign
+   Intelligence if you have a setup token from Smaily
+5. **Subscription forms and RSS** — signup forms and the product RSS feed
+6. **Overview** — summary and last check
 
 **The wizard saves your choices step by step**, so you can close it and return
 later without losing progress.
@@ -250,79 +272,88 @@ path.
 
 ## Important warnings
 
-### The legacy credential guard
+### The 2.0.0 credential guard
 
-The legacy plugin registers a WordPress filter
+The 2.0.0 code registers a WordPress filter
 (`pre_update_option_smaily_connect_api_credentials`) that **protects** the
 credential record from outside modification. This is a security feature, not a
 bug.
 
 **Practical implication:** if you ever need to change your Smaily credentials
 through WP-CLI (`wp option update smaily_connect_api_credentials ...`) or
-direct database access, the legacy filter may reject the change. Use the
-wizard or the new Settings page instead — those go through the proper code
-path that the legacy guard recognizes.
+direct database access, that filter may reject the change. Use the wizard or the
+new Settings page instead — those go through the proper code path that the guard
+recognizes.
 
 ### Don't skip the wizard indefinitely
 
-While the legacy code keeps live subscriber syncing alive without the wizard,
-the new code's features (Backfill, recommendation engine integration, new
-abandoned-cart workflow) are **locked** until the wizard finishes, and the
-daily catch-up sync stays paused. New checkouts and registrations still reach
-Smaily, so using legacy sync for a few days while you familiarize yourself with
-the new UI costs you little — but plan to complete the wizard within a week or
-two so the daily catch-up resumes and you can take advantage of the new
-features.
+While the 2.0.0 code keeps live subscriber syncing alive without the wizard, the
+new code's features (Backfill, Campaign Intelligence, the new abandoned-cart
+workflow) are **locked** until the wizard finishes, and the daily catch-up sync
+stays paused. New checkouts and registrations still reach Smaily, so using the
+old sync path for a few days while you familiarize yourself with the new UI costs
+you little — but plan to complete the wizard within a week or two so the daily
+catch-up resumes and you can take advantage of the new features.
 
-### Don't reinstall the legacy plugin separately
+### Don't reinstall 2.0.0 on top of 3.11.2
 
-If for any reason you reinstall the legacy `sendsmaily/smaily-wordpress-plugin`
-ZIP **on top of Smaily Connect 2.0**, the resulting state is undefined. The
-new plugin will be overwritten by the legacy one. Always use one or the
-other — not both side by side.
+If for any reason you upload the 2.0.0 ZIP **on top of** an installed 3.11.2,
+the resulting state is undefined — the new plugin is overwritten by the old one
+while the new database tables and settings remain. If you need to go back, use
+the rollback procedure below instead.
 
 ### Your sale-price data is read fresh, not migrated
 
 If your store uses sale prices, you might wonder whether your existing
-discount data carries over to the recommendation engine. It doesn't need to —
+discount data carries over to Campaign Intelligence. It doesn't need to —
 and that's by design.
 
 The plugin reads sale prices **fresh from WooCommerce** every time it syncs a
 product (the regular price and the sale price are both pulled from the product
 at sync time). It does not convert or copy any stored discount values from the
-legacy plugin.
+2.0.0 settings.
 
-This matters because the recommendation engine's sale model uses a
-"compare-at" convention: it stores the **higher** pre-sale reference price and
-compares it to the **current** price to determine whether a product is on
-sale. The legacy plugin stored the **lower** on-sale price under a different
-name. A literal copy of the old value into the new field would invert the
-meaning — genuinely discounted products would read as "not on sale." Because
-the plugin re-reads live prices from WooCommerce rather than copying old data,
-this inversion never happens. Your sale prices simply work, with no migration
-step on your part.
+This matters because Campaign Intelligence's sale model uses a "compare-at"
+convention: it stores the **higher** pre-sale reference price and compares it to
+the **current** price to determine whether a product is on sale. The 1.x line
+stored the **lower** on-sale price under a different name. A literal copy of the
+old value into the new field would invert the meaning — genuinely discounted
+products would read as "not on sale." Because the plugin re-reads live prices
+from WooCommerce rather than copying old data, this inversion never happens.
+Your sale prices simply work, with no migration step on your part.
 
 ---
 
-## Rollback — if you need to go back to legacy 1.x
+## Rollback — if you need to go back to 2.0.0
 
 The upgrade is reversible. Your data is not destroyed.
 
+wordpress.org keeps every published release of a plugin: on the plugin's page in
+the directory, open **Advanced View** and use the **Previous versions** section
+to download the 2.0.0 ZIP.
+
 ### Steps
 
-1. `Plugins → Installed Plugins → Smaily Connect → Deactivate`
-2. `Plugins → Add New → Upload Plugin` → upload the original legacy plugin ZIP
-3. When asked "Replace current with uploaded?", click **Replace**
-4. `Activate`
+1. Download the 2.0.0 ZIP as described above
+2. `Plugins → Installed Plugins → Smaily Connect → Deactivate`
+3. `Plugins → Add New Plugin → Upload Plugin` → upload the 2.0.0 ZIP
+4. When asked "Replace current with uploaded?", click **Replace**
+5. `Activate`
 
-The legacy plugin will resume operation. Your `smaily_connect_*` settings are
-untouched, so it picks up exactly where it left off.
+2.0.0 resumes operation. Your `smaily_connect_*` settings are untouched, so it
+picks up where it left off.
+
+**After rolling back, check the connection.** The upgrade re-encrypted your
+stored API password into the newer format; if 2.0.0 reports a credential or
+connection error, re-enter the Smaily API password on its settings page. (The
+rollback direction was not part of the pre-release upgrade rehearsal — the
+forward path was. Report anything unexpected; see Support below.)
 
 ### What stays behind after rollback
 
 The new database tables (`smly_plus_*`, `smly_rec_*`) remain. They don't
-interfere with the legacy plugin (which doesn't know about them), but they
-take up a small amount of space.
+interfere with 2.0.0 (which doesn't know about them), but they take up a small
+amount of space.
 
 If you want to remove them:
 
@@ -330,6 +361,7 @@ If you want to remove them:
 DROP TABLE wp_smly_plus_event_queue;
 DROP TABLE wp_smly_plus_backfill_job;
 DROP TABLE wp_smly_plus_automation_mapping;
+DROP TABLE wp_smly_plus_cart_session;
 DROP TABLE wp_smly_rec_event_queue;
 DROP TABLE wp_smly_rec_visitor;
 DELETE FROM wp_options WHERE option_name LIKE 'smly_plus_%';
@@ -345,8 +377,8 @@ complete and verified.
   while we investigate
 - You need to revert to a known-good state before a high-traffic event
 
-Rollback is **not** a permanent solution. If you hit an issue with 2.0, please
-report it (see Support below) so it can be fixed; rollback is a temporary
+Rollback is **not** a permanent solution. If you hit an issue with 3.11.2,
+please report it (see Support below) so it can be fixed; rollback is a temporary
 safety net, not the recommended end state.
 
 ---
@@ -355,18 +387,18 @@ safety net, not the recommended end state.
 
 ### Wizard didn't launch automatically
 
-Go directly to `/wp-admin/admin.php?page=smaily-connect`. If the page exists,
-the plugin is working; the auto-launch is just a redirect convenience.
+Go directly to `/wp-admin/admin.php?page=smaily-connect-wizard`. If the page
+loads, the plugin is working; the auto-launch is just a redirect convenience.
 
-### Legacy "Smaily" menu still appears
+### The old "Smaily" menu still appears
 
 Hard-reload WP-admin (`Ctrl+Shift+R` or `Cmd+Shift+R`). If still visible,
 disable browser extensions that may cache admin pages, or open in a private
 window.
 
-If the legacy menu persists across hard reloads and private windows, the
-plugin's admin-menu hide hook may have failed to register. Check `Settings →
-Plugins` to confirm Smaily Connect is active, and look at the debug log
+If it persists across hard reloads and private windows, the plugin's admin-menu
+hook may have failed to register. Check `Plugins → Installed Plugins` to confirm
+Smaily Connect is active and shows version 3.11.2, and look at the debug log
 (`wp-content/debug.log` if enabled) for PHP errors.
 
 ### Activation hook didn't fire (new tables missing)
@@ -387,15 +419,19 @@ wp plugin activate smaily-connect
 
 Within the first hour, before completing the wizard:
 
-1. Check that the legacy code is still active. Open the WP-admin Plugins page
-   and verify `Smaily Connect` shows version 2.0.x and is **Active**.
+1. Check that the plugin is running. Open the WP-admin Plugins page and verify
+   `Smaily Connect` shows version **3.11.2** and is **Active**.
 2. Look at `Tools → Scheduled Actions` for any failed actions related to
    `smaily_connect_*` or `smly_plus_contact_sync`.
 3. Check `wp-content/debug.log` (if `WP_DEBUG_LOG` is enabled) for PHP errors.
 
+Note that the daily catch-up sync is paused by design until you finish the
+wizard — a `smly_plus_contact_sync` run that logs `skipped: setup not completed`
+is expected, not a fault. Live syncing (checkout, registration) is unaffected.
+
 After completing the wizard:
 
-1. Verify the wizard reached the Finish step successfully (you were redirected
+1. Verify the wizard reached the Overview step successfully (you were redirected
    to the new Settings page)
 2. Check `Tools → Scheduled Actions` for failed `smly_plus_*` actions
 3. The new Settings page has a "Test connection" button on the Connection tab
@@ -404,7 +440,7 @@ After completing the wizard:
 ### Wizard Finish errors
 
 Check `wp-content/debug.log`. The most common cause is the activation hook not
-having run (see above) — the wizard's Finish step expects new database tables
+having run (see above) — the wizard's last step expects the new database tables
 to exist.
 
 If the log shows a "table doesn't exist" error, run the activation manually
@@ -418,17 +454,17 @@ This usually indicates leftover files from a previous plugin version. The fix:
 2. SSH or FTP into the site
 3. Navigate to `wp-content/plugins/smaily-connect/`
 4. Confirm only the new version's files are present (the `Version:` header
-   in `smaily-connect.php` should show `2.1.0-beta.1` or later)
+   in `smaily-connect.php` should show `3.11.2` or later)
 5. If there are unexpected `.php` files from older versions, delete the entire
-   `smaily-connect` directory and re-upload the new ZIP cleanly
+   `smaily-connect` directory and reinstall the plugin cleanly
 
 ---
 
 ## After the first 24 hours
 
 If everything is working, you don't need to do anything special. Subscriber
-sync is healthy, the new Settings page is your interface, and the legacy code
-is sitting dormant.
+sync is healthy, the new Settings page is your interface, and the 2.0.0 code is
+sitting dormant.
 
 A few good practices for the first week:
 
@@ -437,7 +473,7 @@ A few good practices for the first week:
 - **Monitor `Tools → Scheduled Actions`** for any failures (`Failed` status
   with a `smly_plus_*` hook name)
 - **Try the new features** — Backfill (syncing historical customers to
-  Smaily), abandoned cart workflow, the new mobile-friendly Settings UI
+  Smaily), the abandoned cart workflow, the new mobile-friendly Settings UI
 
 If you see anything unexpected, see Support below.
 
@@ -445,15 +481,14 @@ If you see anything unexpected, see Support below.
 
 ## Support
 
-For issues encountered during or after the migration:
+For issues encountered during or after the upgrade:
 
 - **Smaily support:** https://smaily.com/help/ (your first stop for any issue
   related to Smaily-side data, templates, or automations)
-- **Plugin issues:** report on GitHub at the plugin repo (link in your install
-  package), or via the maintainer contact provided to you
+- **Plugin issues:** report on GitHub at
+  https://github.com/sendsmaily/smaily-wordpress-plugin
 - **Critical urgency** (site is down, customers can't checkout): immediately
-  roll back to the legacy version (see Rollback above) and contact support
-  with details
+  roll back to 2.0.0 (see Rollback above) and contact support with details
 
 When reporting an issue, please include:
 
@@ -465,16 +500,3 @@ When reporting an issue, please include:
   prints
 - A description of what you were doing when the issue appeared
 - Any error messages from `wp-content/debug.log` if available
-
----
-
-## Acknowledgments
-
-This migration plan was designed and verified with the mechanism-level
-testing described in the audit report (available in the project's
-`docs/DECISIONS.md` for technical readers). The first real `1.x → 2.0`
-production install is your site — your observations during the first week
-are the final verification step, and your feedback shapes how this guide
-evolves.
-
-Thank you for being the pilot for Smaily Connect 2.0.
