@@ -88,7 +88,7 @@ Contribute to the development via [GitHub](https://github.com/sendsmaily/smaily-
 
 == Changelog ==
 
-Only releases from 3.0.0 onward are listed here. The complete version history, including the 1.x and 2.x releases, is published at https://github.com/erkkimarkus/smaily-wordpress-plugin/releases
+Only releases from 3.0.0 onward are listed here. The complete version history, including the 1.x and 2.x releases, is published at https://github.com/sendsmaily/smaily-wordpress-plugin/releases
 
 = 3.11.1 =
 * Fixed: the order-completion signal sent to Smaily Campaign Intelligence no longer depends on the shopper keeping the order-received page open. It is sent as soon as the order is confirmed, so completed orders are no longer under-counted when recommendations are computed.
