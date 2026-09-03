@@ -26,7 +26,43 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-03 (**PRO-2285 — the wordpress.org upgrade path was
+_Last updated: 2026-09-04 (**PRO-2286 — an upgrading store can verify its
+Smaily connection without retyping the API password.** The wizard's Step 1
+blocked Steps 2-6 until "Test connection" succeeded, and the test endpoint
+rejected an empty password — so a store upgraded from the wordpress.org 2.0.0
+package, whose credentials work but whose password never reaches the browser,
+could only get past Step 1 by minting a new Smaily API user (the save path has
+always treated an empty password as "keep the stored one"; only the test did
+not). `TestConnectionEndpoint` now takes `password` as optional and, when it
+arrives empty, tests with the password stored for the default account — but
+ONLY when the submitted subdomain + username still equal that stored set, so
+typing a different account can never be vouched for by the old one; everything
+else answers exactly as before. `EnvDetector::saved_settings()` publishes one
+new boolean, `smailyHasStoredPassword` (the value never leaves the server);
+`CredentialBlock` enables the Test button with an empty password while that
+flag holds and the account on screen is still the hydrated one, marks the
+password field not-required and shows "Leave empty to keep using the stored
+password." (EN + ET, catalogs rebuilt). The save path was NOT changed — a
+Continue after a stored-password test goes through the existing
+`persist_credentials()` empty-password preserve branch and flips
+`smly_plus_default_connection_verified`, so Steps 2-6 unlock as they do today.
+Proven live on the dev wp-env through the real REST route with a synthetic
+credential set (only the Smaily network hop stubbed): empty password →
+`connected=true` with the STORED password on the wire; the same call with
+Smaily refusing → `connected=false` "Smaily did not accept those credentials.";
+a different subdomain typed → the unchanged "Subdomain, username, and password
+are required." Docs: `docs/MIGRATION.md` now describes the pre-filled fields
+and the verify step truthfully and names the 2.0.0 → 3.11.2 upgrade merchants
+will see; `docs/site/index.html` Step 1 gained the same note in BOTH languages.
+Also fixed in passing because it blocked the gate: `bin/lib-smly-snapshot.sh`'s
+container lookup relied on `docker ps` ORDER — docker ORs repeated `--filter
+name=` values, so the helper could hand back `…-tests-mysql-1` ("php: not
+found") instead of the dev cli container; it now keeps only `*-wordpress-1`
+candidates. Gates: `npm run ci:strict` exit 0 (748 unit + 285 JS tests),
+integration 256 tests OK via `sg docker`, dev connection restored to the
+sandbox tenant.)_
+
+Prior: 2026-09-03 (**PRO-2285 — the wordpress.org upgrade path was
 rehearsed end to end: real 2.0.0 package → the v3 package built from `main`.**
 A throwaway wp-env (WP 7.0 / PHP 8.3 / WC 11.1, its own ports, the repo NOT
 mapped in) ran the directory's real `smaily-connect` 2.0.0, configured as a
@@ -96,15 +132,18 @@ Docs-only; no code, so no gates run.)_
   this block), PRO-2281 (working repo = `sendsmaily/main`; docs + runbook
   repointed), PRO-2285 (2.0.0 → v3 upgrade rehearsal — all six scenarios pass,
   two findings filed).
-- **(a) PRO-2286 (High) — FIRST:** an upgrading 2.0.0 store is forced to retype
-  its Smaily API password — the wizard's connection test can't use the stored
-  secret (the save path already can). Fix + correct `docs/MIGRATION.md`.
-  User-visible → design nod before dispatch.
-- **(b) PRO-2287 — decided A** (Erkki, 2026-09-03): gate the daily
+- **(a) PRO-2286 — DONE** (2026-09-04): the connection test reuses the stored
+  password when the field is left empty and the account on screen is still the
+  stored one; MIGRATION.md + the docs site corrected. Human acceptance on a real
+  legacy store still open (criterion 1 was proven live only against a synthetic
+  account with the Smaily hop stubbed).
+- **(b) PRO-2287 — NEXT, decided A** (Erkki, 2026-09-03): gate the daily
   `smly_plus_contact_sync` tick on `setup_completed` like the live hooks (daily
-  catch-up resumes after wizard confirmation); correct MIGRATION.md. After (a).
+  catch-up resumes after wizard confirmation); correct MIGRATION.md.
 - **(c) PRO-2283 gate** (Erkki's one-way door), blocked on (a)+(b) shipping in
-  3.11.2: merge PR #135 → bump 3.11.2 → official-repo release, plain tag
+  3.11.2: merge PR #135 → bump 3.11.2 (the bump adds the merchant-language
+  `= 3.11.2 =` changelog block to `readme.txt`, incl. one line for PRO-2286 —
+  readme.txt was deliberately left untouched here) → official-repo release, plain tag
   `3.11.2`, CI attaches the verified ZIP → `./release.sh -u sendsmaily`; then
   update the pilot stores by hand, archive the fork read-only, repoint `origin`.
 - **(d) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +

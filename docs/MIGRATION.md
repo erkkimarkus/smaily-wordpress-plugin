@@ -5,6 +5,12 @@ This guide is for sites currently running the legacy
 Connect 2.0**. If you're installing the plugin fresh on a clean WordPress site,
 see `INSTALL.md` instead.
 
+**Which versions this covers.** The upgrade merchants take from wordpress.org
+is **2.0.0 → 3.11.2** — the directory's 2.0.0 package replaced in place by the
+current release. This guide was first written when the new code line was
+numbered "2.0"; the same code line is now numbered 3.x, so read "Smaily
+Connect 2.0" below as "the new plugin".
+
 **Read this document fully before starting the upgrade.** The upgrade is designed
 to be safe and reversible, but a few specifics about how the new version coexists
 with the legacy plugin are important to understand in advance.
@@ -150,7 +156,11 @@ below.
 
 1. Click `Smaily Connect` in the sidebar
 2. The setup wizard should open on Step 1 (Connection)
-3. Your existing Smaily credentials (subdomain, username) should be **pre-filled**
+3. Your existing Smaily **subdomain** and **API username** are **pre-filled**.
+   The **API password** field is empty — the plugin never sends a stored
+   password back to the browser. Leave it empty: **Test connection** uses the
+   password already stored for that account. Type one only if you're switching
+   to a different Smaily account or rotating the password.
 
 If the wizard doesn't launch automatically, you can open it directly at
 `/wp-admin/admin.php?page=smaily-connect`.
@@ -210,7 +220,9 @@ After this point:
 
 ### The wizard steps
 
-1. **Connection** — your credentials are pre-filled; just verify and continue
+1. **Connection** — your subdomain and API username are pre-filled and the
+   password field is empty; press **Test connection** (it reuses the stored
+   password) and continue
 2. **Subscriber sync** — choose which WordPress events trigger contact sync
    (registration, checkout, account updates)
 3. **WooCommerce integration** — abandoned cart, welcome series, first-order
