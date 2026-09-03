@@ -522,10 +522,11 @@ WRONG for this, so use **`bin/build-i18n.sh`** (it needs the wp-env container):
 ### Cutting a release ZIP + GH release (the full local sequence)
 `composer run package` ALONE is not a release — it rsync+zips the working tree
 but does NOT build the JS/blocks/translations, and `dist/`, `vendor/`,
-`blocks/*/build/` are gitignored. The CI `release.yml` is INCOMPLETE (it never
-runs the admin vite build and its `compile-translations` step has no wp-cli, so
-it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
-2026-06-14, v2.1.0-beta.3-rc.1):
+`blocks/*/build/` are gitignored. **Since PRO-2277 `release.yml` runs this whole
+sequence in CI** (see the note right below), so on the official repo the CI ZIP
+is the authoritative one; on this fork the local sequence below is still how a
+ZIP is cut, and it stays the reference the CI build is checked against. Full
+sequence (verified 2026-06-14, v2.1.0-beta.3-rc.1):
 1. Bump version in FOUR places: `smaily-connect.php` (Version header +
    `SMAILY_CONNECT_VERSION` + `SMAILY_CONNECT_PLUGIN_VERSION`), `package.json`,
    `readme.txt` (Stable tag + Changelog + Upgrade Notice). Also the test pins:
@@ -540,7 +541,9 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    `build:admin` (there is no `client` vite mode) and was removed in PRO-1949.
 3. `composer run install-block-modules && composer run build` → `blocks/*/build/*`
    (the first installs `blocks/node_modules`; without it `wp-scripts` is missing).
-4. Translations: run **`bash bin/build-i18n.sh`** (needs the wp-env container) to
+4. Translations: run **`bash bin/build-i18n.sh`** (uses the wp-env container by
+   default; set `WP_CLI_BIN=vendor/bin/wp` to run the wp-cli steps on the host
+   instead, which is what CI does) to
    rebuild `languages/*.mo` + `*.json` — including the admin-bundle catalog
    `…-et-464ceaab….json` — from the committed `.po`. The plain `compile-translations`
    composer script does NOT produce the correct admin-bundle JSON (see the i18n note
@@ -548,7 +551,10 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    `*.mo`/`*.json` already on disk are current (they are gitignored, shipped from disk).
 5. `composer install --no-dev --optimize-autoloader` (prod vendor) →
    `composer run package` → `composer install` (restore dev so tests work again).
-6. VERIFY the ZIP before releasing: version string; required present
+6. VERIFY the ZIP before releasing — **`bash bin/verify-release-zip.sh
+   smaily-connect.zip [expected-version]`** does every check in this step and
+   exits non-zero on any failure (CI runs the same script): version string;
+   required present
    (`dist/admin/admin.js`, `dist/public/js/sc-runtime.js`,
    `dist/public/js/sc-landing.js`, `blocks/*/build/*`,
    `vendor/autoload.php`, `languages/*.mo`, `build-hash.txt` at the root);
@@ -568,9 +574,25 @@ it fails) — so the authoritative ZIP is built LOCALLY. Full sequence (verified
    e.g. `gh release create v3.3.2 smaily-connect.zip --repo … --target main
    --title "…" --notes-file …`, NO `--prerelease`. (The OLD beta line used
    `v<version>-rc.<N>` + `--prerelease`; that's history, don't copy it for a GA
-   release.) `release.yml` fires on publish but fails harmlessly (no wp-cli) →
-   does NOT clobber the attached asset (confirmed: prior releases' release.yml
-   runs are all red too).
+   release.) On THIS fork `release.yml` now also fires on publish and builds +
+   attaches its own verified ZIP — so either upload the local one first and let
+   CI overwrite it with the identical build, or skip the local asset entirely.
+   (Historical note: the fork's pre-PRO-2277 release runs are all red — that was
+   the old broken workflow, not a signal about the release.)
+
+**The official (sendsmaily) repo publishes from CI — the ZIP is NOT built locally
+there.** The maintainer's path is: (1) create a GitHub release whose tag is the
+**PLAIN version, no `v` prefix** (`3.11.2` — that is what `release.sh` builds its
+download URL from and what upstream history uses; the workflow tolerates a leading
+`v` but don't rely on it), (2) `release.yml` builds admin + both storefront bundles
++ blocks + translations + a `--no-dev` vendor tree, runs
+`bin/verify-release-zip.sh` and attaches `smaily-connect.zip` to the release,
+(3) `./release.sh -u sendsmaily` pushes that asset to the wordpress.org SVN.
+A tag that doesn't match the plugin header version fails the run **before**
+anything is uploaded. To dry-run the builder without touching a release:
+`gh workflow run release.yml --repo <owner>/smaily-wordpress-plugin --ref main`
+— on `workflow_dispatch` the verified ZIP is uploaded as a workflow ARTIFACT
+(`gh run download <id>`), never as a release asset.
 
 ### CI "Lint and test the codebase" is PRE-EXISTING red on main — not authoritative
 The GH workflow runs `composer run test:php` (= bare `phpunit`, includes the

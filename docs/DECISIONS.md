@@ -5369,6 +5369,56 @@ there.
 "maps carry the source" claim it supersedes), F3-41 (the shipped bundle names
 the strip runs over).
 
+### PRO-2277 — The release workflow builds the shippable ZIP; on the official repo the CI build is the authoritative one, tagged with the plain version (2026-09-03)
+
+**Context:** the plugin ZIP is not `composer run package` — it is a six-step
+build (admin vite pass, the chained landing pass, `wp-scripts` blocks, the i18n
+catalogs incl. the fixed-name admin-bundle JSON, a `--no-dev` vendor tree,
+then the package). `release.yml` ran three of those steps: no vite build at
+all, a `compile-translations` that calls a bare `wp` not on PATH (wp-cli is at
+`vendor/bin/wp`) and would not produce the admin-bundle JSON name anyway, and
+the DEV vendor tree. Every release so far was therefore cut by hand from the
+sequence in CLAUDE.md. That was liveable while releases went to a fork; it is
+not liveable for the official `sendsmaily` repo, where the publish path is
+"create a release → CI attaches `smaily-connect.zip` → `./release.sh -u
+sendsmaily` pushes that asset to wordpress.org SVN" — a broken asset there
+installs silently broken on merchant stores.
+
+**Decision:** `release.yml` now runs the documented local sequence end to end
+and gates the result with `bin/verify-release-zip.sh`, which asserts the
+required build outputs are present, the development-only material is absent, no
+shipped bundle keeps a `sourceMappingURL` trailer, the archive root is
+`smaily-connect/` (what `release.sh` copies into the SVN trunk), and the
+version is internally consistent. On the official repo the CI ZIP is the
+authoritative artifact. **The release tag there is the PLAIN version
+(`3.11.2`), no `v` prefix** — that is what `release.sh` builds its download URL
+from and what upstream history uses; a tag that does not equal the plugin
+header version fails the run before anything is uploaded. A leading `v` is
+tolerated so the fork's own `v3.x` habit cannot break a run, but the plain form
+is the convention. `workflow_dispatch` builds and verifies the same ZIP and
+uploads it as a workflow ARTIFACT only — a dispatch never writes to a release.
+
+**Rationale:** the failure mode being closed is silent, not loud — a ZIP
+missing `dist/admin/admin.js` installs fine and simply has no admin UI, and a
+ZIP carrying the dev vendor tree ships phpunit to merchants. A gate that runs
+in the same job that produces the artifact is the only place that cannot be
+skipped. Keeping the verification in a script rather than inline YAML is what
+lets the local sequence be checked with the identical rules, which is how the
+CI build is held to the local one.
+
+**Alternatives:** (a) keep building locally and hand the maintainer a ZIP —
+rejected, it makes every official release depend on one machine's toolchain and
+on remembering six steps in order; (b) inline the checks in the workflow —
+rejected, they would then only ever run in CI, and the local sequence (still
+the reference build) would have no gate; (c) run `composer run
+compile-translations` in CI — rejected, it does not produce the admin-bundle
+JSON under the name WordPress requests, so the admin UI would silently fall
+back to English.
+
+**Relationships:** PRO-1949 (the `sourceMappingURL` strip the verifier
+enforces), PRO-1781 (the source exclusions it enforces), PRO-1196 (the
+wordpress.org publish path this unblocks).
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

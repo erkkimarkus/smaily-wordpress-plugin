@@ -12,8 +12,10 @@
 # Inputs (committed):  languages/smaily-connect-et.po (msgids + translations)
 # Outputs (gitignored, shipped in the ZIP): languages/*.mo, languages/*.json
 #
-# Requires wp-cli, which the host lacks — so the wp-cli steps run inside the wp-env
-# CLI container. Run from the plugin root:  bash bin/build-i18n.sh
+# Requires wp-cli. By default the wp-cli steps run inside the wp-env CLI container
+# (the local dev setup); set WP_CLI_BIN to a wp-cli binary — e.g. the dev-vendor
+# one, WP_CLI_BIN=vendor/bin/wp — to run them on the host instead, which is what
+# CI does (no Docker there). Run from the plugin root:  bash bin/build-i18n.sh
 set -euo pipefail
 cd "$( dirname "$0" )/.."
 
@@ -22,14 +24,20 @@ cd "$( dirname "$0" )/.."
 ADMIN_JSON_HASH="464ceaab21588225a35cae9f83dfa47d"
 LANG=et
 
-# Locate the wp-env dev CLI container (not the -tests- one).
-CONTAINER="$( docker ps --format '{{.Names}}' 2>/dev/null | grep -E 'wp-env.*-cli-1$' | grep -v tests | head -1 )"
-if [ -z "$CONTAINER" ]; then
-	echo "!! wp-env CLI container not found. Start it with: npx @wordpress/env start" >&2
-	exit 1
+WP_CLI_BIN="${WP_CLI_BIN:-}"
+if [ -n "$WP_CLI_BIN" ]; then
+	wpc() { "$WP_CLI_BIN" i18n "$@" --allow-root; }
+else
+	# Locate the wp-env dev CLI container (not the -tests- one).
+	CONTAINER="$( docker ps --format '{{.Names}}' 2>/dev/null | grep -E 'wp-env.*-cli-1$' | grep -v tests | head -1 )"
+	if [ -z "$CONTAINER" ]; then
+		echo "!! wp-env CLI container not found. Start it with: npx @wordpress/env start" >&2
+		echo "   (or point WP_CLI_BIN at a wp-cli binary, e.g. WP_CLI_BIN=vendor/bin/wp)" >&2
+		exit 1
+	fi
+	P=/var/www/html/wp-content/plugins/smaily-connect
+	wpc() { docker exec "$CONTAINER" sh -c "cd $P && wp i18n $* --allow-root"; }
 fi
-P=/var/www/html/wp-content/plugins/smaily-connect
-wpc() { docker exec "$CONTAINER" sh -c "cd $P && wp i18n $* --allow-root"; }
 
 echo "1/6  Transpile admin/src TS/TSX -> _i18n-src (so make-pot can read the __() calls)"
 rm -rf _i18n-src
@@ -55,14 +63,24 @@ import json, glob
 json.dump({ p: "dist/admin/admin.js" for p in sorted(glob.glob('_i18n-src/**/*.js', recursive=True)) },
           open('languages/i18n-map.json', 'w'))
 PY
-wpc make-json "languages/smaily-connect-${LANG}.po" languages/ --use-map=languages/i18n-map.json --no-purge
+# `--purge` (which we must switch off, or make-json strips the JS strings out of
+# the committed .po) only exists in older i18n-command releases; newer ones
+# dropped purging altogether and reject the flag. Pass it only when understood.
+purge_flag=""
+if wpc make-json --help 2>/dev/null | grep -q -- '--purge'; then
+	purge_flag="--no-purge"
+fi
+wpc make-json "languages/smaily-connect-${LANG}.po" languages/ --use-map=languages/i18n-map.json ${purge_flag}
 # The combined admin catalog is the .po-derived JSON with the most strings; rename it
 # to the name WordPress requests for dist/admin/admin.js.
 combined="$( for f in languages/smaily-connect-${LANG}-*.json; do
 		n=$( python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['locale_data']['messages']))" "$f" )
 		echo "$n $f"
 	done | sort -rn | head -1 | awk '{print $2}' )"
-mv "$combined" "languages/smaily-connect-${LANG}-${ADMIN_JSON_HASH}.json"
+target="languages/smaily-connect-${LANG}-${ADMIN_JSON_HASH}.json"
+# Newer i18n-command releases already name the catalog after the MAPPED path, so
+# --use-map lands it on WP's name and there is nothing to rename.
+[ "$combined" = "$target" ] || mv "$combined" "$target"
 
 echo "6/6  Tidy references + drop transient build inputs"
 sed -i -E 's#_i18n-src/(.*)\.js#admin/src/\1.tsx#g' languages/smaily-connect.pot "languages/smaily-connect-${LANG}.po" || true
