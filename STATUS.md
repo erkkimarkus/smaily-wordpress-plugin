@@ -26,7 +26,48 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-08-10 (**PRO-1949 — the release ZIP no longer ships source
+_Last updated: 2026-09-03 (**PRO-2277 — the release workflow now builds the
+shippable ZIP, and refuses a wrong one.** The ZIP is a six-step build; the old
+`release.yml` ran three of them — no vite pass at all (so no `dist/admin/*` and
+neither storefront bundle), a `compile-translations` calling a bare `wp` that is
+not on PATH (wp-cli is `vendor/bin/wp`) and that would not produce the
+admin-bundle JSON name WordPress requests anyway, and the **dev** vendor tree
+(phpunit, phpstan, wp-cli shipped to merchants). That was survivable while every
+release was hand-cut locally; it is not, now that PRO-1196's publish path on the
+official `sendsmaily` repo is "create a release → CI attaches
+`smaily-connect.zip` → `./release.sh -u sendsmaily` pushes that asset to the
+wordpress.org SVN". The workflow now runs the documented local sequence end to
+end (`npm ci` → `npm run build:admin` → blocks → `bin/build-i18n.sh` →
+`--no-dev` composer → `composer run package`) and gates the result with the new
+**`bin/verify-release-zip.sh`** (also runnable locally against any ZIP): required
+outputs present, dev-only material absent, no `sourceMappingURL` trailer in the
+three shipped bundles, archive root `smaily-connect/` (what `release.sh` copies
+into the SVN trunk), version consistent across header/constant/Stable tag.
+**A release tag that does not equal the plugin header version fails the run
+before anything is uploaded**; the tag convention on the official repo is the
+**PLAIN version** (`3.11.2`, no `v` — that is what `release.sh` builds its
+download URL from), with a leading `v` tolerated. `workflow_dispatch` builds and
+verifies the same ZIP but uploads it only as a workflow **artifact** — a dispatch
+never writes to a release. `bin/build-i18n.sh` gained a `WP_CLI_BIN` escape hatch
+so the wp-cli steps can run on the host (no Docker on the runner; the wp-env
+container stays the local default), plus two newer-wp-cli fixes (the dropped
+`--purge` flag; `--use-map` already naming the catalog after the mapped path, so
+the rename is a no-op). **Evidence:** fork dry run
+[33742934146](https://github.com/erkkimarkus/smaily-wordpress-plugin/actions/runs/33742934146)
+green on the first try; its artifact and a locally built ZIP from the same commit
+(`ac1a8c9`) have **identical 376-entry file lists** and the same build stamp, both
+pass the verifier, and the only content differences are two embedded
+`PO-Revision-Date` timestamps and `vendor/composer/InstalledVersions.php`/`LICENSE`
+(the runner's composer version) — the `.mo`/`.json` translation payloads are
+byte-identical in content (177 / 361 entries). The refusal path was demonstrated
+locally (`verify-release-zip.sh smaily-connect.zip 3.11.2` → exit 1). NB the host
+wp-cli's `make-mo` keeps JS-only strings **out** of the `.mo` (they live in the
+JSON catalog the admin bundle loads), so the `.mo` is ~40 kB smaller than the
+container-built one and the ZIP is ~866 kB — strings referenced from PHP are
+unaffected (verified: every dual-referenced string is still in the `.mo`).
+**No version bump — ships with the next release cut.** DECISIONS PRO-2277.)_
+
+Prior: 2026-08-10 (**PRO-1949 — the release ZIP no longer ships source
 maps.** Erkki's call today: strip them. A vite map embeds the whole TypeScript
 tree via `sourcesContent`, so `dist/admin/admin.js.map` alone was ~966 kB of a
 ~1.14 MB ZIP and quietly undid the fresh PRO-1781 source exclusions — **this
