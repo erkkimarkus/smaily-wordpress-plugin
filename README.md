@@ -2,9 +2,9 @@
 
 A WordPress plugin that integrates WooCommerce with [Smaily](https://smaily.com), an email marketing platform. It syncs customer and order data to Smaily for transactional and marketing automation, and connects WooCommerce stores to **Smaily Campaign Intelligence** for personalized product recommendations in email campaigns.
 
-**Status: 3.0.0 — first general-availability release.** The plugin is feature-complete and hardened (WordPress.org Plugin Check pass, full unit + real-environment integration coverage). It is distributed here via [GitHub Releases](../../releases); it is versioned 3.x because an unrelated upstream `2.0.0` (a 1.x-line WordPress 7.0 bump) occupies the `smaily-connect` slot on wordpress.org — see [Relationship to upstream](#relationship-to-upstream).
+**Status: 3.0.0 — first general-availability release.** The plugin is feature-complete and hardened (WordPress.org Plugin Check pass, full unit + real-environment integration coverage). It is developed and released in the official repository [`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin) and distributed to merchants through wordpress.org; it is versioned 3.x because an unrelated `2.0.0` (a 1.x-line WordPress 7.0 bump) already occupies the `smaily-connect` slot on wordpress.org — see [Relationship to the 1.x line](#relationship-to-the-1x-line).
 
-This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin) that carries the legacy 1.x code alongside a new 2.x/3.x architecture which coexists with it during the transition.
+The repository carries the legacy 1.x code alongside the new 2.x/3.x architecture, which coexists with it during the transition.
 
 ---
 
@@ -25,7 +25,7 @@ See [`docs/DECISIONS.md`](docs/DECISIONS.md) for the architecture and the ration
 
 3.0.0 is the first GA build. Phase 1–3 (coexistence, the wizard + admin UI, and the full Campaign Intelligence integration — catalog / customers / orders / browse ingest, backfill, identity-merge, GDPR) are complete and each ingest domain was verified against the deployed engine. Pilot-hardening (Event Log, retry, health notices, queue retention) is in place, and a pre-3.0 security + code-quality + WordPress.org Plugin Check audit landed with all findings addressed (see [`docs/audits/`](docs/audits/)).
 
-What's next is **a real-merchant pilot** (acceptance criteria in [`docs/TESTING.md`](docs/TESTING.md)) and then the **upstream merge** — folding the rewrite back into the wordpress.org plugin.
+What's next is **a real-merchant pilot** (acceptance criteria in [`docs/TESTING.md`](docs/TESTING.md)) and the wordpress.org release of the merged plugin.
 
 ---
 
@@ -82,7 +82,7 @@ Project / developer documentation lives in [`docs/`](docs/) — start with [`doc
 ## Development
 
 ```bash
-git clone https://github.com/erkkimarkus/smaily-wordpress-plugin.git
+git clone https://github.com/sendsmaily/smaily-wordpress-plugin.git
 cd smaily-wordpress-plugin
 composer install && npm install
 npx @wordpress/env start    # WordPress + WooCommerce in Docker, at http://localhost:8888
@@ -103,11 +103,11 @@ The integration suite covers the boundary cases where unit tests can mislead (se
 
 ---
 
-## Relationship to upstream
+## Relationship to the 1.x line
 
-This repository is a fork of [`sendsmaily/smaily-wordpress-plugin`](https://github.com/sendsmaily/smaily-wordpress-plugin), the official Smaily-maintained plugin. The two share the `smaily-connect` wordpress.org slug but are, today, different codebases: upstream's `2.0.0` is the continuation of the 1.x line (a minimum-version bump), while this fork is a parallel rewrite that **preserves the full legacy feature set and adds** the new architecture, admin UI, and Campaign Intelligence integration.
+The 3.x rewrite **preserves the full legacy feature set and adds** the new architecture, admin UI, and Campaign Intelligence integration. It is versioned **3.x** so it lands monotonically over the `2.0.0` that continues the 1.x line (a minimum-version bump) on the same `smaily-connect` wordpress.org slug.
 
-To land monotonically and to avoid wordpress.org silently overwriting the fork mid-pilot, this fork is versioned **3.x** and ships an `Update URI` header that opts it out of wordpress.org auto-updates. The eventual **upstream merge** folds the rewrite back into the official plugin; upstream commit history is tracked in [`docs/audits/UPSTREAM_AUDIT.md`](docs/audits/UPSTREAM_AUDIT.md) and the codebase comparison in [`docs/audits/UPSTREAM_COMPARISON.md`](docs/audits/UPSTREAM_COMPARISON.md).
+The rewrite was developed in a fork (`erkkimarkus/smaily-wordpress-plugin`) and merged back here; that fork is archived read-only as history, and this repository is the one working address. The divergence at merge time is recorded in [`docs/audits/UPSTREAM_AUDIT.md`](docs/audits/UPSTREAM_AUDIT.md) and [`docs/audits/UPSTREAM_COMPARISON.md`](docs/audits/UPSTREAM_COMPARISON.md).
 
 ---
 
