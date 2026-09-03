@@ -177,8 +177,13 @@ and the brand, and the rewrite couples the public plugin to Smaily Campaign Inte
 **Open questions for the Smaily team:**
 1. Does Smaily want the public wordpress.org plugin to carry the Campaign Intelligence
    integration (vs. keeping it fork-/pilot-only)?
-2. If yes — who owns the wordpress.org SVN publish, and on what timeline relative to the
-   pilot?
+2. ~~If yes — which repository is the working one afterwards, who owns the wordpress.org
+   SVN publish, and on what timeline relative to the pilot?~~ **Answered (2026-09-03,
+   PRO-2281):** once PR #135 merges, the official repository's `main` is the working
+   repository and the fork is archived read-only as history; releases are cut there
+   under a plain version tag and Erkki runs the wordpress.org SVN publish via
+   `./release.sh -u sendsmaily`. Timeline: the first official release (3.11.2) follows
+   the merge, ahead of the remaining pilot acceptance batch.
 3. Confirm the fork's PHP 8.0 floor (stricter than upstream #128's PHP 7.4 ask) is
    acceptable for the ~2,000 existing installs — see the item 5 disposition above.
 

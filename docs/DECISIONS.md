@@ -5419,6 +5419,48 @@ back to English.
 enforces), PRO-1781 (the source exclusions it enforces), PRO-1196 (the
 wordpress.org publish path this unblocks).
 
+### PRO-2281 — The official repository is the working repository; the fork is archived history (2026-09-03)
+
+**Context:** the v3 rewrite was built in the fork
+`erkkimarkus/smaily-wordpress-plugin` because there was no write access to
+`sendsmaily/smaily-wordpress-plugin`. Maintainer access was granted 2026-09-02
+and PR #135 folds the rewrite into the official repository, so from the merge
+on there are two addresses for the same plugin with no rule saying which one is
+real. That ambiguity has already cost us once at merchant level: `readme.txt`
+still pointed at the fork's releases page for the 1.x/2.x version history
+(PRO-2280).
+
+**Decision:** after PR #135 merges, the official repository's `main` is the
+working repository — development, issues, releases. The fork is archived
+read-only as history (its releases stay readable; nothing new is cut there).
+Releases are created in the official repo under a **plain** version tag
+(`3.11.2`, no `v` — PRO-2277), the release workflow builds and verifies the
+ZIP, and `./release.sh -u sendsmaily` publishes it to wordpress.org. The first
+official release is a fresh 3.11.2, not a re-tag of the fork's 3.11.1 (main has
+behaviour changes since that tag). The developer docs follow: `README.md`'s
+clone address and distribution sentence, the CLAUDE.md release runbook and
+`docs/DEVELOPER.md` name the official repo, and the fork flow (`v`-prefixed
+tag, `--repo erkkimarkus/…`, a hand-uploaded ZIP) is marked HISTORY rather than
+offered as an alternative.
+
+**Rationale:** one canonical address. wordpress.org distribution is the goal
+(~2,000 existing installs update from there), and the SVN publish reads the
+official repo's release asset — a second live address invites exactly the drift
+the readme showed, where a merchant or a developer is sent to a repository that
+no longer receives the work.
+
+**Alternatives considered:** (a) keep developing in the fork and merge upstream
+per release — rejected, it makes every release a merge and keeps two histories
+diverging for no benefit now that access exists; (b) delete the fork — rejected,
+its releases and issue history are the record of the rewrite, so read-only
+archive rather than removal.
+
+**Relationships:** PRO-1196 (the upstream merge this closes the loop on),
+PRO-2277 (the CI build + plain tag it depends on), PRO-2280 (the readme address
+fix that surfaced the two-address problem), F3-35 (the `Update URI` opt-out that
+was removed ahead of the merge).
+
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or
