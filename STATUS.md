@@ -26,7 +26,32 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**3.11.2 version bump — the tree is release-ready;
+_Last updated: 2026-09-04 (**PRO-2298 — the wizard's Campaign Intelligence
+step now carries marketing's final introduction (GMS-11).** The two sentences
+the step opened with ("Sync product, customer and order data to Smaily Campaign
+Intelligence…" + "Contact Smaily to activate Campaign Intelligence tool and more
+automation workflows.") are replaced by Tanel's final copy, verbatim per Erkki's
+2026-09-04 decision — one paragraph on what Campaign Intelligence does for the
+merchant, one on what it costs (€250/month on top of the regular Smaily monthly
+payment) and how to activate it. Estonian is Erkki's draft in this commit and
+**still awaits his proofread before the release**; the product name stays
+untranslated, matching the heading's existing ET msgstr. Wizard-only: the
+`inSettings` branch of `Step4Recommendations` is untouched, so the Settings tab
+gains no introduction. Catalogs: both msgids replaced in
+`languages/smaily-connect.pot` + `…-et.po` (nothing else used the old strings)
+and the gitignored `.mo`/`.json` rebuilt with `bin/build-i18n.sh` — the admin
+catalog `smaily-connect-et-464ceaab21588225a35cae9f83dfa47d.json` carries both
+ET strings. New `Step4Recommendations.test.tsx` pins all three acceptance
+criteria (both paragraphs render in the wizard, the old sentence is gone, the
+header block is absent under `inSettings`). `readme.txt` gains one merchant
+line in the existing `= 3.11.2 =` block; **no version number changes** — this
+ships in 3.11.2, which is still untagged. Gates: `npm run ci:strict` exit 0 (288
+JS tests); no PHP changed, so no integration run. Browser-rendered ET remains
+human acceptance — `playwright-core` is not installed in this checkout, so the
+evidence is the built bundle (EN msgid present) plus the ET catalog under WP's
+expected `md5('dist/admin/admin.js')` filename.)_
+
+Prior: 2026-09-04 (**3.11.2 version bump — the tree is release-ready;
 nothing is tagged.** Version `3.11.2` in the four places plus the three test
 pins (`smaily-connect.php` header + both constants, `package.json`,
 `readme.txt` Stable tag, `tests/Unit/ConstantsTest.php`, `tests/bootstrap.php`,
@@ -212,8 +237,11 @@ Docs-only; no code, so no gates run.)_
 - **(b) PRO-2283 gate — NEXT, and it is Erkki's** (one-way door): merge PR #135 →
   `gh release create 3.11.2 --repo sendsmaily/smaily-wordpress-plugin --target
   main` (plain tag, no `v`, no local ZIP argument) → CI attaches the verified ZIP
-  → `./release.sh -u sendsmaily`; then update the pilot stores by hand, archive
-  the fork read-only, repoint `origin` at the official repo.
+  → `./release.sh -u sendsmaily`; then update the pilot stores by hand and
+  archive the fork read-only. `origin` ALREADY points at the official repo,
+  whose `main` is protected — until PR #135 merges, work still lands on the fork
+  (`git push https://github.com/erkkimarkus/smaily-wordpress-plugin.git
+  main:main`), which is that PR's head.
 - **PRO-2295 decided:** no rollback rehearsal — `docs/MIGRATION.md` keeps its
   honest hedge that the 3.11.2 → 2.0.0 direction was not rehearsed.
 - Human acceptance on a real legacy store is still open for PRO-2286 (criterion
@@ -222,9 +250,10 @@ Docs-only; no code, so no gates run.)_
 - **(c) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +
   PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian admin-strings
   spot-check (the ZIP's `.mo` is host-built — PRO-2277).
-- **(d)** PRO-1770 needs Erkki's list of stores; GMS-11 Campaign Intelligence
-  promo text for the wizard's CI step waits on marketing's final copy, then
-  EN+ET; PRO-1893 tenant-inactive handling needs a design nod first.
+- **(d)** PRO-1770 needs Erkki's list of stores; PRO-1893 tenant-inactive
+  handling needs a design nod first. **GMS-11 / PRO-2298 is DONE** (in 3.11.2) —
+  the only thing left on it is Erkki's proofread of the Estonian paragraphs
+  before the release.
 - **Open question:** PRO-1878 awaits the engine team's answer (since 2026-08-10).
   **Low backlog filed today:** PRO-2279 (Actions majors), PRO-2282 (developer
   README), PRO-2288 (POT slug on host builds).

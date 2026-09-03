@@ -56,13 +56,13 @@ export function Step4Recommendations({
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
             {__(
-              'Sync product, customer and order data to Smaily Campaign Intelligence to send personalised product recommendations via Smaily automation workflows or in your campaigns. Optional — you can come back and set this up later.',
+              'Campaign Intelligence uses your store’s product, customer and order data to create personalised product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.',
               'smaily-connect',
             )}
           </p>
           <p className="mt-2 text-sm text-text-secondary">
             {__(
-              'Contact Smaily to activate Campaign Intelligence tool and more automation workflows.',
+              'Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later.',
               'smaily-connect',
             )}
           </p>

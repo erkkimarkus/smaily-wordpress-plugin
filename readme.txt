@@ -97,6 +97,7 @@ Only releases from 3.0.0 onward are listed here. The complete version history, i
 * Improved: on a store upgrading from an older plugin version, the daily contact catch-up sync now waits until the setup wizard has been confirmed, so it cannot run against a half-configured store. Live contact syncing (signups, profile changes, checkout opt-in) keeps working throughout.
 * Improved: the release package is now built and verified automatically for every release, and no longer carries developer-only source maps or TypeScript sources.
 * Improved: the migration guide now describes the 2.0.0 to 3.11.2 upgrade merchants actually take through the WordPress updater.
+* Improved: the setup wizard's Campaign Intelligence step now explains what the add-on does, what it costs and how to activate it.
 
 = 3.11.1 =
 * Fixed: the order-completion signal sent to Smaily Campaign Intelligence no longer depends on the shopper keeping the order-received page open. It is sent as soon as the order is confirmed, so completed orders are no longer under-counted when recommendations are computed.

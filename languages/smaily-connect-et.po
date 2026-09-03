@@ -2465,12 +2465,12 @@ msgid "Minimum 10 minutes. Abandoned carts older than the set period are checked
 msgstr "Minimaalselt 10 minutit. Kontrollitakse määratud ooteajast vanemaid hüljatud ostukorve."
 
 #: admin/src/components/steps/Step4Recommendations.tsx:21
-msgid "Sync product, customer and order data to Smaily Campaign Intelligence to send personalised product recommendations via Smaily automation workflows or in your campaigns. Optional — you can come back and set this up later."
-msgstr "Sünkroniseeri toote-, kliendi- ja tellimusandmed Smaily Campaign Intelligence’i, et saata Smaily kaudu isikupärastatud tootesoovitusi. Valikuline — võid naasta ja selle hiljem seadistada."
+msgid "Campaign Intelligence uses your store’s product, customer and order data to create personalised product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work."
+msgstr "Campaign Intelligence kasutab sinu poe toote-, kliendi- ja tellimuseandmeid, et luua Smaily kampaaniate ja automaatikate jaoks personaalseid tootesoovitusi. Nii saad saata asjakohasemaid kirju vähema käsitööga."
 
 #: admin/src/components/steps/Step4Recommendations.tsx:25
-msgid "Contact Smaily to activate Campaign Intelligence tool and more automation workflows."
-msgstr "Võta ühendust Smailyga, et saada ligipääs Campaign Intelligence tööriistale ning lisaautomaatikatele."
+msgid "Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later."
+msgstr "Campaign Intelligence on valikuline tasuline lisateenus (250 €/kuus), mis lisandub sinu tavapärasele Smaily kuumaksele. Aktiveerimiseks võta Smailyga ühendust või seadista see hiljem."
 
 #: admin/src/components/steps/Step4Recommendations.tsx:34
 msgid "Engine connected — now wire up the Campaign Intelligence automation workflows"
