@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 use Smaily\Connect\Constants;
 use Smaily\Connect\Integrations\WooCommerce\LegacyHookBridge;
 use Smaily\Connect\Settings\Credentials;
+use Smaily\Connect\Settings\SetupState;
 use Smaily\Connect\Smaily\ContactSyncMode;
 use WP_Error;
 use WP_REST_Request;
@@ -173,7 +174,7 @@ class SettingsEndpoint {
 	 * boot reads next time the merchant lands on /wizard.
 	 */
 	private function save_finish(): WP_REST_Response {
-		update_option( 'smly_plus_setup_completed', true );
+		update_option( SetupState::OPTION_SETUP_COMPLETED, true );
 
 		// P1 #1: hand contact sync to the new path. The gate (read on every
 		// WooCommerce event) opens the moment the option above flips; strip

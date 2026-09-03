@@ -22,6 +22,7 @@ use Smaily\Connect\Multilingual\TranslatePressAdapter;
 use Smaily\Connect\Multilingual\WPMLAdapter;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Settings\SetupState;
 use Smaily\Connect\Smaily\ContactSyncMode;
 use Smaily\Connect\Smaily\SubscriberPayloadBuilder;
 
@@ -429,7 +430,7 @@ class EnvDetector {
 			// uses this to know whether the merchant has completed at
 			// least one walk-through; Phase-2 logic doesn't gate on
 			// it, but Phase-3 progressive-disclosure (sub-PR 2.I) will.
-			'setupCompleted'                => (bool) get_option( 'smly_plus_setup_completed', false ),
+			'setupCompleted'                => SetupState::completed(),
 			// Empty string when the option was never set — lets hydrate
 			// pick an env-aware default (Mode B for multilingual sites,
 			// 'single' otherwise). Once the merchant explicitly saves a

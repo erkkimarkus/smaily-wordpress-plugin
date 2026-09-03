@@ -99,7 +99,7 @@ function smaily_connect_render_settings_page(): void {
 		wp_die( esc_html__( 'You do not have permission to view this page.', 'smaily-connect' ) );
 	}
 
-	if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+	if ( ! \Smaily\Connect\Settings\SetupState::completed() ) {
 		wp_safe_redirect( admin_url( 'admin.php?page=smaily-connect-wizard' ) );
 		exit;
 	}

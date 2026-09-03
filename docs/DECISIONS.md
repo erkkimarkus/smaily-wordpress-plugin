@@ -5550,6 +5550,41 @@ rehearsal that found it), PRO-2286 (the other rehearsal finding), P1 #1 /
 `HookHandler::gate_closed()` (the live-path gate this mirrors).
 
 
+### PRO-2292 — The setup-completed flag has one accessor, `SetupState::completed()` (2026-09-04)
+
+**Context:** the wizard-completion flag `smly_plus_setup_completed` gated six
+things — the live checkout/registration sync (`HookHandler::gate_closed()`), the
+cart tracker, the abandoned-cart sweeper, the Settings screen redirect, the
+`EnvDetector` hydration and, since PRO-2287, the daily contact-sync tick — and
+every one of them read the option raw with its own spelling. `HookHandler` kept
+the key in a *private* const, so nothing else could reuse it even if it wanted
+to. That is the shape of the PRO-1742 bug: a gate reading a key nothing ever
+wrote, invisible until the one merchant it bites reports it.
+
+**Decision:** one public accessor, `Smaily\Connect\Settings\SetupState::
+completed()`, with `SetupState::OPTION_SETUP_COMPLETED` as the single definition
+of the key. Every gate calls it; the wizard's Finish route
+(`SettingsEndpoint::save_finish()`) writes through the same constant.
+`HookHandler`'s private const is removed (nothing outside referenced it). No
+behaviour change: the accessor is exactly the `(bool) get_option( …, false )`
+every site already ran — all six agreed on that truthiness, so nothing had to be
+unified.
+
+**Rationale:** the `ContactSyncMode::sync_enabled()` precedent, applied to the
+flag's twin. A gate that spells its own key is one typo away from being a gate
+that never closes, and the miss is silent in both directions.
+
+**Alternatives considered:** (b) make `HookHandler::OPTION_SETUP_COMPLETED`
+public and have the others import it — rejected: a WooCommerce hook handler is
+the wrong owner for a wizard-state key, and `Bootstrap`/`EnvDetector` would then
+depend on it for no reason; (c) leave it — rejected: PRO-1742 is the cost of
+leaving it.
+
+**Relationships:** PRO-1742 (the precedent and the same bug class), PRO-2287
+(the newest of the read sites), P1 #1 / `HookHandler::gate_closed()` (the
+gate whose const this replaces).
+
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

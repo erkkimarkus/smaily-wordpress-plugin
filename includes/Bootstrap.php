@@ -37,6 +37,7 @@ use Smaily\Connect\REST\BackfillEndpoint;
 use Smaily\Connect\REST\EndpointRegistry;
 use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Settings\SetupState;
 use Smaily\Connect\Smaily\AutomationRouter;
 use Smaily\Connect\Smaily\CartAbandonmentSweeper;
 use Smaily\Connect\Smaily\CartFlusher;
@@ -239,7 +240,7 @@ final class Bootstrap {
 			static function () use ( $notify_bootstrap ): ?Client {
 				// Only probe Smaily once the email wizard is finished — an
 				// un-set-up store isn't "down", just unconfigured.
-				if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+				if ( ! SetupState::completed() ) {
 					return null;
 				}
 				return $notify_bootstrap->smaily_client();
@@ -372,7 +373,7 @@ final class Bootstrap {
 	 * tick after the wizard is confirmed.
 	 */
 	public function on_contact_sync_tick(): void {
-		if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+		if ( ! SetupState::completed() ) {
 			\Smaily\Connect\Support\DebugLog::write( '[smaily-connect contact.sync] skipped: setup not completed' );
 			return;
 		}
@@ -572,7 +573,7 @@ final class Bootstrap {
 		// re-registers them at every plugin load, so this must run every
 		// request — not once at Finish). Before Finish the new HookHandler
 		// gate keeps this path dormant and the legacy hooks stay in place.
-		if ( (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+		if ( SetupState::completed() ) {
 			LegacyHookBridge::deregister_subscriber_sync();
 		}
 	}
@@ -953,7 +954,7 @@ final class Bootstrap {
 		return new ProfilingConsent(
 			$this->rec_engine_settings(),
 			static function () use ( $bootstrap ): ?Client {
-				if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+				if ( ! SetupState::completed() ) {
 					return null;
 				}
 				return $bootstrap->smaily_client();

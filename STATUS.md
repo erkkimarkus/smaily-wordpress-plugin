@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**PRO-2298 — the wizard's Campaign Intelligence
+_Last updated: 2026-09-04 (**PRO-2292 — the setup-completed flag is read
+through one accessor.** `smly_plus_setup_completed` gated six things and every
+one of them read the option raw with its own spelling; `HookHandler` kept the key
+in a *private* const, so nothing else could reuse it. That is the PRO-1742 bug
+shape (a gate reading a key nothing ever wrote), so the key now has one
+definition — `Settings\SetupState::OPTION_SETUP_COMPLETED` — and one reader,
+`SetupState::completed()`. Callers: `HookHandler::gate_closed()`,
+`CartHookHandler::tracking_enabled()`, `CartAbandonmentSweeper::enabled()`, four
+`Bootstrap` sites (the NotificationManager Smaily probe, `on_contact_sync_tick()`
+incl. the PRO-2287 gate, the LegacyHookBridge strip, the ProfilingConsent client
+factory), `EnvDetector`'s `setupCompleted` hydration and `admin/wizard.php`'s
+Settings redirect; the wizard's Finish route (`SettingsEndpoint::save_finish()`)
+writes through the same constant. **No behaviour change** — all six sites already
+ran the identical `(bool) get_option( …, false )`, so nothing had to be unified
+and no existing test expectation moved; the once-per-request gate log stays in
+`gate_closed()` where it was. New `tests/Unit/Settings/SetupStateTest.php` pins
+the accessor's truthiness (unset/on-shapes/off-shapes) and the key string. Gates:
+`npm run ci:strict` **exit=0** (PHPUnit unit **754**, vitest **288**, PHPCS 0
+errors, PHPStan `[OK] No errors`) and `sg docker -c "composer run
+test:integration"` **OK 256 tests / 1492 assertions, 1 pre-existing skip**, dev
+sandbox tenant "Smaily Connect test" restored. **No version bump** — ships in
+3.11.2, which is still untagged. DECISIONS PRO-2292; CLAUDE.md's PRO-1742 note
+names the twin.)_
+
+Prior: 2026-09-04 (**PRO-2298 — the wizard's Campaign Intelligence
 step now carries marketing's final introduction (GMS-11).** The two sentences
 the step opened with ("Sync product, customer and order data to Smaily Campaign
 Intelligence…" + "Contact Smaily to activate Campaign Intelligence tool and more
@@ -242,6 +266,10 @@ Docs-only; no code, so no gates run.)_
   whose `main` is protected — until PR #135 merges, work still lands on the fork
   (`git push https://github.com/erkkimarkus/smaily-wordpress-plugin.git
   main:main`), which is that PR's head.
+- **PRO-2292 done** (this file's commit): the setup-completed flag now reads
+  through `SetupState::completed()`. Refactor only, no behaviour change; in the
+  fork = PR #135's head, so it lands in 3.11.2. The release gate is unchanged —
+  it still waits on (b).
 - **PRO-2295 decided:** no rollback rehearsal — `docs/MIGRATION.md` keeps its
   honest hedge that the 3.11.2 → 2.0.0 direction was not rehearsed.
 - Human acceptance on a real legacy store is still open for PRO-2286 (criterion

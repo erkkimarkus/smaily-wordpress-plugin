@@ -354,6 +354,13 @@ was never saved writes NOTHING (WP compares against `get_option()`'s `false` and
 concludes nothing changed) — harmless for a flag that defaults to off, silent
 data loss for one that defaults to ON. This switch is therefore stored as
 `'1'`/`''`. Check this before adding any new default-ON boolean setting.
+**Its twin (PRO-2292):** the setup-completed flag `smly_plus_setup_completed` is
+defined once as `Settings\SetupState::OPTION_SETUP_COMPLETED` and read ONLY
+through `SetupState::completed()` — the live-sync gate, the cart tracker, the
+abandoned-cart sweeper, the Settings redirect, `EnvDetector` and the daily
+contact-sync tick all call it, and the wizard's Finish route writes through the
+same constant. Check this before adding any new gate on either flag: read the
+accessor, never the raw key.
 
 ### Contact-sync language goes through ContactLanguageResolver — never get_user_locale / get_current_language_code (F3-47)
 The Smaily contact `language` code is resolved ONLY by `Support\

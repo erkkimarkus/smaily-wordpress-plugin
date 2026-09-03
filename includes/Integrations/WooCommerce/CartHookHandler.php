@@ -11,6 +11,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 
 defined( 'ABSPATH' ) || exit;
 
+use Smaily\Connect\Settings\SetupState;
 use Smaily\Connect\Smaily\CartSessionStore;
 
 /**
@@ -279,7 +280,7 @@ class CartHookHandler {
 	 * shouldn't collect cart PII either).
 	 */
 	private function tracking_enabled(): bool {
-		if ( ! (bool) get_option( 'smly_plus_setup_completed', false ) ) {
+		if ( ! SetupState::completed() ) {
 			return false;
 		}
 

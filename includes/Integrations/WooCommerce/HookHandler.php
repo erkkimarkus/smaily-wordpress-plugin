@@ -12,6 +12,7 @@ namespace Smaily\Connect\Integrations\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Settings\RecEngineSettings;
+use Smaily\Connect\Settings\SetupState;
 use Smaily\Connect\Smaily\AutomationMarker;
 use Smaily\Connect\Smaily\ContactAudience;
 use Smaily\Connect\Smaily\ContactReconciler;
@@ -65,15 +66,6 @@ class HookHandler {
 	 * registration plugin creates outside WooCommerce's own flows.
 	 */
 	public const FILTER_WELCOME_ELIGIBLE = 'smaily_connect_welcome_eligible';
-
-	/**
-	 * Master gate for the new live-sync path. Until the setup wizard is
-	 * finished, the legacy Smaily_Connect subscriber-sync owns WooCommerce
-	 * events; this handler stays dormant so the two never both fire (P1 #1,
-	 * backward-compat audit). Wizard Finish flips it true and Bootstrap then
-	 * de-registers the legacy hooks — see LegacyHookBridge.
-	 */
-	private const OPTION_SETUP_COMPLETED = 'smly_plus_setup_completed';
 
 	private const OPTION_WELCOME_ENABLED     = 'smly_plus_welcome_enabled';
 	private const OPTION_FIRST_ORDER_ENABLED = 'smly_plus_first_order_enabled';
@@ -461,7 +453,7 @@ class HookHandler {
 	 * visible without spamming production debug.log.
 	 */
 	private function gate_closed(): bool {
-		if ( (bool) get_option( self::OPTION_SETUP_COMPLETED, false ) ) {
+		if ( SetupState::completed() ) {
 			return false;
 		}
 
