@@ -26,7 +26,31 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-04 (**PRO-2292 — the setup-completed flag is read
+_Last updated: 2026-09-04 (**PRO-2288 — the translation template's slug is
+pinned, not read off the checkout directory.** `wp i18n make-pot` derives the
+plugin slug (and from it the `Report-Msgid-Bugs-To` address) from the directory
+name it runs in. Inside the wp-env container that directory IS `smaily-connect`,
+so the committed header was right — but on the HOST path (`WP_CLI_BIN=vendor/bin/
+wp`, which is what `release.yml` takes since PRO-2277) this clone is called
+`connect`, and the header regenerated as
+`https://wordpress.org/support/plugin/connect`. `bin/build-i18n.sh` now passes
+`--slug=smaily-connect` to `make-pot`; reproduced before the fix and both paths
+verified after it — the two headers differ only in `POT-Creation-Date`, and both
+extract the same **571** msgids. The template does not ship and no catalog was
+affected, so this is header hygiene, not a merchant-visible bug. Committed with
+it: the catalog refresh this makes honest — `Project-Id-Version` 3.11.1 → 3.11.2
+and the `#:` line references that drifted with the PRO-2286/PRO-2287/PRO-2298
+edits (`SettingsEndpoint`, `TestConnectionEndpoint`); **no msgid or msgstr moved**
+(570 entries before and after, 0 added, 0 removed, 0 changed translations) — and
+`package-lock.json`'s two `version` fields, still on `2.1.0-beta.2`, set to
+3.11.2. Gates: `npm run ci:strict` **exit=0**. No PHP touched, so no integration
+run. Known, out of scope: the container's and the host's wp-cli disagree on
+whether the plugin-header references carry a line number (`smaily-connect.php`
+vs `…:13`) and on `update-po`'s entry ORDER, so a host regeneration still
+produces a large no-op reordering diff; the committed files stay container-built.
+No version bump — ships in 3.11.2.)_
+
+Prior: 2026-09-04 (**PRO-2292 — the setup-completed flag is read
 through one accessor.** `smly_plus_setup_completed` gated six things and every
 one of them read the option raw with its own spelling; `HookHandler` kept the key
 in a *private* const, so nothing else could reuse it. That is the PRO-1742 bug

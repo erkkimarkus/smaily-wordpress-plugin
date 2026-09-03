@@ -237,19 +237,19 @@ msgstr "Smaily Campaign Intelligence on seadistamata. Lõpeta kõigepealt seadis
 msgid "Stored rec-engine configuration is incomplete. Re-run setup."
 msgstr "Salvestatud soovitusmootori seadistus on puudulik. Käivita seadistamine uuesti."
 
-#: includes/REST/SettingsEndpoint.php:112
+#: includes/REST/SettingsEndpoint.php:113
 msgid "You do not have permission to save Smaily Connect settings."
 msgstr "Sul ei ole õigust Smaily Connecti seadeid salvestada."
 
-#: includes/REST/SettingsEndpoint.php:129
+#: includes/REST/SettingsEndpoint.php:130
 msgid "Unknown settings tab."
 msgstr "Tundmatu seadete vaheleht."
 
-#: includes/REST/SettingsEndpoint.php:141
+#: includes/REST/SettingsEndpoint.php:142
 msgid "Payload must be an object."
 msgstr "Andmekogum (payload) peab olema objekt."
 
-#: includes/REST/SettingsEndpoint.php:208
+#: includes/REST/SettingsEndpoint.php:209
 msgid "Subdomain + username are required."
 msgstr "Alamdomeen ja kasutajanimi on kohustuslikud."
 
@@ -257,11 +257,11 @@ msgstr "Alamdomeen ja kasutajanimi on kohustuslikud."
 msgid "You do not have permission to test the Smaily connection."
 msgstr "Sul ei ole õigust Smaily ühendust testida."
 
-#: includes/REST/TestConnectionEndpoint.php:114
+#: includes/REST/TestConnectionEndpoint.php:129
 msgid "Subdomain, username, and password are required."
 msgstr "Alamdomeen, kasutajanimi ja parool on kohustuslikud."
 
-#: includes/REST/TestConnectionEndpoint.php:150
+#: includes/REST/TestConnectionEndpoint.php:165
 msgid "Smaily did not accept those credentials."
 msgstr "Smaily ei aktsepteerinud neid sisselogimisandmeid."
 
@@ -2577,11 +2577,11 @@ msgstr "Smaily Connect: Smaily keeldub igast päringust, sest selle konto pakett
 msgid "Smaily Connect: Smaily is rejecting the saved API credentials, so contact sync and email automations have stopped. Check the subdomain, API username and password under Settings → Connection."
 msgstr "Smaily Connect: Smaily lükkab salvestatud API-sisselogimisandmed tagasi, mistõttu kontaktide sünkroonimine ja e-posti automatiseeringud on seiskunud. Kontrolli alamdomeeni, API-kasutajanime ja parooli jaotises Settings → Connection."
 
-#: includes/REST/TestConnectionEndpoint.php:140
+#: includes/REST/TestConnectionEndpoint.php:155
 msgid "Smaily refused the request because this account's package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all."
 msgstr "Smaily keeldus päringust, sest selle konto pakett ei sisalda API-ligipääsu. Ühendamiseks uuenda Smailys paketti — enne seda ei saa sisselogimisandmeid üldse kontrollida."
 
-#: includes/REST/TestConnectionEndpoint.php:147
+#: includes/REST/TestConnectionEndpoint.php:162
 msgid "Smaily could not be reached. This looks temporary — try again in a moment."
 msgstr "Smailyni ei jõudnud. See tundub ajutine — proovi hetke pärast uuesti."
 

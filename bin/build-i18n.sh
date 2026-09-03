@@ -45,7 +45,10 @@ node_modules/.bin/esbuild $( find admin/src -name '*.tsx' -o -name '*.ts' | grep
 	--outdir=_i18n-src --outbase=admin/src --format=esm --loader:.ts=ts --loader:.tsx=tsx --log-level=error
 
 echo "2/6  make-pot (PHP + blocks + transpiled admin JS)"
-wpc make-pot . languages/smaily-connect.pot --domain=smaily-connect \
+# --slug pins the header's bug-report address: make-pot otherwise derives the slug
+# from the checkout directory name, which is `smaily-connect` only inside the
+# container (the mounted plugin path) and whatever the clone is called on the host.
+wpc make-pot . languages/smaily-connect.pot --domain=smaily-connect --slug=smaily-connect \
 	--exclude=dist,tests,bin,node_modules,vendor,blocks/checkout-optin/build,blocks/landingpage/build,blocks/newsletter-signup/build
 
 echo "3/6  update-po (merge new strings into ${LANG}.po, preserving existing translations)"
