@@ -65,7 +65,8 @@ uninterrupted" promise in `docs/MIGRATION.md` needs re-stating. Repo change:
 `TESTING.md`'s wp-env commands corrected to `npx @wordpress/env …` (the bare
 `npx wp-env` alias was confirmed live to print a deprecation notice and exit
 without starting — README and DEVELOPER.md already said so). The throwaway env
-was destroyed; the repo's own wp-env containers were never started.)_
+was destroyed; the repo's own wp-env containers were never started.) (handoff
+refreshed 2026-09-03 after the PRO-2287 decision)_
 
 Prior: 2026-09-03 (**PRO-2281 — the developer docs and the release
 runbook now name the official repository.** Erkki's decision today: once PR #135
@@ -90,32 +91,31 @@ Docs-only; no code, so no gates run.)_
 
 **Next session opens with:**
 
-- **Done this session:** PRO-2277 (the release workflow now builds *and verifies*
-  the shippable ZIP), PRO-2280 (pre-merge tidy — readme address, the refreshed
-  PR #135 description drafted for Erkki's nod), PRO-2281 (the developer docs
-  and the release runbook now name the official repository as the working one)
-  and PRO-2285 (the 2.0.0 → v3 upgrade rehearsal — six of six acceptance
-  criteria passed; two merchant-visible findings pending as their own issues:
-  the forced Smaily password re-entry in the wizard's Step 1, and the daily
-  contact-sync tick running before the wizard is finished — both also make
-  `docs/MIGRATION.md` inaccurate).
-- **(a) Erkki, in this order:** merge PR #135 (after the nod on the refreshed
-  description) → bump to a **fresh 3.11.2** (main has behaviour changes since the
-  3.11.1 tag — not a re-tag) → GitHub release on
-  `sendsmaily/smaily-wordpress-plugin` with the **plain** tag `3.11.2`, CI
-  attaches the verified ZIP → `./release.sh -u sendsmaily`. **One-way door:** the
-  wordpress.org publish reaches every legacy install at once. Then the two
-  one-time housekeeping actions PRO-2281 documents but does not perform: archive
-  `erkkimarkus/smaily-wordpress-plugin` read-only, and repoint this checkout's
-  `origin` at the official repo.
-- **(b) Human-acceptance batch** once MiuMjau is updated: PRO-1679,
-  PRO-1680 + PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian
-  admin-strings spot-check (the CI ZIP's `.mo` is host-built — PRO-2277).
-- **(c) PRO-1770** — needs Erkki's list of stores.
-- **(d) GMS-11** — Campaign Intelligence promo text for the wizard's CI step;
-  waiting on the final copy from marketing, then EN+ET.
-- **(e) PRO-1893** — tenant-inactive handling; design nod first.
+- **Done this session:** PRO-2277 (CI-built + verified release ZIP), PRO-2280
+  (pre-merge tidy — readme address, the refreshed PR #135 description POSTED,
+  this block), PRO-2281 (working repo = `sendsmaily/main`; docs + runbook
+  repointed), PRO-2285 (2.0.0 → v3 upgrade rehearsal — all six scenarios pass,
+  two findings filed).
+- **(a) PRO-2286 (High) — FIRST:** an upgrading 2.0.0 store is forced to retype
+  its Smaily API password — the wizard's connection test can't use the stored
+  secret (the save path already can). Fix + correct `docs/MIGRATION.md`.
+  User-visible → design nod before dispatch.
+- **(b) PRO-2287 — decided A** (Erkki, 2026-09-03): gate the daily
+  `smly_plus_contact_sync` tick on `setup_completed` like the live hooks (daily
+  catch-up resumes after wizard confirmation); correct MIGRATION.md. After (a).
+- **(c) PRO-2283 gate** (Erkki's one-way door), blocked on (a)+(b) shipping in
+  3.11.2: merge PR #135 → bump 3.11.2 → official-repo release, plain tag
+  `3.11.2`, CI attaches the verified ZIP → `./release.sh -u sendsmaily`; then
+  update the pilot stores by hand, archive the fork read-only, repoint `origin`.
+- **(d) Human-acceptance batch** once MiuMjau is updated: PRO-1679, PRO-1680 +
+  PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian admin-strings
+  spot-check (the ZIP's `.mo` is host-built — PRO-2277).
+- **(e)** PRO-1770 needs Erkki's list of stores; GMS-11 Campaign Intelligence
+  promo text for the wizard's CI step waits on marketing's final copy, then
+  EN+ET; PRO-1893 tenant-inactive handling needs a design nod first.
 - **Open question:** PRO-1878 awaits the engine team's answer (since 2026-08-10).
+  **Low backlog filed today:** PRO-2279 (Actions majors), PRO-2282 (developer
+  README), PRO-2288 (POT slug on host builds).
 
 Prior: 2026-09-03 (**PRO-2280 — pre-merge tidy ahead of PR #135.**
 Three things go stale the moment the upstream merge lands, fixed now. (1)
