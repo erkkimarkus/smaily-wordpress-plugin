@@ -13,6 +13,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\REST\TestConnectionEndpoint;
+use Smaily\Connect\Settings\CredentialSet;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\RefusalReason;
 use WP_REST_Request;
@@ -71,6 +72,8 @@ final class TestConnectionEndpointTest extends TestCase {
 		self::assertArrayHasKey( 'username', $captured_args['args']['args'] );
 		self::assertArrayHasKey( 'password', $captured_args['args']['args'] );
 		self::assertTrue( $captured_args['args']['args']['subdomain']['required'] );
+		// PRO-2286: an upgraded store tests with the password field empty.
+		self::assertFalse( $captured_args['args']['args']['password']['required'] );
 	}
 
 	public function test_handle_returns_connected_true_when_client_validates_credentials(): void {
@@ -154,16 +157,116 @@ final class TestConnectionEndpointTest extends TestCase {
 		self::assertNotNull( $response->get_data()['error'] );
 	}
 
-	private function endpoint_with_client( string $connection_result ): TestConnectionEndpoint {
+	public function test_handle_reuses_the_stored_password_when_none_was_typed(): void {
+		// PRO-2286: the upgrade path. The wizard never puts the stored
+		// secret in the browser, so Step 1 must be verifiable without it.
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', '' );
+
+		$endpoint = $this->endpoint_with_client(
+			RefusalReason::OK,
+			new CredentialSet( 'demo', 'alice', 'stored-secret' )
+		);
+		$response = $endpoint->handle( $request );
+
+		self::assertTrue( $response->get_data()['connected'] );
+		self::assertSame( 'stored-secret', $endpoint->last_password_used() );
+		self::assertArrayNotHasKey( 'password', $response->get_data() );
+	}
+
+	public function test_handle_reports_failure_when_the_stored_password_no_longer_works(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', '' );
+
+		$endpoint = $this->endpoint_with_client(
+			RefusalReason::CREDENTIALS_REJECTED,
+			new CredentialSet( 'demo', 'alice', 'stale-secret' )
+		);
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		self::assertStringContainsString( 'credentials', (string) $response->get_data()['error'] );
+	}
+
+	public function test_handle_asks_for_the_password_when_the_stored_account_is_a_different_one(): void {
+		// Typing another subdomain/username means another account is being
+		// tested — the stored password must not vouch for it.
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'other' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', '' );
+
+		$endpoint = $this->endpoint_that_refuses_to_build_a_client(
+			new CredentialSet( 'demo', 'alice', 'stored-secret' )
+		);
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		self::assertStringContainsString( 'required', (string) $response->get_data()['error'] );
+	}
+
+	public function test_handle_asks_for_the_password_when_nothing_is_stored(): void {
+		// Real Credentials reader over an empty option — the fresh-install
+		// path, where there is no stored secret to fall back on.
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'subdomain', 'demo' );
+		$request->set_param( 'username', 'alice' );
+		$request->set_param( 'password', '' );
+
+		$endpoint = new class extends TestConnectionEndpoint {
+			protected function build_client( string $subdomain, string $username, string $password ): Client {
+				throw new \RuntimeException( 'Client must not be built without a password' );
+			}
+		};
+
+		$response = $endpoint->handle( $request );
+
+		self::assertFalse( $response->get_data()['connected'] );
+		self::assertStringContainsString( 'required', (string) $response->get_data()['error'] );
+	}
+
+	private function endpoint_that_refuses_to_build_a_client( CredentialSet $stored ): TestConnectionEndpoint {
+		return new class( $stored ) extends TestConnectionEndpoint {
+			private CredentialSet $stored;
+			public function __construct( CredentialSet $stored ) {
+				$this->stored = $stored;
+			}
+			protected function stored_credentials(): ?CredentialSet {
+				return $this->stored;
+			}
+			protected function build_client( string $subdomain, string $username, string $password ): Client {
+				throw new \RuntimeException( 'Client must not be built for a mismatching account' );
+			}
+		};
+	}
+
+	private function endpoint_with_client( string $connection_result, ?CredentialSet $stored = null ): TestConnectionEndpoint {
 		$client = $this->createMock( Client::class );
 		$client->method( 'check_connection' )->willReturn( $connection_result );
 
-		return new class( $client ) extends TestConnectionEndpoint {
+		return new class( $client, $stored ) extends TestConnectionEndpoint {
 			private Client $injected;
-			public function __construct( Client $injected ) {
+			private ?CredentialSet $stored;
+			private string $password_used = '';
+			public function __construct( Client $injected, ?CredentialSet $stored ) {
 				$this->injected = $injected;
+				$this->stored   = $stored;
+			}
+			/** The password the endpoint actually authenticated with. */
+			public function last_password_used(): string {
+				return $this->password_used;
+			}
+			protected function stored_credentials(): ?CredentialSet {
+				return $this->stored;
 			}
 			protected function build_client( string $subdomain, string $username, string $password ): Client {
+				$this->password_used = $password;
 				return $this->injected;
 			}
 		};

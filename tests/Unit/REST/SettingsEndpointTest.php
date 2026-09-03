@@ -139,6 +139,40 @@ final class SettingsEndpointTest extends TestCase {
 		self::assertSame( 'default', $this->option_writes['smly_plus_default_fallback_account'] );
 	}
 
+	public function test_connection_tab_keeps_the_stored_password_when_none_was_typed(): void {
+		// PRO-2286: after a connection test that reused the stored password,
+		// Continue arrives with an empty password field. The secret must
+		// survive that save — otherwise unlocking Steps 2-6 would cost the
+		// merchant the very credentials the test just proved work.
+		$this->option_writes['smaily_connect_api_credentials'] = array(
+			'subdomain' => 'smailydemo',
+			'username'  => 'iedky7',
+			'password'  => 'already-encrypted-blob',
+		);
+
+		$endpoint = new SettingsEndpoint();
+
+		$request = new WP_REST_Request();
+		$request->set_param( 'tab', 'connection' );
+		$request->set_param(
+			'data',
+			array(
+				'smailyCredentials' => array(
+					'subdomain' => 'smailydemo',
+					'username'  => 'iedky7',
+					'password'  => '',
+				),
+			)
+		);
+
+		$response = $endpoint->handle( $request );
+
+		self::assertSame( 200, $response->get_status() );
+		$creds = $this->option_writes['smaily_connect_api_credentials'];
+		self::assertSame( 'already-encrypted-blob', $creds['password'] );
+		self::assertTrue( $this->option_writes['smly_plus_default_connection_verified'] );
+	}
+
 	public function test_connection_tab_rejects_missing_subdomain(): void {
 		$endpoint = new SettingsEndpoint();
 

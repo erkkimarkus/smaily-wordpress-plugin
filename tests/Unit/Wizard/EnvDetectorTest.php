@@ -262,6 +262,14 @@ final class EnvDetectorTest extends TestCase {
 		// Password is BLANK in the boot payload — UI re-enters it manually
 		// if changed; no-op save leaves the stored value untouched.
 		self::assertSame( '', $saved['smailyCredentials']['password'] );
+		// PRO-2286: the wizard is told a usable password EXISTS — never its value.
+		self::assertTrue( $saved['smailyHasStoredPassword'] );
+	}
+
+	public function test_saved_settings_reports_no_stored_password_on_a_fresh_install(): void {
+		$saved = ( new EnvDetector() )->saved_settings();
+
+		self::assertFalse( $saved['smailyHasStoredPassword'] );
 	}
 
 	public function test_saved_settings_carries_default_toggle_values_when_options_absent(): void {
