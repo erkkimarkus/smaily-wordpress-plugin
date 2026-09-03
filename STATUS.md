@@ -26,7 +26,45 @@
 If this file and your memory disagree, trust this file and fix it. The roadmap
 table in README is a high-level view; this is the working register.
 
-_Last updated: 2026-09-03 (**PRO-2277 — the release workflow now builds the
+_Last updated: 2026-09-03 (**PRO-2280 — pre-merge tidy ahead of PR #135.**
+Three things go stale the moment the upstream merge lands, fixed now. (1)
+`readme.txt`'s changelog note pointed merchants at the FORK's releases page for
+the 1.x/2.x history — that history lives upstream, and the Contribute section
+already names `sendsmaily/smaily-wordpress-plugin`; the version-history line now
+does too, so the shipped readme carries one canonical address. No other shipped
+metadata points at the fork as the plugin's home (`Plugin URI` is the smaily.com
+user manual; `composer.json`/`package.json` carry no repository/homepage URL) —
+the remaining `erkkimarkus` mentions are `README.md`'s clone line and dev/history
+docs (DEVELOPER.md, DECISIONS, this file), left alone deliberately. (2) PR #135's
+title and body still described the branch at **v3.10.0**; a refreshed description
+is drafted (current version 3.11.1 + the unreleased packaging work, what shipped
+since v3.10.0 in merchant language, the agreed publish path, the 2026-09-02
+maintainer-access fact) — **drafted only, the PR is untouched** until Erkki nods.
+(3) This file gained the handoff block below. `docs/UPSTREAM_MERGE_PROPOSAL.md`
+remains the reference document and is unchanged apart from one current-state
+line. Docs-only; no code, no gates run (nothing `ci:strict` lints was touched).)_
+
+**Next session opens with:**
+
+- **Done this session:** PRO-2277 (the release workflow now builds *and verifies*
+  the shippable ZIP) and PRO-2280 (this tidy — readme address, the refreshed
+  PR #135 description drafted for Erkki's nod).
+- **(a) Erkki, in this order:** merge PR #135 (after the nod on the refreshed
+  description) → bump to a **fresh 3.11.2** (main has behaviour changes since the
+  3.11.1 tag — not a re-tag) → GitHub release on
+  `sendsmaily/smaily-wordpress-plugin` with the **plain** tag `3.11.2`, CI
+  attaches the verified ZIP → `./release.sh -u sendsmaily`. **One-way door:** the
+  wordpress.org publish reaches every legacy install at once.
+- **(b) Human-acceptance batch** once MiuMjau is updated: PRO-1679,
+  PRO-1680 + PRO-1729, PRO-1681, PRO-1683, PRO-1684, plus an Estonian
+  admin-strings spot-check (the CI ZIP's `.mo` is host-built — PRO-2277).
+- **(c) PRO-1770** — needs Erkki's list of stores.
+- **(d) GMS-11** — Campaign Intelligence promo text for the wizard's CI step;
+  waiting on the final copy from marketing, then EN+ET.
+- **(e) PRO-1893** — tenant-inactive handling; design nod first.
+- **Open question:** PRO-1878 awaits the engine team's answer (since 2026-08-10).
+
+Prior: 2026-09-03 (**PRO-2277 — the release workflow now builds the
 shippable ZIP, and refuses a wrong one.** The ZIP is a six-step build; the old
 `release.yml` ran three of them — no vite pass at all (so no `dist/admin/*` and
 neither storefront bundle), a `compile-translations` calling a bare `wp` that is

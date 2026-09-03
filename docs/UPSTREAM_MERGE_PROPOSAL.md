@@ -21,6 +21,8 @@ GitHub-only update channel by header; an existing install now transitions onto t
 wordpress.org update channel automatically, with no separate cutover step, the moment
 sendsmaily publishes a release version ≥ what's installed.
 
+**Update (2026-09-02):** maintainer access on `sendsmaily/smaily-wordpress-plugin` was granted, so the remaining mechanics are Smaily-side: merge PR #135, cut a fresh **3.11.2**, and create the release under a **plain** version tag (`3.11.2`) — the release workflow now builds and verifies the shippable ZIP itself, and `release.sh` pushes that asset to the wordpress.org SVN.
+
 ---
 
 ## TL;DR
