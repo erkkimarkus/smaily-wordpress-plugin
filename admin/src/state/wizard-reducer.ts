@@ -44,6 +44,7 @@ export const wizardInitialState: WizardState = {
 
   smailyCredentials: { ...emptyCredentials },
   smailyConnection: idleAsync,
+  smailyHasStoredPassword: false,
   multilingualMode: 'single',
   perLanguageAccounts: [],
   defaultFallbackAccountKey: 'default',

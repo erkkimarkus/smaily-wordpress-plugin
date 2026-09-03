@@ -253,15 +253,15 @@ msgstr "Andmekogum (payload) peab olema objekt."
 msgid "Subdomain + username are required."
 msgstr "Alamdomeen ja kasutajanimi on kohustuslikud."
 
-#: includes/REST/TestConnectionEndpoint.php:86
+#: includes/REST/TestConnectionEndpoint.php:93
 msgid "You do not have permission to test the Smaily connection."
 msgstr "Sul ei ole õigust Smaily ühendust testida."
 
-#: includes/REST/TestConnectionEndpoint.php:103
+#: includes/REST/TestConnectionEndpoint.php:114
 msgid "Subdomain, username, and password are required."
 msgstr "Alamdomeen, kasutajanimi ja parool on kohustuslikud."
 
-#: includes/REST/TestConnectionEndpoint.php:139
+#: includes/REST/TestConnectionEndpoint.php:150
 msgid "Smaily did not accept those credentials."
 msgstr "Smaily ei aktsepteerinud neid sisselogimisandmeid."
 
@@ -1391,51 +1391,51 @@ msgstr "Ei õnnestunud laadida: %s"
 msgid "Mark %s as default fallback"
 msgstr "Märgi %s vaikimisi varuvalikuks"
 
-#: admin/src/components/steps/CredentialBlock.tsx:28
+#: admin/src/components/steps/CredentialBlock.tsx:29
 msgid "Connection failed."
 msgstr "Ühendus ebaõnnestus."
 
-#: admin/src/components/steps/CredentialBlock.tsx:45
+#: admin/src/components/steps/CredentialBlock.tsx:51
 msgid "✓ Connected"
 msgstr "✓ Ühendatud"
 
-#: admin/src/components/steps/CredentialBlock.tsx:47
+#: admin/src/components/steps/CredentialBlock.tsx:53
 #: admin/src/components/steps/Step4Recommendations.tsx:195
 msgid "as"
 msgstr "kasutajaga"
 
-#: admin/src/components/steps/CredentialBlock.tsx:57
+#: admin/src/components/steps/CredentialBlock.tsx:63
 msgid "Edit credentials"
 msgstr "Muuda kasutajaandmeid"
 
-#: admin/src/components/steps/CredentialBlock.tsx:63
+#: admin/src/components/steps/CredentialBlock.tsx:69
 msgid "Subdomain"
 msgstr "Alamdomeen"
 
-#: admin/src/components/steps/CredentialBlock.tsx:70
+#: admin/src/components/steps/CredentialBlock.tsx:76
 msgid "mypetshop"
 msgstr "mypetshop"
 
-#: admin/src/components/steps/CredentialBlock.tsx:77
+#: admin/src/components/steps/CredentialBlock.tsx:83
 msgid "API username"
 msgstr "API kasutajanimi"
 
-#: admin/src/components/steps/CredentialBlock.tsx:90
+#: admin/src/components/steps/CredentialBlock.tsx:96
 msgid "API password"
 msgstr "API parool"
 
-#: admin/src/components/steps/CredentialBlock.tsx:113
+#: admin/src/components/steps/CredentialBlock.tsx:120
 #: admin/src/components/steps/Step4Recommendations.tsx:207
 msgid "Test connection"
 msgstr "Testi ühendust"
 
 #. translators: %s is the connected Smaily account name.
-#: admin/src/components/steps/CredentialBlock.tsx:118
+#: admin/src/components/steps/CredentialBlock.tsx:125
 #, js-format
 msgid "Connected: %s"
 msgstr "Ühendatud: %s"
 
-#: admin/src/components/steps/CredentialBlock.tsx:120
+#: admin/src/components/steps/CredentialBlock.tsx:127
 msgid "Connected to Smaily."
 msgstr "Ühendus Smailyga loodud."
 
@@ -1517,22 +1517,22 @@ msgstr "Loo ühendus oma Smaily kontoga"
 msgid "Smaily API credentials"
 msgstr "Smaily API kasutaja andmed"
 
-#: admin/src/components/steps/Step1Connect.tsx:104
+#: admin/src/components/steps/Step1Connect.tsx:105
 msgid "Default fallback account"
 msgstr "Vaikimisi varukonto"
 
-#: admin/src/components/steps/Step1Connect.tsx:105
+#: admin/src/components/steps/Step1Connect.tsx:106
 msgid "Used when a contact's language can't be detected (visitors signing up before WPML/Polylang picks a locale)."
 msgstr "Kasutatakse, kui kontakti keelt ei õnnestu tuvastada (külastajad, kes registreeruvad enne, kui WPML/Polylang lokaadi valib)."
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:130
+#: admin/src/components/steps/Step1Connect.tsx:131
 #, js-format
 msgid "Account for %s"
 msgstr "%s konto"
 
 #. translators: %s is a locale code, e.g. en-US.
-#: admin/src/components/steps/Step1Connect.tsx:135
+#: admin/src/components/steps/Step1Connect.tsx:136
 #, js-format
 msgid "Contacts with the %s locale will sync to this Smaily account."
 msgstr "%s lokaadiga kontaktid sünkroonitakse sellesse Smaily kontosse."
@@ -2577,10 +2577,14 @@ msgstr "Smaily Connect: Smaily keeldub igast päringust, sest selle konto pakett
 msgid "Smaily Connect: Smaily is rejecting the saved API credentials, so contact sync and email automations have stopped. Check the subdomain, API username and password under Settings → Connection."
 msgstr "Smaily Connect: Smaily lükkab salvestatud API-sisselogimisandmed tagasi, mistõttu kontaktide sünkroonimine ja e-posti automatiseeringud on seiskunud. Kontrolli alamdomeeni, API-kasutajanime ja parooli jaotises Settings → Connection."
 
-#: includes/REST/TestConnectionEndpoint.php:129
+#: includes/REST/TestConnectionEndpoint.php:140
 msgid "Smaily refused the request because this account's package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all."
 msgstr "Smaily keeldus päringust, sest selle konto pakett ei sisalda API-ligipääsu. Ühendamiseks uuenda Smailys paketti — enne seda ei saa sisselogimisandmeid üldse kontrollida."
 
-#: includes/REST/TestConnectionEndpoint.php:136
+#: includes/REST/TestConnectionEndpoint.php:147
 msgid "Smaily could not be reached. This looks temporary — try again in a moment."
 msgstr "Smailyni ei jõudnud. See tundub ajutine — proovi hetke pärast uuesti."
+
+#: admin/src/components/steps/CredentialBlock.tsx:108
+msgid "Leave empty to keep using the stored password."
+msgstr "Jäta tühjaks, et kasutada salvestatud parooli."

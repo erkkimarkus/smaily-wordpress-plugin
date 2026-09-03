@@ -56,6 +56,8 @@ export interface ServerEnv {
     // a password input pre-filled with cleartext.
   };
   smailyConnected?: boolean;
+  /** True when the server still holds a usable default password (PRO-2286). */
+  smailyHasStoredPassword?: boolean;
   multilingualMode?: 'single' | 'A' | 'B' | 'C';
   subscriberSyncEnabled?: boolean;
   syncFields?: string[];
@@ -96,6 +98,7 @@ export function buildSettingsInitialState(env: ServerEnv = {}): WizardState {
       username: env.smailyCredentials?.username ?? '',
     },
     smailyConnection: env.smailyConnected ? { kind: 'success' } : idleAsync,
+    smailyHasStoredPassword: env.smailyHasStoredPassword ?? false,
     multilingualMode: env.multilingualMode ?? 'single',
     perLanguageAccounts: [],
     defaultFallbackAccountKey: 'default',

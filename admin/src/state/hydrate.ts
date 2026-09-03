@@ -70,6 +70,12 @@ export interface BootPayload {
      * populated.
      */
     smailyConnected: boolean;
+    /**
+     * True when the server still holds a usable password for the default
+     * account (PRO-2286). Optional for payload compatibility — an old
+     * cached bundle / payload pair must not crash hydrate.
+     */
+    smailyHasStoredPassword?: boolean;
     /** True once the merchant clicked Finish on Step 6 (sub-PR 2.H.18). */
     setupCompleted: boolean;
     multilingualMode: string;
@@ -168,6 +174,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
       },
       smailyCredentials: { ...emptyCredentials },
       smailyConnection: idleAsync,
+      smailyHasStoredPassword: false,
       multilingualMode: 'single',
       perLanguageAccounts: [],
       defaultFallbackAccountKey: 'default',
@@ -234,6 +241,7 @@ export function hydrateState(boot: BootPayload | null, inSettings: boolean): Wiz
     },
     smailyCredentials: { ...s.smailyCredentials },
     smailyConnection: deriveCredentialConnection(s.smailyConnected, s.smailyCredentials),
+    smailyHasStoredPassword: s.smailyHasStoredPassword ?? false,
     multilingualMode: mode,
     perLanguageAccounts: [],
     defaultFallbackAccountKey: s.defaultFallbackAccountKey || 'default',

@@ -17,6 +17,12 @@ export interface CredentialBlockProps {
   onConnectionFailure: (error: string) => void;
   /** Suffix added to input ids so multiple blocks on the page don't collide. */
   idSuffix: string;
+  /**
+   * True when the server still holds a usable password for THIS account
+   * (PRO-2286). Only the default account passes it — per-language and
+   * transactional blocks keep the "type the password" rule.
+   */
+  hasStoredPassword?: boolean;
 }
 
 /**
@@ -41,6 +47,7 @@ export function CredentialBlock({
   onConnectionSuccess,
   onConnectionFailure,
   idSuffix,
+  hasStoredPassword = false,
 }: CredentialBlockProps): React.JSX.Element {
   const { mutate, status, data, error, reset } = useTestConnection();
 
@@ -98,8 +105,31 @@ export function CredentialBlock({
 
   const handleEditClick = (): void => setEditMode('edit');
 
+  // PRO-2286 "upgraded store" UX.
+  //
+  // A store upgraded from the wordpress.org 2.0.0 package has working
+  // credentials, but the password lives only on the server — so the
+  // wizard used to demand a secret the merchant may no longer have just
+  // to unlock Steps 2-6. When the server says it still holds a usable
+  // password, Test connection may run with the field left empty; the
+  // endpoint reuses the stored one. Editing the subdomain or username
+  // means a DIFFERENT account is being tested, so the stored password no
+  // longer applies and today's rule comes back — hence the comparison
+  // against the values hydrate put on screen.
+  const [hydratedAccount] = useState(() => ({
+    subdomain: credentials.subdomain,
+    username: credentials.username,
+  }));
+  const canUseStoredPassword =
+    hasStoredPassword &&
+    credentials.password === '' &&
+    credentials.subdomain === hydratedAccount.subdomain &&
+    credentials.username === hydratedAccount.username;
+
   const isComplete =
-    credentials.subdomain !== '' && credentials.username !== '' && credentials.password !== '';
+    credentials.subdomain !== '' &&
+    credentials.username !== '' &&
+    (credentials.password !== '' || canUseStoredPassword);
 
   if (editMode === 'view' && isVerifiedAndPristine) {
     return (
@@ -150,7 +180,7 @@ export function CredentialBlock({
         </div>
 
         <div>
-          <Label htmlFor={`smaily-password-${idSuffix}`} required>
+          <Label htmlFor={`smaily-password-${idSuffix}`} required={!canUseStoredPassword}>
             { __( 'API password', 'smaily-connect' ) }
           </Label>
           <Input
@@ -161,6 +191,11 @@ export function CredentialBlock({
             autoComplete="new-password"
             className="mt-1"
           />
+          {canUseStoredPassword && (
+            <p className="mt-1 text-xs text-text-secondary">
+              { __( 'Leave empty to keep using the stored password.', 'smaily-connect' ) }
+            </p>
+          )}
         </div>
       </div>
 

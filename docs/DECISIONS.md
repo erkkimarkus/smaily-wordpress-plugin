@@ -5461,6 +5461,54 @@ fix that surfaced the two-address problem), F3-35 (the `Update URI` opt-out that
 was removed ahead of the merge).
 
 
+### PRO-2286 — The connection test reuses the stored password, but only for the account it is stored for (2026-09-04)
+
+**Context:** the PRO-2285 upgrade rehearsal found that a store upgraded from the
+wordpress.org 2.0.0 package cannot get past the wizard's Step 1. Its legacy
+credentials carry over and keep syncing, but
+`smly_plus_default_connection_verified` is only ever written by a new-code
+save, so `smailyConnected` hydrates false and the merchant lands on an empty
+password field — and the
+password is never sent to the browser. Steps 2-6 stay locked until "Test
+connection" succeeds, and `TestConnectionEndpoint` rejected an empty password.
+The save path had always treated an empty inbound password as "keep the stored
+one"; only the test had not, so a merchant without the API password had to mint
+a new Smaily API user to finish setup. ~2,000 stores take this path when 3.11.2
+reaches wordpress.org.
+
+**Decision:** `password` becomes optional on the test-connection route. When it
+arrives empty, the endpoint tests with the password stored for the DEFAULT
+account — but only when the submitted subdomain and username still equal that
+stored set; otherwise it answers exactly as before ("Subdomain, username, and
+password are required."). A stored password Smaily no longer accepts produces
+the ordinary rejection response. `EnvDetector::saved_settings()` publishes one
+new boolean, `smailyHasStoredPassword`; the wizard enables the Test button with
+an empty password only while that flag holds and the account on screen is still
+the hydrated one. The upgraded store is NOT auto-marked connected, and the save
+path is unchanged.
+
+**Rationale:** the subdomain + username match is what keeps the fallback
+honest — a merchant typing a different account into the fields is testing THAT
+account, and must never be told it works because the previous one still does.
+Auto-marking an upgraded store as "connected" without a test was rejected for
+the same reason in reverse: the whole value of Step 1 is that the merchant is
+shown, before anything is saved, that the credentials the store will actually
+use authenticate today. Legacy credentials can be stale (rotated in Smaily, on
+a package that lost API access — PRO-1686), and silently unlocking Steps 2-6 on
+their mere presence moves that discovery to the first failed sync.
+
+**Alternatives considered:** (a) mark an upgraded store connected when a
+credential set exists — rejected, above: it trades a real check for a guess;
+(b) send the stored password to the browser so the field can be pre-filled —
+rejected, secrets never reach the browser (CC-3); (c) accept the fallback for
+any submitted subdomain/username — rejected, it would report success for an
+account that was never tested.
+
+**Relationships:** CC-3 (secrets never leave the server), PRO-2285 (the
+rehearsal that found it), PRO-1686 (why a failed test needs its own reason),
+PRO-2287 (the other rehearsal finding, the daily sync gate).
+
+
 ## How to keep this document going
 
 For every new significant technical decision (as part of a sub-PR plan or

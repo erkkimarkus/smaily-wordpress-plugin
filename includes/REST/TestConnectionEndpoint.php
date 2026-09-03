@@ -12,6 +12,8 @@ namespace Smaily\Connect\REST;
 defined( 'ABSPATH' ) || exit;
 
 use Smaily\Connect\Constants;
+use Smaily\Connect\Settings\CredentialSet;
+use Smaily\Connect\Settings\Credentials;
 use Smaily\Connect\Smaily\Client;
 use Smaily\Connect\Smaily\RefusalReason;
 use WP_Error;
@@ -27,6 +29,10 @@ use WP_REST_Response;
  *     "username":  "alice",
  *     "password":  "s3cret"
  *   }
+ *
+ * `password` is optional. Left empty, the test falls back to the password
+ * already stored for the default account — but only when the submitted
+ * subdomain and username still match that stored set (PRO-2286).
  *
  * Response:
  *   200 OK
@@ -69,7 +75,8 @@ class TestConnectionEndpoint {
 					),
 					'password'  => array(
 						'type'     => 'string',
-						'required' => true,
+						'required' => false,
+						'default'  => '',
 					),
 				),
 			)
@@ -95,6 +102,10 @@ class TestConnectionEndpoint {
 		$subdomain = (string) $request->get_param( 'subdomain' );
 		$username  = (string) $request->get_param( 'username' );
 		$password  = (string) $request->get_param( 'password' );
+
+		if ( $password === '' ) {
+			$password = $this->stored_password_for( $subdomain, $username );
+		}
 
 		if ( $subdomain === '' || $username === '' || $password === '' ) {
 			return new WP_REST_Response(
@@ -137,6 +148,39 @@ class TestConnectionEndpoint {
 		}
 
 		return __( 'Smaily did not accept those credentials.', 'smaily-connect' );
+	}
+
+	/**
+	 * The stored password for the submitted account, or '' when there is
+	 * none to reuse.
+	 *
+	 * PRO-2286: a store upgrading from the wordpress.org 2.0.0 package
+	 * carries working credentials, but the wizard never puts the password
+	 * in the browser — so the merchant had to retype a secret they may
+	 * not have any more just to get past Step 1. The save path already
+	 * treats an empty password as "keep the stored one"; the test now
+	 * does the same.
+	 *
+	 * Scoped to an exact subdomain + username match on purpose: a
+	 * merchant typing a DIFFERENT account into the fields is testing
+	 * that account, and must not be told it works because the old one
+	 * still does.
+	 */
+	private function stored_password_for( string $subdomain, string $username ): string {
+		$stored = $this->stored_credentials();
+
+		if ( $stored === null || $stored->subdomain !== $subdomain || $stored->username !== $username ) {
+			return '';
+		}
+
+		return $stored->password;
+	}
+
+	/**
+	 * Reader split out for testability — same rationale as build_client().
+	 */
+	protected function stored_credentials(): ?CredentialSet {
+		return ( new Credentials() )->get();
 	}
 
 	/**

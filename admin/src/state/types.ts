@@ -277,6 +277,14 @@ export interface WizardState {
   /** Step 1 — Connect. */
   smailyCredentials: SmailyCredentials;
   smailyConnection: AsyncStatus;
+  /**
+   * True when the server still holds a usable password for the default
+   * account (PRO-2286). Set on an upgraded store whose credentials work
+   * but were never verified by the new code — the password input stays
+   * empty and "Test connection" reuses the stored secret. The value
+   * itself never reaches the browser.
+   */
+  smailyHasStoredPassword: boolean;
   multilingualMode: MultilingualMode;
   perLanguageAccounts: ModeAccount[];
   /**

@@ -137,6 +137,7 @@ export function Step1Connect({
           onConnectionSuccess={onDefaultConnSuccess}
           onConnectionFailure={onDefaultConnFailure}
           idSuffix="default"
+          hasStoredPassword={state.smailyHasStoredPassword}
         />
       )}
 
